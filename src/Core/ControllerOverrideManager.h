@@ -80,6 +80,8 @@ public:
         void OpenControllerControlPanel() const;
         bool OpenDeviceProperties(const GUID& guid) const;
 
+        static std::string WideToUtf8(const std::wstring& value);
+
 private:
         ControllerOverrideManager();
 
@@ -95,8 +97,6 @@ private:
         void TryEnumerateWinmmDevices(std::vector<ControllerDeviceInfo>& outDevices) const;
         static GUID CreateWinmmGuid(UINT winmmId);
         static bool NamesEqualIgnoreCase(const std::string& lhs, const std::string& rhs);
-
-        static std::string WideToUtf8(const std::wstring& value);
 
         void BounceTrackedDevices();
         void SendDeviceChangeBroadcast() const;
