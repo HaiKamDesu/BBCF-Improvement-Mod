@@ -28,7 +28,7 @@ namespace
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastObservedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastAppliedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
 
-    bool g_demoEnabled = false;
+    bool g_demoEnabled = true; // Keep the original PoC behavior active by default for now.
     bool g_demoShouldForceP2Forward = false;
 
     uint16_t BuildDirectionFromState(const InputState& state)
@@ -241,8 +241,8 @@ void __declspec(naked) BattleInputWrite_Hook()
 
         push ecx
         push edx
-        push eax // packedInput
         push ebx // playerIndex
+        push eax // packedInput
         call ProcessBattleInput
         add esp, 8
         pop edx

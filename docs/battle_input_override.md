@@ -34,7 +34,7 @@ InputState GetLastAppliedBattleInput(uint32_t playerIndex);
 - **framesToHold** counts down each time the hook writes inputs for that player. `0` keeps the override active until cleared; `N > 0` applies for `N` writes and then disables itself.
 - **Observed vs. applied:** `GetLastObservedBattleInput` records the raw value the game provided, while `GetLastAppliedBattleInput` tracks what we ultimately wrote back (useful for debugging overrides or building a frame buffer later).
 
-A helper `SetBattleInputDemoEnabled(bool)` keeps the original proof-of-concept alive: when enabled, P1 holding down (`2`) forces P2 to walk forward (`6`) for a single frame. It is off by default so new features can opt in when needed.
+A helper `SetBattleInputDemoEnabled(bool)` keeps the original proof-of-concept alive: when enabled, P1 holding down (`2`) forces P2 to walk forward (`6`) for a single frame. It currently defaults **on** so the PoC remains testable; callers can disable it once replacement logic exists.
 
 ## Safety considerations
 - The naked hook only pushes volatile registers (`ecx`, `edx`) before calling the C++ handler and restores them after adjusting the stack. Callee-saved registers (`ebx`, `esi`, `edi`) are untouched beyond the original instruction’s `edi` clobber.
