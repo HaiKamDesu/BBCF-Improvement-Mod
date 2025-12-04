@@ -487,6 +487,65 @@ void MainWindow::DrawControllerSettingSection() const {
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Separates keyboard input from controller slots so they can map to different players.");
 
+        ImGui::VerticalSpacing(3);
+
+        ImGui::HorizontalSpacing();
+        bool multiKeyboardOverride = controllerManager.IsMultipleKeyboardOverrideEnabled();
+        if (ImGui::Checkbox("Multiple keyboards override", &multiKeyboardOverride))
+        {
+                controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
+                Settings::settingsIni.multipleKeyboardOverrideEnabled = multiKeyboardOverride;
+        }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected.");
+
+        if (multiKeyboardOverride)
+        {
+                ImGui::VerticalSpacing(3);
+                ImGui::HorizontalSpacing();
+                const auto& keyboards = controllerManager.GetKeyboardDevices();
+                HANDLE selection = controllerManager.GetPrimaryKeyboardHandle();
+                const KeyboardDeviceInfo* selectedInfo = nullptr;
+
+                for (const auto& device : keyboards)
+                {
+                        if (device.deviceHandle == selection)
+                        {
+                                selectedInfo = &device;
+                                break;
+                        }
+                }
+
+                std::string preview = selectedInfo ? selectedInfo->displayName : "No keyboard selected";
+
+                if (keyboards.empty())
+                {
+                        ImGui::TextDisabled("No keyboards detected.");
+                }
+                else
+                {
+                        if (ImGui::BeginCombo("P1 Keyboard", preview.c_str()))
+                        {
+                                for (const auto& device : keyboards)
+                                {
+                                        bool selected = (selection && selection == device.deviceHandle);
+                                        if (ImGui::Selectable(device.displayName.c_str(), selected))
+                                        {
+                                                controllerManager.SetPrimaryKeyboardHandle(device.deviceHandle);
+                                                selection = device.deviceHandle;
+                                        }
+
+                                        if (selected)
+                                        {
+                                                ImGui::SetItemDefaultFocus();
+                                        }
+                                }
+
+                                ImGui::EndCombo();
+                        }
+                }
+        }
+
         ImGui::VerticalSpacing(5);
 
         if (!inDevelopmentFeaturesEnabled && controllerManager.IsOverrideEnabled())

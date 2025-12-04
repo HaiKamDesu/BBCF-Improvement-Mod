@@ -23,6 +23,8 @@ SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
 SETTING(bool, enableInDevelopmentFeatures, "EnableInDevelopmentFeatures", "0");
 SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
 SETTING(bool, separateKeyboardAndControllers, "SeparateKeyboardAndControllers", "0");
+SETTING(bool, multipleKeyboardOverrideEnabled, "MultipleKeyboardOverrideEnabled", "0");
+SETTING(std::string, primaryKeyboardDeviceId, "PrimaryKeyboardDeviceId", "");
 SETTING(bool, autoUpdateControllers, "AutomaticallyUpdateControllers", "1");
 SETTING(int, uploadReplayData, "UploadReplayData", "-1");
 SETTING(std::string, uploadReplayDataHost, "UploadReplayDataHost", "50.118.225.175");
