@@ -483,7 +483,6 @@ void MainWindow::DrawControllerSettingSection() const {
         if (ImGui::Checkbox("Separate Keyboard and Controllers", &controller_position_swapped)) {
                 controllerManager.SetKeyboardControllerSeparated(controller_position_swapped);
                 Settings::settingsIni.separateKeyboardAndControllers = controller_position_swapped;
-                Settings::changeSetting("SeparateKeyboardAndControllers", controller_position_swapped ? "1" : "0");
         }
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Separates keyboard input from controller slots so they can map to different players.");

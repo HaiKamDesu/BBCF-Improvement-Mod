@@ -152,9 +152,15 @@ bool Settings::loadSettingsFile()
 
 	
 	
-	//modValuessettingsIni.loadStateKeybind
-	
-	return true;
+        if (settingsIni.separateKeyboardAndControllers)
+        {
+                LOG(1, "Settings::loadSettingsFile - SeparateKeyboardAndControllers forced off due to startup crash issue.\n");
+        }
+        settingsIni.separateKeyboardAndControllers = false;
+
+        //modValuessettingsIni.loadStateKeybind
+
+        return true;
 }
 
 void Settings::initSavedSettings()
