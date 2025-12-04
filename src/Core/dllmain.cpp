@@ -7,6 +7,7 @@
 #include "DirectInputWrapper.h"
 
 #include "Hooks/hooks_detours.h"
+#include "Hooks/hooks_battle_input.h"
 #include "Overlay/WindowManager.h"
 
 #include <Windows.h>
@@ -112,14 +113,22 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 
         if (!LoadOriginalDinputDll())
         {
-                MessageBoxA(nullptr, "Could not load original dinput8.dll!", "BBCFIM", MB_OK);
-                ExitProcess(0);
+            MessageBoxA(nullptr, "Could not load original dinput8.dll!", "BBCFIM", MB_OK);
+            ExitProcess(0);
         }
 
         if (!placeHooks_detours())
         {
-                MessageBoxA(nullptr, "Failed IAT hook", "BBCFIM", MB_OK);
-                ExitProcess(0);
+            MessageBoxA(nullptr, "Failed IAT hook", "BBCFIM", MB_OK);
+            ExitProcess(0);
+        }
+
+        // Install battle input hook (P1/P2 input write site)
+        if (!Hook_BattleInput())
+        {
+            // For now, don’t hard-fail the entire mod – just log it.
+            // If you prefer, you can pop a MessageBox+ExitProcess instead.
+            LOG(2, "BBCF_IM_Start: Hook_BattleInput failed; P2 input PoC disabled.\n");
         }
 
         LOG(1, "GetBbcfBaseAdress() = 0x%p\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
