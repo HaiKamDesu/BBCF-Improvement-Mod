@@ -60,8 +60,10 @@ public:
 
         const std::vector<KeyboardDeviceInfo>& GetKeyboardDevices() const;
         const std::vector<KeyboardDeviceInfo>& GetAllKeyboardDevices() const;
-        HANDLE GetPrimaryKeyboardHandle() const;
-        void SetPrimaryKeyboardHandle(HANDLE deviceHandle);
+        const std::vector<HANDLE>& GetP1KeyboardHandles() const;
+        bool IsP1KeyboardHandle(HANDLE deviceHandle) const;
+        void SetP1KeyboardHandleEnabled(HANDLE deviceHandle, bool enabled);
+        void SetP1KeyboardHandles(const std::vector<HANDLE>& deviceHandles);
         void IgnoreKeyboard(const KeyboardDeviceInfo& info);
         void UnignoreKeyboard(const std::string& canonicalId);
         void RenameKeyboard(const KeyboardDeviceInfo& info, const std::string& newName);
@@ -101,7 +103,7 @@ private:
         void ApplyOrderingImpl(std::vector<T>& devices) const;
 
         void EnsureSelectionsValid();
-        void EnsurePrimaryKeyboardValid();
+        void EnsureP1KeyboardsValid();
         bool CollectDevices();
         bool RefreshKeyboardDevices();
         void ApplyKeyboardPreferences(std::vector<KeyboardDeviceInfo>& devices);
@@ -122,6 +124,11 @@ private:
         void ProcessRawInput(HRAWINPUT rawInput);
         void HandleRawInputDeviceChange(HANDLE deviceHandle, bool arrived);
         void EnsureRawKeyboardRegistration();
+        void UpdateP2KeyboardOverride();
+        void UpdateP2KeyboardOverrideLocked();
+        void SeedKeyboardStateForHandle(HANDLE deviceHandle);
+        void UpdateP1KeyboardSelectionLocked(const std::vector<HANDLE>& deviceHandles);
+        bool IsP1KeyboardHandleLocked(HANDLE deviceHandle) const;
 
         std::vector<ControllerDeviceInfo> m_devices;
         GUID m_playerSelections[2];
@@ -139,8 +146,9 @@ private:
         std::vector<KeyboardDeviceInfo> m_allKeyboardDevices;
         std::vector<KeyboardDeviceInfo> m_keyboardDevices;
         std::unordered_map<HANDLE, std::array<BYTE, 256>> m_keyboardStates;
-        HANDLE m_primaryKeyboardHandle = nullptr;
-        std::string m_primaryKeyboardDeviceId;
+        std::vector<HANDLE> m_p1KeyboardHandles;
+        std::unordered_set<HANDLE> m_p1KeyboardHandleSet;
+        std::vector<std::string> m_p1KeyboardDeviceIds;
         std::unordered_set<std::string> m_ignoredKeyboardIds;
         std::unordered_map<std::string, std::string> m_keyboardRenames;
         std::unordered_map<std::string, std::string> m_knownKeyboardNames;
