@@ -9,6 +9,7 @@
 #include <atomic>
 #include <array>
 #include <unordered_map>
+#include <unordered_set>
 
 struct ControllerDeviceInfo
 {
@@ -25,8 +26,12 @@ struct ControllerDeviceInfo
 struct KeyboardDeviceInfo
 {
         HANDLE deviceHandle = nullptr;
+        std::string baseName;
         std::string displayName;
         std::string deviceId;
+        std::string canonicalId;
+        bool ignored = false;
+        bool connected = true;
 };
 
 std::string GuidToString(const GUID& guid);
@@ -54,8 +59,15 @@ public:
         bool IsMultipleKeyboardOverrideEnabled() const { return m_multipleKeyboardOverrideEnabled; }
 
         const std::vector<KeyboardDeviceInfo>& GetKeyboardDevices() const;
+        const std::vector<KeyboardDeviceInfo>& GetAllKeyboardDevices() const;
         HANDLE GetPrimaryKeyboardHandle() const;
         void SetPrimaryKeyboardHandle(HANDLE deviceHandle);
+        void IgnoreKeyboard(const KeyboardDeviceInfo& info);
+        void UnignoreKeyboard(const std::string& canonicalId);
+        void RenameKeyboard(const KeyboardDeviceInfo& info, const std::string& newName);
+
+        std::string GetKeyboardLabelForId(const std::string& canonicalId) const;
+        std::vector<KeyboardDeviceInfo> GetIgnoredKeyboardSnapshot() const;
 
         bool GetFilteredKeyboardState(BYTE* keyStateOut);
 
@@ -92,6 +104,10 @@ private:
         void EnsurePrimaryKeyboardValid();
         bool CollectDevices();
         bool RefreshKeyboardDevices();
+        void ApplyKeyboardPreferences(std::vector<KeyboardDeviceInfo>& devices);
+        void PersistKeyboardIgnores();
+        void PersistKeyboardRenames();
+        void LoadKeyboardPreferences();
         bool TryEnumerateDevicesA(std::vector<ControllerDeviceInfo>& outDevices);
         bool TryEnumerateDevicesW(std::vector<ControllerDeviceInfo>& outDevices);
         void TryEnumerateWinmmDevices(std::vector<ControllerDeviceInfo>& outDevices) const;
@@ -120,10 +136,14 @@ private:
 
         std::vector<IDirectInputDevice8A*> m_trackedDevicesA;
         std::vector<IDirectInputDevice8W*> m_trackedDevicesW;
+        std::vector<KeyboardDeviceInfo> m_allKeyboardDevices;
         std::vector<KeyboardDeviceInfo> m_keyboardDevices;
         std::unordered_map<HANDLE, std::array<BYTE, 256>> m_keyboardStates;
         HANDLE m_primaryKeyboardHandle = nullptr;
         std::string m_primaryKeyboardDeviceId;
+        std::unordered_set<std::string> m_ignoredKeyboardIds;
+        std::unordered_map<std::string, std::string> m_keyboardRenames;
+        std::unordered_map<std::string, std::string> m_knownKeyboardNames;
         bool m_rawKeyboardRegistered = false;
         mutable std::mutex m_deviceMutex;
         mutable std::mutex m_keyboardMutex;
