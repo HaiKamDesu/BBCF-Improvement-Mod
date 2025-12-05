@@ -15,6 +15,22 @@
 #include <hidusage.h>
 #include <Shlwapi.h>
 
+#ifndef WM_INPUT_DEVICE_CHANGE
+#define WM_INPUT_DEVICE_CHANGE 0x00FE
+#endif
+
+#ifndef GIDC_ARRIVAL
+#define GIDC_ARRIVAL 1
+#endif
+
+#ifndef GIDC_REMOVAL
+#define GIDC_REMOVAL 2
+#endif
+
+#ifndef RIDEV_DEVNOTIFY
+#define RIDEV_DEVNOTIFY 0x00002000
+#endif
+
 #include <array>
 #include <algorithm>
 #include <cctype>
