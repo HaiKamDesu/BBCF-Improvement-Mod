@@ -498,7 +498,7 @@ void MainWindow::DrawControllerSettingSection() const {
                 Settings::settingsIni.multipleKeyboardOverrideEnabled = multiKeyboardOverride;
         }
         ImGui::SameLine();
-        ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected.");
+        ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected. All keyboards but this one will be treated as Player 2.");
 
         if (multiKeyboardOverride)
         {
@@ -550,8 +550,8 @@ void MainWindow::DrawControllerSettingSection() const {
                                 ImGui::EndCombo();
                         }
                 }
-
-                ImGui::SameLine();
+                ImGui::VerticalSpacing(1);
+                ImGui::HorizontalSpacing();
                 if (selectedInfo)
                 {
                         if (ImGui::Button("Rename"))
@@ -580,7 +580,8 @@ void MainWindow::DrawControllerSettingSection() const {
                         ImGui::PopItemFlag();
                 }
 
-                ImGui::SameLine();
+                ImGui::VerticalSpacing(1);
+                ImGui::HorizontalSpacing();
                 if (ImGui::Button("Ignored keyboards"))
                 {
                         ignoredListOpen = true;
@@ -629,14 +630,14 @@ void MainWindow::DrawControllerSettingSection() const {
                                 {
                                         for (const auto& dev : ignoredDevices)
                                         {
-                                                ImGui::Text("%s", dev.displayName.c_str());
-                                                ImGui::SameLine();
-                                                ImGui::TextDisabled(dev.connected ? "(connected)" : "(not connected)");
-                                                ImGui::SameLine();
                                                 if (ImGui::Button(std::string("Unignore##" + dev.canonicalId).c_str()))
                                                 {
                                                         controllerManager.UnignoreKeyboard(dev.canonicalId);
                                                 }
+                                                ImGui::SameLine();
+                                                ImGui::TextDisabled(dev.connected ? "(connected)" : "(not connected)");
+                                                ImGui::SameLine();
+                                                ImGui::Text("%s", dev.displayName.c_str());
                                         }
                                 }
                         }
@@ -644,7 +645,7 @@ void MainWindow::DrawControllerSettingSection() const {
                 }
         }
 
-        ImGui::VerticalSpacing(5);
+        ImGui::VerticalSpacing(3);
 
         if (!inDevelopmentFeaturesEnabled && controllerManager.IsOverrideEnabled())
         {
