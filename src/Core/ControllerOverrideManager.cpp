@@ -13,6 +13,7 @@
 #include <dbt.h>
 #include <objbase.h>
 #include <hidusage.h>
+#include <Shlwapi.h>
 
 #include <array>
 #include <algorithm>
@@ -26,6 +27,7 @@
 #include <unordered_set>
 
 #pragma comment(lib, "hid.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 // ===== BBCF internal input glue (SystemManager + re-create controllers) =====
 
@@ -100,6 +102,23 @@ namespace
             return instance;
     }
 
+    std::wstring ResolveIndirectString(const std::wstring& value)
+    {
+            if (value.empty())
+                    return value;
+
+            if (value[0] == L'@')
+            {
+                    wchar_t buffer[256] = {};
+                    if (SUCCEEDED(SHLoadIndirectString(value.c_str(), buffer, ARRAYSIZE(buffer), nullptr)))
+                    {
+                            return buffer;
+                    }
+            }
+
+            return value;
+    }
+
     std::string TryReadRegistryDeviceName(const std::wstring& rawName)
     {
             std::wstring instance = NormalizeRawDeviceInstance(rawName);
@@ -111,23 +130,62 @@ namespace
             if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, regPath.c_str(), 0, KEY_READ, &key) != ERROR_SUCCESS)
                     return {};
 
-            auto readValue = [&](const wchar_t* valueName) -> std::string {
+            auto readValue = [&](const wchar_t* valueName) -> std::wstring {
                     wchar_t buffer[256] = {};
                     DWORD type = 0;
                     DWORD size = sizeof(buffer);
                     if (RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS && type == REG_SZ)
                     {
-                            return ControllerOverrideManager::WideToUtf8(buffer);
+                            return buffer;
                     }
                     return {};
             };
 
-            std::string friendly = readValue(L"FriendlyName");
+            std::wstring friendly = ResolveIndirectString(readValue(L"FriendlyName"));
             if (friendly.empty())
-                    friendly = readValue(L"DeviceDesc");
+                    friendly = ResolveIndirectString(readValue(L"DeviceDesc"));
 
             RegCloseKey(key);
-            return friendly;
+            return ControllerOverrideManager::WideToUtf8(friendly);
+    }
+
+    std::wstring TryReadRegistryContainerId(const std::wstring& rawName)
+    {
+            std::wstring instance = NormalizeRawDeviceInstance(rawName);
+            if (instance.empty())
+                    return {};
+
+            std::wstring regPath = L"SYSTEM\\CurrentControlSet\\Enum\\" + instance;
+            HKEY key = nullptr;
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, regPath.c_str(), 0, KEY_READ, &key) != ERROR_SUCCESS)
+                    return {};
+
+            wchar_t buffer[64] = {};
+            DWORD type = 0;
+            DWORD size = sizeof(buffer);
+            if (RegQueryValueExW(key, L"ContainerID", nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS && type == REG_SZ)
+            {
+                    RegCloseKey(key);
+                    return buffer;
+            }
+
+            RegCloseKey(key);
+            return {};
+    }
+
+    std::wstring BuildKeyboardHint(const std::wstring& rawName)
+    {
+            std::wstring normalized = NormalizeRawDeviceInstance(rawName);
+            if (normalized.empty())
+                    return {};
+
+            size_t lastSlash = normalized.rfind(L'\\');
+            if (lastSlash != std::wstring::npos && lastSlash + 1 < normalized.size())
+            {
+                    return normalized.substr(lastSlash + 1);
+            }
+
+            return normalized;
     }
 
     std::string TryReadHidProductString(const std::wstring& rawName)
@@ -190,18 +248,7 @@ namespace
                     friendly = TryReadHidProductString(rawName);
             }
 
-            std::string utf8Name = ControllerOverrideManager::WideToUtf8(rawName);
-            std::string shortName = utf8Name;
-
-            size_t start = utf8Name.rfind('#');
-            if (start != std::string::npos && start + 1 < utf8Name.size())
-            {
-                    size_t end = utf8Name.find('#', start + 1);
-                    if (end != std::string::npos && end > start + 1)
-                    {
-                            shortName = utf8Name.substr(start + 1, end - start - 1);
-                    }
-            }
+            std::string shortName = ControllerOverrideManager::WideToUtf8(BuildKeyboardHint(rawName));
 
             std::pair<USHORT, USHORT> vidPid = ExtractVidPid(rawName);
 
@@ -217,20 +264,13 @@ namespace
 
             if (vidPid.first || vidPid.second)
             {
-                    oss << " (VID_" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << vidPid.first
-                        << " PID_" << std::setw(4) << vidPid.second << std::dec << ")";
+                    oss << " [" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << vidPid.first
+                        << ":" << std::setw(4) << vidPid.second << std::dec << "]";
             }
 
-            oss << " [h=" << deviceHandle << "]";
-
-            if (info.dwNumberOfFunctionKeys > 0 && info.dwNumberOfIndicators > 0)
+            if (!shortName.empty() && friendly != shortName)
             {
-                    oss << " (" << info.dwNumberOfFunctionKeys << "F/" << info.dwNumberOfIndicators << "led)";
-            }
-
-            if (!friendly.empty())
-            {
-                    oss << " / " << shortName;
+                    oss << " · " << shortName;
             }
 
             return oss.str();
@@ -282,10 +322,15 @@ namespace
                     if (info.dwType != RIM_TYPEKEYBOARD)
                             continue;
 
-                    std::wstring normalized = NormalizeRawDeviceInstance(name);
-                    if (!normalized.empty())
+                    std::wstring canonical = TryReadRegistryContainerId(name);
+                    if (canonical.empty())
                     {
-                            if (!canonicalIds.emplace(normalized).second)
+                            canonical = NormalizeRawDeviceInstance(name);
+                    }
+
+                    if (!canonical.empty())
+                    {
+                            if (!canonicalIds.emplace(canonical).second)
                             {
                                     continue;
                             }
