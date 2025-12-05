@@ -22,6 +22,10 @@
 #include <hidsdi.h>
 #include <sstream>
 #include <cstring>
+#include <iomanip>
+#include <unordered_set>
+
+#pragma comment(lib, "hid.lib")
 
 // ===== BBCF internal input glue (SystemManager + re-create controllers) =====
 
@@ -55,8 +59,137 @@ namespace
         std::wstring name;
     };
 
+    std::wstring StripPrefix(const std::wstring& value, const std::wstring& prefix)
+    {
+            if (value.compare(0, prefix.size(), prefix) == 0)
+            {
+                    return value.substr(prefix.size());
+            }
+            return value;
+    }
+
+    std::wstring NormalizeRawDeviceInstance(const std::wstring& rawName)
+    {
+            std::wstring instance = StripPrefix(rawName, L"\\\\?\\");
+
+            // Drop the trailing interface class GUID portion (#GUID)
+            size_t guidHash = instance.rfind(L'#');
+            if (guidHash != std::wstring::npos)
+            {
+                    instance = instance.substr(0, guidHash);
+            }
+
+            // Normalize separators for the registry path
+            std::replace(instance.begin(), instance.end(), L'#', L'\\');
+
+            // Collapse any collection-specific suffix so multi-collection HID interfaces count as a single device
+            size_t colPos = instance.find(L"&Col");
+            if (colPos != std::wstring::npos)
+            {
+                    size_t nextSlash = instance.find(L'\\', colPos);
+                    if (nextSlash == std::wstring::npos)
+                    {
+                            instance = instance.substr(0, colPos);
+                    }
+                    else
+                    {
+                            instance.erase(colPos, nextSlash - colPos);
+                    }
+            }
+
+            return instance;
+    }
+
+    std::string TryReadRegistryDeviceName(const std::wstring& rawName)
+    {
+            std::wstring instance = NormalizeRawDeviceInstance(rawName);
+            if (instance.empty())
+                    return {};
+
+            std::wstring regPath = L"SYSTEM\\CurrentControlSet\\Enum\\" + instance;
+            HKEY key = nullptr;
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, regPath.c_str(), 0, KEY_READ, &key) != ERROR_SUCCESS)
+                    return {};
+
+            auto readValue = [&](const wchar_t* valueName) -> std::string {
+                    wchar_t buffer[256] = {};
+                    DWORD type = 0;
+                    DWORD size = sizeof(buffer);
+                    if (RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS && type == REG_SZ)
+                    {
+                            return ControllerOverrideManager::WideToUtf8(buffer);
+                    }
+                    return {};
+            };
+
+            std::string friendly = readValue(L"FriendlyName");
+            if (friendly.empty())
+                    friendly = readValue(L"DeviceDesc");
+
+            RegCloseKey(key);
+            return friendly;
+    }
+
+    std::string TryReadHidProductString(const std::wstring& rawName)
+    {
+            HANDLE handle = CreateFileW(rawName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+            {
+                    handle = CreateFileW(rawName.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+            }
+
+            if (handle == INVALID_HANDLE_VALUE)
+                    return {};
+
+            std::wstring product(128, L'\0');
+            if (!HidD_GetProductString(handle, &product[0], static_cast<ULONG>(product.size() * sizeof(wchar_t))))
+            {
+                    CloseHandle(handle);
+                    return {};
+            }
+
+            CloseHandle(handle);
+            if (!product.empty() && product.back() == L'\0')
+            {
+                    product.pop_back();
+            }
+
+            return ControllerOverrideManager::WideToUtf8(product);
+    }
+
+    std::pair<USHORT, USHORT> ExtractVidPid(const std::wstring& rawName)
+    {
+            USHORT vid = 0;
+            USHORT pid = 0;
+
+            auto hexToUshort = [](const std::wstring& text) -> USHORT {
+                    wchar_t* end = nullptr;
+                    unsigned long value = wcstoul(text.c_str(), &end, 16);
+                    if (!end || *end != L'\0' || value > 0xFFFF)
+                            return 0;
+                    return static_cast<USHORT>(value);
+            };
+
+            auto findValue = [&](const std::wstring& key) -> USHORT {
+                    size_t pos = rawName.find(key);
+                    if (pos == std::wstring::npos || pos + key.size() + 4 > rawName.size())
+                            return 0;
+                    return hexToUshort(rawName.substr(pos + key.size(), 4));
+            };
+
+            vid = findValue(L"VID_");
+            pid = findValue(L"PID_");
+            return { vid, pid };
+    }
+
     std::string BuildKeyboardDisplayName(const std::wstring& rawName, HANDLE deviceHandle, const RID_DEVICE_INFO_KEYBOARD& info)
     {
+            std::string friendly = TryReadRegistryDeviceName(rawName);
+            if (friendly.empty())
+            {
+                    friendly = TryReadHidProductString(rawName);
+            }
+
             std::string utf8Name = ControllerOverrideManager::WideToUtf8(rawName);
             std::string shortName = utf8Name;
 
@@ -70,13 +203,34 @@ namespace
                     }
             }
 
+            std::pair<USHORT, USHORT> vidPid = ExtractVidPid(rawName);
+
             std::ostringstream oss;
-            oss << (shortName.empty() ? "Keyboard" : shortName);
+            if (!friendly.empty())
+            {
+                    oss << friendly;
+            }
+            else
+            {
+                    oss << (shortName.empty() ? "Keyboard" : shortName);
+            }
+
+            if (vidPid.first || vidPid.second)
+            {
+                    oss << " (VID_" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << vidPid.first
+                        << " PID_" << std::setw(4) << vidPid.second << std::dec << ")";
+            }
+
             oss << " [h=" << deviceHandle << "]";
 
             if (info.dwNumberOfFunctionKeys > 0 && info.dwNumberOfIndicators > 0)
             {
                     oss << " (" << info.dwNumberOfFunctionKeys << "F/" << info.dwNumberOfIndicators << "led)";
+            }
+
+            if (!friendly.empty())
+            {
+                    oss << " / " << shortName;
             }
 
             return oss.str();
@@ -85,6 +239,7 @@ namespace
     std::vector<KeyboardDeviceInfo> EnumerateKeyboardDevices()
     {
             std::vector<KeyboardDeviceInfo> devices;
+            std::unordered_set<std::wstring> canonicalIds;
 
             UINT deviceCount = 0;
             if (GetRawInputDeviceList(nullptr, &deviceCount, sizeof(RAWINPUTDEVICELIST)) == static_cast<UINT>(-1) || deviceCount == 0)
@@ -126,6 +281,15 @@ namespace
 
                     if (info.dwType != RIM_TYPEKEYBOARD)
                             continue;
+
+                    std::wstring normalized = NormalizeRawDeviceInstance(name);
+                    if (!normalized.empty())
+                    {
+                            if (!canonicalIds.emplace(normalized).second)
+                            {
+                                    continue;
+                            }
+                    }
 
                     KeyboardDeviceInfo deviceInfo{};
                     deviceInfo.deviceHandle = entry.hDevice;
