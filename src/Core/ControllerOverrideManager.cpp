@@ -5,6 +5,7 @@
 #include "Settings.h"
 #include "Core/utils.h"
 #include "Core/interfaces.h"
+#include "Hooks/hooks_battle_input.h"
 
 #include <Shellapi.h>
 #include <dinput.h>
@@ -134,6 +135,27 @@ namespace
             return oss.str();
     }
 
+    std::string SerializeList(const std::vector<std::string>& values)
+    {
+            std::ostringstream oss;
+            bool first = true;
+            for (const auto& value : values)
+            {
+                    if (value.empty())
+                    {
+                            continue;
+                    }
+
+                    if (!first)
+                    {
+                            oss << ';';
+                    }
+                    first = false;
+                    oss << value;
+            }
+            return oss.str();
+    }
+
     std::string SerializeList(const std::unordered_set<std::string>& values)
     {
             std::ostringstream oss;
@@ -148,6 +170,110 @@ namespace
                     oss << value;
             }
             return oss.str();
+    }
+
+    std::vector<std::string> DeduplicateList(const std::vector<std::string>& values)
+    {
+            std::unordered_set<std::string> seen;
+            std::vector<std::string> unique;
+            unique.reserve(values.size());
+
+            for (const auto& value : values)
+            {
+                    if (value.empty())
+                    {
+                            continue;
+                    }
+
+                    if (seen.insert(value).second)
+                    {
+                            unique.push_back(value);
+                    }
+            }
+
+            return unique;
+    }
+
+    enum class InputAction
+    {
+            Up,
+            Down,
+            Left,
+            Right,
+            A,
+            B,
+            C,
+            D,
+            Taunt,
+            Special,
+    };
+
+    struct KeyToAction
+    {
+            uint32_t vk = 0;
+            InputAction action = InputAction::Up;
+    };
+
+    const std::vector<KeyToAction> kDefaultP2KeyboardMapping =
+    {
+            { 'W', InputAction::Up },
+            { 'A', InputAction::Left },
+            { 'S', InputAction::Down },
+            { 'D', InputAction::Right },
+            { 'J', InputAction::A },
+            { 'I', InputAction::B },
+            { 'L', InputAction::C },
+            { 'K', InputAction::D },
+    };
+
+    void MergeInputState(const InputState& src, InputState& dst)
+    {
+            dst.up |= src.up;
+            dst.down |= src.down;
+            dst.left |= src.left;
+            dst.right |= src.right;
+
+            dst.A |= src.A;
+            dst.B |= src.B;
+            dst.C |= src.C;
+            dst.D |= src.D;
+            dst.taunt |= src.taunt;
+            dst.special |= src.special;
+    }
+
+    InputState ApplyMapping(const std::array<BYTE, 256>& keyState, const std::vector<KeyToAction>& mapping)
+    {
+            InputState state{};
+
+            for (const auto& entry : mapping)
+            {
+                    if (entry.vk >= keyState.size())
+                    {
+                            continue;
+                    }
+
+                    if ((keyState[entry.vk] & 0x80) == 0)
+                    {
+                            continue;
+                    }
+
+                    switch (entry.action)
+                    {
+                    case InputAction::Up: state.up = true; break;
+                    case InputAction::Down: state.down = true; break;
+                    case InputAction::Left: state.left = true; break;
+                    case InputAction::Right: state.right = true; break;
+                    case InputAction::A: state.A = true; break;
+                    case InputAction::B: state.B = true; break;
+                    case InputAction::C: state.C = true; break;
+                    case InputAction::D: state.D = true; break;
+                    case InputAction::Taunt: state.taunt = true; break;
+                    case InputAction::Special: state.special = true; break;
+                    default: break;
+                    }
+            }
+
+            return state;
     }
 
     std::wstring StripPrefix(const std::wstring& value, const std::wstring& prefix)
@@ -828,12 +954,12 @@ ControllerOverrideManager::ControllerOverrideManager()
         m_playerSelections[1] = GUID_NULL;
         m_autoRefreshEnabled = Settings::settingsIni.autoUpdateControllers;
         m_multipleKeyboardOverrideEnabled = false;
-        m_primaryKeyboardDeviceId = Settings::settingsIni.primaryKeyboardDeviceId;
+        m_p1KeyboardDeviceIds = DeduplicateList(SplitList(Settings::settingsIni.primaryKeyboardDeviceId));
         LoadKeyboardPreferences();
         LOG(1, "ControllerOverrideManager::ControllerOverrideManager - initializing device list\n");
         RefreshDevices();
         RefreshKeyboardDevices();
-        EnsurePrimaryKeyboardValid();
+        EnsureP1KeyboardsValid();
         if (m_multipleKeyboardOverrideEnabled)
         {
                 EnsureRawKeyboardRegistration();
@@ -938,7 +1064,12 @@ void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
         {
                 EnsureRawKeyboardRegistration();
                 RefreshKeyboardDevices();
-                EnsurePrimaryKeyboardValid();
+                EnsureP1KeyboardsValid();
+                UpdateP2KeyboardOverride();
+        }
+        else
+        {
+                ClearBattleInputOverride(1);
         }
 
         LOG(1, "ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled - enabled=%d\n", enabled ? 1 : 0);
@@ -976,6 +1107,45 @@ const std::vector<KeyboardDeviceInfo>& ControllerOverrideManager::GetAllKeyboard
         return m_allKeyboardDevices;
 }
 
+const std::vector<HANDLE>& ControllerOverrideManager::GetP1KeyboardHandles() const
+{
+        return m_p1KeyboardHandles;
+}
+
+bool ControllerOverrideManager::IsP1KeyboardHandle(HANDLE deviceHandle) const
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        return IsP1KeyboardHandleLocked(deviceHandle);
+}
+
+void ControllerOverrideManager::SetP1KeyboardHandleEnabled(HANDLE deviceHandle, bool enabled)
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+        auto current = m_p1KeyboardHandles;
+
+        auto contains = [&](HANDLE handle) {
+                return std::find(current.begin(), current.end(), handle) != current.end();
+        };
+
+        if (enabled && !contains(deviceHandle))
+        {
+                current.push_back(deviceHandle);
+        }
+        else if (!enabled && contains(deviceHandle))
+        {
+                current.erase(std::remove(current.begin(), current.end(), deviceHandle), current.end());
+        }
+
+        UpdateP1KeyboardSelectionLocked(current);
+}
+
+void ControllerOverrideManager::SetP1KeyboardHandles(const std::vector<HANDLE>& deviceHandles)
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        UpdateP1KeyboardSelectionLocked(deviceHandles);
+}
+
 void ControllerOverrideManager::LoadKeyboardPreferences()
 {
         m_ignoredKeyboardIds.clear();
@@ -1001,41 +1171,6 @@ void ControllerOverrideManager::PersistKeyboardRenames()
         Settings::changeSetting("KeyboardRenameMap", Settings::settingsIni.keyboardRenameMap);
 }
 
-HANDLE ControllerOverrideManager::GetPrimaryKeyboardHandle() const
-{
-        return m_primaryKeyboardHandle;
-}
-
-void ControllerOverrideManager::SetPrimaryKeyboardHandle(HANDLE deviceHandle)
-{
-        std::lock_guard<std::mutex> lock(m_keyboardMutex);
-
-        auto it = std::find_if(m_keyboardDevices.begin(), m_keyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
-                return info.deviceHandle == deviceHandle;
-        });
-
-        if (it == m_keyboardDevices.end())
-        {
-                LOG(1, "ControllerOverrideManager::SetPrimaryKeyboardHandle - device not found handle=%p\n", deviceHandle);
-                return;
-        }
-
-        m_primaryKeyboardHandle = deviceHandle;
-        m_primaryKeyboardDeviceId = it->deviceId;
-        Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
-        Settings::changeSetting("PrimaryKeyboardDeviceId", m_primaryKeyboardDeviceId);
-
-        BYTE seedState[256] = {};
-        if (::GetKeyboardState(seedState))
-        {
-                std::array<BYTE, 256> snapshot{};
-                memcpy(snapshot.data(), seedState, 256);
-                m_keyboardStates[deviceHandle] = snapshot;
-        }
-
-        LOG(1, "ControllerOverrideManager::SetPrimaryKeyboardHandle - selected '%s' handle=%p\n", it->displayName.c_str(), deviceHandle);
-}
-
 void ControllerOverrideManager::IgnoreKeyboard(const KeyboardDeviceInfo& info)
 {
         {
@@ -1054,7 +1189,7 @@ void ControllerOverrideManager::IgnoreKeyboard(const KeyboardDeviceInfo& info)
         }
 
         RefreshKeyboardDevices();
-        EnsurePrimaryKeyboardValid();
+        EnsureP1KeyboardsValid();
 }
 
 void ControllerOverrideManager::UnignoreKeyboard(const std::string& canonicalId)
@@ -1073,7 +1208,7 @@ void ControllerOverrideManager::UnignoreKeyboard(const std::string& canonicalId)
         }
 
         RefreshKeyboardDevices();
-        EnsurePrimaryKeyboardValid();
+        EnsureP1KeyboardsValid();
 }
 
 void ControllerOverrideManager::RenameKeyboard(const KeyboardDeviceInfo& info, const std::string& newName)
@@ -1100,7 +1235,7 @@ void ControllerOverrideManager::RenameKeyboard(const KeyboardDeviceInfo& info, c
         }
 
         RefreshKeyboardDevices();
-        EnsurePrimaryKeyboardValid();
+        EnsureP1KeyboardsValid();
 }
 
 std::string ControllerOverrideManager::GetKeyboardLabelForId(const std::string& canonicalId) const
@@ -1226,7 +1361,7 @@ bool ControllerOverrideManager::RefreshKeyboardDevices()
 
         LOG(1, "ControllerOverrideManager::RefreshKeyboardDevices - end count=%zu->%zu\n", previousCount, m_keyboardDevices.size());
 
-        EnsurePrimaryKeyboardValid();
+        EnsureP1KeyboardsValid();
 
         return previousCount != m_keyboardDevices.size();
 }
@@ -1255,7 +1390,7 @@ void ControllerOverrideManager::RefreshDevicesAndReinitializeGame()
 
     RefreshDevices();
     RefreshKeyboardDevices();
-    EnsurePrimaryKeyboardValid();
+    EnsureP1KeyboardsValid();
     ReinitializeGameInputs();
 
     LOG(1, "ControllerOverrideManager::RefreshDevicesAndReinitializeGame - end\n");
@@ -1447,21 +1582,8 @@ void ControllerOverrideManager::ProcessRawInput(HRAWINPUT rawInput)
                 std::lock_guard<std::mutex> lock(m_keyboardMutex);
                 auto& state = m_keyboardStates[deviceHandle];
                 state[virtualKey] = newState;
-        }
 
-        if (m_multipleKeyboardOverrideEnabled && deviceHandle != m_primaryKeyboardHandle)
-        {
-                std::string deviceName;
-                {
-                        std::lock_guard<std::mutex> lock(m_keyboardMutex);
-                        auto it = std::find_if(m_allKeyboardDevices.begin(), m_allKeyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
-                                return info.deviceHandle == deviceHandle;
-                        });
-
-                        deviceName = (it != m_allKeyboardDevices.end()) ? it->displayName : "Unknown keyboard";
-                }
-
-                LOG(1, "[MultiKeyboard] Ignoring input from device '%s' handle=%p vkey=0x%02X flags=0x%04X\n", deviceName.c_str(), deviceHandle, virtualKey, kb.Flags);
+                UpdateP2KeyboardOverrideLocked();
         }
 }
 
@@ -1508,20 +1630,30 @@ bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)
 
         std::lock_guard<std::mutex> lock(m_keyboardMutex);
 
-        if (!m_primaryKeyboardHandle)
+        UpdateP2KeyboardOverrideLocked();
+
+        if (m_p1KeyboardHandles.empty())
         {
                 ZeroMemory(keyStateOut, 256);
                 return true;
         }
 
-        auto it = m_keyboardStates.find(m_primaryKeyboardHandle);
-        if (it == m_keyboardStates.end())
+        ZeroMemory(keyStateOut, 256);
+
+        for (HANDLE handle : m_p1KeyboardHandles)
         {
-                ZeroMemory(keyStateOut, 256);
-                return true;
+                auto it = m_keyboardStates.find(handle);
+                if (it == m_keyboardStates.end())
+                {
+                        continue;
+                }
+
+                for (size_t i = 0; i < 256; ++i)
+                {
+                        keyStateOut[i] |= it->second[i];
+                }
         }
 
-        memcpy(keyStateOut, it->second.data(), 256);
         return true;
 }
 
@@ -1567,6 +1699,162 @@ void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPA
         default:
                 break;
         }
+}
+
+void ControllerOverrideManager::UpdateP2KeyboardOverride()
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        UpdateP2KeyboardOverrideLocked();
+}
+
+void ControllerOverrideManager::UpdateP2KeyboardOverrideLocked()
+{
+        if (!m_multipleKeyboardOverrideEnabled)
+        {
+                return;
+        }
+
+        InputState aggregated{};
+
+        for (const auto& kvp : m_keyboardStates)
+        {
+                if (IsP1KeyboardHandleLocked(kvp.first))
+                {
+                        continue;
+                }
+
+                auto infoIt = std::find_if(m_allKeyboardDevices.begin(), m_allKeyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                        return info.deviceHandle == kvp.first;
+                });
+
+                if (infoIt != m_allKeyboardDevices.end() && infoIt->ignored)
+                {
+                        continue;
+                }
+
+                const InputState mapped = ApplyMapping(kvp.second, kDefaultP2KeyboardMapping);
+                MergeInputState(mapped, aggregated);
+        }
+
+        OverrideBattleInput(1, aggregated, 1);
+}
+
+bool ControllerOverrideManager::IsP1KeyboardHandleLocked(HANDLE deviceHandle) const
+{
+        return m_p1KeyboardHandleSet.find(deviceHandle) != m_p1KeyboardHandleSet.end();
+}
+
+void ControllerOverrideManager::SeedKeyboardStateForHandle(HANDLE deviceHandle)
+{
+        if (!deviceHandle)
+        {
+                return;
+        }
+
+        if (m_keyboardStates.find(deviceHandle) != m_keyboardStates.end())
+        {
+                return;
+        }
+
+        BYTE seedState[256] = {};
+        if (::GetKeyboardState(seedState))
+        {
+                std::array<BYTE, 256> snapshot{};
+                memcpy(snapshot.data(), seedState, 256);
+                m_keyboardStates[deviceHandle] = snapshot;
+        }
+}
+
+void ControllerOverrideManager::UpdateP1KeyboardSelectionLocked(const std::vector<HANDLE>& deviceHandles)
+{
+        std::vector<HANDLE> filtered;
+        std::vector<std::string> resolvedIds;
+        filtered.reserve(deviceHandles.size());
+        resolvedIds.reserve(deviceHandles.size());
+
+        auto addHandle = [&](HANDLE handle, bool allowIgnored) {
+                if (!handle)
+                {
+                        return;
+                }
+
+                if (std::find(filtered.begin(), filtered.end(), handle) != filtered.end())
+                {
+                        return;
+                }
+
+                auto findInfo = [&](const std::vector<KeyboardDeviceInfo>& list) -> const KeyboardDeviceInfo*
+                {
+                        auto it = std::find_if(list.begin(), list.end(), [&](const KeyboardDeviceInfo& info) {
+                                return info.deviceHandle == handle;
+                        });
+                        return it != list.end() ? &(*it) : nullptr;
+                };
+
+                const KeyboardDeviceInfo* info = findInfo(m_keyboardDevices);
+                if (!info)
+                {
+                        info = findInfo(m_allKeyboardDevices);
+                }
+
+                if (!info)
+                {
+                        return;
+                }
+
+                if (info->ignored && !allowIgnored)
+                {
+                        return;
+                }
+
+                filtered.push_back(handle);
+                resolvedIds.push_back(info->deviceId);
+
+                if (info->ignored && !info->canonicalId.empty())
+                {
+                        auto it = m_ignoredKeyboardIds.find(info->canonicalId);
+                        if (it != m_ignoredKeyboardIds.end())
+                        {
+                                m_ignoredKeyboardIds.erase(it);
+                                PersistKeyboardIgnores();
+                        }
+                }
+
+                SeedKeyboardStateForHandle(handle);
+        };
+
+        for (HANDLE handle : deviceHandles)
+        {
+                addHandle(handle, false);
+        }
+
+        if (filtered.empty() && !m_keyboardDevices.empty())
+        {
+                addHandle(m_keyboardDevices.front().deviceHandle, false);
+        }
+
+        if (filtered.empty() && !m_allKeyboardDevices.empty())
+        {
+                addHandle(m_allKeyboardDevices.front().deviceHandle, true);
+        }
+
+        m_p1KeyboardHandles.swap(filtered);
+
+        m_p1KeyboardHandleSet.clear();
+        for (HANDLE handle : m_p1KeyboardHandles)
+        {
+                m_p1KeyboardHandleSet.insert(handle);
+        }
+
+        m_p1KeyboardDeviceIds = DeduplicateList(resolvedIds);
+
+        Settings::settingsIni.primaryKeyboardDeviceId = SerializeList(m_p1KeyboardDeviceIds);
+        Settings::changeSetting("PrimaryKeyboardDeviceId", Settings::settingsIni.primaryKeyboardDeviceId);
+
+        UpdateP2KeyboardOverrideLocked();
+
+        LOG(1, "ControllerOverrideManager::UpdateP1KeyboardSelectionLocked - selected keyboards=%zu available=%zu all=%zu\n",
+                m_p1KeyboardHandles.size(), m_keyboardDevices.size(), m_allKeyboardDevices.size());
 }
 
 void ControllerOverrideManager::ApplyOrdering(std::vector<DIDEVICEINSTANCEA>& devices) const
@@ -1743,90 +2031,45 @@ void ControllerOverrideManager::EnsureSelectionsValid()
         }
 }
 
-void ControllerOverrideManager::EnsurePrimaryKeyboardValid()
+void ControllerOverrideManager::EnsureP1KeyboardsValid()
 {
     std::lock_guard<std::mutex> lock(m_keyboardMutex);
 
-    auto findByIdIn = [](const std::string& deviceId,
-        const std::vector<KeyboardDeviceInfo>& list) -> HANDLE
-        {
-            for (const auto& info : list)
+    auto findHandleById = [&](const std::string& deviceId) -> HANDLE
+    {
+            auto it = std::find_if(m_keyboardDevices.begin(), m_keyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                    return info.deviceId == deviceId;
+            });
+
+            if (it != m_keyboardDevices.end())
             {
-                if (info.deviceId == deviceId)
-                {
-                    return info.deviceHandle;
-                }
+                    return it->deviceHandle;
             }
-            return nullptr;
-        };
 
-    // If we already have a primary handle and it still exists among
-    // the non-ignored keyboards, keep it.
-    if (m_primaryKeyboardHandle &&
-        std::any_of(m_keyboardDevices.begin(), m_keyboardDevices.end(),
-            [&](const KeyboardDeviceInfo& info) {
-                return info.deviceHandle == m_primaryKeyboardHandle;
-            }))
+            auto allIt = std::find_if(m_allKeyboardDevices.begin(), m_allKeyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                    return info.deviceId == deviceId;
+            });
+
+            return allIt != m_allKeyboardDevices.end() ? allIt->deviceHandle : nullptr;
+    };
+
+    std::vector<HANDLE> resolvedHandles;
+    resolvedHandles.reserve(m_p1KeyboardDeviceIds.size());
+
+    for (const auto& id : m_p1KeyboardDeviceIds)
     {
-        return;
-    }
-
-    HANDLE resolved = nullptr;
-
-    // First try: saved device id among non-ignored keyboards.
-    if (!m_primaryKeyboardDeviceId.empty())
-    {
-        resolved = findByIdIn(m_primaryKeyboardDeviceId, m_keyboardDevices);
-    }
-
-    // Second try: any non-ignored keyboard.
-    if (!resolved && !m_keyboardDevices.empty())
-    {
-        const auto& first = m_keyboardDevices.front();
-        resolved = first.deviceHandle;
-        m_primaryKeyboardDeviceId = first.deviceId;
-    }
-
-    // Last-chance fallback – if we still don't have a primary but
-    // we *do* see some keyboard at all (even if previously ignored),
-    // promote the first one from m_allKeyboardDevices and unignore it.
-    if (!resolved && !m_allKeyboardDevices.empty())
-    {
-        const auto& first = m_allKeyboardDevices.front();
-        resolved = first.deviceHandle;
-        m_primaryKeyboardDeviceId = first.deviceId;
-
-        if (!first.canonicalId.empty())
-        {
-            // Make sure it's no longer ignored so it shows
-            // up in the UI and stays usable.
-            auto it = m_ignoredKeyboardIds.find(first.canonicalId);
-            if (it != m_ignoredKeyboardIds.end())
+            HANDLE handle = findHandleById(id);
+            if (handle)
             {
-                m_ignoredKeyboardIds.erase(it);
-                PersistKeyboardIgnores();
+                    resolvedHandles.push_back(handle);
             }
-        }
     }
 
-    m_primaryKeyboardHandle = resolved;
-    Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
-
-    if (resolved)
-    {
-        BYTE seedState[256] = {};
-        if (::GetKeyboardState(seedState))
-        {
-            std::array<BYTE, 256> snapshot{};
-            memcpy(snapshot.data(), seedState, 256);
-            m_keyboardStates[resolved] = snapshot;
-        }
-    }
+    UpdateP1KeyboardSelectionLocked(resolvedHandles);
 
     LOG(1,
-        "ControllerOverrideManager::EnsurePrimaryKeyboardValid - resolved handle=%p id='%s' devices=%zu allDevices=%zu\n",
-        m_primaryKeyboardHandle, m_primaryKeyboardDeviceId.c_str(),
-        m_keyboardDevices.size(), m_allKeyboardDevices.size());
+        "ControllerOverrideManager::EnsureP1KeyboardsValid - resolved handles=%zu devices=%zu allDevices=%zu\n",
+        m_p1KeyboardHandles.size(), m_keyboardDevices.size(), m_allKeyboardDevices.size());
 }
 
 

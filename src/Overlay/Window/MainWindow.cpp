@@ -497,7 +497,7 @@ void MainWindow::DrawControllerSettingSection() const {
                 controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
         }
         ImGui::SameLine();
-        ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected. All keyboards but this one will be treated as Player 2.");
+        ImGui::ShowHelpMarker("Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using the default WASD/JIKL layout.");
 
         if (multiKeyboardOverride)
         {
@@ -509,19 +509,30 @@ void MainWindow::DrawControllerSettingSection() const {
                 ImGui::VerticalSpacing(3);
                 ImGui::HorizontalSpacing();
                 const auto& keyboards = controllerManager.GetKeyboardDevices();
-                HANDLE selection = controllerManager.GetPrimaryKeyboardHandle();
-                const KeyboardDeviceInfo* selectedInfo = nullptr;
+                std::vector<const KeyboardDeviceInfo*> selectedInfos;
+                selectedInfos.reserve(keyboards.size());
 
                 for (const auto& device : keyboards)
                 {
-                        if (device.deviceHandle == selection)
+                        if (controllerManager.IsP1KeyboardHandle(device.deviceHandle))
                         {
-                                selectedInfo = &device;
-                                break;
+                                selectedInfos.push_back(&device);
                         }
                 }
 
-                std::string preview = selectedInfo ? selectedInfo->displayName : "No keyboard selected";
+                std::string preview;
+                if (selectedInfos.empty())
+                {
+                        preview = "No keyboards selected";
+                }
+                else
+                {
+                        preview = selectedInfos.front()->displayName;
+                        for (size_t i = 1; i < selectedInfos.size(); ++i)
+                        {
+                                preview += ", " + selectedInfos[i]->displayName;
+                        }
+                }
 
                 if (keyboards.empty())
                 {
@@ -529,21 +540,19 @@ void MainWindow::DrawControllerSettingSection() const {
                 }
                 else
                 {
-                        if (ImGui::BeginCombo("P1 Keyboard", preview.c_str()))
+                        if (ImGui::BeginCombo("P1 Keyboards", preview.c_str()))
                         {
                                 for (const auto& device : keyboards)
                                 {
-                                        bool selected = (selection && selection == device.deviceHandle);
-                                        if (ImGui::Selectable(device.displayName.c_str(), selected))
+                                        bool selected = controllerManager.IsP1KeyboardHandle(device.deviceHandle);
+                                        ImGui::PushID(device.canonicalId.c_str());
+                                        if (ImGui::Checkbox("##p1-keyboard", &selected))
                                         {
-                                                controllerManager.SetPrimaryKeyboardHandle(device.deviceHandle);
-                                                selection = device.deviceHandle;
+                                                controllerManager.SetP1KeyboardHandleEnabled(device.deviceHandle, selected);
                                         }
-
-                                        if (selected)
-                                        {
-                                                ImGui::SetItemDefaultFocus();
-                                        }
+                                        ImGui::SameLine();
+                                        ImGui::TextUnformatted(device.displayName.c_str());
+                                        ImGui::PopID();
                                 }
 
                                 ImGui::EndCombo();
@@ -551,6 +560,7 @@ void MainWindow::DrawControllerSettingSection() const {
                 }
                 ImGui::VerticalSpacing(1);
                 ImGui::HorizontalSpacing();
+                const KeyboardDeviceInfo* selectedInfo = selectedInfos.empty() ? nullptr : selectedInfos.front();
                 if (selectedInfo)
                 {
                         if (ImGui::Button("Rename"))
