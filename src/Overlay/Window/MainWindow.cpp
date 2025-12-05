@@ -495,7 +495,6 @@ void MainWindow::DrawControllerSettingSection() const {
         if (ImGui::Checkbox("Multiple keyboards override", &multiKeyboardOverride))
         {
                 controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
-                Settings::settingsIni.multipleKeyboardOverrideEnabled = multiKeyboardOverride;
         }
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected. All keyboards but this one will be treated as Player 2.");

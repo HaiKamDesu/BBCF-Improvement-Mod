@@ -331,26 +331,55 @@ namespace
 
     std::string BuildKeyboardBaseName(const std::wstring& rawName, HANDLE deviceHandle, const RID_DEVICE_INFO_KEYBOARD& info)
     {
-            std::string friendly = TryReadRegistryDeviceName(rawName);
-            if (friendly.empty())
+        std::string friendly = TryReadRegistryDeviceName(rawName);
+
+        // Some systems return INF-style resource strings that SHLoadIndirectString
+        // fails to resolve, e.g. "@keyboard.inf,%hid.keyboarddevice%;HID Keyboard Device".
+        // If we still see a leading '@', strip everything before the last ';'
+        // and keep only the readable tail.
+        if (!friendly.empty() && !friendly.compare(0, 1, "@"))
+        {
+            size_t semi = friendly.rfind(';');
+            if (semi != std::string::npos && semi + 1 < friendly.size())
             {
-                    friendly = TryReadHidProductString(rawName);
+                std::string tail = friendly.substr(semi + 1);
+
+                // trim whitespace around the tail
+                auto isSpace = [](unsigned char c) { return std::isspace(c) != 0; };
+
+                tail.erase(tail.begin(),
+                    std::find_if(tail.begin(), tail.end(),
+                        [&](char c) { return !isSpace((unsigned char)c); }));
+                tail.erase(std::find_if(tail.rbegin(), tail.rend(),
+                    [&](char c) { return !isSpace((unsigned char)c); }).base(),
+                    tail.end());
+
+                if (!tail.empty())
+                {
+                    friendly = tail;
+                }
             }
+        }
 
-            if (!friendly.empty())
-            {
-                    return friendly;
-            }
+        if (friendly.empty())
+        {
+            friendly = TryReadHidProductString(rawName);
+        }
 
-            std::string shortName = ControllerOverrideManager::WideToUtf8(BuildKeyboardHint(rawName));
+        if (!friendly.empty())
+        {
+            return friendly;
+        }
 
-            if (!shortName.empty())
-            {
-                    return shortName;
-            }
+        std::string shortName = ControllerOverrideManager::WideToUtf8(BuildKeyboardHint(rawName));
+        if (!shortName.empty())
+        {
+            return shortName;
+        }
 
-            return "Keyboard";
+        return "Keyboard";
     }
+
 
     std::vector<KeyboardDeviceInfo> EnumerateKeyboardDevices()
     {
@@ -798,7 +827,7 @@ ControllerOverrideManager::ControllerOverrideManager()
         m_playerSelections[0] = GUID_NULL;
         m_playerSelections[1] = GUID_NULL;
         m_autoRefreshEnabled = Settings::settingsIni.autoUpdateControllers;
-        m_multipleKeyboardOverrideEnabled = Settings::settingsIni.multipleKeyboardOverrideEnabled;
+        m_multipleKeyboardOverrideEnabled = false;
         m_primaryKeyboardDeviceId = Settings::settingsIni.primaryKeyboardDeviceId;
         LoadKeyboardPreferences();
         LOG(1, "ControllerOverrideManager::ControllerOverrideManager - initializing device list\n");
@@ -903,7 +932,6 @@ void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
         }
 
         m_multipleKeyboardOverrideEnabled = enabled;
-        Settings::settingsIni.multipleKeyboardOverrideEnabled = enabled;
         Settings::changeSetting("MultipleKeyboardOverrideEnabled", enabled ? "1" : "0");
 
         if (enabled)
@@ -1114,7 +1142,7 @@ std::vector<KeyboardDeviceInfo> ControllerOverrideManager::GetIgnoredKeyboardSna
                         auto knownIt = m_knownKeyboardNames.find(id);
                         info.baseName = (knownIt != m_knownKeyboardNames.end()) ? knownIt->second : id;
                 }
-                info.displayName = info.baseName + " · " + info.deviceId;
+                info.displayName = info.baseName;
                 info.ignored = true;
                 info.connected = false;
 
@@ -1215,10 +1243,6 @@ void ControllerOverrideManager::ApplyKeyboardPreferences(std::vector<KeyboardDev
                         : device.baseName;
 
                 device.displayName = effectiveName;
-                if (!device.deviceId.empty())
-                {
-                        device.displayName += " · " + device.deviceId;
-                }
 
                 device.ignored = m_ignoredKeyboardIds.find(key) != m_ignoredKeyboardIds.end();
                 device.canonicalId = key;
@@ -1721,55 +1745,90 @@ void ControllerOverrideManager::EnsureSelectionsValid()
 
 void ControllerOverrideManager::EnsurePrimaryKeyboardValid()
 {
-        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+    std::lock_guard<std::mutex> lock(m_keyboardMutex);
 
-        auto findById = [&](const std::string& deviceId) -> HANDLE {
-                for (const auto& info : m_keyboardDevices)
+    auto findByIdIn = [](const std::string& deviceId,
+        const std::vector<KeyboardDeviceInfo>& list) -> HANDLE
+        {
+            for (const auto& info : list)
+            {
+                if (info.deviceId == deviceId)
                 {
-                        if (info.deviceId == deviceId)
-                        {
-                                return info.deviceHandle;
-                        }
+                    return info.deviceHandle;
                 }
-                return nullptr;
+            }
+            return nullptr;
         };
 
-        if (m_primaryKeyboardHandle && std::any_of(m_keyboardDevices.begin(), m_keyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
-                        return info.deviceHandle == m_primaryKeyboardHandle;
-                }))
+    // If we already have a primary handle and it still exists among
+    // the non-ignored keyboards, keep it.
+    if (m_primaryKeyboardHandle &&
+        std::any_of(m_keyboardDevices.begin(), m_keyboardDevices.end(),
+            [&](const KeyboardDeviceInfo& info) {
+                return info.deviceHandle == m_primaryKeyboardHandle;
+            }))
+    {
+        return;
+    }
+
+    HANDLE resolved = nullptr;
+
+    // First try: saved device id among non-ignored keyboards.
+    if (!m_primaryKeyboardDeviceId.empty())
+    {
+        resolved = findByIdIn(m_primaryKeyboardDeviceId, m_keyboardDevices);
+    }
+
+    // Second try: any non-ignored keyboard.
+    if (!resolved && !m_keyboardDevices.empty())
+    {
+        const auto& first = m_keyboardDevices.front();
+        resolved = first.deviceHandle;
+        m_primaryKeyboardDeviceId = first.deviceId;
+    }
+
+    // Last-chance fallback – if we still don't have a primary but
+    // we *do* see some keyboard at all (even if previously ignored),
+    // promote the first one from m_allKeyboardDevices and unignore it.
+    if (!resolved && !m_allKeyboardDevices.empty())
+    {
+        const auto& first = m_allKeyboardDevices.front();
+        resolved = first.deviceHandle;
+        m_primaryKeyboardDeviceId = first.deviceId;
+
+        if (!first.canonicalId.empty())
         {
-                return;
+            // Make sure it's no longer ignored so it shows
+            // up in the UI and stays usable.
+            auto it = m_ignoredKeyboardIds.find(first.canonicalId);
+            if (it != m_ignoredKeyboardIds.end())
+            {
+                m_ignoredKeyboardIds.erase(it);
+                PersistKeyboardIgnores();
+            }
         }
+    }
 
-        HANDLE resolved = nullptr;
-        if (!m_primaryKeyboardDeviceId.empty())
+    m_primaryKeyboardHandle = resolved;
+    Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
+
+    if (resolved)
+    {
+        BYTE seedState[256] = {};
+        if (::GetKeyboardState(seedState))
         {
-                resolved = findById(m_primaryKeyboardDeviceId);
+            std::array<BYTE, 256> snapshot{};
+            memcpy(snapshot.data(), seedState, 256);
+            m_keyboardStates[resolved] = snapshot;
         }
+    }
 
-        if (!resolved && !m_keyboardDevices.empty())
-        {
-                resolved = m_keyboardDevices.front().deviceHandle;
-                m_primaryKeyboardDeviceId = m_keyboardDevices.front().deviceId;
-        }
-
-        m_primaryKeyboardHandle = resolved;
-        Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
-
-        if (resolved)
-        {
-                BYTE seedState[256] = {};
-                if (::GetKeyboardState(seedState))
-                {
-                        std::array<BYTE, 256> snapshot{};
-                        memcpy(snapshot.data(), seedState, 256);
-                        m_keyboardStates[resolved] = snapshot;
-                }
-        }
-
-        LOG(1, "ControllerOverrideManager::EnsurePrimaryKeyboardValid - resolved handle=%p id='%s' devices=%zu\n",
-                m_primaryKeyboardHandle, m_primaryKeyboardDeviceId.c_str(), m_keyboardDevices.size());
+    LOG(1,
+        "ControllerOverrideManager::EnsurePrimaryKeyboardValid - resolved handle=%p id='%s' devices=%zu allDevices=%zu\n",
+        m_primaryKeyboardHandle, m_primaryKeyboardDeviceId.c_str(),
+        m_keyboardDevices.size(), m_allKeyboardDevices.size());
 }
+
 
 bool ControllerOverrideManager::CollectDevices()
 {
