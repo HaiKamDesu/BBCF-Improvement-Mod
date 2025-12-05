@@ -13,6 +13,23 @@
 #include <dbt.h>
 #include <objbase.h>
 #include <hidusage.h>
+#include <Shlwapi.h>
+
+#ifndef WM_INPUT_DEVICE_CHANGE
+#define WM_INPUT_DEVICE_CHANGE 0x00FE
+#endif
+
+#ifndef GIDC_ARRIVAL
+#define GIDC_ARRIVAL 1
+#endif
+
+#ifndef GIDC_REMOVAL
+#define GIDC_REMOVAL 2
+#endif
+
+#ifndef RIDEV_DEVNOTIFY
+#define RIDEV_DEVNOTIFY 0x00002000
+#endif
 
 #include <array>
 #include <algorithm>
@@ -20,6 +37,13 @@
 #include <cwctype>
 #include <numeric>
 #include <hidsdi.h>
+#include <sstream>
+#include <cstring>
+#include <iomanip>
+#include <unordered_set>
+
+#pragma comment(lib, "hid.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 // ===== BBCF internal input glue (SystemManager + re-create controllers) =====
 
@@ -52,6 +76,383 @@ namespace
         USHORT productId = 0;
         std::wstring name;
     };
+
+    std::vector<std::string> SplitList(const std::string& value)
+    {
+            std::vector<std::string> entries;
+            size_t start = 0;
+            while (start < value.size())
+            {
+                    size_t sep = value.find(';', start);
+                    std::string token = value.substr(start, sep == std::string::npos ? std::string::npos : sep - start);
+                    if (!token.empty())
+                    {
+                            entries.push_back(token);
+                    }
+                    if (sep == std::string::npos)
+                    {
+                            break;
+                    }
+                    start = sep + 1;
+            }
+            return entries;
+    }
+
+    std::unordered_map<std::string, std::string> ParseRenameMap(const std::string& raw)
+    {
+            std::unordered_map<std::string, std::string> map;
+            for (const auto& entry : SplitList(raw))
+            {
+                    size_t eq = entry.find('=');
+                    if (eq == std::string::npos)
+                    {
+                            continue;
+                    }
+                    std::string key = entry.substr(0, eq);
+                    std::string value = entry.substr(eq + 1);
+                    if (!key.empty() && !value.empty())
+                    {
+                            map[key] = value;
+                    }
+            }
+            return map;
+    }
+
+    std::string SerializeRenameMap(const std::unordered_map<std::string, std::string>& map)
+    {
+            std::ostringstream oss;
+            bool first = true;
+            for (const auto& kvp : map)
+            {
+                    if (!first)
+                    {
+                            oss << ';';
+                    }
+                    first = false;
+                    oss << kvp.first << '=' << kvp.second;
+            }
+            return oss.str();
+    }
+
+    std::string SerializeList(const std::unordered_set<std::string>& values)
+    {
+            std::ostringstream oss;
+            bool first = true;
+            for (const auto& value : values)
+            {
+                    if (!first)
+                    {
+                            oss << ';';
+                    }
+                    first = false;
+                    oss << value;
+            }
+            return oss.str();
+    }
+
+    std::wstring StripPrefix(const std::wstring& value, const std::wstring& prefix)
+    {
+            if (value.compare(0, prefix.size(), prefix) == 0)
+            {
+                    return value.substr(prefix.size());
+            }
+            return value;
+    }
+
+    std::wstring NormalizeRawDeviceInstance(const std::wstring& rawName)
+    {
+            std::wstring instance = StripPrefix(rawName, L"\\\\?\\");
+
+            // Drop the trailing interface class GUID portion (#GUID)
+            size_t guidHash = instance.rfind(L'#');
+            if (guidHash != std::wstring::npos)
+            {
+                    instance = instance.substr(0, guidHash);
+            }
+
+            // Normalize separators for the registry path
+            std::replace(instance.begin(), instance.end(), L'#', L'\\');
+
+            // Collapse any collection-specific suffix so multi-collection HID interfaces count as a single device
+            size_t colPos = instance.find(L"&Col");
+            if (colPos != std::wstring::npos)
+            {
+                    size_t nextSlash = instance.find(L'\\', colPos);
+                    if (nextSlash == std::wstring::npos)
+                    {
+                            instance = instance.substr(0, colPos);
+                    }
+                    else
+                    {
+                            instance.erase(colPos, nextSlash - colPos);
+                    }
+            }
+
+            return instance;
+    }
+
+    std::wstring ResolveIndirectString(const std::wstring& value)
+    {
+            if (value.empty())
+                    return value;
+
+            if (value[0] == L'@')
+            {
+                    wchar_t buffer[256] = {};
+                    if (SUCCEEDED(SHLoadIndirectString(value.c_str(), buffer, ARRAYSIZE(buffer), nullptr)))
+                    {
+                            return buffer;
+                    }
+            }
+
+            return value;
+    }
+
+    std::string TryReadRegistryDeviceName(const std::wstring& rawName)
+    {
+            std::wstring instance = NormalizeRawDeviceInstance(rawName);
+            if (instance.empty())
+                    return {};
+
+            std::wstring regPath = L"SYSTEM\\CurrentControlSet\\Enum\\" + instance;
+            HKEY key = nullptr;
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, regPath.c_str(), 0, KEY_READ, &key) != ERROR_SUCCESS)
+                    return {};
+
+            auto readValue = [&](const wchar_t* valueName) -> std::wstring {
+                    wchar_t buffer[256] = {};
+                    DWORD type = 0;
+                    DWORD size = sizeof(buffer);
+                    if (RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS && type == REG_SZ)
+                    {
+                            return buffer;
+                    }
+                    return {};
+            };
+
+            std::wstring friendly = ResolveIndirectString(readValue(L"FriendlyName"));
+            if (friendly.empty())
+                    friendly = ResolveIndirectString(readValue(L"DeviceDesc"));
+
+            RegCloseKey(key);
+            return ControllerOverrideManager::WideToUtf8(friendly);
+    }
+
+    std::wstring TryReadRegistryContainerId(const std::wstring& rawName)
+    {
+            std::wstring instance = NormalizeRawDeviceInstance(rawName);
+            if (instance.empty())
+                    return {};
+
+            std::wstring regPath = L"SYSTEM\\CurrentControlSet\\Enum\\" + instance;
+            HKEY key = nullptr;
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, regPath.c_str(), 0, KEY_READ, &key) != ERROR_SUCCESS)
+                    return {};
+
+            wchar_t buffer[64] = {};
+            DWORD type = 0;
+            DWORD size = sizeof(buffer);
+            if (RegQueryValueExW(key, L"ContainerID", nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS && type == REG_SZ)
+            {
+                    RegCloseKey(key);
+                    return buffer;
+            }
+
+            RegCloseKey(key);
+            return {};
+    }
+
+    std::wstring BuildKeyboardHint(const std::wstring& rawName)
+    {
+            std::wstring normalized = NormalizeRawDeviceInstance(rawName);
+            if (normalized.empty())
+                    return {};
+
+            size_t lastSlash = normalized.rfind(L'\\');
+            if (lastSlash != std::wstring::npos && lastSlash + 1 < normalized.size())
+            {
+                    return normalized.substr(lastSlash + 1);
+            }
+
+            return normalized;
+    }
+
+    std::string TryReadHidProductString(const std::wstring& rawName)
+    {
+            HANDLE handle = CreateFileW(rawName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+            {
+                    handle = CreateFileW(rawName.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+            }
+
+            if (handle == INVALID_HANDLE_VALUE)
+                    return {};
+
+            std::wstring product(128, L'\0');
+            if (!HidD_GetProductString(handle, &product[0], static_cast<ULONG>(product.size() * sizeof(wchar_t))))
+            {
+                    CloseHandle(handle);
+                    return {};
+            }
+
+            CloseHandle(handle);
+            if (!product.empty() && product.back() == L'\0')
+            {
+                    product.pop_back();
+            }
+
+            return ControllerOverrideManager::WideToUtf8(product);
+    }
+
+    std::pair<USHORT, USHORT> ExtractVidPid(const std::wstring& rawName)
+    {
+            USHORT vid = 0;
+            USHORT pid = 0;
+
+            auto hexToUshort = [](const std::wstring& text) -> USHORT {
+                    wchar_t* end = nullptr;
+                    unsigned long value = wcstoul(text.c_str(), &end, 16);
+                    if (!end || *end != L'\0' || value > 0xFFFF)
+                            return 0;
+                    return static_cast<USHORT>(value);
+            };
+
+            auto findValue = [&](const std::wstring& key) -> USHORT {
+                    size_t pos = rawName.find(key);
+                    if (pos == std::wstring::npos || pos + key.size() + 4 > rawName.size())
+                            return 0;
+                    return hexToUshort(rawName.substr(pos + key.size(), 4));
+            };
+
+            vid = findValue(L"VID_");
+            pid = findValue(L"PID_");
+            return { vid, pid };
+    }
+
+    std::string BuildKeyboardBaseName(const std::wstring& rawName, HANDLE deviceHandle, const RID_DEVICE_INFO_KEYBOARD& info)
+    {
+        std::string friendly = TryReadRegistryDeviceName(rawName);
+
+        // Some systems return INF-style resource strings that SHLoadIndirectString
+        // fails to resolve, e.g. "@keyboard.inf,%hid.keyboarddevice%;HID Keyboard Device".
+        // If we still see a leading '@', strip everything before the last ';'
+        // and keep only the readable tail.
+        if (!friendly.empty() && !friendly.compare(0, 1, "@"))
+        {
+            size_t semi = friendly.rfind(';');
+            if (semi != std::string::npos && semi + 1 < friendly.size())
+            {
+                std::string tail = friendly.substr(semi + 1);
+
+                // trim whitespace around the tail
+                auto isSpace = [](unsigned char c) { return std::isspace(c) != 0; };
+
+                tail.erase(tail.begin(),
+                    std::find_if(tail.begin(), tail.end(),
+                        [&](char c) { return !isSpace((unsigned char)c); }));
+                tail.erase(std::find_if(tail.rbegin(), tail.rend(),
+                    [&](char c) { return !isSpace((unsigned char)c); }).base(),
+                    tail.end());
+
+                if (!tail.empty())
+                {
+                    friendly = tail;
+                }
+            }
+        }
+
+        if (friendly.empty())
+        {
+            friendly = TryReadHidProductString(rawName);
+        }
+
+        if (!friendly.empty())
+        {
+            return friendly;
+        }
+
+        std::string shortName = ControllerOverrideManager::WideToUtf8(BuildKeyboardHint(rawName));
+        if (!shortName.empty())
+        {
+            return shortName;
+        }
+
+        return "Keyboard";
+    }
+
+
+    std::vector<KeyboardDeviceInfo> EnumerateKeyboardDevices()
+    {
+            std::vector<KeyboardDeviceInfo> devices;
+            std::unordered_set<std::wstring> canonicalIds;
+
+            UINT deviceCount = 0;
+            if (GetRawInputDeviceList(nullptr, &deviceCount, sizeof(RAWINPUTDEVICELIST)) == static_cast<UINT>(-1) || deviceCount == 0)
+            {
+                    return devices;
+            }
+
+            std::vector<RAWINPUTDEVICELIST> rawList(deviceCount);
+            if (GetRawInputDeviceList(rawList.data(), &deviceCount, sizeof(RAWINPUTDEVICELIST)) == static_cast<UINT>(-1))
+            {
+                    return devices;
+            }
+
+            for (UINT i = 0; i < deviceCount; ++i)
+            {
+                    const RAWINPUTDEVICELIST& entry = rawList[i];
+                    if (entry.dwType != RIM_TYPEKEYBOARD)
+                            continue;
+
+                    UINT nameLength = 0;
+                    if (GetRawInputDeviceInfoW(entry.hDevice, RIDI_DEVICENAME, nullptr, &nameLength) == static_cast<UINT>(-1) || nameLength == 0)
+                            continue;
+
+                    std::wstring name;
+                    name.resize(nameLength);
+                    if (GetRawInputDeviceInfoW(entry.hDevice, RIDI_DEVICENAME, &name[0], &nameLength) == static_cast<UINT>(-1) || nameLength == 0)
+                            continue;
+
+                    if (!name.empty() && name.back() == L'\0')
+                    {
+                            name.pop_back();
+                    }
+
+                    RID_DEVICE_INFO info{};
+                    info.cbSize = sizeof(info);
+                    UINT infoSize = info.cbSize;
+                    if (GetRawInputDeviceInfoW(entry.hDevice, RIDI_DEVICEINFO, &info, &infoSize) == static_cast<UINT>(-1))
+                            continue;
+
+                    if (info.dwType != RIM_TYPEKEYBOARD)
+                            continue;
+
+                    std::wstring canonical = TryReadRegistryContainerId(name);
+                    if (canonical.empty())
+                    {
+                            canonical = NormalizeRawDeviceInstance(name);
+                    }
+
+                    std::string canonicalUtf8 = ControllerOverrideManager::WideToUtf8(canonical);
+
+                    if (!canonical.empty())
+                    {
+                            if (!canonicalIds.emplace(canonical).second)
+                            {
+                                    continue;
+                            }
+                    }
+
+                    KeyboardDeviceInfo deviceInfo{};
+                    deviceInfo.deviceHandle = entry.hDevice;
+                    deviceInfo.deviceId = ControllerOverrideManager::WideToUtf8(name);
+                    deviceInfo.canonicalId = canonicalUtf8.empty() ? deviceInfo.deviceId : canonicalUtf8;
+                    deviceInfo.baseName = BuildKeyboardBaseName(name, entry.hDevice, info.keyboard);
+                    devices.push_back(std::move(deviceInfo));
+            }
+
+            return devices;
+    }
 
     constexpr uintptr_t BBCF_SYSTEM_MANAGER_PTR_OFFSET = 0x008929C8;
     constexpr uintptr_t BBCF_CREATE_PADS_OFFSET = 0x000722C0;
@@ -426,8 +827,17 @@ ControllerOverrideManager::ControllerOverrideManager()
         m_playerSelections[0] = GUID_NULL;
         m_playerSelections[1] = GUID_NULL;
         m_autoRefreshEnabled = Settings::settingsIni.autoUpdateControllers;
+        m_multipleKeyboardOverrideEnabled = false;
+        m_primaryKeyboardDeviceId = Settings::settingsIni.primaryKeyboardDeviceId;
+        LoadKeyboardPreferences();
         LOG(1, "ControllerOverrideManager::ControllerOverrideManager - initializing device list\n");
         RefreshDevices();
+        RefreshKeyboardDevices();
+        EnsurePrimaryKeyboardValid();
+        if (m_multipleKeyboardOverrideEnabled)
+        {
+                EnsureRawKeyboardRegistration();
+        }
         SetKeyboardControllerSeparated(Settings::settingsIni.separateKeyboardAndControllers);
 }
 
@@ -514,6 +924,26 @@ void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
         m_keyboardControllerSeparated = enabled;
 }
 
+void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
+{
+        if (m_multipleKeyboardOverrideEnabled == enabled)
+        {
+                return;
+        }
+
+        m_multipleKeyboardOverrideEnabled = enabled;
+        Settings::changeSetting("MultipleKeyboardOverrideEnabled", enabled ? "1" : "0");
+
+        if (enabled)
+        {
+                EnsureRawKeyboardRegistration();
+                RefreshKeyboardDevices();
+                EnsurePrimaryKeyboardValid();
+        }
+
+        LOG(1, "ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled - enabled=%d\n", enabled ? 1 : 0);
+}
+
 void ControllerOverrideManager::SetPlayerSelection(int playerIndex, const GUID& guid)
 {
         if (playerIndex < 0 || playerIndex > 1)
@@ -536,6 +966,205 @@ const std::vector<ControllerDeviceInfo>& ControllerOverrideManager::GetDevices()
         return m_devices;
 }
 
+const std::vector<KeyboardDeviceInfo>& ControllerOverrideManager::GetKeyboardDevices() const
+{
+        return m_keyboardDevices;
+}
+
+const std::vector<KeyboardDeviceInfo>& ControllerOverrideManager::GetAllKeyboardDevices() const
+{
+        return m_allKeyboardDevices;
+}
+
+void ControllerOverrideManager::LoadKeyboardPreferences()
+{
+        m_ignoredKeyboardIds.clear();
+        m_keyboardRenames.clear();
+
+        for (const auto& id : SplitList(Settings::settingsIni.ignoredKeyboardIds))
+        {
+                m_ignoredKeyboardIds.insert(id);
+        }
+
+        m_keyboardRenames = ParseRenameMap(Settings::settingsIni.keyboardRenameMap);
+}
+
+void ControllerOverrideManager::PersistKeyboardIgnores()
+{
+        Settings::settingsIni.ignoredKeyboardIds = SerializeList(m_ignoredKeyboardIds);
+        Settings::changeSetting("IgnoredKeyboardIds", Settings::settingsIni.ignoredKeyboardIds);
+}
+
+void ControllerOverrideManager::PersistKeyboardRenames()
+{
+        Settings::settingsIni.keyboardRenameMap = SerializeRenameMap(m_keyboardRenames);
+        Settings::changeSetting("KeyboardRenameMap", Settings::settingsIni.keyboardRenameMap);
+}
+
+HANDLE ControllerOverrideManager::GetPrimaryKeyboardHandle() const
+{
+        return m_primaryKeyboardHandle;
+}
+
+void ControllerOverrideManager::SetPrimaryKeyboardHandle(HANDLE deviceHandle)
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+        auto it = std::find_if(m_keyboardDevices.begin(), m_keyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                return info.deviceHandle == deviceHandle;
+        });
+
+        if (it == m_keyboardDevices.end())
+        {
+                LOG(1, "ControllerOverrideManager::SetPrimaryKeyboardHandle - device not found handle=%p\n", deviceHandle);
+                return;
+        }
+
+        m_primaryKeyboardHandle = deviceHandle;
+        m_primaryKeyboardDeviceId = it->deviceId;
+        Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
+        Settings::changeSetting("PrimaryKeyboardDeviceId", m_primaryKeyboardDeviceId);
+
+        BYTE seedState[256] = {};
+        if (::GetKeyboardState(seedState))
+        {
+                std::array<BYTE, 256> snapshot{};
+                memcpy(snapshot.data(), seedState, 256);
+                m_keyboardStates[deviceHandle] = snapshot;
+        }
+
+        LOG(1, "ControllerOverrideManager::SetPrimaryKeyboardHandle - selected '%s' handle=%p\n", it->displayName.c_str(), deviceHandle);
+}
+
+void ControllerOverrideManager::IgnoreKeyboard(const KeyboardDeviceInfo& info)
+{
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+                const std::string key = info.canonicalId.empty() ? info.deviceId : info.canonicalId;
+                if (key.empty())
+                {
+                        return;
+                }
+
+                if (m_ignoredKeyboardIds.insert(key).second)
+                {
+                        PersistKeyboardIgnores();
+                }
+        }
+
+        RefreshKeyboardDevices();
+        EnsurePrimaryKeyboardValid();
+}
+
+void ControllerOverrideManager::UnignoreKeyboard(const std::string& canonicalId)
+{
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+                auto it = m_ignoredKeyboardIds.find(canonicalId);
+                if (it == m_ignoredKeyboardIds.end())
+                {
+                        return;
+                }
+
+                m_ignoredKeyboardIds.erase(it);
+                PersistKeyboardIgnores();
+        }
+
+        RefreshKeyboardDevices();
+        EnsurePrimaryKeyboardValid();
+}
+
+void ControllerOverrideManager::RenameKeyboard(const KeyboardDeviceInfo& info, const std::string& newName)
+{
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+                const std::string key = info.canonicalId.empty() ? info.deviceId : info.canonicalId;
+                if (key.empty())
+                {
+                        return;
+                }
+
+                if (newName.empty())
+                {
+                        m_keyboardRenames.erase(key);
+                }
+                else
+                {
+                        m_keyboardRenames[key] = newName;
+                }
+
+                PersistKeyboardRenames();
+        }
+
+        RefreshKeyboardDevices();
+        EnsurePrimaryKeyboardValid();
+}
+
+std::string ControllerOverrideManager::GetKeyboardLabelForId(const std::string& canonicalId) const
+{
+        auto renameIt = m_keyboardRenames.find(canonicalId);
+        if (renameIt != m_keyboardRenames.end() && !renameIt->second.empty())
+        {
+                return renameIt->second;
+        }
+
+        auto knownIt = m_knownKeyboardNames.find(canonicalId);
+        if (knownIt != m_knownKeyboardNames.end())
+        {
+                return knownIt->second;
+        }
+
+        return canonicalId;
+}
+
+std::vector<KeyboardDeviceInfo> ControllerOverrideManager::GetIgnoredKeyboardSnapshot() const
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+        std::vector<KeyboardDeviceInfo> snapshot;
+        snapshot.reserve(m_ignoredKeyboardIds.size());
+
+        for (const auto& id : m_ignoredKeyboardIds)
+        {
+                KeyboardDeviceInfo info{};
+                info.canonicalId = id;
+                info.deviceId = id;
+                auto renameIt = m_keyboardRenames.find(id);
+                if (renameIt != m_keyboardRenames.end() && !renameIt->second.empty())
+                {
+                        info.baseName = renameIt->second;
+                }
+                else
+                {
+                        auto knownIt = m_knownKeyboardNames.find(id);
+                        info.baseName = (knownIt != m_knownKeyboardNames.end()) ? knownIt->second : id;
+                }
+                info.displayName = info.baseName;
+                info.ignored = true;
+                info.connected = false;
+
+                auto it = std::find_if(m_allKeyboardDevices.begin(), m_allKeyboardDevices.end(), [&](const KeyboardDeviceInfo& candidate) {
+                        return candidate.canonicalId == id;
+                });
+
+                if (it != m_allKeyboardDevices.end())
+                {
+                        info.connected = true;
+                        info.deviceHandle = it->deviceHandle;
+                        info.deviceId = it->deviceId;
+                        info.displayName = it->displayName;
+                        info.baseName = it->baseName;
+                }
+
+                snapshot.push_back(info);
+        }
+
+        return snapshot;
+}
+
 bool ControllerOverrideManager::RefreshDevices()
 {
         LOG(1, "ControllerOverrideManager::RefreshDevices - begin (override=%d)\n", m_overrideEnabled ? 1 : 0);
@@ -549,11 +1178,84 @@ bool ControllerOverrideManager::RefreshDevices()
         return devicesChanged;
 }
 
+bool ControllerOverrideManager::RefreshKeyboardDevices()
+{
+        LOG(1, "ControllerOverrideManager::RefreshKeyboardDevices - begin\n");
+
+        std::vector<KeyboardDeviceInfo> devices = EnumerateKeyboardDevices();
+
+        ApplyKeyboardPreferences(devices);
+
+        size_t previousCount = 0;
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+                m_allKeyboardDevices = devices;
+                std::vector<KeyboardDeviceInfo> filtered;
+                filtered.reserve(devices.size());
+
+                previousCount = m_keyboardDevices.size();
+                for (auto& info : devices)
+                {
+                        m_knownKeyboardNames[info.canonicalId] = info.baseName;
+
+                        if (!info.ignored)
+                        {
+                                filtered.push_back(info);
+                        }
+                }
+
+                m_keyboardDevices.swap(filtered);
+
+                for (auto it = m_keyboardStates.begin(); it != m_keyboardStates.end();)
+                {
+                        auto exists = std::any_of(m_keyboardDevices.begin(), m_keyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                                return info.deviceHandle == it->first;
+                        });
+
+                        if (!exists)
+                        {
+                                it = m_keyboardStates.erase(it);
+                        }
+                        else
+                        {
+                                ++it;
+                        }
+                }
+        }
+
+        LOG(1, "ControllerOverrideManager::RefreshKeyboardDevices - end count=%zu->%zu\n", previousCount, m_keyboardDevices.size());
+
+        EnsurePrimaryKeyboardValid();
+
+        return previousCount != m_keyboardDevices.size();
+}
+
+void ControllerOverrideManager::ApplyKeyboardPreferences(std::vector<KeyboardDeviceInfo>& devices)
+{
+        for (auto& device : devices)
+        {
+                const std::string key = device.canonicalId.empty() ? device.deviceId : device.canonicalId;
+
+                auto renameIt = m_keyboardRenames.find(key);
+                const std::string& effectiveName = (renameIt != m_keyboardRenames.end() && !renameIt->second.empty())
+                        ? renameIt->second
+                        : device.baseName;
+
+                device.displayName = effectiveName;
+
+                device.ignored = m_ignoredKeyboardIds.find(key) != m_ignoredKeyboardIds.end();
+                device.canonicalId = key;
+        }
+}
+
 void ControllerOverrideManager::RefreshDevicesAndReinitializeGame()
 {
     LOG(1, "ControllerOverrideManager::RefreshDevicesAndReinitializeGame - begin\n");
 
     RefreshDevices();
+    RefreshKeyboardDevices();
+    EnsurePrimaryKeyboardValid();
     ReinitializeGameInputs();
 
     LOG(1, "ControllerOverrideManager::RefreshDevicesAndReinitializeGame - end\n");
@@ -700,8 +1402,153 @@ void ControllerOverrideManager::ProcessPendingDeviceChange()
         }
 }
 
+void ControllerOverrideManager::ProcessRawInput(HRAWINPUT rawInput)
+{
+        if (!rawInput)
+        {
+                return;
+        }
+
+        if (!m_multipleKeyboardOverrideEnabled)
+        {
+                return;
+        }
+
+        UINT size = 0;
+        if (GetRawInputData(rawInput, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER)) != 0 || size == 0)
+        {
+                return;
+        }
+
+        std::vector<BYTE> buffer(size);
+        if (GetRawInputData(rawInput, RID_INPUT, buffer.data(), &size, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1) || size == 0)
+        {
+                return;
+        }
+
+        RAWINPUT* data = reinterpret_cast<RAWINPUT*>(buffer.data());
+        if (!data || data->header.dwType != RIM_TYPEKEYBOARD)
+        {
+                return;
+        }
+
+        const RAWKEYBOARD& kb = data->data.keyboard;
+        USHORT virtualKey = kb.VKey;
+        if (virtualKey == 0 || virtualKey >= 256)
+        {
+                return;
+        }
+
+        const bool isBreak = (kb.Flags & RI_KEY_BREAK) != 0;
+        const BYTE newState = isBreak ? 0x00 : 0x80;
+        HANDLE deviceHandle = data->header.hDevice;
+
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+                auto& state = m_keyboardStates[deviceHandle];
+                state[virtualKey] = newState;
+        }
+
+        if (m_multipleKeyboardOverrideEnabled && deviceHandle != m_primaryKeyboardHandle)
+        {
+                std::string deviceName;
+                {
+                        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+                        auto it = std::find_if(m_allKeyboardDevices.begin(), m_allKeyboardDevices.end(), [&](const KeyboardDeviceInfo& info) {
+                                return info.deviceHandle == deviceHandle;
+                        });
+
+                        deviceName = (it != m_allKeyboardDevices.end()) ? it->displayName : "Unknown keyboard";
+                }
+
+                LOG(1, "[MultiKeyboard] Ignoring input from device '%s' handle=%p vkey=0x%02X flags=0x%04X\n", deviceName.c_str(), deviceHandle, virtualKey, kb.Flags);
+        }
+}
+
+void ControllerOverrideManager::HandleRawInputDeviceChange(HANDLE deviceHandle, bool arrived)
+{
+        LOG(1, "ControllerOverrideManager::HandleRawInputDeviceChange - handle=%p arrived=%d\n", deviceHandle, arrived ? 1 : 0);
+        RefreshKeyboardDevices();
+}
+
+void ControllerOverrideManager::EnsureRawKeyboardRegistration()
+{
+        if (m_rawKeyboardRegistered)
+        {
+                return;
+        }
+
+        if (!g_gameProc.hWndGameWindow)
+        {
+                LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - missing game window\n");
+                return;
+        }
+
+        RAWINPUTDEVICE device{};
+        device.usUsagePage = HID_USAGE_PAGE_GENERIC;
+        device.usUsage = HID_USAGE_GENERIC_KEYBOARD;
+        device.dwFlags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY;
+        device.hwndTarget = g_gameProc.hWndGameWindow;
+
+        m_rawKeyboardRegistered = RegisterRawInputDevices(&device, 1, sizeof(RAWINPUTDEVICE)) == TRUE;
+        LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - registered=%d hwnd=%p\n", m_rawKeyboardRegistered ? 1 : 0, g_gameProc.hWndGameWindow);
+}
+
+bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)
+{
+        if (!keyStateOut)
+        {
+                return false;
+        }
+
+        if (!m_multipleKeyboardOverrideEnabled)
+        {
+                return ::GetKeyboardState(keyStateOut) == TRUE;
+        }
+
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+        if (!m_primaryKeyboardHandle)
+        {
+                ZeroMemory(keyStateOut, 256);
+                return true;
+        }
+
+        auto it = m_keyboardStates.find(m_primaryKeyboardHandle);
+        if (it == m_keyboardStates.end())
+        {
+                ZeroMemory(keyStateOut, 256);
+                return true;
+        }
+
+        memcpy(keyStateOut, it->second.data(), 256);
+        return true;
+}
+
 void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam)
 {
+        if (m_multipleKeyboardOverrideEnabled && !m_rawKeyboardRegistered)
+        {
+                EnsureRawKeyboardRegistration();
+        }
+
+        if (msg == WM_INPUT)
+        {
+                if (m_multipleKeyboardOverrideEnabled)
+                {
+                        EnsureRawKeyboardRegistration();
+                        ProcessRawInput(reinterpret_cast<HRAWINPUT>(lParam));
+                }
+                return;
+        }
+
+        if (msg == WM_INPUT_DEVICE_CHANGE)
+        {
+                EnsureRawKeyboardRegistration();
+                HandleRawInputDeviceChange(reinterpret_cast<HANDLE>(lParam), wParam == GIDC_ARRIVAL);
+                return;
+        }
+
         if (msg != WM_DEVICECHANGE)
         {
                 return;
@@ -715,6 +1562,7 @@ void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPA
                 LOG(1, "ControllerOverrideManager::HandleWindowMessage - WM_DEVICECHANGE wParam=0x%08lX lParam=0x%08lX\n", wParam, lParam);
                 m_deviceChangeQueued = true;
                 ProcessPendingDeviceChange();
+                RefreshKeyboardDevices();
                 break;
         default:
                 break;
@@ -894,6 +1742,93 @@ void ControllerOverrideManager::EnsureSelectionsValid()
                 }
         }
 }
+
+void ControllerOverrideManager::EnsurePrimaryKeyboardValid()
+{
+    std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+    auto findByIdIn = [](const std::string& deviceId,
+        const std::vector<KeyboardDeviceInfo>& list) -> HANDLE
+        {
+            for (const auto& info : list)
+            {
+                if (info.deviceId == deviceId)
+                {
+                    return info.deviceHandle;
+                }
+            }
+            return nullptr;
+        };
+
+    // If we already have a primary handle and it still exists among
+    // the non-ignored keyboards, keep it.
+    if (m_primaryKeyboardHandle &&
+        std::any_of(m_keyboardDevices.begin(), m_keyboardDevices.end(),
+            [&](const KeyboardDeviceInfo& info) {
+                return info.deviceHandle == m_primaryKeyboardHandle;
+            }))
+    {
+        return;
+    }
+
+    HANDLE resolved = nullptr;
+
+    // First try: saved device id among non-ignored keyboards.
+    if (!m_primaryKeyboardDeviceId.empty())
+    {
+        resolved = findByIdIn(m_primaryKeyboardDeviceId, m_keyboardDevices);
+    }
+
+    // Second try: any non-ignored keyboard.
+    if (!resolved && !m_keyboardDevices.empty())
+    {
+        const auto& first = m_keyboardDevices.front();
+        resolved = first.deviceHandle;
+        m_primaryKeyboardDeviceId = first.deviceId;
+    }
+
+    // Last-chance fallback – if we still don't have a primary but
+    // we *do* see some keyboard at all (even if previously ignored),
+    // promote the first one from m_allKeyboardDevices and unignore it.
+    if (!resolved && !m_allKeyboardDevices.empty())
+    {
+        const auto& first = m_allKeyboardDevices.front();
+        resolved = first.deviceHandle;
+        m_primaryKeyboardDeviceId = first.deviceId;
+
+        if (!first.canonicalId.empty())
+        {
+            // Make sure it's no longer ignored so it shows
+            // up in the UI and stays usable.
+            auto it = m_ignoredKeyboardIds.find(first.canonicalId);
+            if (it != m_ignoredKeyboardIds.end())
+            {
+                m_ignoredKeyboardIds.erase(it);
+                PersistKeyboardIgnores();
+            }
+        }
+    }
+
+    m_primaryKeyboardHandle = resolved;
+    Settings::settingsIni.primaryKeyboardDeviceId = m_primaryKeyboardDeviceId;
+
+    if (resolved)
+    {
+        BYTE seedState[256] = {};
+        if (::GetKeyboardState(seedState))
+        {
+            std::array<BYTE, 256> snapshot{};
+            memcpy(snapshot.data(), seedState, 256);
+            m_keyboardStates[resolved] = snapshot;
+        }
+    }
+
+    LOG(1,
+        "ControllerOverrideManager::EnsurePrimaryKeyboardValid - resolved handle=%p id='%s' devices=%zu allDevices=%zu\n",
+        m_primaryKeyboardHandle, m_primaryKeyboardDeviceId.c_str(),
+        m_keyboardDevices.size(), m_allKeyboardDevices.size());
+}
+
 
 bool ControllerOverrideManager::CollectDevices()
 {

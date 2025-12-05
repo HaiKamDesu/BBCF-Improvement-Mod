@@ -22,6 +22,7 @@
 
 #include <sstream>
 #include <utility>
+#include <cstring>
 
 MainWindow::MainWindow(const std::string& windowTitle, bool windowClosable, WindowContainer& windowContainer, ImGuiWindowFlags windowFlags)
 	: IWindow(windowTitle, windowClosable, windowFlags), m_pWindowContainer(&windowContainer)
@@ -487,7 +488,163 @@ void MainWindow::DrawControllerSettingSection() const {
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Separates keyboard input from controller slots so they can map to different players.");
 
-        ImGui::VerticalSpacing(5);
+        ImGui::VerticalSpacing(3);
+
+        ImGui::HorizontalSpacing();
+        bool multiKeyboardOverride = controllerManager.IsMultipleKeyboardOverrideEnabled();
+        if (ImGui::Checkbox("Multiple keyboards override", &multiKeyboardOverride))
+        {
+                controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
+        }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker("Choose which physical keyboard should be treated as Player 1 when multiple keyboards are connected. All keyboards but this one will be treated as Player 2.");
+
+        if (multiKeyboardOverride)
+        {
+                static bool renamePopupOpen = false;
+                static KeyboardDeviceInfo renameTarget{};
+                static char renameBuffer[128] = { 0 };
+                static bool ignoredListOpen = false;
+
+                ImGui::VerticalSpacing(3);
+                ImGui::HorizontalSpacing();
+                const auto& keyboards = controllerManager.GetKeyboardDevices();
+                HANDLE selection = controllerManager.GetPrimaryKeyboardHandle();
+                const KeyboardDeviceInfo* selectedInfo = nullptr;
+
+                for (const auto& device : keyboards)
+                {
+                        if (device.deviceHandle == selection)
+                        {
+                                selectedInfo = &device;
+                                break;
+                        }
+                }
+
+                std::string preview = selectedInfo ? selectedInfo->displayName : "No keyboard selected";
+
+                if (keyboards.empty())
+                {
+                        ImGui::TextDisabled("No keyboards detected.");
+                }
+                else
+                {
+                        if (ImGui::BeginCombo("P1 Keyboard", preview.c_str()))
+                        {
+                                for (const auto& device : keyboards)
+                                {
+                                        bool selected = (selection && selection == device.deviceHandle);
+                                        if (ImGui::Selectable(device.displayName.c_str(), selected))
+                                        {
+                                                controllerManager.SetPrimaryKeyboardHandle(device.deviceHandle);
+                                                selection = device.deviceHandle;
+                                        }
+
+                                        if (selected)
+                                        {
+                                                ImGui::SetItemDefaultFocus();
+                                        }
+                                }
+
+                                ImGui::EndCombo();
+                        }
+                }
+                ImGui::VerticalSpacing(1);
+                ImGui::HorizontalSpacing();
+                if (selectedInfo)
+                {
+                        if (ImGui::Button("Rename"))
+                        {
+                                renameTarget = *selectedInfo;
+                                std::string currentLabel = controllerManager.GetKeyboardLabelForId(renameTarget.canonicalId);
+                                strncpy(renameBuffer, currentLabel.c_str(), sizeof(renameBuffer));
+                                renameBuffer[sizeof(renameBuffer) - 1] = '\0';
+                                renamePopupOpen = true;
+                                ImGui::OpenPopup("Rename keyboard");
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Ignore"))
+                        {
+                                controllerManager.IgnoreKeyboard(*selectedInfo);
+                        }
+                }
+                else
+                {
+                        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+                        ImGui::Button("Rename");
+                        ImGui::SameLine();
+                        ImGui::Button("Ignore");
+                        ImGui::PopStyleVar();
+                        ImGui::PopItemFlag();
+                }
+
+                ImGui::VerticalSpacing(1);
+                ImGui::HorizontalSpacing();
+                if (ImGui::Button("Ignored keyboards"))
+                {
+                        ignoredListOpen = true;
+                }
+
+                if (ImGui::BeginPopupModal("Rename keyboard", &renamePopupOpen, ImGuiWindowFlags_AlwaysAutoResize))
+                {
+                        ImGui::Text("Set a custom name for this keyboard.");
+                        ImGui::InputText("##RenameKeyboardInput", renameBuffer, sizeof(renameBuffer));
+
+                        ImGui::Separator();
+                        if (ImGui::Button("Save") && renameTarget.deviceHandle)
+                        {
+                                controllerManager.RenameKeyboard(renameTarget, std::string(renameBuffer));
+                                renamePopupOpen = false;
+                                ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Cancel"))
+                        {
+                                renamePopupOpen = false;
+                                ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Clear"))
+                        {
+                                controllerManager.RenameKeyboard(renameTarget, "");
+                                renamePopupOpen = false;
+                                ImGui::CloseCurrentPopup();
+                        }
+
+                        ImGui::EndPopup();
+                }
+
+                if (ignoredListOpen)
+                {
+                        ImGui::SetNextWindowSize(ImVec2(520.0f, 240.0f), ImGuiCond_FirstUseEver);
+                        if (ImGui::Begin("Ignored keyboards", &ignoredListOpen))
+                        {
+                                auto ignoredDevices = controllerManager.GetIgnoredKeyboardSnapshot();
+                                if (ignoredDevices.empty())
+                                {
+                                        ImGui::TextDisabled("No ignored keyboards.");
+                                }
+                                else
+                                {
+                                        for (const auto& dev : ignoredDevices)
+                                        {
+                                                if (ImGui::Button(std::string("Unignore##" + dev.canonicalId).c_str()))
+                                                {
+                                                        controllerManager.UnignoreKeyboard(dev.canonicalId);
+                                                }
+                                                ImGui::SameLine();
+                                                ImGui::TextDisabled(dev.connected ? "(connected)" : "(not connected)");
+                                                ImGui::SameLine();
+                                                ImGui::Text("%s", dev.displayName.c_str());
+                                        }
+                                }
+                        }
+                        ImGui::End();
+                }
+        }
+
+        ImGui::VerticalSpacing(3);
 
         if (!inDevelopmentFeaturesEnabled && controllerManager.IsOverrideEnabled())
         {
