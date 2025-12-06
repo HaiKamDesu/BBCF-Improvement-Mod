@@ -1313,29 +1313,58 @@ int written = StringFromGUID2(guid, buf, kBufferCount);
 
 KeyboardMapping KeyboardMapping::CreateDefault()
 {
-        KeyboardMapping mapping{};
+    KeyboardMapping mapping{};
 
-        mapping.battleBindings[BattleAction::Up] = { 'W' };
-        mapping.battleBindings[BattleAction::Left] = { 'A' };
-        mapping.battleBindings[BattleAction::Down] = { 'S' };
-        mapping.battleBindings[BattleAction::Right] = { 'D' };
-        mapping.battleBindings[BattleAction::A] = { 'J' };
-        mapping.battleBindings[BattleAction::B] = { 'I' };
-        mapping.battleBindings[BattleAction::C] = { 'L' };
-        mapping.battleBindings[BattleAction::D] = { 'K' };
+    //
+    // Battle action defaults (BBBF keyboard default)
+    //
+    mapping.battleBindings[BattleAction::Up] = { 'W' };
+    mapping.battleBindings[BattleAction::Down] = { 'S' };
+    mapping.battleBindings[BattleAction::Left] = { 'A' };
+    mapping.battleBindings[BattleAction::Right] = { 'D' };
 
-        mapping.menuBindings[MenuAction::Up] = { 'W' };
-        mapping.menuBindings[MenuAction::Left] = { 'A' };
-        mapping.menuBindings[MenuAction::Down] = { 'S' };
-        mapping.menuBindings[MenuAction::Right] = { 'D' };
-        mapping.menuBindings[MenuAction::PlayerInfo] = { 'J' };
-        mapping.menuBindings[MenuAction::FriendFilter] = { 'I' };
-        mapping.menuBindings[MenuAction::ReturnAction] = { 'L' };
-        mapping.menuBindings[MenuAction::Confirm] = { 'K' };
+    mapping.battleBindings[BattleAction::A] = { 'U' };
+    mapping.battleBindings[BattleAction::B] = { 'I' };
+    mapping.battleBindings[BattleAction::C] = { 'O' };
+    mapping.battleBindings[BattleAction::D] = { 'J' };
+    mapping.battleBindings[BattleAction::Taunt] = { 'L' };
+    mapping.battleBindings[BattleAction::Special] = { VK_OEM_1 };      // ';'
 
-        EnsureAllActionsPresent(mapping);
-        return mapping;
+    // A+B, B+C, A+B+C, A+B+C+D are *unbound* by default – leave them empty
+    // mapping.battleBindings[BattleAction::MacroAB]   = {};
+    // mapping.battleBindings[BattleAction::MacroBC]   = {};
+    // mapping.battleBindings[BattleAction::MacroABC]  = {};
+    // mapping.battleBindings[BattleAction::MacroABCD] = {};
+
+    mapping.battleBindings[BattleAction::MacroFn1] = { 'K' };
+    mapping.battleBindings[BattleAction::MacroFn2] = { 'P' };
+    mapping.battleBindings[BattleAction::MacroResetPositions] = { VK_BACK }; // Backspace
+
+    //
+    // Menu action defaults (BBBF keyboard default)
+    //
+    mapping.menuBindings[MenuAction::Up] = { 'W' };
+    mapping.menuBindings[MenuAction::Down] = { 'S' };
+    mapping.menuBindings[MenuAction::Left] = { 'A' };
+    mapping.menuBindings[MenuAction::Right] = { 'D' };
+
+    // A/B/C/D
+    mapping.menuBindings[MenuAction::PlayerInfo] = { 'U' }; // A
+    mapping.menuBindings[MenuAction::FriendFilter] = { 'I' }; // B
+    mapping.menuBindings[MenuAction::ReturnAction] = { 'O' }; // C
+    mapping.menuBindings[MenuAction::Confirm] = { 'J' }; // D
+
+    // Taunt / SP / FN1 / FN2
+    mapping.menuBindings[MenuAction::ChangeCategory] = { 'L' };       // Taunt
+    mapping.menuBindings[MenuAction::ReplayControls] = { VK_OEM_1 };  // SP (';')
+    mapping.menuBindings[MenuAction::ChangeCategory2] = { 'K' };       // FN1
+    mapping.menuBindings[MenuAction::ReplayControls2] = { 'P' };       // FN2
+
+    // Fill in any missing actions as unbound
+    EnsureAllActionsPresent(mapping);
+    return mapping;
 }
+
 
 const std::vector<MenuAction>& ControllerOverrideManager::GetMenuActions()
 {
@@ -1630,12 +1659,20 @@ void ControllerOverrideManager::LoadKeyboardPreferences()
         m_keyboardRenames = ParseRenameMap(Settings::settingsIni.keyboardRenameMap);
         m_keyboardMappings = ParseKeyboardMappings(Settings::settingsIni.keyboardMappings);
 
+        bool anyChanged = false;
         for (auto& kvp : m_keyboardMappings)
         {
-                EnsureAllActionsPresent(kvp.second);
+            if (EnsureAllActionsPresent(kvp.second))
+                anyChanged = true;
         }
 
-        PersistKeyboardMappingsLocked();
+        // Only persist if we actually had mappings AND something changed.
+        // This avoids wiping the INI when settingsIni.keyboardMappings was still empty.
+        if (anyChanged && !Settings::settingsIni.keyboardMappings.empty())
+        {
+            PersistKeyboardMappingsLocked();
+        }
+
         UpdateP2KeyboardOverride();
 }
 
@@ -1726,32 +1763,45 @@ void ControllerOverrideManager::RenameKeyboard(const KeyboardDeviceInfo& info, c
 
 std::string ControllerOverrideManager::GetKeyboardMappingKey(const KeyboardDeviceInfo& info)
 {
-        return info.canonicalId.empty() ? info.deviceId : info.canonicalId;
+    // Prefer deviceId for persistence; it's usually more stable than canonicalId
+    if (!info.deviceId.empty())
+        return info.deviceId;
+    return info.canonicalId;
 }
 
 KeyboardMapping ControllerOverrideManager::GetKeyboardMappingLocked(const std::string& mappingKey)
 {
-        if (mappingKey.empty())
-        {
-                KeyboardMapping mapping = KeyboardMapping::CreateDefault();
-                return mapping;
-        }
-
-        auto it = m_keyboardMappings.find(mappingKey);
-        if (it != m_keyboardMappings.end())
-        {
-                if (EnsureAllActionsPresent(it->second))
-                {
-                        PersistKeyboardMappingsLocked();
-                }
-                return it->second;
-        }
-
+    if (mappingKey.empty())
+    {
         KeyboardMapping mapping = KeyboardMapping::CreateDefault();
+        return mapping;
+    }
+
+    auto it = m_keyboardMappings.find(mappingKey);
+    if (it != m_keyboardMappings.end())
+    {
+        if (EnsureAllActionsPresent(it->second))
+            PersistKeyboardMappingsLocked();
+        return it->second;
+    }
+
+    // Fallback: if we have *some* mapping saved, reuse the first one
+    if (!m_keyboardMappings.empty())
+    {
+        auto first = m_keyboardMappings.begin();
+        KeyboardMapping mapping = first->second;
+        EnsureAllActionsPresent(mapping);
         m_keyboardMappings[mappingKey] = mapping;
         PersistKeyboardMappingsLocked();
         return mapping;
+    }
+
+    KeyboardMapping mapping = KeyboardMapping::CreateDefault();
+    m_keyboardMappings[mappingKey] = mapping;
+    PersistKeyboardMappingsLocked();
+    return mapping;
 }
+
 
 void ControllerOverrideManager::SetKeyboardMappingLocked(const std::string& mappingKey, const KeyboardMapping& mapping)
 {
@@ -1768,9 +1818,28 @@ void ControllerOverrideManager::SetKeyboardMappingLocked(const std::string& mapp
 
 KeyboardMapping ControllerOverrideManager::GetKeyboardMapping(const KeyboardDeviceInfo& info)
 {
-        std::lock_guard<std::mutex> lock(m_keyboardMutex);
-        return GetKeyboardMappingLocked(GetKeyboardMappingKey(info));
+    std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+    // Lazy-load from Settings if we don't have mappings yet,
+    // but the INI data is now available.
+    if (m_keyboardMappings.empty() && !Settings::settingsIni.keyboardMappings.empty())
+    {
+        m_keyboardMappings = ParseKeyboardMappings(Settings::settingsIni.keyboardMappings);
+        bool anyChanged = false;
+        for (auto& kvp : m_keyboardMappings)
+        {
+            if (EnsureAllActionsPresent(kvp.second))
+                anyChanged = true;
+        }
+        if (anyChanged)
+        {
+            PersistKeyboardMappingsLocked();
+        }
+    }
+
+    return GetKeyboardMappingLocked(GetKeyboardMappingKey(info));
 }
+
 
 void ControllerOverrideManager::SetKeyboardMapping(const KeyboardDeviceInfo& info, const KeyboardMapping& mapping)
 {
