@@ -127,6 +127,7 @@ public:
         std::vector<KeyboardDeviceInfo> GetIgnoredKeyboardSnapshot() const;
 
         bool GetFilteredKeyboardState(BYTE* keyStateOut);
+        bool GetKeyboardStateSnapshot(HANDLE deviceHandle, std::array<BYTE, 256>& outState);
 
         bool IsSteamInputLikelyActive() const { return m_steamInputLikely; }
 

@@ -1381,13 +1381,13 @@ const char* ControllerOverrideManager::GetBattleActionLabel(BattleAction action)
         case BattleAction::D: return "D (Drive)";
         case BattleAction::Taunt: return "AP (Taunt)";
         case BattleAction::Special: return "SP (SP Button)";
-        case BattleAction::MacroAB: return "Macro A+B";
-        case BattleAction::MacroBC: return "Macro B+C";
-        case BattleAction::MacroABC: return "Macro A+B+C";
-        case BattleAction::MacroABCD: return "Macro A+B+C+D";
-        case BattleAction::MacroFn1: return "Macro FN1";
-        case BattleAction::MacroFn2: return "Macro FN2";
-        case BattleAction::MacroResetPositions: return "Macro Reset positions";
+        case BattleAction::MacroAB: return "A+B";
+        case BattleAction::MacroBC: return "B+C";
+        case BattleAction::MacroABC: return "A+B+C";
+        case BattleAction::MacroABCD: return "A+B+C+D";
+        case BattleAction::MacroFn1: return "FN1";
+        case BattleAction::MacroFn2: return "FN2";
+        case BattleAction::MacroResetPositions: return "Reset positions";
         default: return "";
         }
 }
@@ -2190,6 +2190,27 @@ bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)
                 }
         }
 
+        return true;
+}
+
+bool ControllerOverrideManager::GetKeyboardStateSnapshot(HANDLE deviceHandle, std::array<BYTE, 256>& outState)
+{
+        if (!deviceHandle)
+        {
+                return false;
+        }
+
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+
+        SeedKeyboardStateForHandle(deviceHandle);
+
+        auto it = m_keyboardStates.find(deviceHandle);
+        if (it == m_keyboardStates.end())
+        {
+                return false;
+        }
+
+        outState = it->second;
         return true;
 }
 

@@ -22,6 +22,7 @@
 
 #include "imgui_internal.h"
 
+#include <array>
 #include <sstream>
 #include <utility>
 #include <cstring>
@@ -517,6 +518,9 @@ void MainWindow::DrawControllerSettingSection() const {
                                 bool isMenu = true;
                                 MenuAction menuAction = MenuAction::Up;
                         BattleAction battleAction = BattleAction::Up;
+
+                        std::array<BYTE, 256> baselineState{};
+                        bool baselineValid = false;
                 };
                 static MappingCaptureState captureState{};
 
@@ -678,20 +682,36 @@ void MainWindow::DrawControllerSettingSection() const {
 
                         auto detectCapturedKey = [&]() -> uint32_t
                         {
-                                if (!captureState.capturing)
+                                if (!captureState.capturing || !mappingTarget.deviceHandle)
                                 {
+                                        return 0;
+                                }
+
+                                std::array<BYTE, 256> currentState{};
+                                if (!controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, currentState))
+                                {
+                                        return 0;
+                                }
+
+                                if (!captureState.baselineValid)
+                                {
+                                        captureState.baselineState = currentState;
+                                        captureState.baselineValid = true;
                                         return 0;
                                 }
 
                                 for (uint32_t vk = 1; vk < 256; ++vk)
                                 {
-                                        SHORT state = GetAsyncKeyState(static_cast<int>(vk));
-                                        if (state & 0x0001)
+                                        const bool wasPressed = (captureState.baselineState[vk] & 0x80) != 0;
+                                        const bool isPressed = (currentState[vk] & 0x80) != 0;
+                                        if (isPressed && !wasPressed)
                                         {
+                                                captureState.baselineState = currentState;
                                                 return vk;
                                         }
                                 }
 
+                                captureState.baselineState = currentState;
                                 return 0;
                         };
 
@@ -708,9 +728,11 @@ void MainWindow::DrawControllerSettingSection() const {
                                 }
 
                                 captureState.capturing = false;
+                                captureState.baselineValid = false;
                         }
 
-                        const float labelColumnWidth = 160.0f;
+                        // Adjust these widths if action labels overlap the binding/action buttons.
+                        const float labelColumnWidth = 230.0f;
                         const float bindingColumnWidth = 200.0f;
 
                         auto drawMenuRow = [&](MenuAction action)
@@ -731,6 +753,9 @@ void MainWindow::DrawControllerSettingSection() const {
                                         captureState.capturing = true;
                                         captureState.isMenu = true;
                                         captureState.menuAction = action;
+                                        captureState.battleAction = BattleAction::Up;
+                                        captureState.baselineState.fill(0);
+                                        captureState.baselineValid = controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, captureState.baselineState);
                                 }
                                 ImGui::SameLine();
                                 if (ImGui::SmallButton("Clear"))
@@ -757,6 +782,9 @@ void MainWindow::DrawControllerSettingSection() const {
                                         captureState.capturing = true;
                                         captureState.isMenu = false;
                                         captureState.battleAction = action;
+                                        captureState.menuAction = MenuAction::Up;
+                                        captureState.baselineState.fill(0);
+                                        captureState.baselineValid = controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, captureState.baselineState);
                                 }
                                 ImGui::SameLine();
                                 if (ImGui::SmallButton("Clear"))
@@ -803,6 +831,7 @@ void MainWindow::DrawControllerSettingSection() const {
                         {
                                 mappingPopupOpen = false;
                                 captureState.capturing = false;
+                                captureState.baselineValid = false;
                                 ImGui::CloseCurrentPopup();
                         }
 
