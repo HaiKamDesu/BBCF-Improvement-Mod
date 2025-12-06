@@ -724,6 +724,7 @@ void MainWindow::DrawControllerSettingSection() const {
 					};
 
 				const uint32_t capturedKey = detectCapturedKey();
+				bool suppressNavThisFrame = false;
 				if (capturedKey != 0)
 				{
 					if (captureState.isMenu)
@@ -737,6 +738,18 @@ void MainWindow::DrawControllerSettingSection() const {
 
 					captureState.capturing = false;
 					captureState.baselineValid = false;
+
+					// NEW: don't let this key also act as navigation in this frame,
+					// and sync navState so it's not treated as a "new press" next frame.
+					suppressNavThisFrame = true;
+					if (mappingTarget.deviceHandle)
+					{
+						std::array<BYTE, 256> navStateSnapshot{};
+						if (controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, navStateSnapshot))
+						{
+							navState.lastKeyState = navStateSnapshot;
+						}
+					}
 				}
 
 				// Extra handling while in bind mode: ESC cancels, ENTER clears
@@ -753,6 +766,10 @@ void MainWindow::DrawControllerSettingSection() const {
 							// Just exit bind mode, keep existing binding
 							captureState.capturing = false;
 							captureState.baselineValid = false;
+
+							// NEW: also suppress nav this frame and sync navState
+							suppressNavThisFrame = true;
+							navState.lastKeyState = currentState;
 						}
 						else if (enterPressed)
 						{
@@ -764,9 +781,14 @@ void MainWindow::DrawControllerSettingSection() const {
 
 							captureState.capturing = false;
 							captureState.baselineValid = false;
+
+							// NEW: also suppress nav this frame and sync navState
+							suppressNavThisFrame = true;
+							navState.lastKeyState = currentState;
 						}
 					}
 				}
+
 
 				// ---- Navigation using the device's menu bindings (Up/Down/Confirm/Return) ----
 				const int totalRows =
@@ -788,7 +810,7 @@ void MainWindow::DrawControllerSettingSection() const {
 				bool navConfirm = false;
 				bool navClose = false;
 
-				if (!captureState.capturing && mappingTarget.deviceHandle && totalRows > 0)
+				if (!captureState.capturing && !suppressNavThisFrame && mappingTarget.deviceHandle && totalRows > 0)
 				{
 					std::array<BYTE, 256> currentState{};
 					if (controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, currentState))
@@ -1022,15 +1044,18 @@ void MainWindow::DrawControllerSettingSection() const {
 					captureState.capturing = false;
 					captureState.baselineValid = false;
 				}
-				ImGui::EndPopup();
 
-				if (navClose)
+				// NEW: handle navClose *before* ending the popup
+				if (!captureState.capturing && !suppressNavThisFrame && navClose)
 				{
 					mappingPopupOpen = false;
 					captureState.capturing = false;
 					captureState.baselineValid = false;
 					ImGui::CloseCurrentPopup();
 				}
+
+				// Only ONE EndPopup here
+				ImGui::EndPopup();
 			}
 
 			if (ignoredListOpen)
