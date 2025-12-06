@@ -998,6 +998,8 @@ void MainWindow::DrawControllerSettingSection() const {
                 ImGui::TextDisabled("STEAM INPUT: %s", steamInputLikely ? "ON" : "OFF");
         }
 }
+} // DrawControllerSettingSection
+
 void MainWindow::DrawLinkButtons() const
 {
 	//ImGui::ButtonUrl("Replay Database", REPLAY_DB_FRONTEND, BTN_SIZE);
