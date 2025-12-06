@@ -97,12 +97,24 @@ float Settings::readSettingsFilePropertyFloat(LPCWSTR key, LPCWSTR defaultVal, L
 
 std::string Settings::readSettingsFilePropertyString(LPCWSTR key, LPCWSTR defaultVal, LPCWSTR filename)
 {
+	// Bigger buffer so huge settings like KeyboardMappings don't get truncated
+	const DWORD BUF_SIZE = 16384;
+
 	CString strBuffer;
-	GetPrivateProfileString(_T("Settings"), key, defaultVal, strBuffer.GetBuffer(MAX_PATH), MAX_PATH, filename);
+	GetPrivateProfileString(
+		_T("Settings"),
+		key,
+		defaultVal,
+		strBuffer.GetBuffer(BUF_SIZE),
+		BUF_SIZE,
+		filename
+	);
 	strBuffer.ReleaseBuffer();
+
 	CT2CA pszConvertedAnsiString(strBuffer);
 	return pszConvertedAnsiString.m_psz;
 }
+
 
 bool Settings::loadSettingsFile()
 {

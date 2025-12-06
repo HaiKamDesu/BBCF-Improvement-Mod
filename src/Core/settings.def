@@ -26,6 +26,7 @@ SETTING(bool, separateKeyboardAndControllers, "SeparateKeyboardAndControllers", 
 SETTING(std::string, primaryKeyboardDeviceId, "PrimaryKeyboardDeviceId", "");
 SETTING(std::string, ignoredKeyboardIds, "IgnoredKeyboardIds", "");
 SETTING(std::string, keyboardRenameMap, "KeyboardRenameMap", "");
+SETTING(std::string, keyboardMappings, "KeyboardMappings", "");
 SETTING(bool, autoUpdateControllers, "AutomaticallyUpdateControllers", "1");
 SETTING(int, uploadReplayData, "UploadReplayData", "-1");
 SETTING(std::string, uploadReplayDataHost, "UploadReplayDataHost", "50.118.225.175");
