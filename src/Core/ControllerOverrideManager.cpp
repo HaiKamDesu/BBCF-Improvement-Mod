@@ -1629,6 +1629,14 @@ void ControllerOverrideManager::LoadKeyboardPreferences()
 
         m_keyboardRenames = ParseRenameMap(Settings::settingsIni.keyboardRenameMap);
         m_keyboardMappings = ParseKeyboardMappings(Settings::settingsIni.keyboardMappings);
+
+        for (auto& kvp : m_keyboardMappings)
+        {
+                EnsureAllActionsPresent(kvp.second);
+        }
+
+        PersistKeyboardMappingsLocked();
+        UpdateP2KeyboardOverride();
 }
 
 void ControllerOverrideManager::PersistKeyboardIgnores()

@@ -732,7 +732,8 @@ void MainWindow::DrawControllerSettingSection() const {
                         }
 
                         // Adjust these widths if action labels overlap the binding/action buttons.
-                        const float labelColumnWidth = 230.0f;
+                        // Increase labelColumnWidth to give long action names more room.
+                        const float labelColumnWidth = 270.0f;
                         const float bindingColumnWidth = 200.0f;
 
                         auto drawMenuRow = [&](MenuAction action)
@@ -762,6 +763,8 @@ void MainWindow::DrawControllerSettingSection() const {
                                 {
                                         commitMenuBinding(action, {});
                                 }
+
+                                ImGui::NewLine();
                         };
 
                         auto drawBattleRow = [&](BattleAction action)
@@ -791,13 +794,17 @@ void MainWindow::DrawControllerSettingSection() const {
                                 {
                                         commitBattleBinding(action, {});
                                 }
+
+                                ImGui::NewLine();
                         };
 
                         ImGui::Text("Mapping for %s", mappingTarget.displayName.c_str());
                         ImGui::Separator();
 
-                        ImGui::TextUnformatted("Menu Action");
-                        ImGui::SameLine(ImGui::GetCursorPosX() + labelColumnWidth - ImGui::CalcTextSize("Menu Action").x);
+                        const float headerStart = ImGui::GetCursorPosX();
+
+                        ImGui::TextUnformatted("Menu action");
+                        ImGui::SameLine(headerStart + labelColumnWidth - ImGui::CalcTextSize("Menu action").x);
                         ImGui::TextUnformatted("Binding");
                         ImGui::SameLine(ImGui::GetCursorPosX() + bindingColumnWidth - ImGui::CalcTextSize("Binding").x);
                         ImGui::TextUnformatted("Actions");
@@ -812,8 +819,8 @@ void MainWindow::DrawControllerSettingSection() const {
 
                         ImGui::Separator();
 
-                        ImGui::TextUnformatted("Battle Action");
-                        ImGui::SameLine(ImGui::GetCursorPosX() + labelColumnWidth - ImGui::CalcTextSize("Battle Action").x);
+                        ImGui::TextUnformatted("Battle action");
+                        ImGui::SameLine(headerStart + labelColumnWidth - ImGui::CalcTextSize("Battle action").x);
                         ImGui::TextUnformatted("Binding");
                         ImGui::SameLine(ImGui::GetCursorPosX() + bindingColumnWidth - ImGui::CalcTextSize("Binding").x);
                         ImGui::TextUnformatted("Actions");
