@@ -702,12 +702,10 @@ void MainWindow::DrawControllerSettingSection() const {
 
                         auto drawMenuRow = [&](MenuAction action)
                         {
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
                                 ImGui::TextUnformatted(ControllerOverrideManager::GetMenuActionLabel(action));
-                                ImGui::TableSetColumnIndex(1);
+                                ImGui::NextColumn();
                                 ImGui::TextUnformatted(describeBindings(mapping.menuBindings[action]).c_str());
-                                ImGui::TableSetColumnIndex(2);
+                                ImGui::NextColumn();
 
                                 const bool isCapturing = captureState.capturing && captureState.isMenu && captureState.menuAction == action;
                                 if (isCapturing)
@@ -725,16 +723,15 @@ void MainWindow::DrawControllerSettingSection() const {
                                 {
                                         commitMenuBinding(action, {});
                                 }
+                                ImGui::NextColumn();
                         };
 
                         auto drawBattleRow = [&](BattleAction action)
                         {
-                                ImGui::TableNextRow();
-                                ImGui::TableSetColumnIndex(0);
                                 ImGui::TextUnformatted(ControllerOverrideManager::GetBattleActionLabel(action));
-                                ImGui::TableSetColumnIndex(1);
+                                ImGui::NextColumn();
                                 ImGui::TextUnformatted(describeBindings(mapping.battleBindings[action]).c_str());
-                                ImGui::TableSetColumnIndex(2);
+                                ImGui::NextColumn();
 
                                 const bool isCapturing = captureState.capturing && !captureState.isMenu && captureState.battleAction == action;
                                 if (isCapturing)
@@ -752,46 +749,49 @@ void MainWindow::DrawControllerSettingSection() const {
                                 {
                                         commitBattleBinding(action, {});
                                 }
+                                ImGui::NextColumn();
                         };
 
                         ImGui::Text("Mapping for %s", mappingTarget.displayName.c_str());
                         ImGui::Separator();
 
-                        if (ImGui::BeginTable("MenuMappingTable", 3, ImGuiTableFlags_SizingStretchProp))
+                        ImGui::Columns(3, "MenuMappingColumns");
+                        ImGui::TextUnformatted("Menu Action");
+                        ImGui::NextColumn();
+                        ImGui::TextUnformatted("Binding");
+                        ImGui::NextColumn();
+                        ImGui::TextUnformatted("Actions");
+                        ImGui::NextColumn();
+                        ImGui::Separator();
+
+                        for (MenuAction action : ControllerOverrideManager::GetMenuActions())
                         {
-                                ImGui::TableSetupColumn("Menu Action");
-                                ImGui::TableSetupColumn("Binding");
-                                ImGui::TableSetupColumn("Actions");
-                                ImGui::TableHeadersRow();
-
-                                for (MenuAction action : ControllerOverrideManager::GetMenuActions())
-                                {
-                                        ImGui::PushID(static_cast<int>(action));
-                                        drawMenuRow(action);
-                                        ImGui::PopID();
-                                }
-
-                                ImGui::EndTable();
+                                ImGui::PushID(static_cast<int>(action));
+                                drawMenuRow(action);
+                                ImGui::PopID();
                         }
+
+                        ImGui::Columns(1);
 
                         ImGui::Separator();
 
-                        if (ImGui::BeginTable("BattleMappingTable", 3, ImGuiTableFlags_SizingStretchProp))
+                        ImGui::Columns(3, "BattleMappingColumns");
+                        ImGui::TextUnformatted("Battle Action");
+                        ImGui::NextColumn();
+                        ImGui::TextUnformatted("Binding");
+                        ImGui::NextColumn();
+                        ImGui::TextUnformatted("Actions");
+                        ImGui::NextColumn();
+                        ImGui::Separator();
+
+                        for (BattleAction action : ControllerOverrideManager::GetBattleActions())
                         {
-                                ImGui::TableSetupColumn("Battle Action");
-                                ImGui::TableSetupColumn("Binding");
-                                ImGui::TableSetupColumn("Actions");
-                                ImGui::TableHeadersRow();
-
-                                for (BattleAction action : ControllerOverrideManager::GetBattleActions())
-                                {
-                                        ImGui::PushID(static_cast<int>(action));
-                                        drawBattleRow(action);
-                                        ImGui::PopID();
-                                }
-
-                                ImGui::EndTable();
+                                ImGui::PushID(static_cast<int>(action));
+                                drawBattleRow(action);
+                                ImGui::PopID();
                         }
+
+                        ImGui::Columns(1);
 
                         ImGui::Separator();
                         if (ImGui::Button("Close"))
