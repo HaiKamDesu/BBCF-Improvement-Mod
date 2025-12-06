@@ -8,8 +8,54 @@
 #include <mutex>
 #include <atomic>
 #include <array>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
+
+enum class MenuAction
+{
+        Up,
+        Down,
+        Left,
+        Right,
+        PlayerInfo,
+        FriendFilter,
+        ReturnAction,
+        Confirm,
+        ChangeCategory,
+        ReplayControls,
+        ChangeCategory2,
+        ReplayControls2,
+};
+
+enum class BattleAction
+{
+        Up,
+        Down,
+        Left,
+        Right,
+        A,
+        B,
+        C,
+        D,
+        Taunt,
+        Special,
+        MacroAB,
+        MacroBC,
+        MacroABC,
+        MacroABCD,
+        MacroFn1,
+        MacroFn2,
+        MacroResetPositions,
+};
+
+struct KeyboardMapping
+{
+        std::map<MenuAction, std::vector<uint32_t>> menuBindings;
+        std::map<BattleAction, std::vector<uint32_t>> battleBindings;
+
+        static KeyboardMapping CreateDefault();
+};
 
 struct ControllerDeviceInfo
 {
@@ -68,6 +114,15 @@ public:
         void UnignoreKeyboard(const std::string& canonicalId);
         void RenameKeyboard(const KeyboardDeviceInfo& info, const std::string& newName);
 
+        KeyboardMapping GetKeyboardMapping(const KeyboardDeviceInfo& info);
+        void SetKeyboardMapping(const KeyboardDeviceInfo& info, const KeyboardMapping& mapping);
+
+        static const std::vector<MenuAction>& GetMenuActions();
+        static const std::vector<BattleAction>& GetBattleActions();
+        static const char* GetMenuActionLabel(MenuAction action);
+        static const char* GetBattleActionLabel(BattleAction action);
+        static std::string VirtualKeyToLabel(uint32_t virtualKey);
+
         std::string GetKeyboardLabelForId(const std::string& canonicalId) const;
         std::vector<KeyboardDeviceInfo> GetIgnoredKeyboardSnapshot() const;
 
@@ -109,12 +164,16 @@ private:
         void ApplyKeyboardPreferences(std::vector<KeyboardDeviceInfo>& devices);
         void PersistKeyboardIgnores();
         void PersistKeyboardRenames();
+        void PersistKeyboardMappingsLocked();
         void LoadKeyboardPreferences();
+        KeyboardMapping GetKeyboardMappingLocked(const std::string& mappingKey);
+        void SetKeyboardMappingLocked(const std::string& mappingKey, const KeyboardMapping& mapping);
         bool TryEnumerateDevicesA(std::vector<ControllerDeviceInfo>& outDevices);
         bool TryEnumerateDevicesW(std::vector<ControllerDeviceInfo>& outDevices);
         void TryEnumerateWinmmDevices(std::vector<ControllerDeviceInfo>& outDevices) const;
         static GUID CreateWinmmGuid(UINT winmmId);
         static bool NamesEqualIgnoreCase(const std::string& lhs, const std::string& rhs);
+        static std::string GetKeyboardMappingKey(const KeyboardDeviceInfo& info);
 
         void BounceTrackedDevices();
         void SendDeviceChangeBroadcast() const;
@@ -152,6 +211,7 @@ private:
         std::unordered_set<std::string> m_ignoredKeyboardIds;
         std::unordered_map<std::string, std::string> m_keyboardRenames;
         std::unordered_map<std::string, std::string> m_knownKeyboardNames;
+        std::unordered_map<std::string, KeyboardMapping> m_keyboardMappings;
         bool m_rawKeyboardRegistered = false;
         mutable std::mutex m_deviceMutex;
         mutable std::mutex m_keyboardMutex;

@@ -208,23 +208,160 @@ namespace
             Special,
     };
 
-    struct KeyToAction
+    const std::vector<MenuAction> kMenuActions =
     {
-            uint32_t vk = 0;
-            InputAction action = InputAction::Up;
+            MenuAction::Up,
+            MenuAction::Down,
+            MenuAction::Left,
+            MenuAction::Right,
+            MenuAction::PlayerInfo,
+            MenuAction::FriendFilter,
+            MenuAction::ReturnAction,
+            MenuAction::Confirm,
+            MenuAction::ChangeCategory,
+            MenuAction::ReplayControls,
+            MenuAction::ChangeCategory2,
+            MenuAction::ReplayControls2,
     };
 
-    const std::vector<KeyToAction> kDefaultP2KeyboardMapping =
+    const std::vector<BattleAction> kBattleActions =
     {
-            { 'W', InputAction::Up },
-            { 'A', InputAction::Left },
-            { 'S', InputAction::Down },
-            { 'D', InputAction::Right },
-            { 'J', InputAction::A },
-            { 'I', InputAction::B },
-            { 'L', InputAction::C },
-            { 'K', InputAction::D },
+            BattleAction::Up,
+            BattleAction::Down,
+            BattleAction::Left,
+            BattleAction::Right,
+            BattleAction::A,
+            BattleAction::B,
+            BattleAction::C,
+            BattleAction::D,
+            BattleAction::Taunt,
+            BattleAction::Special,
+            BattleAction::MacroAB,
+            BattleAction::MacroBC,
+            BattleAction::MacroABC,
+            BattleAction::MacroABCD,
+            BattleAction::MacroFn1,
+            BattleAction::MacroFn2,
+            BattleAction::MacroResetPositions,
     };
+
+    std::string SerializeKeyList(const std::vector<uint32_t>& keys)
+    {
+            std::ostringstream oss;
+            bool first = true;
+            for (uint32_t key : keys)
+            {
+                    if (!first)
+                    {
+                            oss << '+';
+                    }
+                    first = false;
+                    oss << key;
+            }
+            return oss.str();
+    }
+
+    std::vector<uint32_t> ParseKeyList(const std::string& text)
+    {
+            std::vector<uint32_t> keys;
+            size_t start = 0;
+            while (start < text.size())
+            {
+                    size_t plus = text.find('+', start);
+                    std::string token = text.substr(start, plus == std::string::npos ? std::string::npos : plus - start);
+                    if (!token.empty())
+                    {
+                            try
+                            {
+                                    uint32_t value = static_cast<uint32_t>(std::stoul(token));
+                                    keys.push_back(value);
+                            }
+                            catch (...)
+                            {
+                                    // ignore malformed tokens
+                            }
+                    }
+
+                    if (plus == std::string::npos)
+                    {
+                            break;
+                    }
+                    start = plus + 1;
+            }
+
+            return keys;
+    }
+
+    const char* MenuActionId(MenuAction action)
+    {
+            switch (action)
+            {
+            case MenuAction::Up: return "Up";
+            case MenuAction::Down: return "Down";
+            case MenuAction::Left: return "Left";
+            case MenuAction::Right: return "Right";
+            case MenuAction::PlayerInfo: return "PlayerInfo";
+            case MenuAction::FriendFilter: return "FriendFilter";
+            case MenuAction::ReturnAction: return "Return";
+            case MenuAction::Confirm: return "Confirm";
+            case MenuAction::ChangeCategory: return "ChangeCategory";
+            case MenuAction::ReplayControls: return "ReplayControls";
+            case MenuAction::ChangeCategory2: return "ChangeCategory2";
+            case MenuAction::ReplayControls2: return "ReplayControls2";
+            default: return "";
+            }
+    }
+
+    const char* BattleActionId(BattleAction action)
+    {
+            switch (action)
+            {
+            case BattleAction::Up: return "Up";
+            case BattleAction::Down: return "Down";
+            case BattleAction::Left: return "Left";
+            case BattleAction::Right: return "Right";
+            case BattleAction::A: return "A";
+            case BattleAction::B: return "B";
+            case BattleAction::C: return "C";
+            case BattleAction::D: return "D";
+            case BattleAction::Taunt: return "Taunt";
+            case BattleAction::Special: return "Special";
+            case BattleAction::MacroAB: return "MacroAB";
+            case BattleAction::MacroBC: return "MacroBC";
+            case BattleAction::MacroABC: return "MacroABC";
+            case BattleAction::MacroABCD: return "MacroABCD";
+            case BattleAction::MacroFn1: return "MacroFn1";
+            case BattleAction::MacroFn2: return "MacroFn2";
+            case BattleAction::MacroResetPositions: return "MacroResetPositions";
+            default: return "";
+            }
+    }
+
+    bool TryParseMenuAction(const std::string& value, MenuAction& out)
+    {
+            for (MenuAction action : kMenuActions)
+            {
+                    if (value == MenuActionId(action))
+                    {
+                            out = action;
+                            return true;
+                    }
+            }
+            return false;
+    }
+
+    bool TryParseBattleAction(const std::string& value, BattleAction& out)
+    {
+            for (BattleAction action : kBattleActions)
+            {
+                    if (value == BattleActionId(action))
+                    {
+                            out = action;
+                            return true;
+                    }
+            }
+            return false;
+    }
 
     void MergeInputState(const InputState& src, InputState& dst)
     {
@@ -241,23 +378,32 @@ namespace
             dst.special |= src.special;
     }
 
-    InputState ApplyMapping(const std::array<BYTE, 256>& keyState, const std::vector<KeyToAction>& mapping)
+    bool IsVirtualKeyPressed(const std::array<BYTE, 256>& keyState, uint32_t vk)
     {
-            InputState state{};
+            if (vk >= keyState.size())
+                    return false;
 
-            for (const auto& entry : mapping)
+            return (keyState[vk] & 0x80) != 0;
+    }
+
+    bool IsAnyBoundKeyPressed(const std::array<BYTE, 256>& keyState, const std::vector<uint32_t>& bindings)
+    {
+            for (uint32_t key : bindings)
             {
-                    if (entry.vk >= keyState.size())
+                    if (IsVirtualKeyPressed(keyState, key))
                     {
-                            continue;
+                            return true;
                     }
+            }
 
-                    if ((keyState[entry.vk] & 0x80) == 0)
-                    {
-                            continue;
-                    }
+            return false;
+    }
 
-                    switch (entry.action)
+    void ApplyActionsToState(const std::vector<InputAction>& actions, InputState& state)
+    {
+            for (InputAction action : actions)
+            {
+                    switch (action)
                     {
                     case InputAction::Up: state.up = true; break;
                     case InputAction::Down: state.down = true; break;
@@ -272,8 +418,236 @@ namespace
                     default: break;
                     }
             }
+    }
+
+    std::vector<InputAction> MenuActionToInputActions(MenuAction action)
+    {
+            switch (action)
+            {
+            case MenuAction::Up: return { InputAction::Up };
+            case MenuAction::Down: return { InputAction::Down };
+            case MenuAction::Left: return { InputAction::Left };
+            case MenuAction::Right: return { InputAction::Right };
+            case MenuAction::PlayerInfo: return { InputAction::A };
+            case MenuAction::FriendFilter: return { InputAction::B };
+            case MenuAction::ReturnAction: return { InputAction::C };
+            case MenuAction::Confirm: return { InputAction::D };
+            case MenuAction::ChangeCategory: return { InputAction::Taunt };
+            case MenuAction::ReplayControls: return { InputAction::Special };
+            default: return {};
+            }
+    }
+
+    std::vector<InputAction> BattleActionToInputActions(BattleAction action)
+    {
+            switch (action)
+            {
+            case BattleAction::Up: return { InputAction::Up };
+            case BattleAction::Down: return { InputAction::Down };
+            case BattleAction::Left: return { InputAction::Left };
+            case BattleAction::Right: return { InputAction::Right };
+            case BattleAction::A: return { InputAction::A };
+            case BattleAction::B: return { InputAction::B };
+            case BattleAction::C: return { InputAction::C };
+            case BattleAction::D: return { InputAction::D };
+            case BattleAction::Taunt: return { InputAction::Taunt };
+            case BattleAction::Special: return { InputAction::Special };
+            case BattleAction::MacroAB: return { InputAction::A, InputAction::B };
+            case BattleAction::MacroBC: return { InputAction::B, InputAction::C };
+            case BattleAction::MacroABC: return { InputAction::A, InputAction::B, InputAction::C };
+            case BattleAction::MacroABCD: return { InputAction::A, InputAction::B, InputAction::C, InputAction::D };
+            default: return {};
+            }
+    }
+
+    bool EnsureAllActionsPresent(KeyboardMapping& mapping)
+    {
+            bool changed = false;
+
+            for (MenuAction action : kMenuActions)
+            {
+                    if (mapping.menuBindings.find(action) == mapping.menuBindings.end())
+                    {
+                            mapping.menuBindings[action] = {};
+                            changed = true;
+                    }
+            }
+
+            for (BattleAction action : kBattleActions)
+            {
+                    if (mapping.battleBindings.find(action) == mapping.battleBindings.end())
+                    {
+                            mapping.battleBindings[action] = {};
+                            changed = true;
+                    }
+            }
+
+            return changed;
+    }
+
+    InputState ApplyBattleMapping(const std::array<BYTE, 256>& keyState, KeyboardMapping mapping)
+    {
+            EnsureAllActionsPresent(mapping);
+            InputState state{};
+
+            for (BattleAction action : kBattleActions)
+            {
+                    const auto& bindings = mapping.battleBindings[action];
+                    if (bindings.empty())
+                    {
+                            continue;
+                    }
+
+                    if (!IsAnyBoundKeyPressed(keyState, bindings))
+                    {
+                            continue;
+                    }
+
+                    ApplyActionsToState(BattleActionToInputActions(action), state);
+            }
 
             return state;
+    }
+
+    std::string SerializeKeyboardMapping(const KeyboardMapping& mapping)
+    {
+            KeyboardMapping normalized = mapping;
+            EnsureAllActionsPresent(normalized);
+
+            std::ostringstream menu;
+            bool firstMenu = true;
+            for (MenuAction action : kMenuActions)
+            {
+                    const auto& keys = normalized.menuBindings[action];
+                    if (!firstMenu)
+                    {
+                            menu << ',';
+                    }
+                    firstMenu = false;
+                    menu << MenuActionId(action) << '=' << SerializeKeyList(keys);
+            }
+
+            std::ostringstream battle;
+            bool firstBattle = true;
+            for (BattleAction action : kBattleActions)
+            {
+                    const auto& keys = normalized.battleBindings[action];
+                    if (!firstBattle)
+                    {
+                            battle << ',';
+                    }
+                    firstBattle = false;
+                    battle << BattleActionId(action) << '=' << SerializeKeyList(keys);
+            }
+
+            std::ostringstream combined;
+            combined << "menu=" << menu.str() << '|';
+            combined << "battle=" << battle.str();
+            return combined.str();
+    }
+
+    KeyboardMapping ParseKeyboardMapping(const std::string& raw)
+    {
+            KeyboardMapping mapping = KeyboardMapping::CreateDefault();
+
+            size_t menuPos = raw.find("menu=");
+            size_t battlePos = raw.find("battle=");
+
+            auto parseSection = [&](const std::string& section, bool menuSection)
+            {
+                    size_t cursor = 0;
+                    while (cursor < section.size())
+                    {
+                            size_t comma = section.find(',', cursor);
+                            std::string token = section.substr(cursor, comma == std::string::npos ? std::string::npos : comma - cursor);
+                            size_t eq = token.find('=');
+                            if (eq != std::string::npos)
+                            {
+                                    std::string actionName = token.substr(0, eq);
+                                    std::string keys = token.substr(eq + 1);
+                                    if (menuSection)
+                                    {
+                                            MenuAction action;
+                                            if (TryParseMenuAction(actionName, action))
+                                            {
+                                                    mapping.menuBindings[action] = ParseKeyList(keys);
+                                            }
+                                    }
+                                    else
+                                    {
+                                            BattleAction action;
+                                            if (TryParseBattleAction(actionName, action))
+                                            {
+                                                    mapping.battleBindings[action] = ParseKeyList(keys);
+                                            }
+                                    }
+                            }
+
+                            if (comma == std::string::npos)
+                            {
+                                    break;
+                            }
+                            cursor = comma + 1;
+                    }
+            };
+
+            if (menuPos != std::string::npos)
+            {
+                    size_t menuStart = menuPos + strlen("menu=");
+                    size_t menuEnd = raw.find('|', menuStart);
+                    parseSection(raw.substr(menuStart, menuEnd == std::string::npos ? std::string::npos : menuEnd - menuStart), true);
+            }
+
+            if (battlePos != std::string::npos)
+            {
+                    size_t battleStart = battlePos + strlen("battle=");
+                    size_t battleEnd = raw.find('|', battleStart);
+                    parseSection(raw.substr(battleStart, battleEnd == std::string::npos ? std::string::npos : battleEnd - battleStart), false);
+            }
+
+            EnsureAllActionsPresent(mapping);
+            return mapping;
+    }
+
+    std::unordered_map<std::string, KeyboardMapping> ParseKeyboardMappings(const std::string& raw)
+    {
+            std::unordered_map<std::string, KeyboardMapping> mappings;
+            for (const auto& entry : SplitList(raw))
+            {
+                    size_t colon = entry.find(':');
+                    if (colon == std::string::npos)
+                    {
+                            continue;
+                    }
+
+                    std::string key = entry.substr(0, colon);
+                    std::string encoded = entry.substr(colon + 1);
+                    if (key.empty())
+                    {
+                            continue;
+                    }
+
+                    mappings[key] = ParseKeyboardMapping(encoded);
+            }
+
+            return mappings;
+    }
+
+    std::string SerializeKeyboardMappings(const std::unordered_map<std::string, KeyboardMapping>& mappings)
+    {
+            std::ostringstream oss;
+            bool first = true;
+            for (const auto& kvp : mappings)
+            {
+                    if (!first)
+                    {
+                            oss << ';';
+                    }
+                    first = false;
+                    oss << kvp.first << ':' << SerializeKeyboardMapping(kvp.second);
+            }
+
+            return oss.str();
     }
 
     std::wstring StripPrefix(const std::wstring& value, const std::wstring& prefix)
@@ -937,6 +1311,102 @@ int written = StringFromGUID2(guid, buf, kBufferCount);
         return output;
 }
 
+KeyboardMapping KeyboardMapping::CreateDefault()
+{
+        KeyboardMapping mapping{};
+
+        mapping.battleBindings[BattleAction::Up] = { 'W' };
+        mapping.battleBindings[BattleAction::Left] = { 'A' };
+        mapping.battleBindings[BattleAction::Down] = { 'S' };
+        mapping.battleBindings[BattleAction::Right] = { 'D' };
+        mapping.battleBindings[BattleAction::A] = { 'J' };
+        mapping.battleBindings[BattleAction::B] = { 'I' };
+        mapping.battleBindings[BattleAction::C] = { 'L' };
+        mapping.battleBindings[BattleAction::D] = { 'K' };
+
+        mapping.menuBindings[MenuAction::Up] = { 'W' };
+        mapping.menuBindings[MenuAction::Left] = { 'A' };
+        mapping.menuBindings[MenuAction::Down] = { 'S' };
+        mapping.menuBindings[MenuAction::Right] = { 'D' };
+        mapping.menuBindings[MenuAction::PlayerInfo] = { 'J' };
+        mapping.menuBindings[MenuAction::FriendFilter] = { 'I' };
+        mapping.menuBindings[MenuAction::ReturnAction] = { 'L' };
+        mapping.menuBindings[MenuAction::Confirm] = { 'K' };
+
+        EnsureAllActionsPresent(mapping);
+        return mapping;
+}
+
+const std::vector<MenuAction>& ControllerOverrideManager::GetMenuActions()
+{
+        return kMenuActions;
+}
+
+const std::vector<BattleAction>& ControllerOverrideManager::GetBattleActions()
+{
+        return kBattleActions;
+}
+
+const char* ControllerOverrideManager::GetMenuActionLabel(MenuAction action)
+{
+        switch (action)
+        {
+        case MenuAction::Up: return "Up";
+        case MenuAction::Down: return "Down";
+        case MenuAction::Left: return "Left";
+        case MenuAction::Right: return "Right";
+        case MenuAction::PlayerInfo: return "Player info (A)";
+        case MenuAction::FriendFilter: return "Friend filter (B)";
+        case MenuAction::ReturnAction: return "Return (C)";
+        case MenuAction::Confirm: return "Confirm (D)";
+        case MenuAction::ChangeCategory: return "Change category (Taunt/AP)";
+        case MenuAction::ReplayControls: return "Replay controls (Special)";
+        case MenuAction::ChangeCategory2: return "Change category 2 (FN1)";
+        case MenuAction::ReplayControls2: return "Replay controls 2 (FN2)";
+        default: return "";
+        }
+}
+
+const char* ControllerOverrideManager::GetBattleActionLabel(BattleAction action)
+{
+        switch (action)
+        {
+        case BattleAction::Up: return "Up";
+        case BattleAction::Down: return "Down";
+        case BattleAction::Left: return "Left";
+        case BattleAction::Right: return "Right";
+        case BattleAction::A: return "A (Weak)";
+        case BattleAction::B: return "B (Medium)";
+        case BattleAction::C: return "C (Strong)";
+        case BattleAction::D: return "D (Drive)";
+        case BattleAction::Taunt: return "AP (Taunt)";
+        case BattleAction::Special: return "SP (SP Button)";
+        case BattleAction::MacroAB: return "Macro A+B";
+        case BattleAction::MacroBC: return "Macro B+C";
+        case BattleAction::MacroABC: return "Macro A+B+C";
+        case BattleAction::MacroABCD: return "Macro A+B+C+D";
+        case BattleAction::MacroFn1: return "Macro FN1";
+        case BattleAction::MacroFn2: return "Macro FN2";
+        case BattleAction::MacroResetPositions: return "Macro Reset positions";
+        default: return "";
+        }
+}
+
+std::string ControllerOverrideManager::VirtualKeyToLabel(uint32_t virtualKey)
+{
+        UINT scan = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC) << 16;
+        char buffer[64] = {};
+        int len = GetKeyNameTextA(static_cast<LONG>(scan), buffer, static_cast<int>(sizeof(buffer)));
+        if (len > 0)
+        {
+                return std::string(buffer, buffer + len);
+        }
+
+        std::ostringstream fallback;
+        fallback << "VK " << virtualKey;
+        return fallback.str();
+}
+
 extern "C" void HandleControllerWndProcMessage(UINT msg, WPARAM wParam, LPARAM lParam)
 {
         ControllerOverrideManager::GetInstance().HandleWindowMessage(msg, wParam, lParam);
@@ -1150,6 +1620,7 @@ void ControllerOverrideManager::LoadKeyboardPreferences()
 {
         m_ignoredKeyboardIds.clear();
         m_keyboardRenames.clear();
+        m_keyboardMappings.clear();
 
         for (const auto& id : SplitList(Settings::settingsIni.ignoredKeyboardIds))
         {
@@ -1157,6 +1628,7 @@ void ControllerOverrideManager::LoadKeyboardPreferences()
         }
 
         m_keyboardRenames = ParseRenameMap(Settings::settingsIni.keyboardRenameMap);
+        m_keyboardMappings = ParseKeyboardMappings(Settings::settingsIni.keyboardMappings);
 }
 
 void ControllerOverrideManager::PersistKeyboardIgnores()
@@ -1169,6 +1641,12 @@ void ControllerOverrideManager::PersistKeyboardRenames()
 {
         Settings::settingsIni.keyboardRenameMap = SerializeRenameMap(m_keyboardRenames);
         Settings::changeSetting("KeyboardRenameMap", Settings::settingsIni.keyboardRenameMap);
+}
+
+void ControllerOverrideManager::PersistKeyboardMappingsLocked()
+{
+        Settings::settingsIni.keyboardMappings = SerializeKeyboardMappings(m_keyboardMappings);
+        Settings::changeSetting("KeyboardMappings", Settings::settingsIni.keyboardMappings);
 }
 
 void ControllerOverrideManager::IgnoreKeyboard(const KeyboardDeviceInfo& info)
@@ -1236,6 +1714,64 @@ void ControllerOverrideManager::RenameKeyboard(const KeyboardDeviceInfo& info, c
 
         RefreshKeyboardDevices();
         EnsureP1KeyboardsValid();
+}
+
+std::string ControllerOverrideManager::GetKeyboardMappingKey(const KeyboardDeviceInfo& info)
+{
+        return info.canonicalId.empty() ? info.deviceId : info.canonicalId;
+}
+
+KeyboardMapping ControllerOverrideManager::GetKeyboardMappingLocked(const std::string& mappingKey)
+{
+        if (mappingKey.empty())
+        {
+                KeyboardMapping mapping = KeyboardMapping::CreateDefault();
+                return mapping;
+        }
+
+        auto it = m_keyboardMappings.find(mappingKey);
+        if (it != m_keyboardMappings.end())
+        {
+                if (EnsureAllActionsPresent(it->second))
+                {
+                        PersistKeyboardMappingsLocked();
+                }
+                return it->second;
+        }
+
+        KeyboardMapping mapping = KeyboardMapping::CreateDefault();
+        m_keyboardMappings[mappingKey] = mapping;
+        PersistKeyboardMappingsLocked();
+        return mapping;
+}
+
+void ControllerOverrideManager::SetKeyboardMappingLocked(const std::string& mappingKey, const KeyboardMapping& mapping)
+{
+        if (mappingKey.empty())
+        {
+                return;
+        }
+
+        KeyboardMapping normalized = mapping;
+        EnsureAllActionsPresent(normalized);
+        m_keyboardMappings[mappingKey] = normalized;
+        PersistKeyboardMappingsLocked();
+}
+
+KeyboardMapping ControllerOverrideManager::GetKeyboardMapping(const KeyboardDeviceInfo& info)
+{
+        std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        return GetKeyboardMappingLocked(GetKeyboardMappingKey(info));
+}
+
+void ControllerOverrideManager::SetKeyboardMapping(const KeyboardDeviceInfo& info, const KeyboardMapping& mapping)
+{
+        {
+                std::lock_guard<std::mutex> lock(m_keyboardMutex);
+                SetKeyboardMappingLocked(GetKeyboardMappingKey(info), mapping);
+        }
+
+        UpdateP2KeyboardOverride();
 }
 
 std::string ControllerOverrideManager::GetKeyboardLabelForId(const std::string& canonicalId) const
@@ -1732,7 +2268,8 @@ void ControllerOverrideManager::UpdateP2KeyboardOverrideLocked()
                         continue;
                 }
 
-                const InputState mapped = ApplyMapping(kvp.second, kDefaultP2KeyboardMapping);
+                const std::string mappingKey = (infoIt != m_allKeyboardDevices.end()) ? GetKeyboardMappingKey(*infoIt) : std::string{};
+                const InputState mapped = ApplyBattleMapping(kvp.second, GetKeyboardMappingLocked(mappingKey));
                 MergeInputState(mapped, aggregated);
         }
 

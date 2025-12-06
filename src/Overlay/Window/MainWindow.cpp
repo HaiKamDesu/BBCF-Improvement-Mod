@@ -18,6 +18,8 @@
 #include "Overlay/Widget/GameModeSelectWidget.h"
 #include "Overlay/Widget/StageSelectWidget.h"
 
+#include <Windows.h>
+
 #include "imgui_internal.h"
 
 #include <sstream>
@@ -497,7 +499,7 @@ void MainWindow::DrawControllerSettingSection() const {
                 controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
         }
         ImGui::SameLine();
-        ImGui::ShowHelpMarker("Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using the default WASD/JIKL layout.");
+        ImGui::ShowHelpMarker("Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).");
 
         if (multiKeyboardOverride)
         {
@@ -505,6 +507,16 @@ void MainWindow::DrawControllerSettingSection() const {
                 static KeyboardDeviceInfo renameTarget{};
                 static char renameBuffer[128] = { 0 };
                 static bool ignoredListOpen = false;
+                static bool mappingPopupOpen = false;
+                static KeyboardDeviceInfo mappingTarget{};
+                struct MappingCaptureState
+                {
+                        bool capturing = false;
+                        bool isMenu = true;
+                        MenuAction menuAction = MenuAction::Up;
+                        BattleAction battleAction = BattleAction::Up;
+                };
+                static MappingCaptureState captureState{};
 
                 ImGui::VerticalSpacing(3);
                 ImGui::HorizontalSpacing();
@@ -545,48 +557,45 @@ void MainWindow::DrawControllerSettingSection() const {
                                 for (const auto& device : keyboards)
                                 {
                                         bool selected = controllerManager.IsP1KeyboardHandle(device.deviceHandle);
-                                        ImGui::PushID(device.canonicalId.c_str());
+                                        std::string rowId = !device.canonicalId.empty() ? device.canonicalId : (!device.deviceId.empty() ? device.deviceId : std::to_string(reinterpret_cast<uintptr_t>(device.deviceHandle)));
+                                        ImGui::PushID(rowId.c_str());
                                         if (ImGui::Checkbox("##p1-keyboard", &selected))
                                         {
                                                 controllerManager.SetP1KeyboardHandleEnabled(device.deviceHandle, selected);
                                         }
                                         ImGui::SameLine();
                                         ImGui::TextUnformatted(device.displayName.c_str());
+
+                                        ImGui::SameLine();
+                                        if (ImGui::SmallButton("Map"))
+                                        {
+                                                mappingTarget = device;
+                                                mappingPopupOpen = true;
+                                                captureState.capturing = false;
+                                                ImGui::OpenPopup("Configure keyboard mapping");
+                                        }
+
+                                        ImGui::SameLine();
+                                        if (ImGui::SmallButton("Rename"))
+                                        {
+                                                renameTarget = device;
+                                                std::string currentLabel = controllerManager.GetKeyboardLabelForId(renameTarget.canonicalId);
+                                                strncpy(renameBuffer, currentLabel.c_str(), sizeof(renameBuffer));
+                                                renameBuffer[sizeof(renameBuffer) - 1] = '\0';
+                                                renamePopupOpen = true;
+                                                ImGui::OpenPopup("Rename keyboard");
+                                        }
+
+                                        ImGui::SameLine();
+                                        if (ImGui::SmallButton("Ignore"))
+                                        {
+                                                controllerManager.IgnoreKeyboard(device);
+                                        }
                                         ImGui::PopID();
                                 }
 
                                 ImGui::EndCombo();
                         }
-                }
-                ImGui::VerticalSpacing(1);
-                ImGui::HorizontalSpacing();
-                const KeyboardDeviceInfo* selectedInfo = selectedInfos.empty() ? nullptr : selectedInfos.front();
-                if (selectedInfo)
-                {
-                        if (ImGui::Button("Rename"))
-                        {
-                                renameTarget = *selectedInfo;
-                                std::string currentLabel = controllerManager.GetKeyboardLabelForId(renameTarget.canonicalId);
-                                strncpy(renameBuffer, currentLabel.c_str(), sizeof(renameBuffer));
-                                renameBuffer[sizeof(renameBuffer) - 1] = '\0';
-                                renamePopupOpen = true;
-                                ImGui::OpenPopup("Rename keyboard");
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Ignore"))
-                        {
-                                controllerManager.IgnoreKeyboard(*selectedInfo);
-                        }
-                }
-                else
-                {
-                        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-                        ImGui::Button("Rename");
-                        ImGui::SameLine();
-                        ImGui::Button("Ignore");
-                        ImGui::PopStyleVar();
-                        ImGui::PopItemFlag();
                 }
 
                 ImGui::VerticalSpacing(1);
@@ -619,6 +628,176 @@ void MainWindow::DrawControllerSettingSection() const {
                         {
                                 controllerManager.RenameKeyboard(renameTarget, "");
                                 renamePopupOpen = false;
+                                ImGui::CloseCurrentPopup();
+                        }
+
+                        ImGui::EndPopup();
+                }
+
+                if (ImGui::BeginPopupModal("Configure keyboard mapping", &mappingPopupOpen, ImGuiWindowFlags_AlwaysAutoResize))
+                {
+                        auto describeBindings = [](const std::vector<uint32_t>& bindings)
+                        {
+                                if (bindings.empty())
+                                {
+                                        return std::string("Unbound");
+                                }
+
+                                std::string text = ControllerOverrideManager::VirtualKeyToLabel(bindings.front());
+                                for (size_t i = 1; i < bindings.size(); ++i)
+                                {
+                                        text += ", " + ControllerOverrideManager::VirtualKeyToLabel(bindings[i]);
+                                }
+
+                                return text;
+                        };
+
+                        KeyboardMapping mapping = controllerManager.GetKeyboardMapping(mappingTarget);
+
+                        auto commitMenuBinding = [&](MenuAction action, const std::vector<uint32_t>& keys)
+                        {
+                                mapping.menuBindings[action] = keys;
+                                controllerManager.SetKeyboardMapping(mappingTarget, mapping);
+                        };
+
+                        auto commitBattleBinding = [&](BattleAction action, const std::vector<uint32_t>& keys)
+                        {
+                                mapping.battleBindings[action] = keys;
+                                controllerManager.SetKeyboardMapping(mappingTarget, mapping);
+                        };
+
+                        auto detectCapturedKey = [&]() -> uint32_t
+                        {
+                                if (!captureState.capturing)
+                                {
+                                        return 0;
+                                }
+
+                                for (uint32_t vk = 1; vk < 256; ++vk)
+                                {
+                                        SHORT state = GetAsyncKeyState(static_cast<int>(vk));
+                                        if (state & 0x0001)
+                                        {
+                                                return vk;
+                                        }
+                                }
+
+                                return 0;
+                        };
+
+                        const uint32_t capturedKey = detectCapturedKey();
+                        if (capturedKey != 0)
+                        {
+                                if (captureState.isMenu)
+                                {
+                                        commitMenuBinding(captureState.menuAction, { capturedKey });
+                                }
+                                else
+                                {
+                                        commitBattleBinding(captureState.battleAction, { capturedKey });
+                                }
+
+                                captureState.capturing = false;
+                        }
+
+                        auto drawMenuRow = [&](MenuAction action)
+                        {
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::TextUnformatted(ControllerOverrideManager::GetMenuActionLabel(action));
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::TextUnformatted(describeBindings(mapping.menuBindings[action]).c_str());
+                                ImGui::TableSetColumnIndex(2);
+
+                                const bool isCapturing = captureState.capturing && captureState.isMenu && captureState.menuAction == action;
+                                if (isCapturing)
+                                {
+                                        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Press a key...");
+                                }
+                                else if (ImGui::SmallButton("Bind"))
+                                {
+                                        captureState.capturing = true;
+                                        captureState.isMenu = true;
+                                        captureState.menuAction = action;
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Clear"))
+                                {
+                                        commitMenuBinding(action, {});
+                                }
+                        };
+
+                        auto drawBattleRow = [&](BattleAction action)
+                        {
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::TextUnformatted(ControllerOverrideManager::GetBattleActionLabel(action));
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::TextUnformatted(describeBindings(mapping.battleBindings[action]).c_str());
+                                ImGui::TableSetColumnIndex(2);
+
+                                const bool isCapturing = captureState.capturing && !captureState.isMenu && captureState.battleAction == action;
+                                if (isCapturing)
+                                {
+                                        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Press a key...");
+                                }
+                                else if (ImGui::SmallButton("Bind"))
+                                {
+                                        captureState.capturing = true;
+                                        captureState.isMenu = false;
+                                        captureState.battleAction = action;
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Clear"))
+                                {
+                                        commitBattleBinding(action, {});
+                                }
+                        };
+
+                        ImGui::Text("Mapping for %s", mappingTarget.displayName.c_str());
+                        ImGui::Separator();
+
+                        if (ImGui::BeginTable("MenuMappingTable", 3, ImGuiTableFlags_SizingStretchProp))
+                        {
+                                ImGui::TableSetupColumn("Menu Action");
+                                ImGui::TableSetupColumn("Binding");
+                                ImGui::TableSetupColumn("Actions");
+                                ImGui::TableHeadersRow();
+
+                                for (MenuAction action : ControllerOverrideManager::GetMenuActions())
+                                {
+                                        ImGui::PushID(static_cast<int>(action));
+                                        drawMenuRow(action);
+                                        ImGui::PopID();
+                                }
+
+                                ImGui::EndTable();
+                        }
+
+                        ImGui::Separator();
+
+                        if (ImGui::BeginTable("BattleMappingTable", 3, ImGuiTableFlags_SizingStretchProp))
+                        {
+                                ImGui::TableSetupColumn("Battle Action");
+                                ImGui::TableSetupColumn("Binding");
+                                ImGui::TableSetupColumn("Actions");
+                                ImGui::TableHeadersRow();
+
+                                for (BattleAction action : ControllerOverrideManager::GetBattleActions())
+                                {
+                                        ImGui::PushID(static_cast<int>(action));
+                                        drawBattleRow(action);
+                                        ImGui::PopID();
+                                }
+
+                                ImGui::EndTable();
+                        }
+
+                        ImGui::Separator();
+                        if (ImGui::Button("Close"))
+                        {
+                                mappingPopupOpen = false;
+                                captureState.capturing = false;
                                 ImGui::CloseCurrentPopup();
                         }
 
