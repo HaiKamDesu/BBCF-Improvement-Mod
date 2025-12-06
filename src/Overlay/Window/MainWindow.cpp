@@ -493,27 +493,29 @@ void MainWindow::DrawControllerSettingSection() const {
         ImGui::VerticalSpacing(3);
 
         ImGui::HorizontalSpacing();
-        bool multiKeyboardOverride = controllerManager.IsMultipleKeyboardOverrideEnabled();
-        if (ImGui::Checkbox("Multiple keyboards override", &multiKeyboardOverride))
-        {
-                controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
-        }
+                bool multiKeyboardOverride = controllerManager.IsMultipleKeyboardOverrideEnabled();
+                if (ImGui::Checkbox("Multiple keyboards override", &multiKeyboardOverride))
+                {
+                        controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
+                }
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).");
 
         if (multiKeyboardOverride)
         {
+                bool requestRenamePopup = false;
+                bool requestMappingPopup = false;
                 static bool renamePopupOpen = false;
                 static KeyboardDeviceInfo renameTarget{};
                 static char renameBuffer[128] = { 0 };
                 static bool ignoredListOpen = false;
                 static bool mappingPopupOpen = false;
                 static KeyboardDeviceInfo mappingTarget{};
-                struct MappingCaptureState
-                {
-                        bool capturing = false;
-                        bool isMenu = true;
-                        MenuAction menuAction = MenuAction::Up;
+                        struct MappingCaptureState
+                        {
+                                bool capturing = false;
+                                bool isMenu = true;
+                                MenuAction menuAction = MenuAction::Up;
                         BattleAction battleAction = BattleAction::Up;
                 };
                 static MappingCaptureState captureState{};
@@ -572,7 +574,7 @@ void MainWindow::DrawControllerSettingSection() const {
                                                 mappingTarget = device;
                                                 mappingPopupOpen = true;
                                                 captureState.capturing = false;
-                                                ImGui::OpenPopup("Configure keyboard mapping");
+                                                requestMappingPopup = true;
                                         }
 
                                         ImGui::SameLine();
@@ -583,7 +585,7 @@ void MainWindow::DrawControllerSettingSection() const {
                                                 strncpy(renameBuffer, currentLabel.c_str(), sizeof(renameBuffer));
                                                 renameBuffer[sizeof(renameBuffer) - 1] = '\0';
                                                 renamePopupOpen = true;
-                                                ImGui::OpenPopup("Rename keyboard");
+                                                requestRenamePopup = true;
                                         }
 
                                         ImGui::SameLine();
@@ -596,14 +598,22 @@ void MainWindow::DrawControllerSettingSection() const {
 
                                 ImGui::EndCombo();
                         }
-                }
+                        if (requestRenamePopup)
+                        {
+                                ImGui::OpenPopup("Rename keyboard");
+                        }
 
-                ImGui::VerticalSpacing(1);
-                ImGui::HorizontalSpacing();
-                if (ImGui::Button("Ignored keyboards"))
-                {
-                        ignoredListOpen = true;
-                }
+                        if (requestMappingPopup)
+                        {
+                                ImGui::OpenPopup("Configure keyboard mapping");
+                        }
+
+                        ImGui::VerticalSpacing(1);
+                        ImGui::HorizontalSpacing();
+                        if (ImGui::Button("Ignored keyboards"))
+                        {
+                                ignoredListOpen = true;
+                        }
 
                 if (ImGui::BeginPopupModal("Rename keyboard", &renamePopupOpen, ImGuiWindowFlags_AlwaysAutoResize))
                 {
