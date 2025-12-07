@@ -11,6 +11,7 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <cstdint>
 
 enum class MenuAction
 {
@@ -82,6 +83,26 @@ struct KeyboardDeviceInfo
 
 std::string GuidToString(const GUID& guid);
 
+// Represents the 4 system-controller bytes (+30..+33) before packing.
+struct SystemInputBytes
+{
+        uint8_t dirs = 0;      // +30
+        uint8_t main = 0;      // +31
+        uint8_t secondary = 0; // +32
+        uint8_t system = 0;    // +33
+};
+
+enum class SystemControllerSlot
+{
+        MenuP1,
+        MenuP2,
+        CharP1,
+        CharP2,
+        UnknownP1,
+        UnknownP2,
+        None
+};
+
 class ControllerOverrideManager
 {
 public:
@@ -103,6 +124,9 @@ public:
 
         void SetMultipleKeyboardOverrideEnabled(bool enabled);
         bool IsMultipleKeyboardOverrideEnabled() const { return m_multipleKeyboardOverrideEnabled; }
+
+        void SetMappingPopupActive(bool active) { m_mappingPopupActive.store(active, std::memory_order_relaxed); }
+        bool IsMappingPopupActive() const { return m_mappingPopupActive.load(std::memory_order_relaxed); }
 
         const std::vector<KeyboardDeviceInfo>& GetKeyboardDevices() const;
         const std::vector<KeyboardDeviceInfo>& GetAllKeyboardDevices() const;
@@ -151,6 +175,15 @@ public:
         bool OpenDeviceProperties(const GUID& guid) const;
 
         static std::string WideToUtf8(const std::wstring& value);
+        static uint32_t PackSystemInputWord(const SystemInputBytes& bytes);
+
+        uint32_t BuildSystemInputWord(SystemControllerSlot slot) const;
+        bool HasSystemOverride(SystemControllerSlot slot) const;
+
+        void UpdateSystemControllerPointers(void* menuP1, void* menuP2,
+                                            void* unknownP1, void* unknownP2,
+                                            void* charP1, void* charP2);
+        SystemControllerSlot ResolveSystemSlotFromControllerPtr(void* controller) const;
 
 private:
         ControllerOverrideManager();
@@ -200,6 +233,7 @@ private:
         size_t m_lastDeviceHash = 0;
         bool m_steamInputLikely = false;
         std::atomic<bool> m_deviceChangeQueued{ false };
+        std::atomic<bool> m_mappingPopupActive{ false };
 
         std::vector<IDirectInputDevice8A*> m_trackedDevicesA;
         std::vector<IDirectInputDevice8W*> m_trackedDevicesW;
@@ -216,4 +250,18 @@ private:
         bool m_rawKeyboardRegistered = false;
         mutable std::mutex m_deviceMutex;
         mutable std::mutex m_keyboardMutex;
+
+        // Desired packed input words seen by the system controllers, for P2.
+        std::atomic<uint32_t> m_p2MenuSystemInputWord{ 0 };
+        std::atomic<uint32_t> m_p2CharSystemInputWord{ 0 };
+        std::atomic<bool> m_p2MenuOverrideActive{ false };
+        std::atomic<bool> m_p2CharOverrideActive{ false };
+
+        // Latest resolved controller object addresses from BBCF.
+        void* m_menuControllerP1 = nullptr;
+        void* m_menuControllerP2 = nullptr;
+        void* m_charControllerP1 = nullptr;
+        void* m_charControllerP2 = nullptr;
+        void* m_unknownControllerP1 = nullptr;
+        void* m_unknownControllerP2 = nullptr;
 };

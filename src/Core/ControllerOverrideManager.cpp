@@ -206,6 +206,11 @@ namespace
             D,
             Taunt,
             Special,
+            Fn1,
+            Fn2,
+            Start,
+            Select,
+            ResetPositions,
     };
 
     const std::vector<MenuAction> kMenuActions =
@@ -376,6 +381,11 @@ namespace
             dst.D |= src.D;
             dst.taunt |= src.taunt;
             dst.special |= src.special;
+            dst.fn1 |= src.fn1;
+            dst.fn2 |= src.fn2;
+            dst.start |= src.start;
+            dst.select |= src.select;
+            dst.resetPositions |= src.resetPositions;
     }
 
     bool IsVirtualKeyPressed(const std::array<BYTE, 256>& keyState, uint32_t vk)
@@ -415,6 +425,11 @@ namespace
                     case InputAction::D: state.D = true; break;
                     case InputAction::Taunt: state.taunt = true; break;
                     case InputAction::Special: state.special = true; break;
+                    case InputAction::Fn1: state.fn1 = true; break;
+                    case InputAction::Fn2: state.fn2 = true; break;
+                    case InputAction::Start: state.start = true; break;
+                    case InputAction::Select: state.select = true; break;
+                    case InputAction::ResetPositions: state.resetPositions = true; break;
                     default: break;
                     }
             }
@@ -434,6 +449,8 @@ namespace
             case MenuAction::Confirm: return { InputAction::D };
             case MenuAction::ChangeCategory: return { InputAction::Taunt };
             case MenuAction::ReplayControls: return { InputAction::Special };
+            case MenuAction::ChangeCategory2: return { InputAction::Fn1 };
+            case MenuAction::ReplayControls2: return { InputAction::Fn2 };
             default: return {};
             }
     }
@@ -456,6 +473,9 @@ namespace
             case BattleAction::MacroBC: return { InputAction::B, InputAction::C };
             case BattleAction::MacroABC: return { InputAction::A, InputAction::B, InputAction::C };
             case BattleAction::MacroABCD: return { InputAction::A, InputAction::B, InputAction::C, InputAction::D };
+            case BattleAction::MacroFn1: return { InputAction::Fn1 };
+            case BattleAction::MacroFn2: return { InputAction::Fn2 };
+            case BattleAction::MacroResetPositions: return { InputAction::ResetPositions };
             default: return {};
             }
     }
@@ -504,6 +524,106 @@ namespace
                     }
 
                     ApplyActionsToState(BattleActionToInputActions(action), state);
+            }
+
+            return state;
+    }
+
+    uint8_t EncodeDirections(const InputState& state)
+    {
+            const bool up = state.up;
+            const bool down = state.down;
+            const bool left = state.left;
+            const bool right = state.right;
+
+            int vert = 0;
+            if (up && !down) { vert = +1; }
+            else if (down && !up) { vert = -1; }
+            else { vert = 0; }
+
+            int horiz = 0;
+            if (right && !left) { horiz = +1; }
+            else if (left && !right) { horiz = -1; }
+            else { horiz = 0; }
+
+            if (vert == 0 && horiz == 0) return 0x00;
+
+            if (vert == +1 && horiz == 0) return 0x01;
+            if (vert == -1 && horiz == 0) return 0x04;
+            if (vert == 0 && horiz == +1) return 0x02;
+            if (vert == 0 && horiz == -1) return 0x08;
+
+            if (vert == +1 && horiz == +1) return 0x03;
+            if (vert == +1 && horiz == -1) return 0x09;
+            if (vert == -1 && horiz == +1) return 0x06;
+            if (vert == -1 && horiz == -1) return 0x0C;
+
+            return 0x00;
+    }
+
+    uint8_t EncodeMainButtons(const InputState& state)
+    {
+            uint8_t b = 0;
+
+            if (state.D) b |= 0x10;
+            if (state.C) b |= 0x20;
+            if (state.A) b |= 0x40;
+            if (state.B) b |= 0x80;
+
+            return b;
+    }
+
+    uint8_t EncodeSecondaryButtons(const InputState& state)
+    {
+            uint8_t b = 0;
+
+            if (state.fn1) b |= 0x01;
+            if (state.taunt) b |= 0x02;
+            if (state.fn2) b |= 0x04;
+            if (state.special) b |= 0x08;
+
+            return b;
+    }
+
+    uint8_t EncodeSystemButtons(const InputState& state)
+    {
+            uint8_t b = 0;
+
+            if (state.start) b |= 0x04;
+            if (state.select) b |= 0x08;
+
+            return b;
+    }
+
+    SystemInputBytes BuildSystemInputBytes(const InputState& state)
+    {
+            SystemInputBytes out;
+            out.dirs = EncodeDirections(state);
+            out.main = EncodeMainButtons(state);
+            out.secondary = EncodeSecondaryButtons(state);
+            out.system = EncodeSystemButtons(state);
+            return out;
+    }
+
+    InputState ApplyMenuMapping(const std::array<BYTE, 256>& keyState, KeyboardMapping mapping)
+    {
+            EnsureAllActionsPresent(mapping);
+            InputState state{};
+
+            for (MenuAction action : kMenuActions)
+            {
+                    const auto& bindings = mapping.menuBindings[action];
+                    if (bindings.empty())
+                    {
+                            continue;
+                    }
+
+                    if (!IsAnyBoundKeyPressed(keyState, bindings))
+                    {
+                            continue;
+                    }
+
+                    ApplyActionsToState(MenuActionToInputActions(action), state);
             }
 
             return state;
@@ -1311,6 +1431,16 @@ int written = StringFromGUID2(guid, buf, kBufferCount);
         return output;
 }
 
+uint32_t ControllerOverrideManager::PackSystemInputWord(const SystemInputBytes& bytes)
+{
+        uint32_t v = 0;
+        v |= static_cast<uint32_t>(bytes.dirs);
+        v |= static_cast<uint32_t>(bytes.main) << 8;
+        v |= static_cast<uint32_t>(bytes.secondary) << 16;
+        v |= static_cast<uint32_t>(bytes.system) << 24;
+        return v;
+}
+
 KeyboardMapping KeyboardMapping::CreateDefault()
 {
     KeyboardMapping mapping{};
@@ -1330,7 +1460,7 @@ KeyboardMapping KeyboardMapping::CreateDefault()
     mapping.battleBindings[BattleAction::Taunt] = { 'L' };
     mapping.battleBindings[BattleAction::Special] = { VK_OEM_1 };      // ';'
 
-    // A+B, B+C, A+B+C, A+B+C+D are *unbound* by default � leave them empty
+    // A+B, B+C, A+B+C, A+B+C+D are *unbound* by default  leave them empty
     // mapping.battleBindings[BattleAction::MacroAB]   = {};
     // mapping.battleBindings[BattleAction::MacroBC]   = {};
     // mapping.battleBindings[BattleAction::MacroABC]  = {};
@@ -1494,11 +1624,6 @@ bool ControllerOverrideManager::IsAutoRefreshEnabled() const
 
 void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
 {
-        if (m_keyboardControllerSeparated == enabled)
-        {
-                return;
-        }
-
         uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
         char*** battle_key_controller = reinterpret_cast<char***>(base + 0x8929c8);
 
@@ -1534,6 +1659,16 @@ void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
         LOG(1, "      *char_p1 = 0x%08X\n", reinterpret_cast<unsigned int>(*char_control_p1));
         LOG(1, "      *char_p2 = 0x%08X\n", reinterpret_cast<unsigned int>(*char_control_p2));
 
+        UpdateSystemControllerPointers(
+                *menu_control_p1, *menu_control_p2,
+                *unknown_p1, *unknown_p2,
+                *char_control_p1, *char_control_p2);
+
+        if (m_keyboardControllerSeparated == enabled)
+        {
+                return;
+        }
+
         std::swap(*menu_control_p1, *menu_control_p2);
         std::swap(*char_control_p1, *char_control_p2);
         std::swap(*unknown_p1, *unknown_p2);
@@ -1547,6 +1682,78 @@ void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
         LOG(1, "      *char_p2 = 0x%08X\n", reinterpret_cast<unsigned int>(*char_control_p2));
 
         m_keyboardControllerSeparated = enabled;
+}
+
+void ControllerOverrideManager::UpdateSystemControllerPointers(
+        void* menuP1, void* menuP2,
+        void* unknownP1, void* unknownP2,
+        void* charP1, void* charP2)
+{
+        m_menuControllerP1 = menuP1;
+        m_menuControllerP2 = menuP2;
+        m_unknownControllerP1 = unknownP1;
+        m_unknownControllerP2 = unknownP2;
+        m_charControllerP1 = charP1;
+        m_charControllerP2 = charP2;
+}
+
+SystemControllerSlot ControllerOverrideManager::ResolveSystemSlotFromControllerPtr(void* controller) const
+{
+    if (!controller)
+        return SystemControllerSlot::None;
+
+    uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+    if (!base)
+        return SystemControllerSlot::None;
+
+    // battle_key_controller points to the system manager's controller array
+    auto battle_key_controller = *reinterpret_cast<char***>(base + 0x8929c8);
+    if (!battle_key_controller)
+        return SystemControllerSlot::None;
+
+    // Read the six live controller pointers from the game
+    auto menu_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x10);
+    auto menu_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x14);
+    auto unknown_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x1C);
+    auto unknown_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x20);
+    auto char_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x24);
+    auto char_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x28);
+
+    if (controller == menu_p1)    return SystemControllerSlot::MenuP1;
+    if (controller == menu_p2)    return SystemControllerSlot::MenuP2;
+    if (controller == unknown_p1) return SystemControllerSlot::UnknownP1;
+    if (controller == unknown_p2) return SystemControllerSlot::UnknownP2;
+    if (controller == char_p1)    return SystemControllerSlot::CharP1;
+    if (controller == char_p2)    return SystemControllerSlot::CharP2;
+
+    return SystemControllerSlot::None;
+}
+
+
+bool ControllerOverrideManager::HasSystemOverride(SystemControllerSlot slot) const
+{
+        switch (slot)
+        {
+        case SystemControllerSlot::MenuP2:
+                return m_p2MenuOverrideActive.load(std::memory_order_relaxed);
+        case SystemControllerSlot::CharP2:
+                return m_p2CharOverrideActive.load(std::memory_order_relaxed);
+        default:
+                return false;
+        }
+}
+
+uint32_t ControllerOverrideManager::BuildSystemInputWord(SystemControllerSlot slot) const
+{
+        switch (slot)
+        {
+        case SystemControllerSlot::MenuP2:
+                return m_p2MenuSystemInputWord.load(std::memory_order_relaxed);
+        case SystemControllerSlot::CharP2:
+                return m_p2CharSystemInputWord.load(std::memory_order_relaxed);
+        default:
+                return 0;
+        }
 }
 
 void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
@@ -2242,8 +2449,17 @@ bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)
         }
 
         std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        // While the keyboard mapping popup is open, we don't want any keyboard input
+        // to drive the game at all. The popup reads raw snapshots directly, so it
+        // still works, but here we return a "neutral" keyboard state to the game.
+        if (m_mappingPopupActive.load(std::memory_order_relaxed))
+        {
+            ZeroMemory(keyStateOut, 256);
+            return true;
+        }
 
         UpdateP2KeyboardOverrideLocked();
+
 
         if (m_p1KeyboardHandles.empty())
         {
@@ -2345,10 +2561,30 @@ void ControllerOverrideManager::UpdateP2KeyboardOverrideLocked()
 {
         if (!m_multipleKeyboardOverrideEnabled)
         {
+                m_p2MenuSystemInputWord.store(0, std::memory_order_relaxed);
+                m_p2CharSystemInputWord.store(0, std::memory_order_relaxed);
+                m_p2MenuOverrideActive.store(false, std::memory_order_relaxed);
+                m_p2CharOverrideActive.store(false, std::memory_order_relaxed);
                 return;
         }
 
-        InputState aggregated{};
+        // While the mapping popup is active, completely neutralize P2’s keyboard override.
+        if (m_mappingPopupActive.load(std::memory_order_relaxed))
+        {
+            // Clear any active battle override for P2.
+            ClearBattleInputOverride(1);
+
+            // Also clear system override words for P2 so menus don’t react.
+            m_p2MenuSystemInputWord.store(0, std::memory_order_relaxed);
+            m_p2MenuOverrideActive.store(false, std::memory_order_relaxed);
+            m_p2CharSystemInputWord.store(0, std::memory_order_relaxed);
+            m_p2CharOverrideActive.store(false, std::memory_order_relaxed);
+
+            return;
+        }
+
+        InputState aggregatedBattle{};
+        InputState aggregatedMenu{};
 
         for (const auto& kvp : m_keyboardStates)
         {
@@ -2367,11 +2603,24 @@ void ControllerOverrideManager::UpdateP2KeyboardOverrideLocked()
                 }
 
                 const std::string mappingKey = (infoIt != m_allKeyboardDevices.end()) ? GetKeyboardMappingKey(*infoIt) : std::string{};
-                const InputState mapped = ApplyBattleMapping(kvp.second, GetKeyboardMappingLocked(mappingKey));
-                MergeInputState(mapped, aggregated);
+                const auto mapping = GetKeyboardMappingLocked(mappingKey);
+                const InputState mappedBattle = ApplyBattleMapping(kvp.second, mapping);
+                const InputState mappedMenu = ApplyMenuMapping(kvp.second, mapping);
+                MergeInputState(mappedBattle, aggregatedBattle);
+                MergeInputState(mappedMenu, aggregatedMenu);
         }
 
-        OverrideBattleInput(1, aggregated, 1);
+        OverrideBattleInput(1, aggregatedBattle, 1);
+
+        SystemInputBytes charBytes = BuildSystemInputBytes(aggregatedBattle);
+        uint32_t charWord = PackSystemInputWord(charBytes);
+        m_p2CharSystemInputWord.store(charWord, std::memory_order_relaxed);
+        m_p2CharOverrideActive.store(charWord != 0, std::memory_order_relaxed);
+
+        SystemInputBytes menuBytes = BuildSystemInputBytes(aggregatedMenu);
+        uint32_t menuWord = PackSystemInputWord(menuBytes);
+        m_p2MenuSystemInputWord.store(menuWord, std::memory_order_relaxed);
+        m_p2MenuOverrideActive.store(menuWord != 0, std::memory_order_relaxed);
 }
 
 bool ControllerOverrideManager::IsP1KeyboardHandleLocked(HANDLE deviceHandle) const

@@ -8,6 +8,7 @@
 
 #include "Hooks/hooks_detours.h"
 #include "Hooks/hooks_battle_input.h"
+#include "Hooks/hooks_system_input.h"
 #include "Overlay/WindowManager.h"
 
 #include <Windows.h>
@@ -126,9 +127,14 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
         // Install battle input hook (P1/P2 input write site)
         if (!Hook_BattleInput())
         {
-            // For now, don’t hard-fail the entire mod – just log it.
+            // For now, don't hard-fail the entire mod - just log it.
             // If you prefer, you can pop a MessageBox+ExitProcess instead.
             LOG(2, "BBCF_IM_Start: Hook_BattleInput failed; P2 input PoC disabled.\n");
+        }
+
+        if (!InstallSystemInputHook())
+        {
+                LOG(2, "BBCF_IM_Start: InstallSystemInputHook failed; system input override disabled.\n");
         }
 
         LOG(1, "GetBbcfBaseAdress() = 0x%p\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
