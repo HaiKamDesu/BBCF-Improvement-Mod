@@ -20,6 +20,12 @@ struct InputState
     bool taunt = false;
     bool special = false;
 
+    bool fn1 = false;
+    bool fn2 = false;
+    bool start = false;
+    bool select = false;
+    bool resetPositions = false;
+
     uint16_t ToPackedValue() const;
     static InputState FromPackedValue(uint16_t packed);
 };

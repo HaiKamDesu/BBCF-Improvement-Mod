@@ -101,6 +101,7 @@
     </ClCompile>
     <ClCompile Include="src\SteamApiWrapper\SteamApiHelper.cpp" />
     <ClCompile Include="src\Hooks\hooks_customGameModes.cpp" />
+    <ClCompile Include="src\Hooks\hooks_system_input.cpp" />
     <ClCompile Include="src\Game\characters.cpp" />
     <ClCompile Include="src\Hooks\hooks_palette.cpp" />
     <ClCompile Include="src\Overlay\fonts.cpp" />
@@ -232,6 +233,7 @@
     </ClInclude>
     <ClInclude Include="src\Hooks\hooks_detours.h" />
     <ClInclude Include="src\Hooks\hooks_bbcf.h" />
+    <ClInclude Include="src\Hooks\hooks_system_input.h" />
     <ClInclude Include="src\D3D9EXWrapper\D3DXMath.h">
       <Filter>include\D3D9ExWrapper</Filter>
     </ClInclude>
