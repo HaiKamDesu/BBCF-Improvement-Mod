@@ -24,28 +24,28 @@ namespace
 
         void __declspec(naked) SystemInputWrite_Hook()
         {
-                __asm {
-                        // EBX = packed system input word from the game
-                        // ESI = controller pointer
+            __asm {
+                // EBX = packed system input word from the game
+                // ESI = controller pointer
 
-                        push ecx
-                        push edx
+                push ecx
+                push edx
 
-                        push ebx // currentWord
-                        push esi // controllerPtr
-                        call SystemInputHookInternal
-                        add esp, 8
+                push ebx // currentWord
+                push esi // controllerPtr
+                call SystemInputHookInternal
+                // NO add esp, 8 here when using __stdcall
 
-                        mov ebx, eax
+                mov ebx, eax
 
-                        pop edx
-                        pop ecx
+                pop edx
+                pop ecx
 
-                        mov [esi+0x30], ebx
-                        cmp [esi+0x38], ebx
+                mov[esi + 0x30], ebx
+                cmp[esi + 0x38], ebx
 
-                        jmp systemInputWrite_JmpBack
-                }
+                jmp systemInputWrite_JmpBack
+            }
         }
 }
 

@@ -1697,7 +1697,8 @@ void ControllerOverrideManager::UpdateSystemControllerPointers(
         m_charControllerP2 = charP2;
 }
 
-ControllerOverrideManager::SystemControllerSlot ControllerOverrideManager::ResolveSystemSlotFromControllerPtr(void* controller) const
+SystemControllerSlot
+ControllerOverrideManager::ResolveSystemSlotFromControllerPtr(void* controller) const
 {
         if (!controller)
         {
