@@ -74,6 +74,12 @@
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerRefreshDrawer.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerSettingsSection.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\KeyboardSeparationDrawer.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\LocalControllerOverrideDrawer.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\MultipleKeyboardOverrideDrawer.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\SteamInputWarningDrawer.cpp" />
     <ClCompile Include="src\Overlay\Window\PaletteEditorWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\UpdateNotifierWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\IWindow.cpp" />
@@ -187,6 +193,12 @@
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Overlay\Window\LogWindow.h" />
     <ClInclude Include="src\Overlay\Window\MainWindow.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\ControllerRefreshDrawer.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\ControllerSettingsSection.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\KeyboardSeparationDrawer.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\LocalControllerOverrideDrawer.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\MultipleKeyboardOverrideDrawer.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\SteamInputWarningDrawer.h" />
     <ClInclude Include="src\Overlay\Window\PaletteEditorWindow.h" />
     <ClInclude Include="src\Overlay\Window\UpdateNotifierWindow.h" />
     <ClInclude Include="src\Overlay\Window\IWindow.h" />
