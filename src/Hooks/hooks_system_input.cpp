@@ -13,18 +13,21 @@ namespace
         {
             auto& mgr = ControllerOverrideManager::GetInstance();
 
+            // If multiple-keyboard override is off, or the mapping popup is open,
+            // we leave system input completely untouched.
+            if (!mgr.IsMultipleKeyboardOverrideEnabled() || mgr.IsMappingPopupActive())
+            {
+                return currentWord;
+            }
+
             const auto slot = mgr.ResolveSystemSlotFromControllerPtr(controllerPtr);
-
-            // Don’t override anything if multiple-keyboard override is off
-            if (!mgr.IsMultipleKeyboardOverrideEnabled())
-                return currentWord;
-
             if (!mgr.HasSystemOverride(slot))
+            {
                 return currentWord;
+            }
 
             return mgr.BuildSystemInputWord(slot);
         }
-
 
         void __declspec(naked) SystemInputWrite_Hook()
         {

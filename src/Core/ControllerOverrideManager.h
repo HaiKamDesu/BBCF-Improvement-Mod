@@ -125,6 +125,9 @@ public:
         void SetMultipleKeyboardOverrideEnabled(bool enabled);
         bool IsMultipleKeyboardOverrideEnabled() const { return m_multipleKeyboardOverrideEnabled; }
 
+        void SetMappingPopupActive(bool active) { m_mappingPopupActive.store(active, std::memory_order_relaxed); }
+        bool IsMappingPopupActive() const { return m_mappingPopupActive.load(std::memory_order_relaxed); }
+
         const std::vector<KeyboardDeviceInfo>& GetKeyboardDevices() const;
         const std::vector<KeyboardDeviceInfo>& GetAllKeyboardDevices() const;
         const std::vector<HANDLE>& GetP1KeyboardHandles() const;
@@ -230,6 +233,7 @@ private:
         size_t m_lastDeviceHash = 0;
         bool m_steamInputLikely = false;
         std::atomic<bool> m_deviceChangeQueued{ false };
+        std::atomic<bool> m_mappingPopupActive{ false };
 
         std::vector<IDirectInputDevice8A*> m_trackedDevicesA;
         std::vector<IDirectInputDevice8W*> m_trackedDevicesW;

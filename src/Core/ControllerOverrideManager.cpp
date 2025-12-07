@@ -2449,8 +2449,17 @@ bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)
         }
 
         std::lock_guard<std::mutex> lock(m_keyboardMutex);
+        // While the keyboard mapping popup is open, we don't want any keyboard input
+        // to drive the game at all. The popup reads raw snapshots directly, so it
+        // still works, but here we return a "neutral" keyboard state to the game.
+        if (m_mappingPopupActive.load(std::memory_order_relaxed))
+        {
+            ZeroMemory(keyStateOut, 256);
+            return true;
+        }
 
         UpdateP2KeyboardOverrideLocked();
+
 
         if (m_p1KeyboardHandles.empty())
         {
@@ -2557,6 +2566,21 @@ void ControllerOverrideManager::UpdateP2KeyboardOverrideLocked()
                 m_p2MenuOverrideActive.store(false, std::memory_order_relaxed);
                 m_p2CharOverrideActive.store(false, std::memory_order_relaxed);
                 return;
+        }
+
+        // While the mapping popup is active, completely neutralize P2’s keyboard override.
+        if (m_mappingPopupActive.load(std::memory_order_relaxed))
+        {
+            // Clear any active battle override for P2.
+            ClearBattleInputOverride(1);
+
+            // Also clear system override words for P2 so menus don’t react.
+            m_p2MenuSystemInputWord.store(0, std::memory_order_relaxed);
+            m_p2MenuOverrideActive.store(false, std::memory_order_relaxed);
+            m_p2CharSystemInputWord.store(0, std::memory_order_relaxed);
+            m_p2CharOverrideActive.store(false, std::memory_order_relaxed);
+
+            return;
         }
 
         InputState aggregatedBattle{};

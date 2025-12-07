@@ -529,6 +529,10 @@ void MainWindow::DrawControllerSettingSection() const {
 			bool initialized = false;
 			int selectedIndex = 0;                // index in "all rows" (menu+battle)
 			std::array<BYTE, 256> lastKeyState{}; // for edge detection (new presses)
+
+			// NEW: tracking for "hold Right for 2 seconds to clear"
+			float rightHoldSeconds = 0.0f;
+			bool  rightWasDown = false;
 		};
 		static MappingNavState navState{};
 
@@ -658,6 +662,9 @@ void MainWindow::DrawControllerSettingSection() const {
 
 			if (ImGui::BeginPopupModal("Configure keyboard mapping", &mappingPopupOpen, ImGuiWindowFlags_AlwaysAutoResize))
 			{
+				// Tell the controller manager that mapping is active this frame.
+				controllerManager.SetMappingPopupActive(true);
+
 				auto describeBindings = [](const std::vector<uint32_t>& bindings)
 					{
 						if (bindings.empty())
@@ -809,6 +816,7 @@ void MainWindow::DrawControllerSettingSection() const {
 
 				bool navConfirm = false;
 				bool navClose = false;
+				bool navClear = false;   // NEW: clear binding on selected row when true
 
 				if (!captureState.capturing && !suppressNavThisFrame && mappingTarget.deviceHandle && totalRows > 0)
 				{
@@ -844,6 +852,21 @@ void MainWindow::DrawControllerSettingSection() const {
 								return false;
 							};
 
+						// NEW: "is this action currently held down?"
+						auto actionHeld = [&](MenuAction action) -> bool
+							{
+								auto it = mapping.menuBindings.find(action);
+								if (it == mapping.menuBindings.end())
+									return false;
+
+								for (uint32_t key : it->second)
+								{
+									if (isPressedNow(key))
+										return true;
+								}
+								return false;
+							};
+
 						// Move selection with Up/Down
 						if (actionNewPress(MenuAction::Up))
 						{
@@ -858,11 +881,43 @@ void MainWindow::DrawControllerSettingSection() const {
 						navConfirm = actionNewPress(MenuAction::Confirm);
 
 						// Return (C button) to close popup
-						navClose = actionNewPress(MenuAction::ReturnAction);
+						bool navCloseByReturn = actionNewPress(MenuAction::ReturnAction);
+
+						// NEW: ESC closes popup when NOT binding
+						bool escNow = isPressedNow(VK_ESCAPE);
+						bool escWas = wasPressed(VK_ESCAPE);
+						bool navCloseByEsc = escNow && !escWas;
+
+						navClose = navCloseByReturn || navCloseByEsc;
+
+						// NEW: Right hold-to-clear: only when not binding
+						bool rightHeldThisFrame = actionHeld(MenuAction::Right);
+						if (rightHeldThisFrame)
+						{
+							// accumulate hold time while Right is down
+							navState.rightHoldSeconds += ImGui::GetIO().DeltaTime;
+							navState.rightWasDown = true;
+
+							if (navState.rightHoldSeconds >= 2.0f)
+							{
+								// Trigger clear on the currently selected row
+								navClear = true;
+								navState.rightHoldSeconds = 0.0f; // reset so you can do it again later
+
+								// Optional: prevent this same frame from also doing Up/Down/Confirm nav
+								suppressNavThisFrame = true;
+							}
+						}
+						else
+						{
+							navState.rightHoldSeconds = 0.0f;
+							navState.rightWasDown = false;
+						}
 
 						navState.lastKeyState = currentState;
 					}
 				}
+
 
 				// Adjust these widths if action labels overlap the binding/action buttons.
 				// Increase labelColumnWidth to give long action names more room.
@@ -870,7 +925,7 @@ void MainWindow::DrawControllerSettingSection() const {
 				const float bindingColumnWidth = 150.0f;
 
 				// rowIndex is a running index across all rows (menu then battle)
-				auto drawMenuRow = [&](MenuAction action, int rowIndex, bool confirmForRow)
+				auto drawMenuRow = [&](MenuAction action, int rowIndex, bool confirmForRow, bool clearForRow)
 					{
 						const float rowStart = ImGui::GetCursorPosX();
 						const bool isSelected = (rowIndex == navState.selectedIndex);
@@ -894,11 +949,9 @@ void MainWindow::DrawControllerSettingSection() const {
 						{
 							bool triggerBind = false;
 
-							// Mouse click
 							if (ImGui::SmallButton("Bind"))
 								triggerBind = true;
 
-							// Keyboard/controller confirm on selected row
 							if (isSelected && confirmForRow && !captureState.capturing)
 								triggerBind = true;
 
@@ -917,7 +970,7 @@ void MainWindow::DrawControllerSettingSection() const {
 						}
 
 						ImGui::SameLine();
-						if (ImGui::SmallButton("Clear"))
+						if (ImGui::SmallButton("Clear") || clearForRow)
 						{
 							commitMenuBinding(action, {});
 						}
@@ -928,61 +981,61 @@ void MainWindow::DrawControllerSettingSection() const {
 						}
 					};
 
-				auto drawBattleRow = [&](BattleAction action, int rowIndex, bool confirmForRow)
+				auto drawBattleRow = [&](BattleAction action, int rowIndex, bool confirmForRow, bool clearForRow)
+				{
+					const float rowStart = ImGui::GetCursorPosX();
+					const bool isSelected = (rowIndex == navState.selectedIndex);
+
+					if (isSelected)
 					{
-						const float rowStart = ImGui::GetCursorPosX();
-						const bool isSelected = (rowIndex == navState.selectedIndex);
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.6f, 1.0f));
+					}
 
-						if (isSelected)
+					ImGui::TextUnformatted(ControllerOverrideManager::GetBattleActionLabel(action));
+					ImGui::SameLine(rowStart + labelColumnWidth);
+					ImGui::TextUnformatted(describeBindings(mapping.battleBindings[action]).c_str());
+					ImGui::SameLine(rowStart + labelColumnWidth + bindingColumnWidth);
+
+					const bool isCapturing = captureState.capturing && !captureState.isMenu && captureState.battleAction == action;
+					if (isCapturing)
+					{
+						ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Press a key...");
+					}
+					else
+					{
+						bool triggerBind = false;
+
+						if (ImGui::SmallButton("Bind"))
+							triggerBind = true;
+
+						if (isSelected && confirmForRow && !captureState.capturing)
+							triggerBind = true;
+
+						if (triggerBind)
 						{
-							ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.6f, 1.0f));
-						}
-
-						ImGui::TextUnformatted(ControllerOverrideManager::GetBattleActionLabel(action));
-						ImGui::SameLine(rowStart + labelColumnWidth);
-						ImGui::TextUnformatted(describeBindings(mapping.battleBindings[action]).c_str());
-						ImGui::SameLine(rowStart + labelColumnWidth + bindingColumnWidth);
-
-						const bool isCapturing = captureState.capturing && !captureState.isMenu && captureState.battleAction == action;
-						if (isCapturing)
-						{
-							ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Press a key...");
-						}
-						else
-						{
-							bool triggerBind = false;
-
-							if (ImGui::SmallButton("Bind"))
-								triggerBind = true;
-
-							if (isSelected && confirmForRow && !captureState.capturing)
-								triggerBind = true;
-
-							if (triggerBind)
+							captureState.capturing = true;
+							captureState.isMenu = false;
+							captureState.battleAction = action;
+							captureState.menuAction = MenuAction::Up;
+							captureState.baselineState.fill(0);
+							if (mappingTarget.deviceHandle)
 							{
-								captureState.capturing = true;
-								captureState.isMenu = false;
-								captureState.battleAction = action;
-								captureState.menuAction = MenuAction::Up;
-								captureState.baselineState.fill(0);
-								if (mappingTarget.deviceHandle)
-								{
-									controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, captureState.baselineState);
-								}
+								controllerManager.GetKeyboardStateSnapshot(mappingTarget.deviceHandle, captureState.baselineState);
 							}
 						}
+					}
 
-						ImGui::SameLine();
-						if (ImGui::SmallButton("Clear"))
-						{
-							commitBattleBinding(action, {});
-						}
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Clear") || clearForRow)
+					{
+						commitBattleBinding(action, {});
+					}
 
-						if (isSelected)
-						{
-							ImGui::PopStyleColor();
-						}
-					};
+					if (isSelected)
+					{
+						ImGui::PopStyleColor();
+					}
+				};
 
 
 				ImGui::Text("Mapping for %s", mappingTarget.displayName.c_str());
@@ -998,7 +1051,8 @@ void MainWindow::DrawControllerSettingSection() const {
 				{
 					ImGui::PushID(static_cast<int>(action));
 					const bool confirmForRow = navConfirm && (rowIndex == navState.selectedIndex);
-					drawMenuRow(action, rowIndex, confirmForRow);
+					const bool clearForRow = navClear && (rowIndex == navState.selectedIndex);
+					drawMenuRow(action, rowIndex, confirmForRow, clearForRow);
 					ImGui::PopID();
 					++rowIndex;
 				}
@@ -1014,7 +1068,8 @@ void MainWindow::DrawControllerSettingSection() const {
 				{
 					ImGui::PushID(static_cast<int>(action));
 					const bool confirmForRow = navConfirm && (rowIndex == navState.selectedIndex);
-					drawBattleRow(action, rowIndex, confirmForRow);
+					const bool clearForRow = navClear && (rowIndex == navState.selectedIndex);
+					drawBattleRow(action, rowIndex, confirmForRow, clearForRow);
 					ImGui::PopID();
 					++rowIndex;
 				}
@@ -1056,6 +1111,11 @@ void MainWindow::DrawControllerSettingSection() const {
 
 				// Only ONE EndPopup here
 				ImGui::EndPopup();
+
+				if (!mappingPopupOpen)
+				{
+					controllerManager.SetMappingPopupActive(false);
+				}
 			}
 
 			if (ignoredListOpen)
