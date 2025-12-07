@@ -11,16 +11,20 @@ namespace
 
         uint32_t __stdcall SystemInputHookInternal(void* controllerPtr, uint32_t currentWord)
         {
-                auto& mgr = ControllerOverrideManager::GetInstance();
+            auto& mgr = ControllerOverrideManager::GetInstance();
 
-                const auto slot = mgr.ResolveSystemSlotFromControllerPtr(controllerPtr);
-                if (!mgr.HasSystemOverride(slot))
-                {
-                        return currentWord;
-                }
+            const auto slot = mgr.ResolveSystemSlotFromControllerPtr(controllerPtr);
 
-                return mgr.BuildSystemInputWord(slot);
+            // Don’t override anything if multiple-keyboard override is off
+            if (!mgr.IsMultipleKeyboardOverrideEnabled())
+                return currentWord;
+
+            if (!mgr.HasSystemOverride(slot))
+                return currentWord;
+
+            return mgr.BuildSystemInputWord(slot);
         }
+
 
         void __declspec(naked) SystemInputWrite_Hook()
         {
@@ -33,10 +37,9 @@ namespace
 
                 push ebx // currentWord
                 push esi // controllerPtr
-                call SystemInputHookInternal
-                // NO add esp, 8 here when using __stdcall
+                call SystemInputHookInternal // __stdcall cleans stack itself
 
-                mov ebx, eax
+                mov ebx, eax  // apply override word if any
 
                 pop edx
                 pop ecx

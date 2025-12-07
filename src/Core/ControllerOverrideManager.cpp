@@ -1697,23 +1697,38 @@ void ControllerOverrideManager::UpdateSystemControllerPointers(
         m_charControllerP2 = charP2;
 }
 
-SystemControllerSlot
-ControllerOverrideManager::ResolveSystemSlotFromControllerPtr(void* controller) const
+SystemControllerSlot ControllerOverrideManager::ResolveSystemSlotFromControllerPtr(void* controller) const
 {
-        if (!controller)
-        {
-                return SystemControllerSlot::None;
-        }
-
-        if (controller == m_menuControllerP1) { return SystemControllerSlot::MenuP1; }
-        if (controller == m_menuControllerP2) { return SystemControllerSlot::MenuP2; }
-        if (controller == m_charControllerP1) { return SystemControllerSlot::CharP1; }
-        if (controller == m_charControllerP2) { return SystemControllerSlot::CharP2; }
-        if (controller == m_unknownControllerP1) { return SystemControllerSlot::UnknownP1; }
-        if (controller == m_unknownControllerP2) { return SystemControllerSlot::UnknownP2; }
-
+    if (!controller)
         return SystemControllerSlot::None;
+
+    uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+    if (!base)
+        return SystemControllerSlot::None;
+
+    // battle_key_controller points to the system manager's controller array
+    auto battle_key_controller = *reinterpret_cast<char***>(base + 0x8929c8);
+    if (!battle_key_controller)
+        return SystemControllerSlot::None;
+
+    // Read the six live controller pointers from the game
+    auto menu_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x10);
+    auto menu_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x14);
+    auto unknown_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x1C);
+    auto unknown_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x20);
+    auto char_p1 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x24);
+    auto char_p2 = *reinterpret_cast<void**>((char*)battle_key_controller + 0x28);
+
+    if (controller == menu_p1)    return SystemControllerSlot::MenuP1;
+    if (controller == menu_p2)    return SystemControllerSlot::MenuP2;
+    if (controller == unknown_p1) return SystemControllerSlot::UnknownP1;
+    if (controller == unknown_p2) return SystemControllerSlot::UnknownP2;
+    if (controller == char_p1)    return SystemControllerSlot::CharP1;
+    if (controller == char_p2)    return SystemControllerSlot::CharP2;
+
+    return SystemControllerSlot::None;
 }
+
 
 bool ControllerOverrideManager::HasSystemOverride(SystemControllerSlot slot) const
 {
