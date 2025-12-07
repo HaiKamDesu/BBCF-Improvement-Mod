@@ -706,6 +706,7 @@ void __declspec(naked)UploadReplayToEndpoint()
 		jmp[UploadReplayToEndpointJmpBackAddr]
 	}
 }
+
 DWORD DelNetworkReqWatchReplaysJmpBackAddr = 0;
 void __declspec(naked)DelNetworkReqWatchReplays()
 {
@@ -726,21 +727,30 @@ void __declspec(naked)DelNetworkReqWatchReplays()
 //	}
 //}
 
+void BeforeWriteReplayListDat_Helper()
+{
+	if (!g_rep_manager.template_modified) {
+		typedef void(__stdcall *func)();
+		func continue_write = (func)(GetBbcfBaseAdress() + 0x2C3F20);
+		continue_write();
+	}
+}
 
 DWORD BeforeWriteReplayListDatJmpBackAddr = 0;
 void __declspec(naked)BeforeWriteReplayListDat()
 {
-	if (!g_rep_manager.template_modified) {
-		char* continue_write = GetBbcfBaseAdress() + 0x2C3F20;
-		_asm {
-			call[continue_write]
-		}
-	}
+	LOG_ASM(2, "BeforeWriteReplayListDat\n");
+	__asm {
+		pushfd
+		pushad
 
-	_asm {
+		call BeforeWriteReplayListDat_Helper
+
+		popad
+		popfd
+
 		jmp[BeforeWriteReplayListDatJmpBackAddr]
 	}
-	LOG_ASM(2, "BeforeWriteReplayListDat\n");
 }
 
 void __declspec(naked)SkipReplayListConfirm()
