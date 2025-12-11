@@ -489,7 +489,6 @@ namespace ControllerSettings
                                 }
                         }
 
-                        ImGui::SetNextItemWidth(300.0f);
                         ImGui::TextUnformatted("Menu action");
                         ImGui::Separator();
 
