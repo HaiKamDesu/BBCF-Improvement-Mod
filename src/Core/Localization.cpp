@@ -76,8 +76,10 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
         buffer << file.rdbuf();
         std::string content = buffer.str();
 
-        std::regex dataRegex(R"(<data\s+name=\"([^\"]+)\"[^>]*>\s*<value>(.*?)</value>)",
-                std::regex_constants::icase | std::regex_constants::dotall);
+        // Use a character class that matches any character (including newlines) instead of dotall,
+        // which is unsupported in the MSVC STL implementation used by this project.
+        std::regex dataRegex(R"(<data\s+name=\"([^\"]+)\"[^>]*>\s*<value>([\s\S]*?)</value>)",
+                std::regex_constants::icase);
 
         auto begin = std::sregex_iterator(content.begin(), content.end(), dataRegex);
         auto end = std::sregex_iterator();
