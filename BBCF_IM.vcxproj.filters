@@ -82,6 +82,9 @@
     <ClCompile Include="src\Core\DirectInputWrapper.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\Localization.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Web\update_check.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -224,6 +227,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\dllmain.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Localization.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Web\update_check.h">

@@ -19,7 +19,9 @@ struct LanguageDefinition
 {
         std::string code;
         std::string displayName;
+        std::string explicitCode;
         std::unordered_map<std::string, std::string> strings;
+        bool isFallback = false;
 };
 
 std::string Trim(const std::string& value)
@@ -90,6 +92,12 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
                     continue;
             }
 
+            if (key == "_LanguageCode")
+            {
+                    outDefinition.explicitCode = value;
+                    continue;
+            }
+
             outDefinition.strings.emplace(std::move(key), std::move(value));
         }
 
@@ -132,6 +140,19 @@ std::vector<LanguageDefinition> LoadResxLanguages()
                 return languages;
         }
 
+        struct ResxEntry
+        {
+                std::filesystem::path path;
+                std::string baseName;
+                std::string culture;
+                bool hasCulture;
+        };
+
+        std::vector<ResxEntry> files;
+        files.reserve(8);
+
+        const std::regex nameRegex(R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)");
+
         for (const auto& entry : std::filesystem::directory_iterator(localizationDir))
         {
                 if (!entry.is_regular_file() || entry.path().extension() != ".resx")
@@ -139,11 +160,59 @@ std::vector<LanguageDefinition> LoadResxLanguages()
                         continue;
                 }
 
-                LanguageDefinition definition;
-                definition.code = entry.path().stem().string();
-
-                if (ParseResxFile(entry.path(), definition))
+                const std::string filename = entry.path().filename().string();
+                std::smatch match;
+                if (!std::regex_match(filename, match, nameRegex))
                 {
+                        continue;
+                }
+
+                ResxEntry info;
+                info.path = entry.path();
+                info.baseName = match[1].str();
+                info.hasCulture = match[2].matched;
+                info.culture = info.hasCulture ? match[2].str() : std::string();
+                files.push_back(std::move(info));
+        }
+
+        if (files.empty())
+        {
+                return languages;
+        }
+
+        std::string targetBaseName;
+        for (const auto& file : files)
+        {
+                if (!file.hasCulture)
+                {
+                        targetBaseName = file.baseName;
+                        break;
+                }
+        }
+
+        if (targetBaseName.empty())
+        {
+                targetBaseName = files.front().baseName;
+        }
+
+        for (const auto& file : files)
+        {
+                if (file.baseName != targetBaseName)
+                {
+                        continue;
+                }
+
+                LanguageDefinition definition;
+                definition.code = file.hasCulture ? file.culture : m_fallbackLanguage;
+                definition.isFallback = !file.hasCulture;
+
+                if (ParseResxFile(file.path, definition))
+                {
+                        if (!definition.explicitCode.empty())
+                        {
+                                definition.code = definition.explicitCode;
+                        }
+
                         languages.push_back(std::move(definition));
                 }
         }
@@ -263,6 +332,11 @@ void Localization::LoadLanguageData()
         for (const auto& language : definitions)
         {
                 m_languageStrings.emplace(language.code, language.strings);
+
+                if (language.isFallback)
+                {
+                        m_fallbackLanguage = language.code;
+                }
 
                 LanguageOption option{};
                 option.code = language.code;
