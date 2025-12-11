@@ -12,8 +12,6 @@ namespace ControllerSettings
 {
         void DrawControllerRefresh(ControllerOverrideManager& controllerManager, bool inDevelopmentFeaturesEnabled, bool steamInputLikely)
         {
-                ImGui::VerticalSpacing(5);
-
                 ImGui::HorizontalSpacing();
                 if (ImGui::Button("Refresh controllers"))
                 {
@@ -31,11 +29,13 @@ namespace ControllerSettings
                                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
                                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
                         }
+
                         if (ImGui::Button("Open Joy.cpl"))
                         {
                                 LOG(1, "MainWindow::DrawControllers - Joy.cpl clicked\n");
                                 controllerManager.OpenControllerControlPanel();
                         }
+
                         if (steamInputLikely)
                         {
                                 ImGui::PopStyleVar();
@@ -43,11 +43,9 @@ namespace ControllerSettings
                         }
                 }
 
-                ImGui::VerticalSpacing(5);
-
-                ImGui::HorizontalSpacing();
+                ImGui::SameLine();
                 bool autoRefreshEnabled = controllerManager.IsAutoRefreshEnabled();
-                if (ImGui::Checkbox("Automatically Update Controllers", &autoRefreshEnabled))
+                if (ImGui::Checkbox("Auto-refresh", &autoRefreshEnabled))
                 {
                         controllerManager.SetAutoRefreshEnabled(autoRefreshEnabled);
                         Settings::settingsIni.autoUpdateControllers = autoRefreshEnabled;
