@@ -7,6 +7,7 @@
 #include "FrameAdvantage/FrameAdvantageWindow.h"
 
 #include "Core/Settings.h"
+#include "Core/logger.h"
 #include "Core/info.h"
 #include "Core/interfaces.h"
 #include "Game/gamestates.h"

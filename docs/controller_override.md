@@ -3,7 +3,7 @@
 _Reverse-engineering notes for this feature lean on the memory map published by **tadatys** in the [BBCF-Ghidra repository](https://github.com/Tadatys/BBCF-Ghidra), preserved under `docs/Research/Tadatys-BBCF-Ghidra/` for reference._
 
 ## Refresh controllers
-- **UI hook:** `Overlay/Window/MainWindow.cpp` uses the Controller Override Manager when the **Refresh controllers** button is pressed.
+- **UI hook:** `Overlay/Window/ControllerSettings/ControllerRefreshDrawer.cpp` drives the **Refresh controllers** button through the controller settings section entry point in `Overlay/Window/ControllerSettings/ControllerSettingsSection.cpp` (called from `MainWindow`).
 - **What happens:**
   1. Re-enumerates DirectInput/WinMM devices to update the override list.
   2. "Bounces" every DirectInput device the game has already created by unacquiring and reacquiring the handle. This helps BlazBlue notice devices that appeared after launch without restarting the game.
@@ -14,9 +14,13 @@ _Reverse-engineering notes for this feature lean on the memory map published by 
   - `DirectInput8A/WWrapper::CreateDevice` registers each created device with the manager.
 
 ## Separate keyboard and controllers toggle
-- **UI hook:** The "Separate keyboard and controllers" checkbox lives in `Overlay/Window/MainWindow.cpp`.
+- **UI hook:** The "Separate keyboard and controllers" checkbox is rendered by `Overlay/Window/ControllerSettings/KeyboardSeparationDrawer.cpp` via `ControllerSettingsSection`.
 - **How it works:**
   - The checkbox toggles a swap in the game's internal controller slots by editing the structure at `GetBbcfBaseAdress() + 0x8929c8` (named `battle_key_controller` in comments).
   - It swaps the pointers for menu controls, character controls, and two auxiliary slots between Player 1 and Player 2. This detaches the shared keyboard mapping so the keyboard can belong to a different player than the first detected controller.
   - The address and layout come from reverse-engineering the game's controller table rather than any public API; the code treats it as an opaque array of pointers and manually reorders the entries in place when the toggle changes.
-- **Notes:** The structure layout is still handled as raw pointers (see the `battle_key_controller` comment block); formalizing it into a typed struct would make future work safer.
+  - **Notes:** The structure layout is still handled as raw pointers (see the `battle_key_controller` comment block); formalizing it into a typed struct would make future work safer.
+
+## Multiple keyboards override UI
+- **UI hook:** `Overlay/Window/ControllerSettings/MultipleKeyboardOverrideDrawer.cpp` owns the multi-keyboard selection, rename, ignore, and mapping popups surfaced through `ControllerSettingsSection`.
+- **Behavior:** The drawer works directly with `ControllerOverrideManager` to mark keyboard handles as Player 1, open mapping capture modals, and persist rename/ignore preferences without changing underlying input handling.

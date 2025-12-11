@@ -6,6 +6,7 @@
 #include "Overlay/imgui_utils.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 namespace ControllerSettings
 {

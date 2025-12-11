@@ -4,11 +4,14 @@
 #include "Overlay/imgui_utils.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
+#include <Windows.h>
 #include <algorithm>
 #include <array>
 #include <cfloat>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace ControllerSettings
@@ -73,7 +76,25 @@ namespace ControllerSettings
 
                 ImGui::VerticalSpacing(1);
                 ImGui::HorizontalSpacing();
-                ImGui::Text("%s will become Player 1", controllerManager.GetKeyboardLabelForId(ControllerOverrideManager::KeyboardP1Id).c_str());
+                const auto& summaryKeyboards = controllerManager.GetKeyboardDevices();
+                const auto& summaryHandles = controllerManager.GetP1KeyboardHandles();
+                std::vector<std::string> p1Labels;
+                for (HANDLE handle : summaryHandles)
+                {
+                        auto it = std::find_if(summaryKeyboards.begin(), summaryKeyboards.end(), [&](const KeyboardDeviceInfo& dev) { return dev.deviceHandle == handle; });
+                        if (it != summaryKeyboards.end())
+                        {
+                                p1Labels.push_back(it->displayName);
+                        }
+                }
+
+                std::string p1Summary = p1Labels.empty() ? std::string("No keyboards selected") : p1Labels.front();
+                for (size_t i = 1; i < p1Labels.size(); ++i)
+                {
+                        p1Summary += ", " + p1Labels[i];
+                }
+
+                ImGui::Text("%s will become Player 1", p1Summary.c_str());
                 ImGui::Text("Other keyboards will become Player 2");
                 ImGui::VerticalSpacing(3);
 
