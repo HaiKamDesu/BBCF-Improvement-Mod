@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="_DisplayName">
+    <value>English</value>
+  </data>
+  <data name="Toggle me with %s">
+    <value>Toggle me with %s</value>
+  </data>
+  <data name="Toggle Online with %s">
+    <value>Toggle Online with %s</value>
+  </data>
+  <data name="Toggle HUD with %s">
+    <value>Toggle HUD with %s</value>
+  </data>
+  <data name="Generate Debug Logs">
+    <value>Generate Debug Logs</value>
+  </data>
+  <data name="Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.">
+    <value>Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.</value>
+  </data>
+  <data name="Online">
+    <value>Online</value>
+  </data>
+  <data name="Gameplay settings">
+    <value>Gameplay settings</value>
+  </data>
+  <data name="Custom palettes">
+    <value>Custom palettes</value>
+  </data>
+  <data name="Hitbox overlay">
+    <value>Hitbox overlay</value>
+  </data>
+  <data name="FrameHistory">
+    <value>FrameHistory</value>
+  </data>
+  <data name="Framedata">
+    <value>Framedata</value>
+  </data>
+  <data name="Avatar settings">
+    <value>Avatar settings</value>
+  </data>
+  <data name="Controller Settings">
+    <value>Controller Settings</value>
+  </data>
+  <data name="Loaded settings.ini values">
+    <value>Loaded settings.ini values</value>
+  </data>
+  <data name="Current online players:">
+    <value>Current online players:</value>
+  </data>
+  <data name="&lt;No data&gt;">
+    <value>&lt;No data&gt;</value>
+  </data>
+  <data name="Avatar">
+    <value>Avatar</value>
+  </data>
+  <data name="Color">
+    <value>Color</value>
+  </data>
+  <data name="Accessory 1">
+    <value>Accessory 1</value>
+  </data>
+  <data name="Accessory 2">
+    <value>Accessory 2</value>
+  </data>
+  <data name="CONNECT TO NETWORK MODE FIRST">
+    <value>CONNECT TO NETWORK MODE FIRST</value>
+  </data>
+  <data name="FrameHistory help">
+    <value>For each non-idle frame, display a column of rectangles with info about it. 
+ 
+For each player : 
+ = The first row displays player state. 
+ - Startup-&gt;green 
+ - Active-&gt;red 
+ - Recovery-&gt;blue 
+ - Blockstun-&gt;yellow 
+ - Hitstun-&gt;purple 
+ - Hard landing recovery-&gt;blush 
+ - Special: hard to classify states(e.g.dashes)-&gt;Aquamarine 
+
+ = Second row is for invul/armor. The position of the line segments indicates the attributes, and its color if invul or armor: 
+ - Invul-&gt;white 
+ - Armor-&gt;brown 
+ - H-&gt;top segment 
+ - B-&gt;middle segment 
+ - F-&gt;bottom segment 
+ - T-&gt;left segment 
+ - P-&gt;right segment 
+</value>
+  </data>
+  <data name="FrameHistory auto reset help">
+    <value>block auto-reset on an idle frame: Do not overwrite automatically after an idle frame.</value>
+  </data>
+  <data name="Box width">
+    <value>Box width</value>
+  </data>
+  <data name="Box height">
+    <value>Box height</value>
+  </data>
+  <data name="spacing">
+    <value>spacing</value>
+  </data>
+  <data name="Enable##framehistory_section">
+    <value>Enable##framehistory_section</value>
+  </data>
+  <data name="Auto Reset##Reset after each idle frame">
+    <value>Auto Reset##Reset after each idle frame</value>
+  </data>
+  <data name="Enable##framedata_section">
+    <value>Enable##framedata_section</value>
+  </data>
+  <data name="Advantage on stagger hit">
+    <value>Advantage on stagger hit</value>
+  </data>
+  <data name="YOU ARE NOT IN MATCH!">
+    <value>YOU ARE NOT IN MATCH!</value>
+  </data>
+  <data name="YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!">
+    <value>YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!</value>
+  </data>
+  <data name="YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!">
+    <value>YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!</value>
+  </data>
+  <data name="THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS">
+    <value>THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS</value>
+  </data>
+  <data name="Palette editor">
+    <value>Palette editor</value>
+  </data>
+  <data name="YOU ARE NOT IN MATCH! (Replay)">
+    <value>YOU ARE NOT IN MATCH!</value>
+  </data>
+  <data name="YOU ARE NOT IN REPLAY MENU!">
+    <value>YOU ARE NOT IN REPLAY MENU!</value>
+  </data>
+  <data name="YOU ARE NOT IN CHARACTER SELECTION!">
+    <value>YOU ARE NOT IN CHARACTER SELECTION!</value>
+  </data>
+  <data name="Hide HUD">
+    <value>Hide HUD</value>
+  </data>
+  <data name="Toggle Rewind">
+    <value>Toggle Rewind</value>
+  </data>
+  <data name="Replay Database">
+    <value>Replay Database</value>
+  </data>
+  <data name="Enable/Disable Upload">
+    <value>Enable/Disable Upload</value>
+  </data>
+  <data name="Discord">
+    <value>Discord</value>
+  </data>
+  <data name="Forum">
+    <value>Forum</value>
+  </data>
+  <data name="GitHub">
+    <value>GitHub</value>
+  </data>
+  <data name="Player1">
+    <value>Player1</value>
+  </data>
+  <data name="Player2">
+    <value>Player2</value>
+  </data>
+  <data name="Draw hitbox/hurtbox">
+    <value>Draw hitbox/hurtbox</value>
+  </data>
+  <data name="Draw origin">
+    <value>Draw origin</value>
+  </data>
+  <data name="Draw collision">
+    <value>Draw collision</value>
+  </data>
+  <data name="Draw throw/range boxes">
+    <value>Draw throw/range boxes</value>
+  </data>
+  <data name="The point in space where your character resides. 
+Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.">
+    <value>The point in space where your character resides. 
+Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.</value>
+  </data>
+  <data name="Defines collision between objects/characters. Also used for throw range checks.">
+    <value>Defines collision between objects/characters. Also used for throw range checks.</value>
+  </data>
+  <data name="Throw range help">
+    <value>Throw Range Box(yellow): All throws require the throw range check. In order to pass this check the throw range box must overlap target&#x27;s  collision box.
+
+Move Range Box(green): All throws and some moves require the move range check. In order to pass this check the move range box must overlap the target&#x27;s origin point.
+
+
+
+How do throws connect?
+
+In order for a throw to connect you must have satisfy the following conditions:
+1: Both players must be on the ground or in the air. This is decided by their origin position, not sprite.
+2: You must pass the move range check.
+3: You must pass the throw range check.
+4: The hitbox of the throw must overlap the hurtbox of the target.
+5: The target must not be throw immune.
+</value>
+  </data>
+  <data name="Freeze frame:">
+    <value>Freeze frame:</value>
+  </data>
+  <data name="Frame Count">
+    <value>Frame Count</value>
+  </data>
+  <data name="Reset">
+    <value>Reset</value>
+  </data>
+  <data name="Freeze animation">
+    <value>Freeze animation</value>
+  </data>
+  <data name="Stop timer">
+    <value>Stop timer</value>
+  </data>
+  <data name="Step frames">
+    <value>Step frames</value>
+  </data>
+  <data name="YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!">
+    <value>YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!</value>
+  </data>
+  <data name="Game Mode">
+    <value>Game Mode</value>
+  </data>
+  <data name="Enable##hitbox_overlay_section">
+    <value>Enable##hitbox_overlay_section</value>
+  </data>
+  <data name="Custom palette reload">
+    <value>Reload all palettes</value>
+  </data>
+  <data name="Enable##framehistory_section checkbox">
+    <value>Enable##framehistory_section</value>
+  </data>
+  <data name="Draw hitbox/hurtbox##hitbox_overlay_section">
+    <value>Draw hitbox/hurtbox</value>
+  </data>
+  <data name="Draw origin##hitbox_overlay_section">
+    <value>Draw origin</value>
+  </data>
+  <data name="Draw collision##hitbox_overlay_section">
+    <value>Draw collision</value>
+  </data>
+  <data name="Step frames##hitbox_overlay_section">
+    <value>Step frames</value>
+  </data>
+  <data name="Gameplay settings header">
+    <value>Gameplay settings</value>
+  </data>
+  <data name="Hide HUD checkbox">
+    <value>Hide HUD</value>
+  </data>
+  <data name="States">
+    <value>States</value>
+  </data>
+  <data name="Log">
+    <value>Log</value>
+  </data>
+  <data name="Replay Rewind">
+    <value>Replay Rewind</value>
+  </data>
+  <data name="Replay Upload">
+    <value>Replay Upload</value>
+  </data>
+  <data name="Enable##framehistory_section label">
+    <value>Enable</value>
+  </data>
+  <data name="Auto Reset label">
+    <value>Auto Reset</value>
+  </data>
+  <data name="FrameHistory width label">
+    <value>Box width</value>
+  </data>
+  <data name="FrameHistory height label">
+    <value>Box height</value>
+  </data>
+  <data name="FrameHistory spacing label">
+    <value>spacing</value>
+  </data>
+  <data name="FrameHistory not enabled message">
+    <value>YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!</value>
+  </data>
+  <data name="FrameHistory character load error">
+    <value>THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS</value>
+  </data>
+  <data name="Language">
+    <value>Language</value>
+  </data>
+  <data name="Language incomplete label">
+    <value>%s - Incomplete (Missing %zu terms)</value>
+  </data>
+  <data name="Language selection help">
+    <value>Select a language for all UI text. Requires full dictionary coverage.</value>
+  </data>
+</root>
