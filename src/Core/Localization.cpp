@@ -15,6 +15,7 @@ namespace
 {
 const char* kLocalizationDirectory = "resource/localization";
 const char* kDisplayNameKey = "_DisplayName";
+const char* kDefaultLanguageCode = "en";
 
 const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
 
@@ -206,7 +207,7 @@ std::vector<LanguageDefinition> LoadResxLanguages()
                 }
 
                 LanguageDefinition definition;
-                definition.code = file.hasCulture ? file.culture : m_fallbackLanguage;
+                definition.code = file.hasCulture ? file.culture : kDefaultLanguageCode;
                 definition.isFallback = !file.hasCulture;
 
                 if (ParseResxFile(file.path, definition))
@@ -232,8 +233,8 @@ std::vector<LanguageDefinition> LoadResxLanguages()
 
 std::unordered_map<std::string, std::unordered_map<std::string, std::string>> Localization::m_languageStrings = {};
 std::vector<LanguageOption> Localization::m_languageOptions = {};
-std::string Localization::m_currentLanguage = "en";
-std::string Localization::m_fallbackLanguage = "en";
+std::string Localization::m_currentLanguage = kDefaultLanguageCode;
+std::string Localization::m_fallbackLanguage = kDefaultLanguageCode;
 bool Localization::m_initialized = false;
 
 void Localization::Initialize(const std::string& requestedLanguage)
