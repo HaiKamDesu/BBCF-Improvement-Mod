@@ -164,13 +164,11 @@ bool Settings::loadSettingsFile()
 
 	
 	
-        if (settingsIni.separateKeyboardAndControllers)
+        if (settingsIni.swapControllerPos)
         {
-                LOG(1, "Settings::loadSettingsFile - SeparateKeyboardAndControllers forced off due to startup crash issue.\n");
+                LOG(1, "Settings::loadSettingsFile - SwapControllerPos forced off due to a known startup crash issue.\n");
         }
-        settingsIni.separateKeyboardAndControllers = false;
-
-        //modValuessettingsIni.loadStateKeybind
+        settingsIni.swapControllerPos = false;
 
         return true;
 }

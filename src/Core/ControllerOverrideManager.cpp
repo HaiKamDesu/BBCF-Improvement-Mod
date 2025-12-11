@@ -1593,7 +1593,7 @@ ControllerOverrideManager::ControllerOverrideManager()
         {
                 EnsureRawKeyboardRegistration();
         }
-        SetKeyboardControllerSeparated(Settings::settingsIni.separateKeyboardAndControllers);
+        SetControllerPosSwap(Settings::settingsIni.swapControllerPos);
 }
 
 void ControllerOverrideManager::SetOverrideEnabled(bool enabled)
@@ -1622,7 +1622,7 @@ bool ControllerOverrideManager::IsAutoRefreshEnabled() const
         return m_autoRefreshEnabled;
 }
 
-void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
+void ControllerOverrideManager::SetControllerPosSwap(bool enabled)
 {
         uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
         char*** battle_key_controller = reinterpret_cast<char***>(base + 0x8929c8);
@@ -1664,7 +1664,7 @@ void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
                 *unknown_p1, *unknown_p2,
                 *char_control_p1, *char_control_p2);
 
-        if (m_keyboardControllerSeparated == enabled)
+        if (m_ControllerPosSwap == enabled)
         {
                 return;
         }
@@ -1681,7 +1681,7 @@ void ControllerOverrideManager::SetKeyboardControllerSeparated(bool enabled)
         LOG(1, "      *char_p1 = 0x%08X\n", reinterpret_cast<unsigned int>(*char_control_p1));
         LOG(1, "      *char_p2 = 0x%08X\n", reinterpret_cast<unsigned int>(*char_control_p2));
 
-        m_keyboardControllerSeparated = enabled;
+        m_ControllerPosSwap = enabled;
 }
 
 void ControllerOverrideManager::UpdateSystemControllerPointers(
@@ -2207,11 +2207,21 @@ void ControllerOverrideManager::ApplyKeyboardPreferences(std::vector<KeyboardDev
 void ControllerOverrideManager::RefreshDevicesAndReinitializeGame()
 {
     LOG(1, "ControllerOverrideManager::RefreshDevicesAndReinitializeGame - begin\n");
+    
+    //If controllers are swapped before we reinitialize, then make sure to swap them again at the end.
+    bool controllerPosSwap = m_ControllerPosSwap;
+    if (controllerPosSwap) {
+        SetControllerPosSwap(false);
+    }
 
     RefreshDevices();
     RefreshKeyboardDevices();
     EnsureP1KeyboardsValid();
     ReinitializeGameInputs();
+
+    if (controllerPosSwap) {
+        SetControllerPosSwap(true);
+    }
 
     LOG(1, "ControllerOverrideManager::RefreshDevicesAndReinitializeGame - end\n");
 }

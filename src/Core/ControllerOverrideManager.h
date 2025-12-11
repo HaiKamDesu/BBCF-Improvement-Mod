@@ -114,8 +114,8 @@ public:
         void SetAutoRefreshEnabled(bool enabled);
         bool IsAutoRefreshEnabled() const;
 
-        void SetKeyboardControllerSeparated(bool enabled);
-        bool IsKeyboardControllerSeparated() const { return m_keyboardControllerSeparated; }
+        void SetControllerPosSwap(bool enabled);
+        bool IsKeyboardControllerSeparated() const { return m_ControllerPosSwap; }
 
         void SetPlayerSelection(int playerIndex, const GUID& guid);
         GUID GetPlayerSelection(int playerIndex) const;
@@ -227,7 +227,7 @@ private:
         GUID m_playerSelections[2];
         bool m_overrideEnabled = false;
         bool m_autoRefreshEnabled = true;
-        bool m_keyboardControllerSeparated = false;
+        bool m_ControllerPosSwap = false;
         bool m_multipleKeyboardOverrideEnabled = false;
         ULONGLONG m_lastRefresh = 0;
         size_t m_lastDeviceHash = 0;
