@@ -10,6 +10,7 @@
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Core/Localization.h"
 #include "Web/update_check.h"
 
 #include <imgui.h>
@@ -60,11 +61,13 @@ bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 		return false;
 	}
 
-	m_pLogger = g_imGuiLogger;
+        m_pLogger = g_imGuiLogger;
 
-	m_pLogger->Log("[system] Initialization starting...\n");
+        m_pLogger->Log("[system] Initialization starting...\n");
 
-	m_windowContainer = new WindowContainer();
+        m_windowContainer = new WindowContainer();
+
+        Localization::Initialize(Settings::settingsIni.language);
 
 	ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();

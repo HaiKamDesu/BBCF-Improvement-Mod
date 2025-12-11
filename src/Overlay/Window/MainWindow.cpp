@@ -10,6 +10,8 @@
 #include "Core/logger.h"
 #include "Core/info.h"
 #include "Core/interfaces.h"
+#include "Core/utils.h"
+#include "Core/Localization.h"
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Window/ControllerSettings/ControllerSettingsSection.h"
@@ -62,26 +64,28 @@ void MainWindow::BeforeDraw()
 
 void MainWindow::Draw()
 {
-	ImGui::Text("Toggle me with %s", Settings::settingsIni.togglebutton.c_str());
-	ImGui::Text("Toggle Online with %s", Settings::settingsIni.toggleOnlineButton.c_str());
-	ImGui::Text("Toggle HUD with %s", Settings::settingsIni.toggleHUDbutton.c_str());
-	ImGui::Separator();
+        ImGui::Text(L("Toggle me with %s").c_str(), Settings::settingsIni.togglebutton.c_str());
+        ImGui::Text(L("Toggle Online with %s").c_str(), Settings::settingsIni.toggleOnlineButton.c_str());
+        ImGui::Text(L("Toggle HUD with %s").c_str(), Settings::settingsIni.toggleHUDbutton.c_str());
+        ImGui::Separator();
 
-	ImGui::VerticalSpacing(5);
+        ImGui::VerticalSpacing(5);
 
-	ImGui::HorizontalSpacing();
-	bool generateDebugLogs = Settings::settingsIni.generateDebugLogs;
-	if (ImGui::Checkbox("Generate Debug Logs", &generateDebugLogs))
-	{
-		Settings::settingsIni.generateDebugLogs = generateDebugLogs;
-		Settings::changeSetting("GenerateDebugLogs", generateDebugLogs ? "1" : "0");
-		SetLoggingEnabled(generateDebugLogs);
-	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.");
+        DrawLanguageSelector();
+
+        ImGui::HorizontalSpacing();
+        bool generateDebugLogs = Settings::settingsIni.generateDebugLogs;
+        if (ImGui::Checkbox(L("Generate Debug Logs").c_str(), &generateDebugLogs))
+        {
+                Settings::settingsIni.generateDebugLogs = generateDebugLogs;
+                Settings::changeSetting("GenerateDebugLogs", generateDebugLogs ? "1" : "0");
+                SetLoggingEnabled(generateDebugLogs);
+        }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(L("Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.").c_str());
 
 	ImGui::AlignTextToFramePadding();
-	ImGui::TextUnformatted("P$"); ImGui::SameLine();
+        ImGui::TextUnformatted("P$"); ImGui::SameLine();
 	if (g_gameVals.pGameMoney)
 	{
 		ImGui::InputInt("##P$", *&g_gameVals.pGameMoney);
@@ -89,10 +93,10 @@ void MainWindow::Draw()
 
 	ImGui::VerticalSpacing(5);
 
-	if (ImGui::Button("Online", BTN_SIZE))
-	{
-		m_pWindowContainer->GetWindow(WindowType_Room)->ToggleOpen();
-	}
+        if (ImGui::Button(L("Online").c_str(), BTN_SIZE))
+        {
+                m_pWindowContainer->GetWindow(WindowType_Room)->ToggleOpen();
+        }
 
 	ImGui::VerticalSpacing(5);
 
@@ -108,71 +112,130 @@ void MainWindow::Draw()
 
 	ImGui::VerticalSpacing(5);
 
-	DrawCurrentPlayersCount();
-	DrawLinkButtons();
+        DrawCurrentPlayersCount();
+        DrawLinkButtons();
+}
+
+void MainWindow::DrawLanguageSelector()
+{
+        ImGui::HorizontalSpacing();
+
+        const auto& options = Localization::GetAvailableLanguages();
+
+        int currentIndex = 0;
+        for (size_t i = 0; i < options.size(); ++i)
+        {
+                if (options[i].code == Localization::GetCurrentLanguage())
+                {
+                        currentIndex = static_cast<int>(i);
+                        break;
+                }
+        }
+
+        const auto& currentOption = options[currentIndex];
+        std::string preview = currentOption.displayName;
+
+        if (ImGui::BeginCombo(L("Language").c_str(), preview.c_str()))
+        {
+                for (size_t i = 0; i < options.size(); ++i)
+                {
+                        const auto& option = options[i];
+                        std::string label = option.displayName;
+                        if (!option.complete)
+                        {
+                                label = FormatText(L("Language incomplete label").c_str(), option.displayName.c_str(), option.missingKeys);
+                        }
+
+                        if (!option.complete)
+                        {
+                                ImGui::BeginDisabled();
+                        }
+
+                        bool selected = currentIndex == static_cast<int>(i);
+                        if (ImGui::Selectable(label.c_str(), selected))
+                        {
+                                if (Localization::SetCurrentLanguage(option.code))
+                                {
+                                        Settings::settingsIni.language = option.code;
+                                        Settings::changeSetting("Language", Settings::settingsIni.language);
+                                        currentIndex = static_cast<int>(i);
+                                }
+                        }
+
+                        if (!option.complete)
+                        {
+                                ImGui::EndDisabled();
+                        }
+                }
+
+                ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(L("Language selection help").c_str());
 }
 
 void MainWindow::DrawUtilButtons() const
 {
 #ifdef _DEBUG
-	if (ImGui::Button("DEBUG", BTN_SIZE))
-	{
-		m_pWindowContainer->GetWindow(WindowType_Debug)->ToggleOpen();
-	}
+        if (ImGui::Button("DEBUG", BTN_SIZE))
+        {
+                m_pWindowContainer->GetWindow(WindowType_Debug)->ToggleOpen();
+        }
 #endif
 
-	if (ImGui::Button("Log", BTN_SIZE))
-	{
-		m_pWindowContainer->GetWindow(WindowType_Log)->ToggleOpen();
-	}
-	if (ImGui::Button("States", BTN_SIZE))
-	{
-		m_pWindowContainer->GetWindow(WindowType_Scr)->ToggleOpen();
-	}
+        if (ImGui::Button(L("Log").c_str(), BTN_SIZE))
+        {
+                m_pWindowContainer->GetWindow(WindowType_Log)->ToggleOpen();
+        }
+        if (ImGui::Button(L("States").c_str(), BTN_SIZE))
+        {
+                m_pWindowContainer->GetWindow(WindowType_Scr)->ToggleOpen();
+        }
 }
 
 void MainWindow::DrawCurrentPlayersCount() const
 {
-	ImGui::Text("Current online players:");
-	ImGui::SameLine();
+        ImGui::Text("%s", L("Current online players:").c_str());
+        ImGui::SameLine();
 
-	std::string currentPlayersCount = g_interfaces.pSteamApiHelper ? g_interfaces.pSteamApiHelper->GetCurrentPlayersCountString() : "<No data>";
-	ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", currentPlayersCount.c_str());
+        std::string currentPlayersCount = g_interfaces.pSteamApiHelper ? g_interfaces.pSteamApiHelper->GetCurrentPlayersCountString() : L("<No data>");
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", currentPlayersCount.c_str());
 }
 
 void MainWindow::DrawAvatarSection() const
 {
-	if (!ImGui::CollapsingHeader("Avatar settings"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Avatar settings").c_str()))
+                return;
 
-	if (g_gameVals.playerAvatarAddr == NULL && g_gameVals.playerAvatarColAddr == NULL && g_gameVals.playerAvatarAcc1 == NULL && g_gameVals.playerAvatarAcc2 == NULL)
-	{
-		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("CONNECT TO NETWORK MODE FIRST");
-	}
-	else
-	{
-		ImGui::HorizontalSpacing(); ImGui::SliderInt("Avatar", g_gameVals.playerAvatarAddr, 0, 0x2F);
-		ImGui::HorizontalSpacing(); ImGui::SliderInt("Color", g_gameVals.playerAvatarColAddr, 0, 0x3);
-		ImGui::HorizontalSpacing(); ImGui::SliderByte("Accessory 1", g_gameVals.playerAvatarAcc1, 0, 0xCF);
-		ImGui::HorizontalSpacing(); ImGui::SliderByte("Accessory 2", g_gameVals.playerAvatarAcc2, 0, 0xCF);
-	}
+        if (g_gameVals.playerAvatarAddr == NULL && g_gameVals.playerAvatarColAddr == NULL && g_gameVals.playerAvatarAcc1 == NULL && g_gameVals.playerAvatarAcc2 == NULL)
+        {
+                ImGui::HorizontalSpacing();
+                ImGui::TextDisabled(L("CONNECT TO NETWORK MODE FIRST").c_str());
+        }
+        else
+        {
+                ImGui::HorizontalSpacing(); ImGui::SliderInt(L("Avatar").c_str(), g_gameVals.playerAvatarAddr, 0, 0x2F);
+                ImGui::HorizontalSpacing(); ImGui::SliderInt(L("Color").c_str(), g_gameVals.playerAvatarColAddr, 0, 0x3);
+                ImGui::HorizontalSpacing(); ImGui::SliderByte(L("Accessory 1").c_str(), g_gameVals.playerAvatarAcc1, 0, 0xCF);
+                ImGui::HorizontalSpacing(); ImGui::SliderByte(L("Accessory 2").c_str(), g_gameVals.playerAvatarAcc2, 0, 0xCF);
+        }
 }
 
 
 void MainWindow::DrawFrameHistorySection() const
 {
-	if (!ImGui::CollapsingHeader("FrameHistory"))
-		return;
+        if (!ImGui::CollapsingHeader(L("FrameHistory").c_str()))
+                return;
 
 	if (!isFrameHistoryEnabledInCurrentState()) {
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!");
+                ImGui::TextDisabled(L("YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!").c_str());
 		return;
 	}
 	if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS");
+                ImGui::TextDisabled(L("THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS").c_str());
 		return;
 	}
 	//if (g_interfaces.player1.GetData()->charIndex == g_interfaces.player2.GetData()->charIndex) {
@@ -186,9 +249,9 @@ void MainWindow::DrawFrameHistorySection() const
 
 
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox("Enable##framehistory_section", &isOpen);
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker("For each non-idle frame, display a column of rectangles with info about it. \r\n \r\nFor each player : \r\n = The first row displays player state. \r\n - Startup->green \r\n - Active->red \r\n - Recovery->blue \r\n - Blockstun->yellow \r\n - Hitstun->purple \r\n - Hard landing recovery->blush \r\n - Special: hard to classify states(e.g.dashes)->Aquamarine \r\n\r\n = Second row is for invul/armor. The position of the line segments indicates the attributes, and its color if invul or armor: \r\n - Invul->white \r\n - Armor->brown \r\n - H->top segment \r\n - B->middle segment \r\n - F->bottom segment \r\n - T->left segment \r\n - P->right segment \r\n");
+        ImGui::Checkbox(L("Enable##framehistory_section").c_str(), &isOpen);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(L("FrameHistory help").c_str());
 	if (isOpen)
 	{
 		frameHistWin->Open();
@@ -199,22 +262,22 @@ void MainWindow::DrawFrameHistorySection() const
 	}
 
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox("Auto Reset##Reset after each idle frame", &frameHistWin->resetting);
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker("block auto-reset on an idle frame: Do not overwrite automatically after an idle frame.");
+        ImGui::Checkbox(L("Auto Reset##Reset after each idle frame").c_str(), &frameHistWin->resetting);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(L("FrameHistory auto reset help").c_str());
 
 	ImGui::HorizontalSpacing();
-	if (ImGui::SliderFloat("Box width", &frameHistWin->width, 1., 100.)) {
-		Settings::changeSetting("FrameHistoryWidth", std::to_string(frameHistWin->width));
-	}
-	ImGui::HorizontalSpacing();
-	if (ImGui::SliderFloat("Box height", &frameHistWin->height, 1., 100.)) {
-		Settings::changeSetting("FrameHistoryHeight", std::to_string(frameHistWin->height));
-	}
-	ImGui::HorizontalSpacing();
-	if (ImGui::SliderFloat("spacing", &frameHistWin->spacing, 1., 100.)) {
-		Settings::changeSetting("FrameHistorySpacing", std::to_string(frameHistWin->spacing));
-	};
+        if (ImGui::SliderFloat(L("Box width").c_str(), &frameHistWin->width, 1., 100.)) {
+                Settings::changeSetting("FrameHistoryWidth", std::to_string(frameHistWin->width));
+        }
+        ImGui::HorizontalSpacing();
+        if (ImGui::SliderFloat(L("Box height").c_str(), &frameHistWin->height, 1., 100.)) {
+                Settings::changeSetting("FrameHistoryHeight", std::to_string(frameHistWin->height));
+        }
+        ImGui::HorizontalSpacing();
+        if (ImGui::SliderFloat(L("spacing").c_str(), &frameHistWin->spacing, 1., 100.)) {
+                Settings::changeSetting("FrameHistorySpacing", std::to_string(frameHistWin->spacing));
+        };
 
 
 }
@@ -223,31 +286,31 @@ void MainWindow::DrawFrameHistorySection() const
 
 void MainWindow::DrawFrameAdvantageSection() const
 {
-	if (!ImGui::CollapsingHeader("Framedata"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Framedata").c_str()))
+                return;
 
 	if (!isInMatch())
 	{
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN MATCH!");
-		return;
-	}
-	else if (!(*g_gameVals.pGameMode == GameMode_Training || *g_gameVals.pGameMode == GameMode_ReplayTheater))
-	{
-		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!");
-		return;
-	}
+                ImGui::TextDisabled(L("YOU ARE NOT IN MATCH!").c_str());
+                return;
+        }
+        else if (!(*g_gameVals.pGameMode == GameMode_Training || *g_gameVals.pGameMode == GameMode_ReplayTheater))
+        {
+                ImGui::HorizontalSpacing();
+                ImGui::TextDisabled(L("YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!").c_str());
+                return;
+        }
 
 	if (!g_gameVals.pEntityList)
 		return;
 
 	static bool isFrameAdvantageOpen = false;
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox("Enable##framedata_section", &isFrameAdvantageOpen);
-	//ImGui::Checkbox("Enable##framedata_section", &isFrameAdvantageOpen);
-	ImGui::HorizontalSpacing();
-	ImGui::Checkbox("Advantage on stagger hit", &idleActionToggles.ukemiStaggerHit);
+        ImGui::Checkbox(L("Enable##framedata_section").c_str(), &isFrameAdvantageOpen);
+        //ImGui::Checkbox("Enable##framedata_section", &isFrameAdvantageOpen);
+        ImGui::HorizontalSpacing();
+        ImGui::Checkbox(L("Advantage on stagger hit").c_str(), &idleActionToggles.ukemiStaggerHit);
 
 	if (isFrameAdvantageOpen)
 	{
@@ -263,18 +326,18 @@ void MainWindow::DrawFrameAdvantageSection() const
 
 void MainWindow::DrawCustomPalettesSection() const
 {
-	if (!ImGui::CollapsingHeader("Custom palettes"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Custom palettes").c_str()))
+                return;
 
 	if (!isInMatch())
 	{
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN MATCH!");
-	}
-	else
-	{
-		ImGui::HorizontalSpacing();
-		m_pWindowContainer->GetWindow<PaletteEditorWindow>(WindowType_PaletteEditor)->ShowAllPaletteSelections("Main");
+                ImGui::TextDisabled(L("YOU ARE NOT IN MATCH!").c_str());
+        }
+        else
+        {
+                ImGui::HorizontalSpacing();
+                m_pWindowContainer->GetWindow<PaletteEditorWindow>(WindowType_PaletteEditor)->ShowAllPaletteSelections("Main");
 	}
 
 	ImGui::VerticalSpacing(15);
@@ -285,28 +348,28 @@ void MainWindow::DrawCustomPalettesSection() const
 	{
 		ImGui::HorizontalSpacing();
 
-		if (ImGui::Button("Palette editor"))
-			m_pWindowContainer->GetWindow(WindowType_PaletteEditor)->ToggleOpen();
-	}
+                if (ImGui::Button(L("Palette editor").c_str()))
+                        m_pWindowContainer->GetWindow(WindowType_PaletteEditor)->ToggleOpen();
+        }
 }
 
 void MainWindow::DrawHitboxOverlaySection() const
 {
-	if (!ImGui::CollapsingHeader("Hitbox overlay"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Hitbox overlay").c_str()))
+                return;
 
 	if (!isHitboxOverlayEnabledInCurrentState())
 	{
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!");
-		return;
-	}
+                ImGui::TextDisabled(L("YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!").c_str());
+                return;
+        }
 
 	static bool isOpen = false;
 
 	ImGui::HorizontalSpacing();
-	if (ImGui::Checkbox("Enable##hitbox_overlay_section", &isOpen))
-	{
+        if (ImGui::Checkbox(L("Enable##hitbox_overlay_section").c_str(), &isOpen))
+        {
 		if (isOpen)
 		{
 			m_pWindowContainer->GetWindow(WindowType_HitboxOverlay)->Open();
@@ -322,19 +385,19 @@ void MainWindow::DrawHitboxOverlaySection() const
 	{
 		ImGui::VerticalSpacing(10);
 
-		if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr())
-		{
-			ImGui::HorizontalSpacing();
-			ImGui::Checkbox("Player1", &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCharacterHitbox[0]);
-			ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player1.GetData()->charIndex).c_str());
-			ImGui::SameLine(); ImGui::HorizontalSpacing();
-			ImGui::TextUnformatted(g_interfaces.player1.GetData()->currentAction);
+                        if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr())
+                        {
+                                ImGui::HorizontalSpacing();
+                                ImGui::Checkbox(L("Player1").c_str(), &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCharacterHitbox[0]);
+                                ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player1.GetData()->charIndex).c_str());
+                                ImGui::SameLine(); ImGui::HorizontalSpacing();
+                                ImGui::TextUnformatted(g_interfaces.player1.GetData()->currentAction);
 
-			ImGui::HorizontalSpacing();
-			ImGui::Checkbox("Player2", &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCharacterHitbox[1]);
-			ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player2.GetData()->charIndex).c_str());
-			ImGui::SameLine(); ImGui::HorizontalSpacing();
-			ImGui::TextUnformatted(g_interfaces.player2.GetData()->currentAction);
+                                ImGui::HorizontalSpacing();
+                                ImGui::Checkbox(L("Player2").c_str(), &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCharacterHitbox[1]);
+                                ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player2.GetData()->charIndex).c_str());
+                                ImGui::SameLine(); ImGui::HorizontalSpacing();
+                                ImGui::TextUnformatted(g_interfaces.player2.GetData()->currentAction);
 		}
 
 		ImGui::VerticalSpacing(10);
@@ -346,50 +409,50 @@ void MainWindow::DrawHitboxOverlaySection() const
 		m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->DrawRectFillTransparencySlider();
 
 		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Draw hitbox/hurtbox",
-			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawHitboxHurtbox);
-		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Draw origin",
-			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawOriginLine);
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker("The point in space where your character resides. \nImportant!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.");
-		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Draw collision",
-			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCollisionBoxes);
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker("Defines collision between objects/characters. Also used for throw range checks.");
-		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Draw throw/range boxes",
-			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawRangeCheckBoxes);
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker("Throw Range Box(yellow): All throws require the throw range check. In order to pass this check the throw range box must overlap target's  collision box.\n\nMove Range Box(green): All throws and some moves require the move range check. In order to pass this check the move range box must overlap the target's origin point.\n\n\n\nHow do throws connect?\n\nIn order for a throw to connect you must have satisfy the following conditions:\n1: Both players must be on the ground or in the air. This is decided by their origin position, not sprite.\n2: You must pass the move range check.\n3: You must pass the throw range check.\n4: The hitbox of the throw must overlap the hurtbox of the target.\n5: The target must not be throw immune.\n");
+                ImGui::Checkbox(L("Draw hitbox/hurtbox").c_str(),
+                        &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawHitboxHurtbox);
+                ImGui::HorizontalSpacing();
+                ImGui::Checkbox(L("Draw origin").c_str(),
+                        &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawOriginLine);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(L("The point in space where your character resides. \nImportant!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.").c_str());
+                ImGui::HorizontalSpacing();
+                ImGui::Checkbox(L("Draw collision").c_str(),
+                        &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCollisionBoxes);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(L("Defines collision between objects/characters. Also used for throw range checks.").c_str());
+                ImGui::HorizontalSpacing();
+                ImGui::Checkbox(L("Draw throw/range boxes").c_str(),
+                        &m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawRangeCheckBoxes);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(L("Throw range help").c_str());
 		ImGui::VerticalSpacing();
 
 		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Freeze frame:", &g_gameVals.isFrameFrozen);
-		if (ImGui::IsKeyPressed(g_modVals.freeze_frame_keycode))
-			g_gameVals.isFrameFrozen ^= 1;
+                ImGui::Checkbox(L("Freeze frame:").c_str(), &g_gameVals.isFrameFrozen);
+                if (ImGui::IsKeyPressed(g_modVals.freeze_frame_keycode))
+                        g_gameVals.isFrameFrozen ^= 1;
 
 		if (g_gameVals.pFrameCount)
 		{
 			ImGui::SameLine();
-			ImGui::Text("%d", *g_gameVals.pFrameCount);
-			ImGui::SameLine();
-			if (ImGui::Button("Reset"))
-			{
-				*g_gameVals.pFrameCount = 0;
-				g_gameVals.framesToReach = 0;
-			}
+                        ImGui::Text("%d", *g_gameVals.pFrameCount);
+                        ImGui::SameLine();
+                        if (ImGui::Button(L("Reset").c_str()))
+                        {
+                                *g_gameVals.pFrameCount = 0;
+                                g_gameVals.framesToReach = 0;
+                        }
 		}
 
 		if (g_gameVals.isFrameFrozen)
 		{
 			static int framesToStep = 1;
 			ImGui::HorizontalSpacing();
-			if (ImGui::Button("Step frames") || ImGui::IsKeyPressed(g_modVals.step_frames_keycode))
-			{
-				g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
-			}
+                        if (ImGui::Button(L("Step frames").c_str()) || ImGui::IsKeyPressed(g_modVals.step_frames_keycode))
+                        {
+                                g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
+                        }
 
 			ImGui::SameLine();
 			ImGui::SliderInt("", &framesToStep, 1, 60);
@@ -399,19 +462,19 @@ void MainWindow::DrawHitboxOverlaySection() const
 
 void MainWindow::DrawGameplaySettingSection() const
 {
-	if (!ImGui::CollapsingHeader("Gameplay settings"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Gameplay settings header").c_str()))
+                return;
 
 	if (!isInMatch() && !isOnVersusScreen() && !isOnReplayMenuScreen() && !isOnCharacterSelectionScreen())
 	{
 		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN MATCH!");
+                ImGui::TextDisabled(L("YOU ARE NOT IN MATCH!").c_str());
 
-		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN REPLAY MENU!");
+                ImGui::HorizontalSpacing();
+                ImGui::TextDisabled(L("YOU ARE NOT IN REPLAY MENU!").c_str());
 
-		ImGui::HorizontalSpacing();
-		ImGui::TextDisabled("YOU ARE NOT IN CHARACTER SELECTION!");
+                ImGui::HorizontalSpacing();
+                ImGui::TextDisabled(L("YOU ARE NOT IN CHARACTER SELECTION!").c_str());
 
 		return;
 	}
@@ -441,12 +504,12 @@ void MainWindow::DrawGameplaySettingSection() const
 	{
 		ImGui::VerticalSpacing(10);
 		ImGui::HorizontalSpacing();
-		ImGui::Checkbox("Hide HUD", (bool*)g_gameVals.pIsHUDHidden);
-	}
+                ImGui::Checkbox(L("Hide HUD checkbox").c_str(), (bool*)g_gameVals.pIsHUDHidden);
+        }
 }
 void MainWindow::DrawControllerSettingSection() const {
-	if (!ImGui::CollapsingHeader("Controller Settings"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Controller Settings").c_str()))
+                return;
 
 	ControllerSettings::DrawSection();
 } // DrawControllerSettingSection
@@ -454,31 +517,31 @@ void MainWindow::DrawControllerSettingSection() const {
 void MainWindow::DrawLinkButtons() const
 {
 	//ImGui::ButtonUrl("Replay Database", REPLAY_DB_FRONTEND, BTN_SIZE);
-	if (*g_gameVals.pGameMode == GameMode_ReplayTheater) {
-		if (ImGui::Button("Toggle Rewind"))
-			m_pWindowContainer->GetWindow(WindowType_ReplayRewind)->ToggleOpen();
-	}
-	ImGui::ButtonUrl("Replay Database", REPLAY_DB_FRONTEND);
-	ImGui::SameLine();
-	if (ImGui::Button("Enable/Disable Upload")) {
-		m_pWindowContainer->GetWindow(WindowType_ReplayDBPopup)->ToggleOpen();
-	}
+        if (*g_gameVals.pGameMode == GameMode_ReplayTheater) {
+                if (ImGui::Button(L("Toggle Rewind").c_str()))
+                        m_pWindowContainer->GetWindow(WindowType_ReplayRewind)->ToggleOpen();
+        }
+        ImGui::ButtonUrl(L("Replay Database").c_str(), REPLAY_DB_FRONTEND);
+        ImGui::SameLine();
+        if (ImGui::Button(L("Enable/Disable Upload").c_str())) {
+                m_pWindowContainer->GetWindow(WindowType_ReplayDBPopup)->ToggleOpen();
+        }
 
 
-	ImGui::ButtonUrl("Discord", MOD_LINK_DISCORD, BTN_SIZE);
+        ImGui::ButtonUrl(L("Discord").c_str(), MOD_LINK_DISCORD, BTN_SIZE);
 
-	ImGui::SameLine();
-	ImGui::ButtonUrl("Forum", MOD_LINK_FORUM, BTN_SIZE);
+        ImGui::SameLine();
+        ImGui::ButtonUrl(L("Forum").c_str(), MOD_LINK_FORUM, BTN_SIZE);
 
-	ImGui::SameLine();
-	ImGui::ButtonUrl("GitHub", MOD_LINK_GITHUB, BTN_SIZE);
+        ImGui::SameLine();
+        ImGui::ButtonUrl(L("GitHub").c_str(), MOD_LINK_GITHUB, BTN_SIZE);
 
 }
 
 void MainWindow::DrawLoadedSettingsValuesSection() const
 {
-	if (!ImGui::CollapsingHeader("Loaded settings.ini values"))
-		return;
+        if (!ImGui::CollapsingHeader(L("Loaded settings.ini values").c_str()))
+                return;
 
 	// Not using ImGui columns here because they are bugged if the window has always_autoresize flag. The window 
 	// starts extending to infinity, if the left edge of the window touches any edges of the screen

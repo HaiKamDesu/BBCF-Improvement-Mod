@@ -79,6 +79,7 @@ This handbook is a one-stop map for agents modifying the BBCF Improvement Mod. T
 - Rendering/UI changes should go through the wrapper classes so ImGui draws safely; avoid direct device calls without routing through `ID3D9EXWrapper_Device` and friends.
 - Networking additions should define packets in `Network/Packet.h`, send/receive in `NetworkManager` or specialized managers, and use Steam wrappers for transport. Mirror state changes in `CustomGameMode` or `PaletteManager` as needed.
 - Keep logs verbose while iterating (`logger.h` levels) and update templates in `resource/` when introducing new user-facing config knobs.
+- Localization strings live in `src/Core/Localization.cpp`. Add new UI copy there and wrap ImGui labels with the `L()` helper to make sure every language stays in sync. Disable languages with missing keys by leaving the translation map incomplete; the UI will gray them out automatically.
 
 ## Release checklist
 1. Build `Release|Win32` to generate `bin/Release/dinput8.dll`.

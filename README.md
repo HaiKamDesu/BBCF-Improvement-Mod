@@ -18,6 +18,7 @@ Join the [BB Improvement Mod Discord Server](https://discord.gg/j2mCX9s) to disc
 - Adds gap action thru training dummy slots
 - Adds local replay file loading
 - more experimental features
+- Switchable overlay language (English/Spanish) with extendable dictionaries
 
 
 - Create and load custom palettes and effects without file modifications
