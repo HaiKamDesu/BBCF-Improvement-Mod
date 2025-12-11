@@ -148,7 +148,8 @@ void MainWindow::DrawLanguageSelector()
 
                         if (!option.complete)
                         {
-                                ImGui::BeginDisabled();
+                                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+                                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
                         }
 
                         bool selected = currentIndex == static_cast<int>(i);
@@ -164,7 +165,8 @@ void MainWindow::DrawLanguageSelector()
 
                         if (!option.complete)
                         {
-                                ImGui::EndDisabled();
+                                ImGui::PopStyleVar();
+                                ImGui::PopItemFlag();
                         }
                 }
 
