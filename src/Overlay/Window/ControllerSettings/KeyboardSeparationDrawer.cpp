@@ -12,12 +12,12 @@ namespace ControllerSettings
         {
                 ImGui::HorizontalSpacing();
                 bool controllerPositionSwapped = controllerManager.IsKeyboardControllerSeparated();
-                if (ImGui::Checkbox("Separate Keyboard and Controllers", &controllerPositionSwapped))
+                if (ImGui::Checkbox("Swap P1 Controller to P2", &controllerPositionSwapped))
                 {
-                        controllerManager.SetKeyboardControllerSeparated(controllerPositionSwapped);
-                        Settings::settingsIni.separateKeyboardAndControllers = controllerPositionSwapped;
+                        controllerManager.SetControllerPosSwap(controllerPositionSwapped);
+                        Settings::settingsIni.swapControllerPos = controllerPositionSwapped;
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker("Separates keyboard input from controller slots so they can map to different players.");
+                ImGui::ShowHelpMarker("Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.");
         }
 }
