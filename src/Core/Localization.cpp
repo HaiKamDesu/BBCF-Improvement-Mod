@@ -5,6 +5,9 @@
 #include <fstream>
 #include <regex>
 #include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "logger.h"
 
