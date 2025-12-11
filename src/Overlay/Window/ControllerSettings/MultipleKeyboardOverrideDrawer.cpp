@@ -111,7 +111,7 @@ namespace ControllerSettings
                                         return;
                                 }
 
-                                if (ImGui::BeginListBox(isP1 ? "##keyboard_list_p1" : "##keyboard_list_p2", ImVec2(-FLT_MIN, 200)))
+                                if (ImGui::ListBoxHeader(isP1 ? "##keyboard_list_p1" : "##keyboard_list_p2", ImVec2(-FLT_MIN, 200)))
                                 {
                                         for (auto& dev : devices)
                                         {
@@ -178,7 +178,7 @@ namespace ControllerSettings
                                                 ImGui::PopID();
                                         }
 
-                                        ImGui::EndListBox();
+                                        ImGui::ListBoxFooter();
 
                                         // Save P1 handle list if anything changed.
                                         controllerManager.SetP1KeyboardHandles(p1Handles);
