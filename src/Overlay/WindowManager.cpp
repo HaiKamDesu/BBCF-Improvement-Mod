@@ -207,52 +207,67 @@ void WindowManager::CreateDeviceObjects()
 
 void WindowManager::Render()
 {
-	if (!m_initialized)
-	{
-		return;
-	}
+        if (!m_initialized)
+        {
+                return;
+        }
 
-	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
-	{
-		return;
-	}
+        if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
+        {
+                return;
+        }
 
-	if (IsIconic(g_gameProc.hWndGameWindow))
-	{
-		return; // don't render when window is minimized, since this sometimes moves ui around
-	}
+        if (IsIconic(g_gameProc.hWndGameWindow))
+        {
+                return; // don't render when window is minimized, since this sometimes moves ui around
+        }
 
+        static int s_renderLogCount = 0;
+        if (s_renderLogCount < 5)
+        {
+                LOG(2, "WindowManager::Render frame %d start\n", s_renderLogCount);
+        }
 
-	LOG(7, "WindowManager::Render\n");
+        LOG(7, "WindowManager::Render\n");
 
-	HandleButtons();
+        HandleButtons();
 
-	ImGui_ImplDX9_NewFrame();
+        ImGui_ImplDX9_NewFrame();
 
-	ImGui::GetIO().MouseDrawCursor = false;
-	for (auto p : m_windowContainer->GetWindows()) {
-		if (p.first == WindowType_HitboxOverlay) continue; // ignore windows that don't need a mouse
-		if (p.second->IsOpen()) {
-			ImGui::GetIO().MouseDrawCursor = true;
-			break;
-		}
-	}
+        ImGui::GetIO().MouseDrawCursor = false;
+        for (auto p : m_windowContainer->GetWindows())
+        {
+                if (p.first == WindowType_HitboxOverlay)
+                {
+                        continue; // ignore windows that don't need a mouse
+                }
+                if (p.second->IsOpen())
+                {
+                        ImGui::GetIO().MouseDrawCursor = true;
+                        break;
+                }
+        }
 
+        if (Settings::settingsIni.viewport == 2)
+        {
+                ImGui::GetIO().DisplaySize = ImVec2(Settings::settingsIni.renderwidth, Settings::settingsIni.renderheight);
+        }
+        else if (Settings::settingsIni.viewport == 3)
+        {
+                ImGui::GetIO().DisplaySize = ImVec2(1280, 768);
+        }
 
-	if (Settings::settingsIni.viewport == 2)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(Settings::settingsIni.renderwidth, Settings::settingsIni.renderheight);
-	}
-	else if (Settings::settingsIni.viewport == 3)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(1280, 768);
-	}
+        DrawAllWindows();
 
-	DrawAllWindows();
+        g_notificationBar->DrawNotifications();
 
-	g_notificationBar->DrawNotifications();
+        if (s_renderLogCount < 5)
+        {
+                LOG(2, "WindowManager::Render frame %d end\n", s_renderLogCount);
+                ++s_renderLogCount;
+        }
 
-	ImGui::Render();
+        ImGui::Render();
 }
 
 void WindowManager::HandleButtons()
