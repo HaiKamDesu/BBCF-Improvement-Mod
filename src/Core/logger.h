@@ -25,6 +25,7 @@
         }
 
 void logger(const char* message, ...);
+void ForceLog(const char* message, ...);
 void openLogger();
 void closeLogger();
 void SetLoggingEnabled(bool enabled);

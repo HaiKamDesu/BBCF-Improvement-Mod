@@ -193,16 +193,36 @@ bool Hook(void* toHook, void* ourFunc, int len)
 
 std::string FormatText(const char* message, ...)
 {
-	if (!message) { return std::string(""); }
+        if (!message)
+        {
+                return std::string("");
+        }
 
-	char buf[1000];
-	va_list args;
-	va_start(args, message);
-	
-	vsprintf(buf, message, args);
-	va_end(args);
+        va_list args;
+        va_start(args, message);
 
-	return std::string(buf);
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
+        va_end(argsCopy);
+
+        if (required < 0)
+        {
+                va_end(args);
+                return std::string("");
+        }
+
+        std::string buffer(static_cast<size_t>(required) + 1, '\0');
+        const int written = std::vsnprintf(&buffer[0], buffer.size(), message, args);
+        va_end(args);
+
+        if (written < 0)
+        {
+                return std::string("");
+        }
+
+        buffer.resize(static_cast<size_t>(written));
+        return buffer;
 }
 
 

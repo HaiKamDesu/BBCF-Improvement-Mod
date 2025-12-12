@@ -10,6 +10,7 @@
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Core/Localization.h"
 #include "Web/update_check.h"
 
 #include <imgui.h>
@@ -35,12 +36,14 @@ WindowManager & WindowManager::GetInstance()
 
 bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 {
-	if (m_initialized)
-	{
-		return true;
-	}
+        if (m_initialized)
+        {
+                return true;
+        }
 
-	LOG(2, "WindowManager::Initialize\n");
+        ForceLog("[RenderTrace] WindowManager::Initialize begin\n");
+
+        LOG(2, "WindowManager::Initialize\n");
 
 	if (!hwnd)
 	{
@@ -60,11 +63,13 @@ bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 		return false;
 	}
 
-	m_pLogger = g_imGuiLogger;
+        m_pLogger = g_imGuiLogger;
 
-	m_pLogger->Log("[system] Initialization starting...\n");
+        m_pLogger->Log("[system] Initialization starting...\n");
 
-	m_windowContainer = new WindowContainer();
+        m_windowContainer = new WindowContainer();
+
+        Localization::Initialize(Settings::settingsIni.language);
 
 	ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -155,14 +160,15 @@ bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 	notificationText += " (DEBUG)";
 #endif
 
-	g_notificationBar->AddNotification("%s (Press %s to open the main window)",
-		notificationText.c_str(), Settings::settingsIni.togglebutton.c_str());
+        g_notificationBar->AddNotification("%s (Press %s to open the main window)",
+                notificationText.c_str(), Settings::settingsIni.togglebutton.c_str());
 
-	m_pLogger->Log("[system] Finished initialization\n");
-	m_pLogger->LogSeparator();
-	LOG(2, "Initialize end\n");
+        m_pLogger->Log("[system] Finished initialization\n");
+        m_pLogger->LogSeparator();
+        ForceLog("[RenderTrace] WindowManager::Initialize end\n");
+        LOG(2, "Initialize end\n");
 
-	return true;
+        return true;
 }
 
 void WindowManager::Shutdown()
@@ -204,52 +210,79 @@ void WindowManager::CreateDeviceObjects()
 
 void WindowManager::Render()
 {
-	if (!m_initialized)
-	{
-		return;
-	}
+        if (!m_initialized)
+        {
+                return;
+        }
 
-	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
-	{
-		return;
-	}
+        static int s_renderTraceCount = 0;
+        if (s_renderTraceCount < 5)
+        {
+                ForceLog("[RenderTrace] WindowManager::Render begin %d\n", s_renderTraceCount);
+        }
 
-	if (IsIconic(g_gameProc.hWndGameWindow))
-	{
-		return; // don't render when window is minimized, since this sometimes moves ui around
-	}
+        if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
+        {
+                return;
+        }
 
+        if (IsIconic(g_gameProc.hWndGameWindow))
+        {
+                return; // don't render when window is minimized, since this sometimes moves ui around
+        }
 
-	LOG(7, "WindowManager::Render\n");
+        static int s_renderLogCount = 0;
+        if (s_renderLogCount < 5)
+        {
+                LOG(2, "WindowManager::Render frame %d start\n", s_renderLogCount);
+        }
 
-	HandleButtons();
+        LOG(7, "WindowManager::Render\n");
 
-	ImGui_ImplDX9_NewFrame();
+        HandleButtons();
 
-	ImGui::GetIO().MouseDrawCursor = false;
-	for (auto p : m_windowContainer->GetWindows()) {
-		if (p.first == WindowType_HitboxOverlay) continue; // ignore windows that don't need a mouse
-		if (p.second->IsOpen()) {
-			ImGui::GetIO().MouseDrawCursor = true;
-			break;
-		}
-	}
+        ImGui_ImplDX9_NewFrame();
 
+        ImGui::GetIO().MouseDrawCursor = false;
+        for (auto p : m_windowContainer->GetWindows())
+        {
+                if (p.first == WindowType_HitboxOverlay)
+                {
+                        continue; // ignore windows that don't need a mouse
+                }
+                if (p.second->IsOpen())
+                {
+                        ImGui::GetIO().MouseDrawCursor = true;
+                        break;
+                }
+        }
 
-	if (Settings::settingsIni.viewport == 2)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(Settings::settingsIni.renderwidth, Settings::settingsIni.renderheight);
-	}
-	else if (Settings::settingsIni.viewport == 3)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(1280, 768);
-	}
+        if (Settings::settingsIni.viewport == 2)
+        {
+                ImGui::GetIO().DisplaySize = ImVec2(Settings::settingsIni.renderwidth, Settings::settingsIni.renderheight);
+        }
+        else if (Settings::settingsIni.viewport == 3)
+        {
+                ImGui::GetIO().DisplaySize = ImVec2(1280, 768);
+        }
 
-	DrawAllWindows();
+        DrawAllWindows();
 
-	g_notificationBar->DrawNotifications();
+        g_notificationBar->DrawNotifications();
 
-	ImGui::Render();
+        if (s_renderLogCount < 5)
+        {
+                LOG(2, "WindowManager::Render frame %d end\n", s_renderLogCount);
+                ++s_renderLogCount;
+        }
+
+        ImGui::Render();
+
+        if (s_renderTraceCount < 5)
+        {
+                ForceLog("[RenderTrace] WindowManager::Render end %d\n", s_renderTraceCount);
+                ++s_renderTraceCount;
+        }
 }
 
 void WindowManager::HandleButtons()

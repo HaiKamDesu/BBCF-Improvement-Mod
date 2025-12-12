@@ -155,8 +155,15 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::Reset(D3DPRESENT_PARAMETERS* pPresent
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::Present(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
 {
-	LOG(7, "Present\n");
-	return m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+    static int s_presentTraceCount = 0;
+    if (s_presentTraceCount < 5)
+    {
+            ForceLog("[RenderTrace] Present(%d) src=%p dst=%p hwnd=%p dirty=%p\n", s_presentTraceCount, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+            ++s_presentTraceCount;
+    }
+
+    LOG(7, "Present\n");
+    return m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::GetBackBuffer(UINT iSwapChain, UINT iBackBuffer, D3DBACKBUFFER_TYPE Type, IDirect3DSurface9** ppBackBuffer)
@@ -846,8 +853,15 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::ComposeRects(IDirect3DSurface9* pSrc,
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::PresentEx(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
 {
-	LOG(7, "PresentEx 0x%p 0x%p\n", pSourceRect, pDestRect);
-	return m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+    static int s_presentExTraceCount = 0;
+    if (s_presentExTraceCount < 5)
+    {
+            ForceLog("[RenderTrace] PresentEx(%d) src=%p dst=%p hwnd=%p dirty=%p flags=0x%08X\n", s_presentExTraceCount, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+            ++s_presentExTraceCount;
+    }
+
+    LOG(7, "PresentEx 0x%p 0x%p\n", pSourceRect, pDestRect);
+    return m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::GetGPUThreadPriority(INT* pPriority)

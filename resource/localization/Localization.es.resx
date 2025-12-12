@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="_LanguageCode">
+    <value>es</value>
+  </data>
+  <data name="_DisplayName">
+    <value>Español</value>
+  </data>
+  <data name="Toggle me with %s">
+    <value>Activa la ventana con %s</value>
+  </data>
+  <data name="Toggle Online with %s">
+    <value>Abrir en línea con %s</value>
+  </data>
+  <data name="Toggle HUD with %s">
+    <value>Ocultar HUD con %s</value>
+  </data>
+  <data name="Generate Debug Logs">
+    <value>Generar registros de depuración</value>
+  </data>
+  <data name="Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.">
+    <value>Escribe DEBUG.txt con información detallada de ejecución. Se guarda en settings.ini para futuras sesiones.</value>
+  </data>
+  <data name="Online">
+    <value>En línea</value>
+  </data>
+  <data name="Gameplay settings">
+    <value>Opciones de juego</value>
+  </data>
+  <data name="Custom palettes">
+    <value>Paletas personalizadas</value>
+  </data>
+  <data name="Hitbox overlay">
+    <value>Superposición de hitbox</value>
+  </data>
+  <data name="FrameHistory">
+    <value>Historial de cuadros</value>
+  </data>
+  <data name="Framedata">
+    <value>Datos de cuadro</value>
+  </data>
+  <data name="Avatar settings">
+    <value>Opciones de avatar</value>
+  </data>
+  <data name="Controller Settings">
+    <value>Opciones de control</value>
+  </data>
+  <data name="Loaded settings.ini values">
+    <value>Valores cargados de settings.ini</value>
+  </data>
+  <data name="Current online players:">
+    <value>Jugadores en línea actuales:</value>
+  </data>
+  <data name="&lt;No data&gt;">
+    <value>&lt;Sin datos&gt;</value>
+  </data>
+  <data name="Avatar">
+    <value>Avatar</value>
+  </data>
+  <data name="Color">
+    <value>Color</value>
+  </data>
+  <data name="Accessory 1">
+    <value>Accesorio 1</value>
+  </data>
+  <data name="Accessory 2">
+    <value>Accesorio 2</value>
+  </data>
+  <data name="CONNECT TO NETWORK MODE FIRST">
+    <value>CONECTA AL MODO EN LÍNEA PRIMERO</value>
+  </data>
+  <data name="FrameHistory help">
+    <value>Para cada cuadro no inactivo, muestra una columna de rectángulos con información. 
+ 
+Para cada jugador: 
+ = La primera fila muestra el estado del jugador. 
+ - Inicio-&gt;verde 
+ - Activo-&gt;rojo 
+ - Recuperación-&gt;azul 
+ - Aturdimiento por bloqueo-&gt;amarillo 
+ - Aturdimiento por golpe-&gt;morado 
+ - Recuperación por caída dura-&gt;rosa 
+ - Especial: estados difíciles de clasificar (p.ej. dashes)-&gt;aguamarina 
+
+ = La segunda fila es para invulnerabilidad/armadura. La posición de los segmentos indica los atributos y su color si hay invul o armadura: 
+ - Invul-&gt;blanco 
+ - Armadura-&gt;marrón 
+ - H-&gt;segmento superior 
+ - B-&gt;segmento medio 
+ - F-&gt;segmento inferior 
+ - T-&gt;segmento izquierdo 
+ - P-&gt;segmento derecho 
+</value>
+  </data>
+  <data name="FrameHistory auto reset help">
+    <value>Bloquear el reinicio automático en un cuadro inactivo: no sobrescribir automáticamente después de un cuadro inactivo.</value>
+  </data>
+  <data name="Box width">
+    <value>Ancho de caja</value>
+  </data>
+  <data name="Box height">
+    <value>Alto de caja</value>
+  </data>
+  <data name="spacing">
+    <value>Espaciado</value>
+  </data>
+  <data name="Enable##framehistory_section">
+    <value>Activar##framehistory_section</value>
+  </data>
+  <data name="Auto Reset##Reset after each idle frame">
+    <value>Reinicio automático##Reset after each idle frame</value>
+  </data>
+  <data name="Enable##framedata_section">
+    <value>Activar##framedata_section</value>
+  </data>
+  <data name="Advantage on stagger hit">
+    <value>Ventaja en golpe tambaleante</value>
+  </data>
+  <data name="YOU ARE NOT IN MATCH!">
+    <value>¡NO ESTÁS EN UNA PARTIDA!</value>
+  </data>
+  <data name="YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!">
+    <value>¡NO ESTÁS EN ENTRENAMIENTO NI EN REPLAY THEATER!</value>
+  </data>
+  <data name="YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!">
+    <value>¡NO ESTÁS EN PARTIDA, ENTRENAMIENTO NI REPLAY THEATER!</value>
+  </data>
+  <data name="THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS">
+    <value>HUBO UN ERROR AL CARGAR UNO O AMBOS PERSONAJES</value>
+  </data>
+  <data name="Palette editor">
+    <value>Editor de paletas</value>
+  </data>
+  <data name="YOU ARE NOT IN MATCH! (Replay)">
+    <value>¡NO ESTÁS EN UNA PARTIDA!</value>
+  </data>
+  <data name="YOU ARE NOT IN REPLAY MENU!">
+    <value>¡NO ESTÁS EN EL MENÚ DE REPLAY!</value>
+  </data>
+  <data name="YOU ARE NOT IN CHARACTER SELECTION!">
+    <value>¡NO ESTÁS EN LA SELECCIÓN DE PERSONAJE!</value>
+  </data>
+  <data name="Hide HUD">
+    <value>Ocultar HUD</value>
+  </data>
+  <data name="Toggle Rewind">
+    <value>Alternar rebobinado</value>
+  </data>
+  <data name="Replay Database">
+    <value>Base de datos de repeticiones</value>
+  </data>
+  <data name="Enable/Disable Upload">
+    <value>Activar/Desactivar subida</value>
+  </data>
+  <data name="Discord">
+    <value>Discord</value>
+  </data>
+  <data name="Forum">
+    <value>Foro</value>
+  </data>
+  <data name="GitHub">
+    <value>GitHub</value>
+  </data>
+  <data name="Player1">
+    <value>Jugador 1</value>
+  </data>
+  <data name="Player2">
+    <value>Jugador 2</value>
+  </data>
+  <data name="Draw hitbox/hurtbox">
+    <value>Dibujar hitbox/hurtbox</value>
+  </data>
+  <data name="Draw origin">
+    <value>Dibujar origen</value>
+  </data>
+  <data name="Draw collision">
+    <value>Dibujar colisión</value>
+  </data>
+  <data name="Draw throw/range boxes">
+    <value>Dibujar cajas de agarre/rango</value>
+  </data>
+  <data name="The point in space where your character resides. 
+Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.">
+    <value>El punto en el espacio donde reside tu personaje. 
+Importante: es un único punto; el renderizado muestra dos líneas para facilitar la vista, el punto real está donde se cruzan.</value>
+  </data>
+  <data name="Defines collision between objects/characters. Also used for throw range checks.">
+    <value>Define la colisión entre objetos/personajes. También se usa para comprobar el alcance de agarres.</value>
+  </data>
+  <data name="Throw range help">
+    <value>Caja de rango de agarre (amarillo): todos los agarres requieren superar esta comprobación; la caja debe solaparse con la caja de colisión del objetivo.
+
+Caja de rango de movimiento (verde): todos los agarres y algunos movimientos requieren esta comprobación; la caja debe solaparse con el punto de origen del objetivo.
+
+
+
+¿Cómo conecta un agarre?
+
+Para que conecte debes cumplir: 
+1: Ambos jugadores en tierra o aire (según su origen, no el sprite).
+2: Pasar la comprobación de rango de movimiento.
+3: Pasar la comprobación de rango de agarre.
+4: La hitbox del agarre debe solapar la hurtbox del objetivo.
+5: El objetivo no debe ser inmune a agarres.
+</value>
+  </data>
+  <data name="Freeze frame:">
+    <value>Congelar cuadro:</value>
+  </data>
+  <data name="Frame Count">
+    <value>Contador de cuadros</value>
+  </data>
+  <data name="Reset">
+    <value>Reiniciar</value>
+  </data>
+  <data name="Freeze animation">
+    <value>Congelar animación</value>
+  </data>
+  <data name="Stop timer">
+    <value>Detener temporizador</value>
+  </data>
+  <data name="Step frames">
+    <value>Avanzar cuadros</value>
+  </data>
+  <data name="YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!">
+    <value>¡NO ESTÁS EN ENTRENAMIENTO, VERSUS O REPLAY!</value>
+  </data>
+  <data name="Game Mode">
+    <value>Modo de juego</value>
+  </data>
+  <data name="Enable##hitbox_overlay_section">
+    <value>Activar##hitbox_overlay_section</value>
+  </data>
+  <data name="Custom palette reload">
+    <value>Recargar todas las paletas</value>
+  </data>
+  <data name="Enable##framehistory_section checkbox">
+    <value>Activar</value>
+  </data>
+  <data name="Draw hitbox/hurtbox##hitbox_overlay_section">
+    <value>Dibujar hitbox/hurtbox</value>
+  </data>
+  <data name="Draw origin##hitbox_overlay_section">
+    <value>Dibujar origen</value>
+  </data>
+  <data name="Draw collision##hitbox_overlay_section">
+    <value>Dibujar colisión</value>
+  </data>
+  <data name="Step frames##hitbox_overlay_section">
+    <value>Avanzar cuadros</value>
+  </data>
+  <data name="Gameplay settings header">
+    <value>Opciones de juego</value>
+  </data>
+  <data name="Hide HUD checkbox">
+    <value>Ocultar HUD</value>
+  </data>
+  <data name="States">
+    <value>Estados</value>
+  </data>
+  <data name="Log">
+    <value>Registro</value>
+  </data>
+  <data name="Replay Rewind">
+    <value>Rebobinado de repetición</value>
+  </data>
+  <data name="Replay Upload">
+    <value>Subida de repetición</value>
+  </data>
+  <data name="Enable##framehistory_section label">
+    <value>Activar</value>
+  </data>
+  <data name="Auto Reset label">
+    <value>Reinicio automático</value>
+  </data>
+  <data name="FrameHistory width label">
+    <value>Ancho de caja</value>
+  </data>
+  <data name="FrameHistory height label">
+    <value>Alto de caja</value>
+  </data>
+  <data name="FrameHistory spacing label">
+    <value>Espaciado</value>
+  </data>
+  <data name="FrameHistory not enabled message">
+    <value>¡NO ESTÁS EN UNA PARTIDA, ENTRENAMIENTO NI REPLAY THEATER!</value>
+  </data>
+  <data name="FrameHistory character load error">
+    <value>HUBO UN ERROR AL CARGAR UNO O AMBOS PERSONAJES</value>
+  </data>
+  <data name="Language">
+    <value>Idioma</value>
+  </data>
+  <data name="Language incomplete label">
+    <value>%s - Incompleto (faltan %zu términos)</value>
+  </data>
+  <data name="Language selection help">
+    <value>Selecciona un idioma para todo el texto de la interfaz. Requiere cobertura completa del diccionario.</value>
+  </data>
+</root>
