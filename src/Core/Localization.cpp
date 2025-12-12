@@ -68,7 +68,7 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
         std::ifstream file(path);
         if (!file.is_open())
         {
-                LOG("Failed to open localization file: %s", path.string().c_str());
+                LOG(1, "Failed to open localization file: %s", path.string().c_str());
                 return false;
         }
 
@@ -114,7 +114,7 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
 
         if (outDefinition.strings.empty())
         {
-                LOG("Localization file %s did not contain any <data> entries with values.", path.string().c_str());
+                LOG(1, "Localization file %s did not contain any <data> entries with values.", path.string().c_str());
                 return false;
         }
 
@@ -142,7 +142,7 @@ std::vector<LanguageDefinition> LoadResxLanguages()
 
         if (localizationDir.empty())
         {
-                LOG("Localization directory not found: %s", std::filesystem::path(kLocalizationDirectory).string().c_str());
+                LOG(1, "Localization directory not found: %s", std::filesystem::path(kLocalizationDirectory).string().c_str());
                 return languages;
         }
 
