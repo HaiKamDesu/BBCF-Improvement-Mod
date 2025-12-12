@@ -36,12 +36,14 @@ WindowManager & WindowManager::GetInstance()
 
 bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 {
-	if (m_initialized)
-	{
-		return true;
-	}
+        if (m_initialized)
+        {
+                return true;
+        }
 
-	LOG(2, "WindowManager::Initialize\n");
+        ForceLog("[RenderTrace] WindowManager::Initialize begin\n");
+
+        LOG(2, "WindowManager::Initialize\n");
 
 	if (!hwnd)
 	{
@@ -158,14 +160,15 @@ bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 	notificationText += " (DEBUG)";
 #endif
 
-	g_notificationBar->AddNotification("%s (Press %s to open the main window)",
-		notificationText.c_str(), Settings::settingsIni.togglebutton.c_str());
+        g_notificationBar->AddNotification("%s (Press %s to open the main window)",
+                notificationText.c_str(), Settings::settingsIni.togglebutton.c_str());
 
-	m_pLogger->Log("[system] Finished initialization\n");
-	m_pLogger->LogSeparator();
-	LOG(2, "Initialize end\n");
+        m_pLogger->Log("[system] Finished initialization\n");
+        m_pLogger->LogSeparator();
+        ForceLog("[RenderTrace] WindowManager::Initialize end\n");
+        LOG(2, "Initialize end\n");
 
-	return true;
+        return true;
 }
 
 void WindowManager::Shutdown()
@@ -210,6 +213,12 @@ void WindowManager::Render()
         if (!m_initialized)
         {
                 return;
+        }
+
+        static int s_renderTraceCount = 0;
+        if (s_renderTraceCount < 5)
+        {
+                ForceLog("[RenderTrace] WindowManager::Render begin %d\n", s_renderTraceCount);
         }
 
         if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
@@ -268,6 +277,12 @@ void WindowManager::Render()
         }
 
         ImGui::Render();
+
+        if (s_renderTraceCount < 5)
+        {
+                ForceLog("[RenderTrace] WindowManager::Render end %d\n", s_renderTraceCount);
+                ++s_renderTraceCount;
+        }
 }
 
 void WindowManager::HandleButtons()
