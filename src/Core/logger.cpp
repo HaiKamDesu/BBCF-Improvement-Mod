@@ -2,6 +2,7 @@
 
 #include <ctime>
 #include <cstdarg>
+#include <cstdio>
 #include <sstream>
 #include <string>
 
@@ -9,6 +10,36 @@ namespace
 {
         FILE* g_oFile = nullptr;
         bool g_isLoggingEnabled = false;
+
+        std::string FormatLogMessage(const char* message, va_list args)
+        {
+                va_list argsCopy;
+                va_copy(argsCopy, args);
+                const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
+                va_end(argsCopy);
+
+                if (required <= 0)
+                {
+                        return std::string();
+                }
+
+                const size_t bufferSize = static_cast<size_t>(required) + 1; // include null terminator
+                std::string buffer(bufferSize, '\0');
+
+                const int written = std::vsnprintf(&buffer[0], buffer.size(), message, args);
+                if (written < 0)
+                {
+                        return std::string();
+                }
+
+                buffer.resize(static_cast<size_t>(written));
+                if (buffer.empty() || buffer.back() != '\n')
+                {
+                        buffer.push_back('\n');
+                }
+
+                return buffer;
+        }
 }
 
 bool IsLoggingEnabled()
@@ -53,24 +84,12 @@ void logger(const char* message, ...)
         va_list args;
         va_start(args, message);
 
-        va_list argsCopy;
-        va_copy(argsCopy, args);
-        const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
-        va_end(argsCopy);
-
-        if (required <= 0)
-        {
-                va_end(args);
-                return;
-        }
-
-        std::string buffer(static_cast<size_t>(required), '\0');
-        std::vsnprintf(&buffer[0], buffer.size() + 1, message, args);
+        const std::string buffer = FormatLogMessage(message, args);
         va_end(args);
 
-        if (buffer.empty() || buffer.back() != '\n')
+        if (buffer.empty())
         {
-                buffer.push_back('\n');
+                return;
         }
 
         fputs(buffer.c_str(), g_oFile);
@@ -97,24 +116,12 @@ void ForceLog(const char* message, ...)
         va_list args;
         va_start(args, message);
 
-        va_list argsCopy;
-        va_copy(argsCopy, args);
-        const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
-        va_end(argsCopy);
-
-        if (required <= 0)
-        {
-                va_end(args);
-                return;
-        }
-
-        std::string buffer(static_cast<size_t>(required), '\0');
-        std::vsnprintf(&buffer[0], buffer.size() + 1, message, args);
+        const std::string buffer = FormatLogMessage(message, args);
         va_end(args);
 
-        if (buffer.empty() || buffer.back() != '\n')
+        if (buffer.empty())
         {
-                buffer.push_back('\n');
+                return;
         }
 
         fputs(buffer.c_str(), g_oFile);
