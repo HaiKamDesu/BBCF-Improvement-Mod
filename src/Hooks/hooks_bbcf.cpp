@@ -23,31 +23,45 @@ extern "C" void HandleControllerWndProcMessage(UINT msg, WPARAM wParam, LPARAM l
 
 
 
+static void LogTitleScreenContext(const char* phase)
+{
+        LOG(1, "[TitleScreen] %s\n", phase);
+        LOG(1, "  pGameMode ptr=0x%p value=%d\n", g_gameVals.pGameMode, SafeDereferencePtr(g_gameVals.pGameMode));
+        LOG(1, "  pGameState ptr=0x%p value=%d\n", g_gameVals.pGameState, SafeDereferencePtr(g_gameVals.pGameState));
+        LOG(1, "  WindowManager initialized=%d d3dWrapper=0x%p hwnd=0x%p\n",
+                WindowManager::GetInstance().IsInitialized(), g_interfaces.pD3D9ExWrapper, g_gameProc.hWndGameWindow);
+}
+
+
 DWORD GetGameStateTitleScreenJmpBackAddr = 0;
 void __declspec(naked)GetGameStateTitleScreen()
 {
 	LOG_ASM(2, "GetGameStateTitleScreen\n");
 
-	_asm
-	{
-		pushad
-		add edi, 108h
-		lea ebx, g_gameVals.pGameMode
-		mov[ebx], edi
+        _asm
+        {
+                pushad
+                add edi, 108h
+                lea ebx, g_gameVals.pGameMode
+                mov[ebx], edi
 
-		add edi, 4h
-		lea ebx, g_gameVals.pGameState
-		mov[ebx], edi
-	}
+                add edi, 4h
+                lea ebx, g_gameVals.pGameState
+                mov[ebx], edi
+        }
 
-	InitSteamApiWrappers();
-	InitManagers();
+        LogTitleScreenContext("after pointer capture");
 
-	WindowManager::GetInstance().Initialize(g_gameProc.hWndGameWindow, g_interfaces.pD3D9ExWrapper);
+        InitSteamApiWrappers();
+        InitManagers();
 
-	__asm
-	{
-		popad
+        WindowManager::GetInstance().Initialize(g_gameProc.hWndGameWindow, g_interfaces.pD3D9ExWrapper);
+
+        LogTitleScreenContext("after initialization");
+
+        __asm
+        {
+                popad
 		mov dword ptr[edi + 10Ch], 4 //original bytes
 		jmp[GetGameStateTitleScreenJmpBackAddr]
 	}
