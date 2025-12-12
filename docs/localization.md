@@ -23,6 +23,7 @@ At build time, every `Localization*.resx` file is embedded into `dinput8.dll` vi
 - The language dropdown lists every `.resx` file that shares the `Localization` base name, starting with the versions embedded in the DLL and then any overrides found in `resource/localization/` on disk.
 - Languages missing any key from `Localization.resx` are shown as disabled and report how many translations are still required.
 - English remains the fallback language for any unresolved keys and for persistence across sessions. If no English file is present, the fallback becomes the first culture found.
+- If neither embedded nor on-disk resources are available, the DLL falls back to built-in English/Spanish dictionaries so UI strings stay valid (preventing formatting errors during startup).
 - The selected language is stored in `settings.ini` (`Language`), so it stays consistent between launches.
 
 ## Why `.resx`?
