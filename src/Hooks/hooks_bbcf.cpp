@@ -23,35 +23,39 @@ extern "C" void HandleControllerWndProcMessage(UINT msg, WPARAM wParam, LPARAM l
 
 
 
-DWORD GetGameStateTitleScreenJmpBackAddr = 0;
-void __declspec(naked)GetGameStateTitleScreen()
+namespace
 {
-	LOG_ASM(2, "GetGameStateTitleScreen\n");
-
-	_asm
+	void __stdcall HandleTitleScreenHookState(DWORD ediValue)
 	{
-		pushad
-		add edi, 108h
-		lea ebx, g_gameVals.pGameMode
-		mov[ebx], edi
-
-		add edi, 4h
-		lea ebx, g_gameVals.pGameState
-		mov[ebx], edi
+		const DWORD gameModeAddress = ediValue + 0x108;
+		g_gameVals.pGameMode = reinterpret_cast<DWORD*>(gameModeAddress);
+		g_gameVals.pGameState = reinterpret_cast<DWORD*>(gameModeAddress + 0x4);
+		
+		ForceLog("[TitleHook] GetGameStateTitleScreen begin (mode=0x%08X state=0x%08X)\n", gameModeAddress, gameModeAddress + 0x4);
+		
+		InitSteamApiWrappers();
+		InitManagers();
+		WindowManager::GetInstance().Initialize(g_gameProc.hWndGameWindow, g_interfaces.pD3D9ExWrapper);
+		
+		ForceLog("[TitleHook] GetGameStateTitleScreen end\n");
+	}
 	}
 
-	InitSteamApiWrappers();
-	InitManagers();
-
-	WindowManager::GetInstance().Initialize(g_gameProc.hWndGameWindow, g_interfaces.pD3D9ExWrapper);
-
+DWORD GetGameStateTitleScreenJmpBackAddr = 0;
+	void __declspec(naked)GetGameStateTitleScreen()
+	{
 	__asm
 	{
+		pushad
+		mov eax, edi
+		push eax
+		call HandleTitleScreenHookState
+		add esp, 4
 		popad
 		mov dword ptr[edi + 10Ch], 4 //original bytes
 		jmp[GetGameStateTitleScreenJmpBackAddr]
 	}
-}
+	}
 
 DWORD GetGameStateMenuScreenJmpBackAddr = 0;
 void __declspec(naked)GetGameStateMenuScreen()
