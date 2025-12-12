@@ -1,5 +1,7 @@
 #include "Localization.h"
 
+#include <Windows.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -16,6 +18,8 @@ namespace
 const char* kLocalizationDirectory = "resource/localization";
 const char* kDisplayNameKey = "_DisplayName";
 const char* kDefaultLanguageCode = "en";
+const char* kLanguageLogTag = "[Language]";
+const size_t kMissingPreviewLimit = 5;
 
 const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
 
@@ -27,6 +31,18 @@ struct LanguageDefinition
         std::unordered_map<std::string, std::string> strings;
         bool isFallback = false;
 };
+
+struct ResxEntry
+{
+        std::string name;
+        std::string baseName;
+        std::string culture;
+        bool hasCulture = false;
+        std::string content;
+        bool fromResource = false;
+};
+
+const std::regex kResxNameRegex(R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)");
 
 std::string Trim(const std::string& value)
 {
@@ -63,21 +79,67 @@ std::string DecodeXmlEntities(std::string value)
         return value;
 }
 
-bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDefinition)
+std::string WideToUtf8(LPCWSTR value)
 {
-        std::ifstream file(path);
-        if (!file.is_open())
+        if (!value)
         {
-                LOG(1, "Failed to open localization file: %s", path.string().c_str());
+                return std::string();
+        }
+
+        const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+        if (length <= 0)
+        {
+                return std::string();
+        }
+
+        std::string output(static_cast<size_t>(length - 1), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value, -1, output.data(), length, nullptr, nullptr);
+        return output;
+}
+
+std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std::string, std::string>& fallback,
+        const std::unordered_map<std::string, std::string>& language)
+{
+        std::vector<std::string> preview;
+        preview.reserve(kMissingPreviewLimit);
+
+        for (const auto& required : fallback)
+        {
+                if (language.find(required.first) == language.end())
+                {
+                        preview.push_back(required.first);
+                        if (preview.size() >= kMissingPreviewLimit)
+                        {
+                                break;
+                        }
+                }
+        }
+
+        return preview;
+}
+
+bool AddResxEntry(const std::string& name, std::string content, bool fromResource, std::vector<ResxEntry>& out)
+{
+        std::smatch match;
+        if (!std::regex_match(name, match, kResxNameRegex))
+        {
+                LOG(2, "%s Skipping localization blob with unexpected name: %s", kLanguageLogTag, name.c_str());
                 return false;
         }
 
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
+        ResxEntry entry;
+        entry.name = name;
+        entry.baseName = match[1].str();
+        entry.hasCulture = match[2].matched;
+        entry.culture = entry.hasCulture ? match[2].str() : std::string();
+        entry.content = std::move(content);
+        entry.fromResource = fromResource;
+        out.push_back(std::move(entry));
+        return true;
+}
 
-        // Use a character class that matches any character (including newlines) instead of dotall,
-        // which is unsupported in the MSVC STL implementation used by this project.
+bool ParseResxContent(const std::string& content, const std::string& sourceLabel, LanguageDefinition& outDefinition)
+{
         std::regex dataRegex(R"(<data\s+name=\"([^\"]+)\"[^>]*>\s*<value>([\s\S]*?)</value>)",
                 std::regex_constants::icase);
 
@@ -86,25 +148,25 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
 
         for (auto it = begin; it != end; ++it)
         {
-            std::string key = Trim((*it)[1].str());
-            std::string value = (*it)[2].str();
+                std::string key = Trim((*it)[1].str());
+                std::string value = (*it)[2].str();
 
-            value = DecodeXmlEntities(value);
-            value = Trim(value);
+                value = DecodeXmlEntities(value);
+                value = Trim(value);
 
-            if (key == kDisplayNameKey)
-            {
-                    outDefinition.displayName = value;
-                    continue;
-            }
+                if (key == kDisplayNameKey)
+                {
+                        outDefinition.displayName = value;
+                        continue;
+                }
 
-            if (key == "_LanguageCode")
-            {
-                    outDefinition.explicitCode = value;
-                    continue;
-            }
+                if (key == "_LanguageCode")
+                {
+                        outDefinition.explicitCode = value;
+                        continue;
+                }
 
-            outDefinition.strings.emplace(std::move(key), std::move(value));
+                outDefinition.strings.emplace(std::move(key), std::move(value));
         }
 
         if (outDefinition.displayName.empty())
@@ -114,16 +176,86 @@ bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDef
 
         if (outDefinition.strings.empty())
         {
-                LOG(1, "Localization file %s did not contain any <data> entries with values.", path.string().c_str());
+                LOG(1, "%s Localization blob %s did not contain any <data> entries with values.", kLanguageLogTag, sourceLabel.c_str());
                 return false;
         }
 
         return true;
 }
 
-std::vector<LanguageDefinition> LoadResxLanguages()
+bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDefinition)
 {
-        std::vector<LanguageDefinition> languages;
+        std::ifstream file(path, std::ios::binary);
+        if (!file.is_open())
+        {
+                LOG(1, "%s Failed to open localization file: %s", kLanguageLogTag, path.string().c_str());
+                return false;
+        }
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return ParseResxContent(buffer.str(), path.string(), outDefinition);
+}
+
+std::vector<ResxEntry> LoadEmbeddedResxEntries()
+{
+        std::vector<ResxEntry> entries;
+
+        EnumResourceNamesW(nullptr, RT_RCDATA,
+                [](HMODULE, LPCWSTR, LPWSTR name, LONG_PTR param) -> BOOL
+                {
+                        if (IS_INTRESOURCE(name))
+                        {
+                                return TRUE;
+                        }
+
+                        auto* out = reinterpret_cast<std::vector<ResxEntry>*>(param);
+                        std::string resourceName = WideToUtf8(name);
+                        if (resourceName.find(".resx") == std::string::npos)
+                        {
+                                return TRUE;
+                        }
+
+                        HRSRC resource = FindResourceW(nullptr, name, RT_RCDATA);
+                        if (!resource)
+                        {
+                                return TRUE;
+                        }
+
+                        HGLOBAL handle = LoadResource(nullptr, resource);
+                        if (!handle)
+                        {
+                                return TRUE;
+                        }
+
+                        const DWORD size = SizeofResource(nullptr, resource);
+                        const void* data = LockResource(handle);
+                        if (!data || size == 0)
+                        {
+                                return TRUE;
+                        }
+
+                        std::string content(static_cast<const char*>(data), static_cast<const char*>(data) + size);
+                        AddResxEntry(resourceName, std::move(content), true, *out);
+                        return TRUE;
+                },
+                reinterpret_cast<LONG_PTR>(&entries));
+
+        if (entries.empty())
+        {
+                LOG(2, "%s No embedded localization resources detected.", kLanguageLogTag);
+        }
+        else
+        {
+                LOG(2, "%s Loaded %zu embedded localization resource(s).", kLanguageLogTag, entries.size());
+        }
+
+        return entries;
+}
+
+std::vector<ResxEntry> LoadFilesystemResxEntries()
+{
+        std::vector<ResxEntry> files;
         std::filesystem::path localizationDir;
 
         const std::vector<std::filesystem::path> candidates = {
@@ -142,22 +274,9 @@ std::vector<LanguageDefinition> LoadResxLanguages()
 
         if (localizationDir.empty())
         {
-                LOG(1, "Localization directory not found: %s", std::filesystem::path(kLocalizationDirectory).string().c_str());
-                return languages;
+                LOG(2, "%s Localization directory not found on disk; relying on embedded resources.", kLanguageLogTag);
+                return files;
         }
-
-        struct ResxEntry
-        {
-                std::filesystem::path path;
-                std::string baseName;
-                std::string culture;
-                bool hasCulture;
-        };
-
-        std::vector<ResxEntry> files;
-        files.reserve(8);
-
-        const std::regex nameRegex(R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)");
 
         for (const auto& entry : std::filesystem::directory_iterator(localizationDir))
         {
@@ -166,61 +285,102 @@ std::vector<LanguageDefinition> LoadResxLanguages()
                         continue;
                 }
 
-                const std::string filename = entry.path().filename().string();
-                std::smatch match;
-                if (!std::regex_match(filename, match, nameRegex))
+                std::ifstream file(entry.path(), std::ios::binary);
+                if (!file.is_open())
                 {
+                        LOG(1, "%s Failed to open localization file on disk: %s", kLanguageLogTag, entry.path().string().c_str());
                         continue;
                 }
 
-                ResxEntry info;
-                info.path = entry.path();
-                info.baseName = match[1].str();
-                info.hasCulture = match[2].matched;
-                info.culture = info.hasCulture ? match[2].str() : std::string();
-                files.push_back(std::move(info));
+                std::stringstream buffer;
+                buffer << file.rdbuf();
+                AddResxEntry(entry.path().filename().string(), buffer.str(), false, files);
         }
 
         if (files.empty())
         {
-                return languages;
+                LOG(2, "%s No .resx files found in %s.", kLanguageLogTag, localizationDir.string().c_str());
         }
 
-        std::string targetBaseName;
-        for (const auto& file : files)
+        return files;
+}
+
+std::string SelectBaseName(const std::vector<ResxEntry>& entries)
+{
+        for (const auto& entry : entries)
         {
-                if (!file.hasCulture)
+                if (!entry.hasCulture)
                 {
-                        targetBaseName = file.baseName;
-                        break;
+                        return entry.baseName;
                 }
         }
 
-        if (targetBaseName.empty())
+        if (!entries.empty())
         {
-                targetBaseName = files.front().baseName;
+                return entries.front().baseName;
         }
 
-        for (const auto& file : files)
+        return std::string();
+}
+
+std::vector<LanguageDefinition> LoadResxLanguages()
+{
+        auto entries = LoadEmbeddedResxEntries();
+        auto fileEntries = LoadFilesystemResxEntries();
+        entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
+
+        std::vector<LanguageDefinition> languages;
+        if (entries.empty())
         {
-                if (file.baseName != targetBaseName)
+                return languages;
+        }
+
+        const std::string targetBaseName = SelectBaseName(entries);
+        if (targetBaseName.empty())
+        {
+                LOG(1, "%s No valid localization base name found while loading resx data.", kLanguageLogTag);
+                return languages;
+        }
+
+        std::unordered_map<std::string, size_t> languageIndex;
+
+        for (const auto& entry : entries)
+        {
+                if (entry.baseName != targetBaseName)
                 {
+                        LOG(2, "%s Skipping resx '%s' because base name '%s' does not match '%s'.",
+                                kLanguageLogTag, entry.name.c_str(), entry.baseName.c_str(), targetBaseName.c_str());
                         continue;
                 }
 
                 LanguageDefinition definition;
-                definition.code = file.hasCulture ? file.culture : kDefaultLanguageCode;
-                definition.isFallback = !file.hasCulture;
+                definition.code = entry.hasCulture ? entry.culture : kDefaultLanguageCode;
+                definition.isFallback = !entry.hasCulture;
 
-                if (ParseResxFile(file.path, definition))
+                if (!ParseResxContent(entry.content, entry.name, definition))
                 {
-                        if (!definition.explicitCode.empty())
-                        {
-                                definition.code = definition.explicitCode;
-                        }
-
-                        languages.push_back(std::move(definition));
+                        continue;
                 }
+
+                if (!definition.explicitCode.empty())
+                {
+                        definition.code = definition.explicitCode;
+                }
+
+                const auto existing = languageIndex.find(definition.code);
+                if (existing != languageIndex.end())
+                {
+                        languages[existing->second] = definition;
+                }
+                else
+                {
+                        languageIndex.emplace(definition.code, languages.size());
+                        languages.push_back(definition);
+                }
+
+                LOG(2, "%s Loaded language '%s' (%s) with %zu entries from %s.", kLanguageLogTag,
+                        definition.code.c_str(), definition.displayName.c_str(), definition.strings.size(),
+                        entry.fromResource ? "embedded resources" : "disk");
         }
 
         std::sort(languages.begin(), languages.end(),
@@ -308,8 +468,15 @@ bool Localization::IsLanguageComplete(const std::string& languageCode)
 
 size_t Localization::GetMissingKeyCount(const std::string& languageCode)
 {
-        const auto& fallbackMap = GetLanguageMap(m_fallbackLanguage);
-        const auto& languageMap = GetLanguageMap(languageCode);
+        const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
+        if (fallbackIt == m_languageStrings.end())
+        {
+                return 0;
+        }
+
+        const auto languageIt = m_languageStrings.find(languageCode);
+        const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
+        const auto& fallbackMap = fallbackIt->second;
 
         if (fallbackMap.empty())
         {
@@ -358,20 +525,40 @@ void Localization::LoadLanguageData()
 
                 LanguageOption option{ m_fallbackLanguage, "English", true, 0 };
                 m_languageOptions.push_back(option);
+                LOG(1, "%s No localization resources found; using empty fallback language '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
         }
 
         if (m_languageStrings.find(m_fallbackLanguage) == m_languageStrings.end() && !m_languageOptions.empty())
         {
                 m_fallbackLanguage = m_languageOptions.front().code;
         }
+
+        LOG(2, "%s Fallback language set to '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
 }
 
 void Localization::RefreshLanguageStatuses()
 {
+        const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
+        const auto& fallbackMap = fallbackIt != m_languageStrings.end() ? fallbackIt->second : kEmptyLanguage;
+
         for (auto& option : m_languageOptions)
         {
+                const auto languageIt = m_languageStrings.find(option.code);
+                const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
+
                 option.missingKeys = GetMissingKeyCount(option.code);
                 option.complete = option.missingKeys == 0;
+
+                if (!option.complete && !fallbackMap.empty())
+                {
+                        auto preview = CollectMissingKeysPreview(fallbackMap, languageMap);
+                        LOG(2, "%s Language '%s' missing %zu key(s)%s.", kLanguageLogTag, option.code.c_str(), option.missingKeys,
+                                preview.size() < option.missingKeys ? " (preview)" : "");
+                        for (const auto& key : preview)
+                        {
+                                LOG(2, "%s    missing: %s", kLanguageLogTag, key.c_str());
+                        }
+                }
         }
 }
 

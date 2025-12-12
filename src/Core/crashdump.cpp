@@ -1,14 +1,27 @@
 #include "crashdump.h"
+#include "logger.h"
 
 #include <ctime>
 #include <dbghelp.h>
 #include <memory>
 #include <shlobj.h>
 #include <tchar.h>
+#include <cstring>
 
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
-	BOOL(WINAPI* pMiniDumpWriteDump)(IN HANDLE hProcess, IN DWORD ProcessId, IN HANDLE hFile, IN MINIDUMP_TYPE DumpType, IN CONST PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam, OPTIONAL IN CONST PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam, OPTIONAL IN CONST PMINIDUMP_CALLBACK_INFORMATION CallbackParam OPTIONAL) = NULL;
+        if (ExPtr && ExPtr->ExceptionRecord)
+        {
+                ForceLog("[Crash] Unhandled exception 0x%08X at address 0x%p\n",
+                        ExPtr->ExceptionRecord->ExceptionCode,
+                        ExPtr->ExceptionRecord->ExceptionAddress);
+        }
+        else
+        {
+                ForceLog("[Crash] Unhandled exception with missing exception record.\n");
+        }
+
+        BOOL(WINAPI* pMiniDumpWriteDump)(IN HANDLE hProcess, IN DWORD ProcessId, IN HANDLE hFile, IN MINIDUMP_TYPE DumpType, IN CONST PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam, OPTIONAL IN CONST PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam, OPTIONAL IN CONST PMINIDUMP_CALLBACK_INFORMATION CallbackParam OPTIONAL) = NULL;
 
 	HMODULE hLib = LoadLibrary(_T("dbghelp"));
 	if (hLib)
@@ -54,10 +67,19 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 			wsprintf(buf, _T("Could not create minidump:\n%s"), buf2);
 		}
 	}
-	else 
-	{
-		wsprintf(buf, _T("Could not load dbghelp"));
-	}
-	MessageBox(NULL, buf, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
-	ExitProcess(0);    //do whatever u want here
+        else
+        {
+                wsprintf(buf, _T("Could not load dbghelp"));
+        }
+
+        char logBuffer[512] = { 0 };
+#ifdef UNICODE
+        WideCharToMultiByte(CP_UTF8, 0, buf, -1, logBuffer, static_cast<int>(sizeof(logBuffer)), nullptr, nullptr);
+#else
+        strncpy_s(logBuffer, buf, _TRUNCATE);
+#endif
+
+        ForceLog("[Crash] %s\n", logBuffer);
+        MessageBox(NULL, buf, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
+        ExitProcess(0);    //do whatever u want here
 }

@@ -343,6 +343,12 @@
     <None Include="export\dinput8.def">
       <Filter>export</Filter>
     </None>
+    <None Include="resource\localization\Localization.es.resx">
+      <Filter>resource</Filter>
+    </None>
+    <None Include="resource\localization\Localization.resx">
+      <Filter>resource</Filter>
+    </None>
     <None Include="resource\settings.ini">
       <Filter>resource</Filter>
     </None>
@@ -351,6 +357,11 @@
     <None Include=".gitignore" />
     <None Include="LICENSE" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource\resource.rc">
+      <Filter>resource</Filter>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="USER_README.txt" />

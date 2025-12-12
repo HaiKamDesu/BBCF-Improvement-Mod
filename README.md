@@ -28,13 +28,13 @@ Join the [BB Improvement Mod Discord Server](https://discord.gg/j2mCX9s) to disc
 - Freely adjustable ingame currency value
 
 ## Installing
-Download dinput8.dll, settings.ini and optionally palettes.ini from the latest release and put it in your BlazBlue Centralfiction folder. There is no need to compile it yourself for regular usage.
+Download dinput8.dll, settings.ini and optionally palettes.ini from the latest release and put it in your BlazBlue Centralfiction folder. All localization data is bundled inside dinput8.dll, so no extra language files are required. There is no need to compile it yourself for regular usage.
 
 
 ## Compiling and usage
 BBCF Improvement Mod is coded using Visual Studio 2019 (toolset v142). <br>
 To compile, you should only need to load the sln file and compile as-is. No changes should be needed to the solution or source.<br>
-Copy the compiled binary, settings.ini, and palettes.ini files from the bin/ folder into the game's root folder.
+Copy the compiled binary, settings.ini, and palettes.ini files from the bin/ folder into the game's root folder. The embedded localization resources mean no extra language files are needed at runtime.
 
 
 ### FrameHistory: 

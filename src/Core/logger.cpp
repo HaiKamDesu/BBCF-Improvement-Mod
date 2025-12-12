@@ -57,6 +57,31 @@ void logger(const char* message, ...)
         fflush(g_oFile);
 }
 
+void ForceLog(const char* message, ...)
+{
+        if (!message)
+        {
+                return;
+        }
+
+        if (!g_oFile)
+        {
+                openLogger();
+        }
+
+        if (!g_oFile)
+        {
+                return;
+        }
+
+        va_list args;
+        va_start(args, message);
+        vfprintf(g_oFile, message, args);
+        va_end(args);
+
+        fflush(g_oFile);
+}
+
 void openLogger()
 {
         if (g_oFile)

@@ -232,12 +232,17 @@
     <None Include="export\dinput8.def" />
     <None Include="LICENSE" />
     <None Include="README.md" />
+    <None Include="resource\localization\Localization.es.resx" />
+    <None Include="resource\localization\Localization.resx" />
     <None Include="resource\palettes.ini" />
     <None Include="resource\settings.ini">
       <FileType>Document</FileType>
       <DeploymentContent>false</DeploymentContent>
     </None>
     <None Include="src\Core\settings.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource\resource.rc" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="USER_README.txt" />

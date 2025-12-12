@@ -1,0 +1,5 @@
+// Localization resources packaged into the DLL so external .resx files aren't required at runtime.
+#include <windows.h>
+
+"Localization.resx" RCDATA "localization\\Localization.resx"
+"Localization.es.resx" RCDATA "localization\\Localization.es.resx"
