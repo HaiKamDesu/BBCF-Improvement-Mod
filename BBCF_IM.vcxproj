@@ -62,7 +62,7 @@
     <ClCompile Include="src\Core\crashdump.cpp" />
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp" />
     <ClCompile Include="src\Core\DirectInputWrapper.cpp" />
-    <ClCompile Include="src\Core\Localization.cpp" />
+	<ClCompile Include="src\Core\Localization.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
@@ -307,7 +307,7 @@
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <PreprocessToFile>false</PreprocessToFile>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>Default</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -333,7 +333,7 @@
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <AssemblerOutput>NoListing</AssemblerOutput>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>Default</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -3,8 +3,15 @@
 #include <Windows.h>
 
 #include <algorithm>
-#include <filesystem>
 #include <fstream>
+
+#ifndef _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#endif
+
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+
 #include <regex>
 #include <sstream>
 #include <string>
@@ -521,20 +528,20 @@ std::string DecodeXmlEntities(std::string value)
 
 std::string WideToUtf8(LPCWSTR value)
 {
-        if (!value)
-        {
-                return std::string();
-        }
+    if (!value)
+    {
+        return std::string();
+    }
 
-        const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
-        if (length <= 0)
-        {
-                return std::string();
-        }
+    const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+    if (length <= 0)
+    {
+        return std::string();
+    }
 
-        std::string output(static_cast<size_t>(length - 1), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value, -1, output.data(), length, nullptr, nullptr);
-        return output;
+    std::string output(static_cast<size_t>(length - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value, -1, &output[0], length, nullptr, nullptr);
+    return output;
 }
 
 std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std::string, std::string>& fallback,
@@ -623,7 +630,7 @@ bool ParseResxContent(const std::string& content, const std::string& sourceLabel
         return true;
 }
 
-bool ParseResxFile(const std::filesystem::path& path, LanguageDefinition& outDefinition)
+bool ParseResxFile(const fs::path& path, LanguageDefinition& outDefinition)
 {
         std::ifstream file(path, std::ios::binary);
         if (!file.is_open())
@@ -715,55 +722,56 @@ std::vector<ResxEntry> LoadEmbeddedResxEntries()
 
 std::vector<ResxEntry> LoadFilesystemResxEntries()
 {
-        std::vector<ResxEntry> files;
-        std::filesystem::path localizationDir;
+    std::vector<ResxEntry> files;
+    fs::path localizationDir;
 
-        const std::vector<std::filesystem::path> candidates = {
-                std::filesystem::path(kLocalizationDirectory),
-                std::filesystem::path("localization"),
-        };
+    const std::vector<fs::path> candidates = {
+            fs::path(kLocalizationDirectory),
+            fs::path("localization"),
+    };
 
-        for (const auto& candidate : candidates)
+    for (const auto& candidate : candidates)
+    {
+        if (fs::exists(candidate) && fs::is_directory(candidate))
         {
-                if (std::filesystem::exists(candidate) && std::filesystem::is_directory(candidate))
-                {
-                        localizationDir = candidate;
-                        break;
-                }
+            localizationDir = candidate;
+            break;
         }
+    }
 
-        if (localizationDir.empty())
-        {
-                LOG(2, "%s Localization directory not found on disk; relying on embedded resources.", kLanguageLogTag);
-                return files;
-        }
-
-        for (const auto& entry : std::filesystem::directory_iterator(localizationDir))
-        {
-                if (!entry.is_regular_file() || entry.path().extension() != ".resx")
-                {
-                        continue;
-                }
-
-                std::ifstream file(entry.path(), std::ios::binary);
-                if (!file.is_open())
-                {
-                        LOG(1, "%s Failed to open localization file on disk: %s", kLanguageLogTag, entry.path().string().c_str());
-                        continue;
-                }
-
-                std::stringstream buffer;
-                buffer << file.rdbuf();
-                AddResxEntry(entry.path().filename().string(), buffer.str(), false, files);
-        }
-
-        if (files.empty())
-        {
-                LOG(2, "%s No .resx files found in %s.", kLanguageLogTag, localizationDir.string().c_str());
-        }
-
+    if (localizationDir.empty())
+    {
+        LOG(2, "%s Localization directory not found on disk; relying on embedded resources.", kLanguageLogTag);
         return files;
+    }
+
+    for (const auto& entry : fs::directory_iterator(localizationDir))
+    {
+        if (!fs::is_regular_file(entry.status()) || entry.path().extension() != ".resx")
+        {
+            continue;
+        }
+
+        std::ifstream file(entry.path(), std::ios::binary);
+        if (!file.is_open())
+        {
+            LOG(1, "%s Failed to open localization file on disk: %s", kLanguageLogTag, entry.path().string().c_str());
+            continue;
+        }
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        AddResxEntry(entry.path().filename().string(), buffer.str(), false, files);
+    }
+
+    if (files.empty())
+    {
+        LOG(2, "%s No .resx files found in %s.", kLanguageLogTag, localizationDir.string().c_str());
+    }
+
+    return files;
 }
+
 
 std::vector<ResxEntry> LoadBuiltInResxEntries()
 {
