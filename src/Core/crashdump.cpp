@@ -1,27 +1,14 @@
 #include "crashdump.h"
-#include "logger.h"
 
 #include <ctime>
 #include <dbghelp.h>
 #include <memory>
 #include <shlobj.h>
 #include <tchar.h>
-#include <cstring>
 
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
-        if (ExPtr && ExPtr->ExceptionRecord)
-        {
-                ForceLog("[Crash] Unhandled exception 0x%08X at address 0x%p\n",
-                        ExPtr->ExceptionRecord->ExceptionCode,
-                        ExPtr->ExceptionRecord->ExceptionAddress);
-        }
-        else
-        {
-                ForceLog("[Crash] Unhandled exception with missing exception record.\n");
-        }
-
-        BOOL(WINAPI* pMiniDumpWriteDump)(IN HANDLE hProcess, IN DWORD ProcessId, IN HANDLE hFile, IN MINIDUMP_TYPE DumpType, IN CONST PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam, OPTIONAL IN CONST PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam, OPTIONAL IN CONST PMINIDUMP_CALLBACK_INFORMATION CallbackParam OPTIONAL) = NULL;
+	BOOL(WINAPI * pMiniDumpWriteDump)(IN HANDLE hProcess, IN DWORD ProcessId, IN HANDLE hFile, IN MINIDUMP_TYPE DumpType, IN CONST PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam, OPTIONAL IN CONST PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam, OPTIONAL IN CONST PMINIDUMP_CALLBACK_INFORMATION CallbackParam OPTIONAL) = NULL;
 
 	HMODULE hLib = LoadLibrary(_T("dbghelp"));
 	if (hLib)
@@ -38,7 +25,7 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 		strftime(timebuffer, 26, "%Y%m%d%H%M%S", tm_info);
 		//convert from char* to wchar_t*
 		size_t newsize = strlen(timebuffer) + 1;
-		wchar_t * wtimestring = new wchar_t[newsize]; 
+		wchar_t* wtimestring = new wchar_t[newsize];
 		size_t convertedChars = 0;
 		mbstowcs_s(&convertedChars, wtimestring, newsize, timebuffer, _TRUNCATE);
 
@@ -47,7 +34,7 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 
 		HANDLE hFile = CreateFile(buf2, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-		if (hFile != INVALID_HANDLE_VALUE) 
+		if (hFile != INVALID_HANDLE_VALUE)
 		{
 			MINIDUMP_EXCEPTION_INFORMATION md;
 			md.ThreadId = GetCurrentThreadId();
@@ -62,24 +49,15 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 			CloseHandle(hFile);
 
 		}
-		else 
+		else
 		{
 			wsprintf(buf, _T("Could not create minidump:\n%s"), buf2);
 		}
 	}
-        else
-        {
-                wsprintf(buf, _T("Could not load dbghelp"));
-        }
-
-        char logBuffer[512] = { 0 };
-#ifdef UNICODE
-        WideCharToMultiByte(CP_UTF8, 0, buf, -1, logBuffer, static_cast<int>(sizeof(logBuffer)), nullptr, nullptr);
-#else
-        strncpy_s(logBuffer, buf, _TRUNCATE);
-#endif
-
-        ForceLog("[Crash] %s\n", logBuffer);
-        MessageBox(NULL, buf, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
-        ExitProcess(0);    //do whatever u want here
+	else
+	{
+		wsprintf(buf, _T("Could not load dbghelp"));
+	}
+	MessageBox(NULL, buf, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
+	ExitProcess(0);    //do whatever u want here
 }

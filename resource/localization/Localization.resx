@@ -1,5 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -12,76 +117,76 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="_LanguageCode">
+  <data name="_LanguageCode" xml:space="preserve">
     <value>en</value>
   </data>
-  <data name="_DisplayName">
+  <data name="_DisplayName" xml:space="preserve">
     <value>English</value>
   </data>
-  <data name="Toggle me with %s">
+  <data name="Toggle me with %s" xml:space="preserve">
     <value>Toggle me with %s</value>
   </data>
-  <data name="Toggle Online with %s">
+  <data name="Toggle Online with %s" xml:space="preserve">
     <value>Toggle Online with %s</value>
   </data>
-  <data name="Toggle HUD with %s">
+  <data name="Toggle HUD with %s" xml:space="preserve">
     <value>Toggle HUD with %s</value>
   </data>
-  <data name="Generate Debug Logs">
+  <data name="Generate Debug Logs" xml:space="preserve">
     <value>Generate Debug Logs</value>
   </data>
-  <data name="Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.">
+  <data name="Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions." xml:space="preserve">
     <value>Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.</value>
   </data>
-  <data name="Online">
+  <data name="Online" xml:space="preserve">
     <value>Online</value>
   </data>
-  <data name="Gameplay settings">
+  <data name="Gameplay settings" xml:space="preserve">
     <value>Gameplay settings</value>
   </data>
-  <data name="Custom palettes">
+  <data name="Custom palettes" xml:space="preserve">
     <value>Custom palettes</value>
   </data>
-  <data name="Hitbox overlay">
+  <data name="Hitbox overlay" xml:space="preserve">
     <value>Hitbox overlay</value>
   </data>
-  <data name="FrameHistory">
+  <data name="FrameHistory" xml:space="preserve">
     <value>FrameHistory</value>
   </data>
-  <data name="Framedata">
+  <data name="Framedata" xml:space="preserve">
     <value>Framedata</value>
   </data>
-  <data name="Avatar settings">
+  <data name="Avatar settings" xml:space="preserve">
     <value>Avatar settings</value>
   </data>
-  <data name="Controller Settings">
+  <data name="Controller Settings" xml:space="preserve">
     <value>Controller Settings</value>
   </data>
-  <data name="Loaded settings.ini values">
+  <data name="Loaded settings.ini values" xml:space="preserve">
     <value>Loaded settings.ini values</value>
   </data>
-  <data name="Current online players:">
+  <data name="Current online players:" xml:space="preserve">
     <value>Current online players:</value>
   </data>
-  <data name="&lt;No data&gt;">
+  <data name="&lt;No data&gt;" xml:space="preserve">
     <value>&lt;No data&gt;</value>
   </data>
-  <data name="Avatar">
+  <data name="Avatar" xml:space="preserve">
     <value>Avatar</value>
   </data>
-  <data name="Color">
+  <data name="Color" xml:space="preserve">
     <value>Color</value>
   </data>
-  <data name="Accessory 1">
+  <data name="Accessory 1" xml:space="preserve">
     <value>Accessory 1</value>
   </data>
-  <data name="Accessory 2">
+  <data name="Accessory 2" xml:space="preserve">
     <value>Accessory 2</value>
   </data>
-  <data name="CONNECT TO NETWORK MODE FIRST">
+  <data name="CONNECT TO NETWORK MODE FIRST" xml:space="preserve">
     <value>CONNECT TO NETWORK MODE FIRST</value>
   </data>
-  <data name="FrameHistory help">
+  <data name="FrameHistory help" xml:space="preserve">
     <value>For each non-idle frame, display a column of rectangles with info about it. 
  
 For each player : 
@@ -104,105 +209,104 @@ For each player :
  - P-&gt;right segment 
 </value>
   </data>
-  <data name="FrameHistory auto reset help">
+  <data name="FrameHistory auto reset help" xml:space="preserve">
     <value>block auto-reset on an idle frame: Do not overwrite automatically after an idle frame.</value>
   </data>
-  <data name="Box width">
+  <data name="Box width" xml:space="preserve">
     <value>Box width</value>
   </data>
-  <data name="Box height">
+  <data name="Box height" xml:space="preserve">
     <value>Box height</value>
   </data>
-  <data name="spacing">
+  <data name="spacing" xml:space="preserve">
     <value>spacing</value>
   </data>
-  <data name="Enable##framehistory_section">
+  <data name="Enable##framehistory_section" xml:space="preserve">
     <value>Enable##framehistory_section</value>
   </data>
-  <data name="Auto Reset##Reset after each idle frame">
+  <data name="Auto Reset##Reset after each idle frame" xml:space="preserve">
     <value>Auto Reset##Reset after each idle frame</value>
   </data>
-  <data name="Enable##framedata_section">
+  <data name="Enable##framedata_section" xml:space="preserve">
     <value>Enable##framedata_section</value>
   </data>
-  <data name="Advantage on stagger hit">
+  <data name="Advantage on stagger hit" xml:space="preserve">
     <value>Advantage on stagger hit</value>
   </data>
-  <data name="YOU ARE NOT IN MATCH!">
+  <data name="YOU ARE NOT IN MATCH!" xml:space="preserve">
     <value>YOU ARE NOT IN MATCH!</value>
   </data>
-  <data name="YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!">
+  <data name="YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!" xml:space="preserve">
     <value>YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!</value>
   </data>
-  <data name="YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!">
+  <data name="YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!" xml:space="preserve">
     <value>YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!</value>
   </data>
-  <data name="THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS">
+  <data name="THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS" xml:space="preserve">
     <value>THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS</value>
   </data>
-  <data name="Palette editor">
+  <data name="Palette editor" xml:space="preserve">
     <value>Palette editor</value>
   </data>
-  <data name="YOU ARE NOT IN MATCH! (Replay)">
+  <data name="YOU ARE NOT IN MATCH! (Replay)" xml:space="preserve">
     <value>YOU ARE NOT IN MATCH!</value>
   </data>
-  <data name="YOU ARE NOT IN REPLAY MENU!">
+  <data name="YOU ARE NOT IN REPLAY MENU!" xml:space="preserve">
     <value>YOU ARE NOT IN REPLAY MENU!</value>
   </data>
-  <data name="YOU ARE NOT IN CHARACTER SELECTION!">
+  <data name="YOU ARE NOT IN CHARACTER SELECTION!" xml:space="preserve">
     <value>YOU ARE NOT IN CHARACTER SELECTION!</value>
   </data>
-  <data name="Hide HUD">
+  <data name="Hide HUD" xml:space="preserve">
     <value>Hide HUD</value>
   </data>
-  <data name="Toggle Rewind">
+  <data name="Toggle Rewind" xml:space="preserve">
     <value>Toggle Rewind</value>
   </data>
-  <data name="Replay Database">
+  <data name="Replay Database" xml:space="preserve">
     <value>Replay Database</value>
   </data>
-  <data name="Enable/Disable Upload">
+  <data name="Enable/Disable Upload" xml:space="preserve">
     <value>Enable/Disable Upload</value>
   </data>
-  <data name="Discord">
+  <data name="Discord" xml:space="preserve">
     <value>Discord</value>
   </data>
-  <data name="Forum">
+  <data name="Forum" xml:space="preserve">
     <value>Forum</value>
   </data>
-  <data name="GitHub">
+  <data name="GitHub" xml:space="preserve">
     <value>GitHub</value>
   </data>
-  <data name="Player1">
+  <data name="Player1" xml:space="preserve">
     <value>Player1</value>
   </data>
-  <data name="Player2">
+  <data name="Player2" xml:space="preserve">
     <value>Player2</value>
   </data>
-  <data name="Draw hitbox/hurtbox">
+  <data name="Draw hitbox/hurtbox" xml:space="preserve">
     <value>Draw hitbox/hurtbox</value>
   </data>
-  <data name="Draw origin">
+  <data name="Draw origin" xml:space="preserve">
     <value>Draw origin</value>
   </data>
-  <data name="Draw collision">
+  <data name="Draw collision" xml:space="preserve">
     <value>Draw collision</value>
   </data>
-  <data name="Draw throw/range boxes">
+  <data name="Draw throw/range boxes" xml:space="preserve">
     <value>Draw throw/range boxes</value>
   </data>
-  <data name="The point in space where your character resides. 
-Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.">
+  <data name="The point in space where your character resides. &#xA;Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch." xml:space="preserve">
     <value>The point in space where your character resides. 
 Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.</value>
   </data>
-  <data name="Defines collision between objects/characters. Also used for throw range checks.">
+  <data name="Defines collision between objects/characters. Also used for throw range checks." xml:space="preserve">
     <value>Defines collision between objects/characters. Also used for throw range checks.</value>
   </data>
-  <data name="Throw range help">
-    <value>Throw Range Box(yellow): All throws require the throw range check. In order to pass this check the throw range box must overlap target&#x27;s  collision box.
+  <data name="Throw range help" xml:space="preserve">
+    <value>Throw Range Box(yellow): All throws require the throw range check. In order to pass this check the throw range box must overlap target's  collision box.
 
-Move Range Box(green): All throws and some moves require the move range check. In order to pass this check the move range box must overlap the target&#x27;s origin point.
+Move Range Box(green): All throws and some moves require the move range check. In order to pass this check the move range box must overlap the target's origin point.
 
 
 
@@ -216,97 +320,97 @@ In order for a throw to connect you must have satisfy the following conditions:
 5: The target must not be throw immune.
 </value>
   </data>
-  <data name="Freeze frame:">
+  <data name="Freeze frame:" xml:space="preserve">
     <value>Freeze frame:</value>
   </data>
-  <data name="Frame Count">
+  <data name="Frame Count" xml:space="preserve">
     <value>Frame Count</value>
   </data>
-  <data name="Reset">
+  <data name="Reset" xml:space="preserve">
     <value>Reset</value>
   </data>
-  <data name="Freeze animation">
+  <data name="Freeze animation" xml:space="preserve">
     <value>Freeze animation</value>
   </data>
-  <data name="Stop timer">
+  <data name="Stop timer" xml:space="preserve">
     <value>Stop timer</value>
   </data>
-  <data name="Step frames">
+  <data name="Step frames" xml:space="preserve">
     <value>Step frames</value>
   </data>
-  <data name="YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!">
+  <data name="YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!" xml:space="preserve">
     <value>YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!</value>
   </data>
-  <data name="Game Mode">
+  <data name="Game Mode" xml:space="preserve">
     <value>Game Mode</value>
   </data>
-  <data name="Enable##hitbox_overlay_section">
+  <data name="Enable##hitbox_overlay_section" xml:space="preserve">
     <value>Enable##hitbox_overlay_section</value>
   </data>
-  <data name="Custom palette reload">
+  <data name="Custom palette reload" xml:space="preserve">
     <value>Reload all palettes</value>
   </data>
-  <data name="Enable##framehistory_section checkbox">
+  <data name="Enable##framehistory_section checkbox" xml:space="preserve">
     <value>Enable##framehistory_section</value>
   </data>
-  <data name="Draw hitbox/hurtbox##hitbox_overlay_section">
+  <data name="Draw hitbox/hurtbox##hitbox_overlay_section" xml:space="preserve">
     <value>Draw hitbox/hurtbox</value>
   </data>
-  <data name="Draw origin##hitbox_overlay_section">
+  <data name="Draw origin##hitbox_overlay_section" xml:space="preserve">
     <value>Draw origin</value>
   </data>
-  <data name="Draw collision##hitbox_overlay_section">
+  <data name="Draw collision##hitbox_overlay_section" xml:space="preserve">
     <value>Draw collision</value>
   </data>
-  <data name="Step frames##hitbox_overlay_section">
+  <data name="Step frames##hitbox_overlay_section" xml:space="preserve">
     <value>Step frames</value>
   </data>
-  <data name="Gameplay settings header">
+  <data name="Gameplay settings header" xml:space="preserve">
     <value>Gameplay settings</value>
   </data>
-  <data name="Hide HUD checkbox">
+  <data name="Hide HUD checkbox" xml:space="preserve">
     <value>Hide HUD</value>
   </data>
-  <data name="States">
+  <data name="States" xml:space="preserve">
     <value>States</value>
   </data>
-  <data name="Log">
+  <data name="Log" xml:space="preserve">
     <value>Log</value>
   </data>
-  <data name="Replay Rewind">
+  <data name="Replay Rewind" xml:space="preserve">
     <value>Replay Rewind</value>
   </data>
-  <data name="Replay Upload">
+  <data name="Replay Upload" xml:space="preserve">
     <value>Replay Upload</value>
   </data>
-  <data name="Enable##framehistory_section label">
+  <data name="Enable##framehistory_section label" xml:space="preserve">
     <value>Enable</value>
   </data>
-  <data name="Auto Reset label">
+  <data name="Auto Reset label" xml:space="preserve">
     <value>Auto Reset</value>
   </data>
-  <data name="FrameHistory width label">
+  <data name="FrameHistory width label" xml:space="preserve">
     <value>Box width</value>
   </data>
-  <data name="FrameHistory height label">
+  <data name="FrameHistory height label" xml:space="preserve">
     <value>Box height</value>
   </data>
-  <data name="FrameHistory spacing label">
+  <data name="FrameHistory spacing label" xml:space="preserve">
     <value>spacing</value>
   </data>
-  <data name="FrameHistory not enabled message">
+  <data name="FrameHistory not enabled message" xml:space="preserve">
     <value>YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!</value>
   </data>
-  <data name="FrameHistory character load error">
+  <data name="FrameHistory character load error" xml:space="preserve">
     <value>THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS</value>
   </data>
-  <data name="Language">
+  <data name="Language" xml:space="preserve">
     <value>Language</value>
   </data>
-  <data name="Language incomplete label">
+  <data name="Language incomplete label" xml:space="preserve">
     <value>%s - Incomplete (Missing %zu terms)</value>
   </data>
-  <data name="Language selection help">
+  <data name="Language selection help" xml:space="preserve">
     <value>Select a language for all UI text. Requires full dictionary coverage.</value>
   </data>
 </root>

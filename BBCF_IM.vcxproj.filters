@@ -82,9 +82,6 @@
     <ClCompile Include="src\Core\DirectInputWrapper.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\Localization.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\Web\update_check.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -229,9 +226,6 @@
     <ClInclude Include="src\Core\dllmain.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\Localization.h">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="src\Web\update_check.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -342,12 +336,6 @@
   <ItemGroup>
     <None Include="export\dinput8.def">
       <Filter>export</Filter>
-    </None>
-    <None Include="resource\localization\Localization.es.resx">
-      <Filter>resource</Filter>
-    </None>
-    <None Include="resource\localization\Localization.resx">
-      <Filter>resource</Filter>
     </None>
     <None Include="resource\settings.ini">
       <Filter>resource</Filter>
