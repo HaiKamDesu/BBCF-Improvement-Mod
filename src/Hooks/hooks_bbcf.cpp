@@ -32,15 +32,59 @@ static void LogTitleScreenContext(const char* phase)
                 WindowManager::GetInstance().IsInitialized(), g_interfaces.pD3D9ExWrapper, g_gameProc.hWndGameWindow);
 }
 
+struct TitleScreenRegisterDump
+{
+        uint32_t eax = 0;
+        uint32_t ecx = 0;
+        uint32_t edx = 0;
+        uint32_t ebx = 0;
+        uint32_t esp = 0;
+        uint32_t ebp = 0;
+        uint32_t esi = 0;
+        uint32_t edi = 0;
+        uint32_t eflags = 0;
+};
+
+static TitleScreenRegisterDump g_titleScreenRegs = {};
+
+static void CaptureTitleScreenRegisters(uint32_t* stackBase)
+{
+        // Stack layout after `pushfd; pushad` (top-to-bottom):
+        // [0] = eax, [1] = ecx, [2] = edx, [3] = ebx, [4] = esp, [5] = ebp, [6] = esi, [7] = edi, [8] = eflags.
+        g_titleScreenRegs.eax = stackBase[0];
+        g_titleScreenRegs.ecx = stackBase[1];
+        g_titleScreenRegs.edx = stackBase[2];
+        g_titleScreenRegs.ebx = stackBase[3];
+        g_titleScreenRegs.esp = stackBase[4];
+        g_titleScreenRegs.ebp = stackBase[5];
+        g_titleScreenRegs.esi = stackBase[6];
+        g_titleScreenRegs.edi = stackBase[7];
+        g_titleScreenRegs.eflags = stackBase[8];
+}
+
+static void LogTitleScreenRegisters(const char* phase)
+{
+        LOG(1, "[TitleScreen][Regs] %s eax=0x%08X ecx=0x%08X edx=0x%08X ebx=0x%08X esp=0x%08X ebp=0x%08X esi=0x%08X edi=0x%08X eflags=0x%08X\n",
+                phase,
+                g_titleScreenRegs.eax, g_titleScreenRegs.ecx, g_titleScreenRegs.edx, g_titleScreenRegs.ebx,
+                g_titleScreenRegs.esp, g_titleScreenRegs.ebp, g_titleScreenRegs.esi, g_titleScreenRegs.edi, g_titleScreenRegs.eflags);
+}
+
 
 DWORD GetGameStateTitleScreenJmpBackAddr = 0;
 void __declspec(naked)GetGameStateTitleScreen()
 {
-	LOG_ASM(2, "GetGameStateTitleScreen\n");
+        LOG_ASM(2, "GetGameStateTitleScreen\n");
 
         _asm
         {
+                pushfd
                 pushad
+                mov eax, esp
+                push eax
+                call CaptureTitleScreenRegisters
+                add esp, 4
+
                 add edi, 108h
                 lea ebx, g_gameVals.pGameMode
                 mov[ebx], edi
@@ -51,6 +95,7 @@ void __declspec(naked)GetGameStateTitleScreen()
         }
 
         LogTitleScreenContext("after pointer capture");
+        LogTitleScreenRegisters("after pointer capture");
 
         InitSteamApiWrappers();
         InitManagers();
@@ -58,13 +103,15 @@ void __declspec(naked)GetGameStateTitleScreen()
         WindowManager::GetInstance().Initialize(g_gameProc.hWndGameWindow, g_interfaces.pD3D9ExWrapper);
 
         LogTitleScreenContext("after initialization");
+        LogTitleScreenRegisters("after initialization");
 
         __asm
         {
                 popad
-		mov dword ptr[edi + 10Ch], 4 //original bytes
-		jmp[GetGameStateTitleScreenJmpBackAddr]
-	}
+                popfd
+                mov dword ptr[edi + 10Ch], 4 //original bytes
+                jmp[GetGameStateTitleScreenJmpBackAddr]
+        }
 }
 
 DWORD GetGameStateMenuScreenJmpBackAddr = 0;
