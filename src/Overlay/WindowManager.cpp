@@ -10,7 +10,6 @@
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
-#include "Core/Localization.h"
 #include "Web/update_check.h"
 
 #include <imgui.h>
@@ -69,9 +68,7 @@ bool WindowManager::Initialize(void *hwnd, IDirect3DDevice9 *device)
 
         m_windowContainer = new WindowContainer();
 
-        Localization::Initialize(Settings::settingsIni.language);
-
-	ImGui::StyleColorsDark();
+        ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowBorderSize = 1;
 	style.FrameBorderSize = 1;

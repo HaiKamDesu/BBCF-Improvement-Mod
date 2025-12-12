@@ -5,6 +5,7 @@
 #include "dllmain.h"
 #include "ControllerOverrideManager.h"
 #include "DirectInputWrapper.h"
+#include "Localization.h"
 
 #include "Hooks/hooks_detours.h"
 #include "Hooks/hooks_battle_input.h"
@@ -114,6 +115,8 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 
                 logSettingsIni();
                 Settings::initSavedSettings();
+
+                Localization::Initialize(Settings::settingsIni.language);
 
                 if (!LoadOriginalDinputDll())
                 {
