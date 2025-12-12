@@ -3,6 +3,7 @@
 #include <ctime>
 #include <cstdarg>
 #include <sstream>
+#include <string>
 
 namespace
 {
@@ -51,9 +52,28 @@ void logger(const char* message, ...)
 
         va_list args;
         va_start(args, message);
-        vfprintf(g_oFile, message, args);
+
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
+        va_end(argsCopy);
+
+        if (required <= 0)
+        {
+                va_end(args);
+                return;
+        }
+
+        std::string buffer(static_cast<size_t>(required), '\0');
+        std::vsnprintf(&buffer[0], buffer.size() + 1, message, args);
         va_end(args);
 
+        if (buffer.empty() || buffer.back() != '\n')
+        {
+                buffer.push_back('\n');
+        }
+
+        fputs(buffer.c_str(), g_oFile);
         fflush(g_oFile);
 }
 
@@ -76,9 +96,28 @@ void ForceLog(const char* message, ...)
 
         va_list args;
         va_start(args, message);
-        vfprintf(g_oFile, message, args);
+
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        const int required = std::vsnprintf(nullptr, 0, message, argsCopy);
+        va_end(argsCopy);
+
+        if (required <= 0)
+        {
+                va_end(args);
+                return;
+        }
+
+        std::string buffer(static_cast<size_t>(required), '\0');
+        std::vsnprintf(&buffer[0], buffer.size() + 1, message, args);
         va_end(args);
 
+        if (buffer.empty() || buffer.back() != '\n')
+        {
+                buffer.push_back('\n');
+        }
+
+        fputs(buffer.c_str(), g_oFile);
         fflush(g_oFile);
 }
 

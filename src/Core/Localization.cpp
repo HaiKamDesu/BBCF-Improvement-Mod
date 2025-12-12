@@ -201,7 +201,26 @@ std::vector<ResxEntry> LoadEmbeddedResxEntries()
 {
         std::vector<ResxEntry> entries;
 
-        EnumResourceNamesW(nullptr, RT_RCDATA,
+        HMODULE moduleHandle = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&LoadEmbeddedResxEntries), &moduleHandle))
+        {
+                moduleHandle = GetModuleHandleW(nullptr);
+        }
+
+        if (!moduleHandle)
+        {
+                LOG(1, "%s Failed to resolve module handle for embedded localization resources.", kLanguageLogTag);
+                return entries;
+        }
+
+        struct EnumContext
+        {
+                HMODULE module;
+                std::vector<ResxEntry>* entries;
+        } context{ moduleHandle, &entries };
+
+        EnumResourceNamesW(moduleHandle, RT_RCDATA,
                 [](HMODULE, LPCWSTR, LPWSTR name, LONG_PTR param) -> BOOL
                 {
                         if (IS_INTRESOURCE(name))
@@ -209,26 +228,27 @@ std::vector<ResxEntry> LoadEmbeddedResxEntries()
                                 return TRUE;
                         }
 
-                        auto* out = reinterpret_cast<std::vector<ResxEntry>*>(param);
+                        auto* ctx = reinterpret_cast<EnumContext*>(param);
+                        auto* out = ctx->entries;
                         std::string resourceName = WideToUtf8(name);
                         if (resourceName.find(".resx") == std::string::npos)
                         {
                                 return TRUE;
                         }
 
-                        HRSRC resource = FindResourceW(nullptr, name, RT_RCDATA);
+                        HRSRC resource = FindResourceW(ctx->module, name, RT_RCDATA);
                         if (!resource)
                         {
                                 return TRUE;
                         }
 
-                        HGLOBAL handle = LoadResource(nullptr, resource);
+                        HGLOBAL handle = LoadResource(ctx->module, resource);
                         if (!handle)
                         {
                                 return TRUE;
                         }
 
-                        const DWORD size = SizeofResource(nullptr, resource);
+                        const DWORD size = SizeofResource(ctx->module, resource);
                         const void* data = LockResource(handle);
                         if (!data || size == 0)
                         {
@@ -239,7 +259,7 @@ std::vector<ResxEntry> LoadEmbeddedResxEntries()
                         AddResxEntry(resourceName, std::move(content), true, *out);
                         return TRUE;
                 },
-                reinterpret_cast<LONG_PTR>(&entries));
+                reinterpret_cast<LONG_PTR>(&context));
 
         if (entries.empty())
         {
