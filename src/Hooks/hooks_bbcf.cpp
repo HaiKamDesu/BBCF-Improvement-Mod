@@ -47,19 +47,34 @@ struct TitleScreenRegisterDump
 
 static TitleScreenRegisterDump g_titleScreenRegs = {};
 
-static void CaptureTitleScreenRegisters(uint32_t* stackBase)
+static void CaptureTitleScreenRegisters()
 {
-        // Stack layout after `pushfd; pushad` (top-to-bottom):
-        // [0] = eax, [1] = ecx, [2] = edx, [3] = ebx, [4] = esp, [5] = ebp, [6] = esi, [7] = edi, [8] = eflags.
-        g_titleScreenRegs.eax = stackBase[0];
-        g_titleScreenRegs.ecx = stackBase[1];
-        g_titleScreenRegs.edx = stackBase[2];
-        g_titleScreenRegs.ebx = stackBase[3];
-        g_titleScreenRegs.esp = stackBase[4];
-        g_titleScreenRegs.ebp = stackBase[5];
-        g_titleScreenRegs.esi = stackBase[6];
-        g_titleScreenRegs.edi = stackBase[7];
-        g_titleScreenRegs.eflags = stackBase[8];
+        // Snapshot registers without leaving the saved values on the stack. This avoids
+        // accidentally restoring a corrupted ESP when the title-screen hook jumps back
+        // to the game code.
+        __asm
+        {
+                push eax
+                push ecx
+                push edx
+
+                mov g_titleScreenRegs.eax, eax
+                mov g_titleScreenRegs.ecx, ecx
+                mov g_titleScreenRegs.edx, edx
+                mov g_titleScreenRegs.ebx, ebx
+                mov g_titleScreenRegs.esp, esp
+                mov g_titleScreenRegs.ebp, ebp
+                mov g_titleScreenRegs.esi, esi
+                mov g_titleScreenRegs.edi, edi
+
+                pushfd
+                pop eax
+                mov g_titleScreenRegs.eflags, eax
+
+                pop edx
+                pop ecx
+                pop eax
+        }
 }
 
 static void LogTitleScreenRegisters(const char* phase)
@@ -76,15 +91,10 @@ void __declspec(naked)GetGameStateTitleScreen()
 {
         LOG_ASM(2, "GetGameStateTitleScreen\n");
 
+        CaptureTitleScreenRegisters();
+
         _asm
         {
-                pushfd
-                pushad
-                mov eax, esp
-                push eax
-                call CaptureTitleScreenRegisters
-                add esp, 4
-
                 add edi, 108h
                 lea ebx, g_gameVals.pGameMode
                 mov[ebx], edi
@@ -107,7 +117,15 @@ void __declspec(naked)GetGameStateTitleScreen()
 
         __asm
         {
-                popad
+                mov eax, g_titleScreenRegs.eax
+                mov ecx, g_titleScreenRegs.ecx
+                mov edx, g_titleScreenRegs.edx
+                mov ebx, g_titleScreenRegs.ebx
+                mov ebp, g_titleScreenRegs.ebp
+                mov esi, g_titleScreenRegs.esi
+                mov edi, g_titleScreenRegs.edi
+                mov esp, g_titleScreenRegs.esp
+                push dword ptr [g_titleScreenRegs.eflags]
                 popfd
                 mov dword ptr[edi + 10Ch], 4 //original bytes
                 jmp[GetGameStateTitleScreenJmpBackAddr]
