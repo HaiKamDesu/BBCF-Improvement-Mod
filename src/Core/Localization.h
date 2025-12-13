@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "LocalizationKeys.autogen.h"
+
 struct LanguageOption
 {
         std::string code;
@@ -23,6 +25,8 @@ public:
         static const std::string& GetCurrentLanguage();
         static bool IsLanguageComplete(const std::string& languageCode);
         static size_t GetMissingKeyCount(const std::string& languageCode);
+
+        static const LocalizationKeysAccessor Strings;
 
 private:
         static void LoadLanguageData();

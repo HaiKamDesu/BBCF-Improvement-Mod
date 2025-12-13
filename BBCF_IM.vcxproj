@@ -233,7 +233,11 @@
     <None Include="LICENSE" />
     <None Include="README.md" />
     <None Include="resource\localization\Localization.es.resx" />
-    <None Include="resource\localization\Localization.resx" />
+    <CustomBuild Include="resource\localization\Localization.resx">
+      <Message>Generating strongly-typed localization accessors</Message>
+      <Command>python "$(ProjectDir)tools\generate_localization_bindings.py" --input "$(ProjectDir)resource\localization\Localization.resx" --output "$(ProjectDir)src\Core\LocalizationKeys.autogen.h"</Command>
+      <Outputs>$(ProjectDir)src\Core\LocalizationKeys.autogen.h;%(Outputs)</Outputs>
+    </CustomBuild>
     <None Include="resource\palettes.ini" />
     <None Include="resource\settings.ini">
       <FileType>Document</FileType>
