@@ -135,18 +135,25 @@ void MainWindow::DrawLanguageSelector()
         const auto& currentOption = options[currentIndex];
         std::string preview = currentOption.displayName;
 
+        std::string pendingLanguage;
+        bool shouldReload = false;
+
         if (ImGui::BeginCombo(L("Language").c_str(), preview.c_str()))
         {
                 for (size_t i = 0; i < options.size(); ++i)
                 {
                         const auto& option = options[i];
+                        const bool optionComplete = option.complete;
+                        const size_t missingKeys = option.missingKeys;
+                        const std::string languageCode = option.code;
+
                         std::string label = option.displayName;
-                        if (!option.complete)
+                        if (!optionComplete)
                         {
-                                label = FormatText(L("Language incomplete label").c_str(), option.displayName.c_str(), option.missingKeys);
+                                label = FormatText(L("Language incomplete label").c_str(), option.displayName.c_str(), missingKeys);
                         }
 
-                        if (!option.complete)
+                        if (!optionComplete)
                         {
                                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
                                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
@@ -155,15 +162,12 @@ void MainWindow::DrawLanguageSelector()
                         bool selected = currentIndex == static_cast<int>(i);
                         if (ImGui::Selectable(label.c_str(), selected))
                         {
-                                if (Localization::SetCurrentLanguage(option.code))
-                                {
-                                        Settings::settingsIni.language = option.code;
-                                        Settings::changeSetting("Language", Settings::settingsIni.language);
-                                        currentIndex = static_cast<int>(i);
-                                }
+                                pendingLanguage = languageCode;
+                                shouldReload = true;
+                                currentIndex = static_cast<int>(i);
                         }
 
-                        if (!option.complete)
+                        if (!optionComplete)
                         {
                                 ImGui::PopStyleVar();
                                 ImGui::PopItemFlag();
@@ -171,6 +175,13 @@ void MainWindow::DrawLanguageSelector()
                 }
 
                 ImGui::EndCombo();
+        }
+
+        if (shouldReload)
+        {
+                Localization::Reload(pendingLanguage);
+                Settings::settingsIni.language = Localization::GetCurrentLanguage();
+                Settings::changeSetting("Language", Settings::settingsIni.language);
         }
 
         ImGui::SameLine();
