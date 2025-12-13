@@ -906,6 +906,17 @@ void Localization::Initialize(const std::string& requestedLanguage)
         }
 }
 
+void Localization::Reload(const std::string& requestedLanguage)
+{
+        m_languageStrings.clear();
+        m_languageOptions.clear();
+        m_currentLanguage = kDefaultLanguageCode;
+        m_fallbackLanguage = kDefaultLanguageCode;
+        m_initialized = false;
+
+        Initialize(requestedLanguage);
+}
+
 const std::string& Localization::Translate(const std::string& key)
 {
         const auto& languageMap = GetLanguageMap(m_currentLanguage);

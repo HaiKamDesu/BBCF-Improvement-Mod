@@ -16,6 +16,7 @@ class Localization
 {
 public:
         static void Initialize(const std::string& requestedLanguage);
+        static void Reload(const std::string& requestedLanguage);
         static const std::string& Translate(const std::string& key);
         static const std::vector<LanguageOption>& GetAvailableLanguages();
         static bool SetCurrentLanguage(const std::string& languageCode);

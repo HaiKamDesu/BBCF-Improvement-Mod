@@ -155,12 +155,10 @@ void MainWindow::DrawLanguageSelector()
                         bool selected = currentIndex == static_cast<int>(i);
                         if (ImGui::Selectable(label.c_str(), selected))
                         {
-                                if (Localization::SetCurrentLanguage(option.code))
-                                {
-                                        Settings::settingsIni.language = option.code;
-                                        Settings::changeSetting("Language", Settings::settingsIni.language);
-                                        currentIndex = static_cast<int>(i);
-                                }
+                                Localization::Reload(option.code);
+                                Settings::settingsIni.language = Localization::GetCurrentLanguage();
+                                Settings::changeSetting("Language", Settings::settingsIni.language);
+                                currentIndex = static_cast<int>(i);
                         }
 
                         if (!option.complete)
