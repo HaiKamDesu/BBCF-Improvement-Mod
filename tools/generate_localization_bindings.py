@@ -39,13 +39,15 @@ def render_header(keys):
     lines.append("")
     lines.append("struct LocalizationKeysAccessor")
     lines.append("{")
-    lines.append("        const std::string& Get(const std::string& key) const;")
+    lines.append("        const char* Get(const std::string& key) const;")
     lines.append("")
     seen = set()
     for original in keys:
         method = sanitize_name(original, seen)
-        lines.append(f"        // {original}")
-        lines.append(f"        inline const std::string& {method}() const {{ return Get(\"{original}\"); }}")
+        escaped_comment = original.replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n")
+        escaped_literal = original.replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", "").replace("\n", "\\n")
+        lines.append(f"        // {escaped_comment}")
+        lines.append(f"        inline const char* {method}() const {{ return Get(\"{escaped_literal}\"); }}")
         lines.append("")
     if lines[-1] == "":
         lines.pop()

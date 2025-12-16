@@ -887,9 +887,9 @@ std::string Localization::m_fallbackLanguage = kDefaultLanguageCode;
 bool Localization::m_initialized = false;
 const LocalizationKeysAccessor Localization::Strings = {};
 
-const std::string& LocalizationKeysAccessor::Get(const std::string& key) const
+const char* LocalizationKeysAccessor::Get(const std::string& key) const
 {
-        return Localization::Translate(key);
+        return Localization::Translate(key).c_str();
 }
 
 void Localization::Initialize(const std::string& requestedLanguage)
