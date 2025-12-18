@@ -413,4 +413,7 @@ Para que conecte debes cumplir:
   <data name="Language selection help" xml:space="preserve">
     <value>Selecciona un idioma para todo el texto de la interfaz. Requiere cobertura completa del diccionario.</value>
   </data>
+  <data name="KoreWaTestoDakeDa" xml:space="preserve">
+    <value>asasasasa</value>
+  </data>
 </root>

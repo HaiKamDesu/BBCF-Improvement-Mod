@@ -6,6 +6,8 @@
 
 #include "LocalizationKeys.autogen.h"
 
+#define Messages Localization::Strings
+
 struct LanguageOption
 {
         std::string code;
