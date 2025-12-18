@@ -1,6 +1,7 @@
 #include "KeyboardSeparationDrawer.h"
 
 #include "Core/ControllerOverrideManager.h"
+#include "Core/Localization.h"
 #include "Core/Settings.h"
 #include "Overlay/imgui_utils.h"
 
@@ -12,12 +13,12 @@ namespace ControllerSettings
         {
                 ImGui::HorizontalSpacing();
                 bool controllerPositionSwapped = controllerManager.IsKeyboardControllerSeparated();
-                if (ImGui::Checkbox("Swap P1 Controller to P2", &controllerPositionSwapped))
+                if (ImGui::Checkbox(Messages.Swap_P1_Controller_to_P2(), &controllerPositionSwapped))
                 {
                         controllerManager.SetControllerPosSwap(controllerPositionSwapped);
                         Settings::settingsIni.swapControllerPos = controllerPositionSwapped;
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker("Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.");
+                ImGui::ShowHelpMarker(Messages.Changes_P1_Controller_s_assignment_so_it_is_recognized_as_P2_Internally_this_is_just_swapping_p1_with_p2_s_game_controllers());
         }
 }

@@ -162,6 +162,141 @@
   <data name="Controller Settings" xml:space="preserve">
     <value>Opciones de control</value>
   </data>
+  <data name="Local Controller Override" xml:space="preserve">
+    <value>Anulación de controlador local</value>
+  </data>
+  <data name="Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change." xml:space="preserve">
+    <value>Elige qué controlador conectado o el teclado deben ser Jugador 1 y Jugador 2. Usa Actualizar cuando cambien los dispositivos.</value>
+  </data>
+  <data name="Refresh controllers" xml:space="preserve">
+    <value>Actualizar controladores</value>
+  </data>
+  <data name="Reload the controller list and reinitialize input slots to match connected devices." xml:space="preserve">
+    <value>Recarga la lista de controladores y reinicializa las ranuras de entrada para coincidir con los dispositivos conectados.</value>
+  </data>
+  <data name="Open Joy.cpl" xml:space="preserve">
+    <value>Abrir Joy.cpl</value>
+  </data>
+  <data name="Auto-refresh" xml:space="preserve">
+    <value>Actualización automática</value>
+  </data>
+  <data name="Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses." xml:space="preserve">
+    <value>Actualiza automáticamente las ranuras de controladores cuando cambian los dispositivos. La llamada interna para actualizarlos puede congelar el juego por unos momentos, así que actívalo solo si aceptas pausas cortas.</value>
+  </data>
+  <data name="No input devices detected." xml:space="preserve">
+    <value>No se detectaron dispositivos de entrada.</value>
+  </data>
+  <data name="STEAM INPUT: %s" xml:space="preserve">
+    <value>STEAM INPUT: %s</value>
+  </data>
+  <data name="ON" xml:space="preserve">
+    <value>ACTIVADO</value>
+  </data>
+  <data name="OFF" xml:space="preserve">
+    <value>DESACTIVADO</value>
+  </data>
+  <data name="Steam Input appears to be active.&#xA;This will disable some of this section's features." xml:space="preserve">
+    <value>Steam Input parece estar activo.&#xA;Esto deshabilitará algunas funciones de esta sección.</value>
+  </data>
+  <data name="The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.&#xA;&#xA;The disabled features include:&#xA;- Local Controller Override&#xA;- Opening Joy.cpl" xml:space="preserve">
+    <value>El comportamiento interno de Steam Input oculta algunos controladores del proceso del juego, lo que hace que ciertas funciones relacionadas con controladores sean imposibles o funcionen de forma inesperada.&#xA;&#xA;Las funciones deshabilitadas incluyen:&#xA>- Anulación de controlador local&#xA>- Abrir Joy.cpl</value>
+  </data>
+  <data name="Swap P1 Controller to P2" xml:space="preserve">
+    <value>Cambiar el controlador de P1 a P2</value>
+  </data>
+  <data name="Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers." xml:space="preserve">
+    <value>Cambia la asignación del controlador de P1 para que se reconozca como P2. Internamente solo intercambia los controladores de juego de P1 con los de P2.</value>
+  </data>
+  <data name="Multiple keyboards override" xml:space="preserve">
+    <value>Reasignación de múltiples teclados</value>
+  </data>
+  <data name="Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL)." xml:space="preserve">
+    <value>Elige qué teclados físicos deben ser el Jugador 1 cuando haya varios conectados. El resto controlará al Jugador 2 usando sus asignaciones guardadas (por defecto WASD/JIKL).</value>
+  </data>
+  <data name="No keyboards selected" xml:space="preserve">
+    <value>No hay teclados seleccionados</value>
+  </data>
+  <data name="No keyboards detected." xml:space="preserve">
+    <value>No se detectaron teclados.</value>
+  </data>
+  <data name="P1 Keyboards" xml:space="preserve">
+    <value>Teclados de P1</value>
+  </data>
+  <data name="Map" xml:space="preserve">
+    <value>Asignar</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Renombrar</value>
+  </data>
+  <data name="Ignore" xml:space="preserve">
+    <value>Ignorar</value>
+  </data>
+  <data name="Rename keyboard" xml:space="preserve">
+    <value>Renombrar teclado</value>
+  </data>
+  <data name="Set a custom name for this keyboard." xml:space="preserve">
+    <value>Define un nombre personalizado para este teclado.</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Guardar</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancelar</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Borrar</value>
+  </data>
+  <data name="Configure keyboard mapping" xml:space="preserve">
+    <value>Configurar asignación de teclado</value>
+  </data>
+  <data name="Unbound" xml:space="preserve">
+    <value>Sin asignar</value>
+  </data>
+  <data name="Press a key..." xml:space="preserve">
+    <value>Pulsa una tecla...</value>
+  </data>
+  <data name="Bind" xml:space="preserve">
+    <value>Vincular</value>
+  </data>
+  <data name="Menu action" xml:space="preserve">
+    <value>Acción de menú</value>
+  </data>
+  <data name="Battle action" xml:space="preserve">
+    <value>Acción en combate</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Cerrar</value>
+  </data>
+  <data name="Set all to default" xml:space="preserve">
+    <value>Restablecer todo a los valores predeterminados</value>
+  </data>
+  <data name="Ignored keyboards" xml:space="preserve">
+    <value>Teclados ignorados</value>
+  </data>
+  <data name="No ignored keyboards." xml:space="preserve">
+    <value>No hay teclados ignorados.</value>
+  </data>
+  <data name="Unignore" xml:space="preserve">
+    <value>Dejar de ignorar</value>
+  </data>
+  <data name="(connected)" xml:space="preserve">
+    <value>(conectado)</value>
+  </data>
+  <data name="(not connected)" xml:space="preserve">
+    <value>(desconectado)</value>
+  </data>
+  <data name="Mapping for %s" xml:space="preserve">
+    <value>Asignación para %s</value>
+  </data>
+  <data name="Test" xml:space="preserve">
+    <value>Probar</value>
+  </data>
+  <data name="Player 1 Controller" xml:space="preserve">
+    <value>Controlador del Jugador 1</value>
+  </data>
+  <data name="Player 2 Controller" xml:space="preserve">
+    <value>Controlador del Jugador 2</value>
+  </data>
   <data name="Loaded settings.ini values" xml:space="preserve">
     <value>Valores cargados de settings.ini</value>
   </data>

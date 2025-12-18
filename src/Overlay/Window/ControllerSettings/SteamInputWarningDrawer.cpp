@@ -1,6 +1,7 @@
 #include "SteamInputWarningDrawer.h"
 
 #include "Core/ControllerOverrideManager.h"
+#include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
 
@@ -31,16 +32,10 @@ namespace ControllerSettings
 
                 ImGui::HorizontalSpacing();
                 ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.25f, 1.0f),
-                        "Steam Input appears to be active.\n"
-                        "This will disable some of this section's features.");
+                        Messages.Steam_Input_appears_to_be_active_This_will_disable_some_of_this_section_s_features());
                 ImGui::SameLine();
                 ImGui::ShowHelpMarker(
-                        "The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.\n"
-                        "\n"
-                        "The disabled features include:\n"
-                        "- Local Controller Override\n"
-                        "- Opening Joy.cpl"
-                );
+                        Messages.The_internal_behavior_of_Steam_Input_hides_some_controllers_from_the_game_s_process_thus_making_some_controller_related_features_impossible_work_in_unintended_ways_The_disabled_features_include_Local_Controller_Override_Opening_Joy_c_pl());
                 ImGui::VerticalSpacing(5);
         }
 }
