@@ -4,6 +4,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "LocalizationKeys.autogen.h"
+
+#define Messages Localization::Strings
+
 struct LanguageOption
 {
         std::string code;
@@ -16,12 +20,15 @@ class Localization
 {
 public:
         static void Initialize(const std::string& requestedLanguage);
+        static void Reload(const std::string& requestedLanguage);
         static const std::string& Translate(const std::string& key);
         static const std::vector<LanguageOption>& GetAvailableLanguages();
         static bool SetCurrentLanguage(const std::string& languageCode);
         static const std::string& GetCurrentLanguage();
         static bool IsLanguageComplete(const std::string& languageCode);
         static size_t GetMissingKeyCount(const std::string& languageCode);
+
+        static const LocalizationKeysAccessor Strings;
 
 private:
         static void LoadLanguageData();

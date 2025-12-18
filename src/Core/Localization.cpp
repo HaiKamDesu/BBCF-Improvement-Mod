@@ -885,6 +885,12 @@ std::vector<LanguageOption> Localization::m_languageOptions = {};
 std::string Localization::m_currentLanguage = kDefaultLanguageCode;
 std::string Localization::m_fallbackLanguage = kDefaultLanguageCode;
 bool Localization::m_initialized = false;
+const LocalizationKeysAccessor Localization::Strings = {};
+
+const char* LocalizationKeysAccessor::Get(const std::string& key) const
+{
+        return Localization::Translate(key).c_str();
+}
 
 void Localization::Initialize(const std::string& requestedLanguage)
 {
@@ -904,6 +910,17 @@ void Localization::Initialize(const std::string& requestedLanguage)
         {
                 m_currentLanguage = m_fallbackLanguage;
         }
+}
+
+void Localization::Reload(const std::string& requestedLanguage)
+{
+        m_languageStrings.clear();
+        m_languageOptions.clear();
+        m_currentLanguage = kDefaultLanguageCode;
+        m_fallbackLanguage = kDefaultLanguageCode;
+        m_initialized = false;
+
+        Initialize(requestedLanguage);
 }
 
 const std::string& Localization::Translate(const std::string& key)

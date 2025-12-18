@@ -413,4 +413,7 @@ In order for a throw to connect you must have satisfy the following conditions:
   <data name="Language selection help" xml:space="preserve">
     <value>Select a language for all UI text. Requires full dictionary coverage.</value>
   </data>
+  <data name="KoreWaTestoDakeDa" xml:space="preserve">
+    <value>dsdsd</value>
+  </data>
 </root>

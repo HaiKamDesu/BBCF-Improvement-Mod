@@ -233,7 +233,16 @@
     <None Include="LICENSE" />
     <None Include="README.md" />
     <None Include="resource\localization\Localization.es.resx" />
-    <None Include="resource\localization\Localization.resx" />
+    <CustomBuild Include="resource\localization\Localization.resx">
+      <Message>Generating strongly-typed localization accessors</Message>
+		<Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_localization_bindings.ps1" -ResxPath "$(ProjectDir)resource\localization\Localization.resx" -OutPath "$(ProjectDir)src\Core\LocalizationKeys.autogen.h"</Command>
+		<Outputs>$(ProjectDir)src\Core\LocalizationKeys.autogen.h;%(Outputs)</Outputs>
+		<AdditionalInputs>
+			$(ProjectDir)resource\localization\Localization.resx;
+			$(ProjectDir)tools\generate_localization_bindings.ps1;
+			%(AdditionalInputs)
+		</AdditionalInputs>
+    </CustomBuild>
     <None Include="resource\palettes.ini" />
     <None Include="resource\settings.ini">
       <FileType>Document</FileType>
