@@ -489,7 +489,10 @@ struct ResxEntry
         bool fromResource = false;
 };
 
-const std::regex kResxNameRegex(R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)");
+const std::regex kResxNameRegex(
+    R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)",
+    std::regex::icase
+);
 
 std::string Trim(const std::string& value)
 {
@@ -671,10 +674,23 @@ std::vector<ResxEntry> LoadEmbeddedResxEntries()
 
                         auto* ctx = reinterpret_cast<EnumContext*>(param);
                         auto* out = ctx->entries;
-                        std::string resourceName = WideToUtf8(name);
-                        if (resourceName.find(".resx") == std::string::npos)
+                        auto rawName = WideToUtf8(name);
+
+                        LOG(2, "%s Found RCDATA resource name rawWideUtf8='%s' (len=%zu)",
+                            kLanguageLogTag, rawName.c_str(), rawName.size());
+                        std::string resourceName = Localization::StripWrappingQuotes(std::move(rawName));
+
+                        LOG(2, "%s Normalized RCDATA resource name='%s' (len=%zu)",
+                            kLanguageLogTag, resourceName.c_str(), resourceName.size());
+
+                        // Case-insensitive check for ".resx"
+                        std::string lower = resourceName;
+                        std::transform(lower.begin(), lower.end(), lower.begin(),
+                            [](unsigned char c) { return (unsigned char)std::tolower(c); });
+
+                        if (lower.rfind(".resx") == std::string::npos)
                         {
-                                return TRUE;
+                            return TRUE;
                         }
 
                         HRSRC resource = FindResourceW(ctx->module, name, RT_RCDATA);
@@ -772,21 +788,6 @@ std::vector<ResxEntry> LoadFilesystemResxEntries()
     return files;
 }
 
-
-std::vector<ResxEntry> LoadBuiltInResxEntries()
-{
-        std::vector<ResxEntry> entries;
-        AddResxEntry("Localization.resx", kBuiltInEnglishResx, true, entries);
-        AddResxEntry("Localization.es.resx", kBuiltInSpanishResx, true, entries);
-
-        if (!entries.empty())
-        {
-                LOG(1, "%s Falling back to compiled-in localization data (%zu resource(s)).", kLanguageLogTag, entries.size());
-        }
-
-        return entries;
-}
-
 std::string SelectBaseName(const std::vector<ResxEntry>& entries)
 {
         for (const auto& entry : entries)
@@ -808,12 +809,13 @@ std::string SelectBaseName(const std::vector<ResxEntry>& entries)
 std::vector<LanguageDefinition> LoadResxLanguages()
 {
         auto entries = LoadEmbeddedResxEntries();
-        auto fileEntries = LoadFilesystemResxEntries();
-        entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
+        //auto fileEntries = LoadFilesystemResxEntries();
+        //entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
 
         if (entries.empty())
         {
-                entries = LoadBuiltInResxEntries();
+            LOG(1, "%s ERROR: No embedded localization resources found. Cannot continue.", kLanguageLogTag);
+            return {}; // languages empty
         }
 
         std::vector<LanguageDefinition> languages;
@@ -998,11 +1000,25 @@ size_t Localization::GetMissingKeyCount(const std::string& languageCode)
         return missingKeys;
 }
 
+std::string Localization::StripWrappingQuotes(std::string s)
+{
+    if (s.size() >= 2)
+    {
+        if ((s.front() == '"' && s.back() == '"') ||
+            (s.front() == '\'' && s.back() == '\''))
+        {
+            return s.substr(1, s.size() - 2);
+        }
+    }
+    return s;
+}
+
 void Localization::LoadLanguageData()
 {
-        if (!m_languageStrings.empty())
+        if (m_languageStrings.empty())
         {
-                return;
+            LOG(1, "%s ERROR: Localization failed to load. Aborting language init.", kLanguageLogTag);
+            m_languageStrings.emplace(m_fallbackLanguage, kEmptyLanguage); // optional
         }
 
         auto definitions = LoadResxLanguages();
