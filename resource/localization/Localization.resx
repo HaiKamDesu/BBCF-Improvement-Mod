@@ -401,6 +401,28 @@ For each player :
   <data name="Replay Database" xml:space="preserve">
     <value>Replay Database</value>
   </data>
+  <data name="Enable/Disable Automatic Replay Uploads?" xml:space="preserve">
+    <value>Enable/Disable Automatic Replay Uploads?</value>
+  </data>
+  <data name="IM BOBLEIS can automatically upload your replays to a public central repository.&#xA;&#xA;This feature allows:&#xA;- Easy sharing: Facilitates sharing of replays between players.&#xA;- Community sharing: Contribute to a collection of matches for learning and analysis.&#xA;- Cataloging: Easily search by characters for matchups.&#xA;- Storage: Keep your replays backed up automatically after the 100 limit.&#xA;&#xA;You can access the database using the Replay Database button on the IM main menu.&#xA;&#xA;If you disable it your replays won't be uploaded even if matched with someone with it enabled.&#xA;&#xA;If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.&#xA;&#xA;This has no impact on performance or stability.&#xA;&#xA;Would you like to leave automatic replay uploads on or turn it off?" xml:space="preserve">
+    <value>IM BOBLEIS can automatically upload your replays to a public central repository.
+
+This feature allows:
+- Easy sharing: Facilitates sharing of replays between players.
+- Community sharing: Contribute to a collection of matches for learning and analysis.
+- Cataloging: Easily search by characters for matchups.
+- Storage: Keep your replays backed up automatically after the 100 limit.
+
+You can access the database using the Replay Database button on the IM main menu.
+
+If you disable it your replays won't be uploaded even if matched with someone with it enabled.
+
+If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.
+
+This has no impact on performance or stability.
+
+Would you like to leave automatic replay uploads on or turn it off?</value>
+  </data>
   <data name="Enable/Disable Upload" xml:space="preserve">
     <value>Enable/Disable Upload</value>
   </data>

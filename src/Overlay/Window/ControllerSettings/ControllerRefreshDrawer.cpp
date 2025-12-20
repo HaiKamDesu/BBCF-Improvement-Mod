@@ -31,7 +31,7 @@ namespace ControllerSettings
                                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
                         }
 
-                        if (ImGui::Button(Messages.Open_Joy_c_pl()))
+                        if (ImGui::Button(Messages.Open_Joy_cpl()))
                         {
                                 LOG(1, "MainWindow::DrawControllers - Joy.cpl clicked\n");
                                 controllerManager.OpenControllerControlPanel();

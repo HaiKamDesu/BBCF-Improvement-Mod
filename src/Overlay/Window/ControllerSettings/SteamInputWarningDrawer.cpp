@@ -35,7 +35,7 @@ namespace ControllerSettings
                         Messages.Steam_Input_appears_to_be_active_This_will_disable_some_of_this_section_s_features());
                 ImGui::SameLine();
                 ImGui::ShowHelpMarker(
-                        Messages.The_internal_behavior_of_Steam_Input_hides_some_controllers_from_the_game_s_process_thus_making_some_controller_related_features_impossible_work_in_unintended_ways_The_disabled_features_include_Local_Controller_Override_Opening_Joy_c_pl());
+                        Messages.The_internal_behavior_of_Steam_Input_hides_some_controllers_from_the_game_s_process_thus_making_some_controller_related_features_impossible_work_in_unintended_ways_The_disabled_features_include_Local_Controller_Override_Opening_Joy_cpl());
                 ImGui::VerticalSpacing(5);
         }
 }

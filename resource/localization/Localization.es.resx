@@ -401,6 +401,28 @@ Para cada jugador:
   <data name="Replay Database" xml:space="preserve">
     <value>Base de datos de repeticiones</value>
   </data>
+  <data name="Enable/Disable Automatic Replay Uploads?" xml:space="preserve">
+    <value>¿Activar/Desactivar las cargas automáticas de repeticiones?</value>
+  </data>
+  <data name="IM BOBLEIS can automatically upload your replays to a public central repository.&#xA;&#xA;This feature allows:&#xA;- Easy sharing: Facilitates sharing of replays between players.&#xA;- Community sharing: Contribute to a collection of matches for learning and analysis.&#xA;- Cataloging: Easily search by characters for matchups.&#xA;- Storage: Keep your replays backed up automatically after the 100 limit.&#xA;&#xA;You can access the database using the Replay Database button on the IM main menu.&#xA;&#xA;If you disable it your replays won't be uploaded even if matched with someone with it enabled.&#xA;&#xA;If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.&#xA;&#xA;This has no impact on performance or stability.&#xA;&#xA;Would you like to leave automatic replay uploads on or turn it off?" xml:space="preserve">
+    <value>IM BOBLEIS puede subir automáticamente tus repeticiones a un repositorio público central.
+
+Esta función permite:
+- Uso compartido sencillo: facilita compartir repeticiones entre jugadores.
+- Compartir con la comunidad: contribuye a una colección de partidas para aprender y analizar.
+- Catalogación: busca fácilmente por personajes para estudiar emparejamientos.
+- Almacenamiento: mantiene tus repeticiones respaldadas automáticamente después del límite de 100.
+
+Puedes acceder a la base de datos mediante el botón Replay Database en el menú principal de IM.
+
+Si la desactivas tus repeticiones no se subirán incluso si juegas contra alguien que la tenga activada.
+
+Si deseas volver a activarla o desactivarla puedes abrir este menú con el botón en el menú principal de IM o con settings.ini.
+
+Esto no tiene impacto en el rendimiento ni en la estabilidad.
+
+¿Quieres dejar activadas las cargas automáticas de repeticiones o desactivarlas?</value>
+  </data>
   <data name="Enable/Disable Upload" xml:space="preserve">
     <value>Activar/Desactivar subida</value>
   </data>
