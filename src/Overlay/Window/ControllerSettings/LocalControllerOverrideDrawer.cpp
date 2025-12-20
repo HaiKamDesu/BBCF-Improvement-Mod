@@ -1,6 +1,8 @@
 #include "LocalControllerOverrideDrawer.h"
 
 #include "Core/ControllerOverrideManager.h"
+#include "Core/Localization.h"
+#include "Core/utils.h"
 #include "Overlay/imgui_utils.h"
 
 #include "imgui.h"
@@ -34,12 +36,12 @@ namespace ControllerSettings
                         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
                 }
-                if (ImGui::Checkbox("Local Controller Override", &overrideEnabled))
+                if (ImGui::Checkbox(Messages.Local_Controller_Override(), &overrideEnabled))
                 {
                         controllerManager.SetOverrideEnabled(overrideEnabled);
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker("Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.");
+                ImGui::ShowHelpMarker(Messages.Choose_which_connected_controller_or_the_keyboard_should_be_Player_1_and_Player_2_Use_Refresh_when_devices_change());
 
                 bool showOverrideControls = overrideEnabled && !steamInputLikely;
 
@@ -59,7 +61,7 @@ namespace ControllerSettings
                 const auto& devices = controllerManager.GetDevices();
                 if (devices.empty())
                 {
-                        ImGui::TextDisabled("No input devices detected.");
+                        ImGui::TextDisabled(Messages.No_input_devices_detected());
                         return;
                 }
 
@@ -106,7 +108,7 @@ namespace ControllerSettings
                         }
 
                         ImGui::SameLine();
-                        std::string testLabel = std::string("Test##player") + std::to_string(playerIndex + 1);
+                        std::string testLabel = FormatText("%s##player%d", Messages.Test(), playerIndex + 1);
                         if (ImGui::Button(testLabel.c_str()))
                         {
                                 controllerManager.OpenDeviceProperties(selection);
@@ -119,8 +121,8 @@ namespace ControllerSettings
                         }
                         };
 
-                renderPlayerSelector("Player 1 Controller", 0);
+                renderPlayerSelector(Messages.Player_1_Controller(), 0);
                 ImGui::HorizontalSpacing();
-                renderPlayerSelector("Player 2 Controller", 1);
+                renderPlayerSelector(Messages.Player_2_Controller(), 1);
         }
 }

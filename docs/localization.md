@@ -26,6 +26,16 @@ At build time, every `Localization*.resx` file is embedded into `dinput8.dll` vi
 - If neither embedded nor on-disk resources are available, the DLL falls back to built-in English/Spanish dictionaries so UI strings stay valid (preventing formatting errors during startup).
 - The selected language is stored in `settings.ini` (`Language`), so it stays consistent between launches.
 
+## Regenerating bindings
+
+Any time you add or rename a key in `Localization.resx`, regenerate `src/Core/LocalizationKeys.autogen.h` so C++ callers can fetch it via `Messages.<SanitizedKey>()`.
+
+```powershell
+pwsh -File tools/generate_localization_bindings.ps1 resource/localization/Localization.resx src/Core/LocalizationKeys.autogen.h
+```
+
+The generator converts any characters outside `[0-9A-Za-z_]` into underscores, collapses repeated underscores, and prefixes an underscore when the key starts with a digit. The original text stays untouched inside the resx files.
+
 ## Why `.resx`?
 
 `.resx` files are a simple XML format that Visual Studio can display in a spreadsheet-style grid. With a shared `Localization` base name, tools like the built-in resource editor or the ResX Resource Manager extension can show every culture in one table (columns for key/English/Spanish/etc.), making it easy to compare and hide columns as needed.

@@ -162,6 +162,141 @@
   <data name="Controller Settings" xml:space="preserve">
     <value>Controller Settings</value>
   </data>
+  <data name="Local Controller Override" xml:space="preserve">
+    <value>Local Controller Override</value>
+  </data>
+  <data name="Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change." xml:space="preserve">
+    <value>Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.</value>
+  </data>
+  <data name="Refresh controllers" xml:space="preserve">
+    <value>Refresh controllers</value>
+  </data>
+  <data name="Reload the controller list and reinitialize input slots to match connected devices." xml:space="preserve">
+    <value>Reload the controller list and reinitialize input slots to match connected devices.</value>
+  </data>
+  <data name="Open Joy.cpl" xml:space="preserve">
+    <value>Open Joy.cpl</value>
+  </data>
+  <data name="Auto-refresh" xml:space="preserve">
+    <value>Auto-refresh</value>
+  </data>
+  <data name="Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses." xml:space="preserve">
+    <value>Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.</value>
+  </data>
+  <data name="No input devices detected." xml:space="preserve">
+    <value>No input devices detected.</value>
+  </data>
+  <data name="STEAM INPUT: %s" xml:space="preserve">
+    <value>STEAM INPUT: %s</value>
+  </data>
+  <data name="ON" xml:space="preserve">
+    <value>ON</value>
+  </data>
+  <data name="OFF" xml:space="preserve">
+    <value>OFF</value>
+  </data>
+  <data name="Steam Input appears to be active.&#xA;This will disable some of this section's features." xml:space="preserve">
+    <value>Steam Input appears to be active.&#xA;This will disable some of this section's features.</value>
+  </data>
+  <data name="The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.&#xA;&#xA;The disabled features include:&#xA;- Local Controller Override&#xA;- Opening Joy.cpl" xml:space="preserve">
+    <value>The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.&#xA;&#xA;The disabled features include:&#xA;- Local Controller Override&#xA;- Opening Joy.cpl</value>
+  </data>
+  <data name="Swap P1 Controller to P2" xml:space="preserve">
+    <value>Swap P1 Controller to P2</value>
+  </data>
+  <data name="Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers." xml:space="preserve">
+    <value>Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.</value>
+  </data>
+  <data name="Multiple keyboards override" xml:space="preserve">
+    <value>Multiple keyboards override</value>
+  </data>
+  <data name="Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL)." xml:space="preserve">
+    <value>Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).</value>
+  </data>
+  <data name="No keyboards selected" xml:space="preserve">
+    <value>No keyboards selected</value>
+  </data>
+  <data name="No keyboards detected." xml:space="preserve">
+    <value>No keyboards detected.</value>
+  </data>
+  <data name="P1 Keyboards" xml:space="preserve">
+    <value>P1 Keyboards</value>
+  </data>
+  <data name="Map" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="Ignore" xml:space="preserve">
+    <value>Ignore</value>
+  </data>
+  <data name="Rename keyboard" xml:space="preserve">
+    <value>Rename keyboard</value>
+  </data>
+  <data name="Set a custom name for this keyboard." xml:space="preserve">
+    <value>Set a custom name for this keyboard.</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="Configure keyboard mapping" xml:space="preserve">
+    <value>Configure keyboard mapping</value>
+  </data>
+  <data name="Unbound" xml:space="preserve">
+    <value>Unbound</value>
+  </data>
+  <data name="Press a key..." xml:space="preserve">
+    <value>Press a key...</value>
+  </data>
+  <data name="Bind" xml:space="preserve">
+    <value>Bind</value>
+  </data>
+  <data name="Menu action" xml:space="preserve">
+    <value>Menu action</value>
+  </data>
+  <data name="Battle action" xml:space="preserve">
+    <value>Battle action</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Set all to default" xml:space="preserve">
+    <value>Set all to default</value>
+  </data>
+  <data name="Ignored keyboards" xml:space="preserve">
+    <value>Ignored keyboards</value>
+  </data>
+  <data name="No ignored keyboards." xml:space="preserve">
+    <value>No ignored keyboards.</value>
+  </data>
+  <data name="Unignore" xml:space="preserve">
+    <value>Unignore</value>
+  </data>
+  <data name="(connected)" xml:space="preserve">
+    <value>(connected)</value>
+  </data>
+  <data name="(not connected)" xml:space="preserve">
+    <value>(not connected)</value>
+  </data>
+  <data name="Mapping for %s" xml:space="preserve">
+    <value>Mapping for %s</value>
+  </data>
+  <data name="Test" xml:space="preserve">
+    <value>Test</value>
+  </data>
+  <data name="Player 1 Controller" xml:space="preserve">
+    <value>Player 1 Controller</value>
+  </data>
+  <data name="Player 2 Controller" xml:space="preserve">
+    <value>Player 2 Controller</value>
+  </data>
   <data name="Loaded settings.ini values" xml:space="preserve">
     <value>Loaded settings.ini values</value>
   </data>
@@ -265,6 +400,28 @@ For each player :
   </data>
   <data name="Replay Database" xml:space="preserve">
     <value>Replay Database</value>
+  </data>
+  <data name="Enable/Disable Automatic Replay Uploads?" xml:space="preserve">
+    <value>Enable/Disable Automatic Replay Uploads?</value>
+  </data>
+  <data name="IM BOBLEIS can automatically upload your replays to a public central repository.&#xA;&#xA;This feature allows:&#xA;- Easy sharing: Facilitates sharing of replays between players.&#xA;- Community sharing: Contribute to a collection of matches for learning and analysis.&#xA;- Cataloging: Easily search by characters for matchups.&#xA;- Storage: Keep your replays backed up automatically after the 100 limit.&#xA;&#xA;You can access the database using the Replay Database button on the IM main menu.&#xA;&#xA;If you disable it your replays won't be uploaded even if matched with someone with it enabled.&#xA;&#xA;If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.&#xA;&#xA;This has no impact on performance or stability.&#xA;&#xA;Would you like to leave automatic replay uploads on or turn it off?" xml:space="preserve">
+    <value>IM BOBLEIS can automatically upload your replays to a public central repository.
+
+This feature allows:
+- Easy sharing: Facilitates sharing of replays between players.
+- Community sharing: Contribute to a collection of matches for learning and analysis.
+- Cataloging: Easily search by characters for matchups.
+- Storage: Keep your replays backed up automatically after the 100 limit.
+
+You can access the database using the Replay Database button on the IM main menu.
+
+If you disable it your replays won't be uploaded even if matched with someone with it enabled.
+
+If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.
+
+This has no impact on performance or stability.
+
+Would you like to leave automatic replay uploads on or turn it off?</value>
   </data>
   <data name="Enable/Disable Upload" xml:space="preserve">
     <value>Enable/Disable Upload</value>
