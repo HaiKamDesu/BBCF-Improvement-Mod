@@ -1,5 +1,6 @@
 #include "PlaybackEditorWindow.h"
 #include <vector>
+#include "Core/Localization.h"
 
 void PlaybackEditorWindow::Draw() {
     static std::vector<std::vector<char>> playback_slot_buffers = { PlaybackSlot(1).get_slot_buffer(),
@@ -16,13 +17,13 @@ void PlaybackEditorWindow::Draw() {
     static char facing_direction = 0;
     const char* slots[] = { "1", "2", "3", "4" };
     auto selected_slot_buffer = &playback_slot_buffers[selected_slot];
-    ImGui::Combo("Slot##playback_editor_window", &selected_slot, slots, IM_ARRAYSIZE(slots));
-    if(ImGui::Button("Refresh##playback_editor_window")) {
-        playback_slot_buffers[selected_slot] = PlaybackSlot(selected_slot+1).get_slot_buffer();
-        facing_direction_slot_buffers[selected_slot] = PlaybackSlot(selected_slot + 1).get_facing_direction();
-    }
-    ImGui::Text("Recording side: %c", facing_direction_slot_buffers[selected_slot]? 'R': 'L');
-    if (ImGui::Button("Switch recording side")) {
+ImGui::Combo("Slot##playback_editor_window", &selected_slot, slots, IM_ARRAYSIZE(slots));
+if(ImGui::Button(std::string(Messages.Refresh()) + "##playback_editor_window")) {
+playback_slot_buffers[selected_slot] = PlaybackSlot(selected_slot+1).get_slot_buffer();
+facing_direction_slot_buffers[selected_slot] = PlaybackSlot(selected_slot + 1).get_facing_direction();
+}
+ImGui::Text(Messages.Recording_side_c(), facing_direction_slot_buffers[selected_slot]? 'R': 'L');
+if (ImGui::Button(Messages.Switch_recording_side())) {
         facing_direction_slot_buffers[selected_slot] = !facing_direction_slot_buffers[selected_slot];
     }
     ImGui::BeginChild("asdfasdfasdf", ImVec2(-1, ImGui::GetContentRegionAvail().y * 0.95f),true);
@@ -30,10 +31,10 @@ void PlaybackEditorWindow::Draw() {
     ImGui::Separator();
     ImGui::Columns(4, "mycolumns"); // 4-ways, with border
     ImGui::Separator();
-    ImGui::Text("Add/Remove"); ImGui::NextColumn();
-    ImGui::Text("Frame"); ImGui::NextColumn();
-    ImGui::Text("Literal"); ImGui::NextColumn();
-    ImGui::Text("Command"); ImGui::NextColumn();
+ImGui::Text(Messages.Add_Remove()); ImGui::NextColumn();
+ImGui::Text(Messages.Frame()); ImGui::NextColumn();
+ImGui::Text(Messages.Literal()); ImGui::NextColumn();
+ImGui::Text(Messages.Command()); ImGui::NextColumn();
     ImGui::Separator();
     int counter = 0;
     static float initialScrollPosition = 0.0f;
@@ -48,7 +49,7 @@ void PlaybackEditorWindow::Draw() {
         
         ImGui::PushID((int)"playback_editor" + counter);
         //auto remove_row_button_pressed = ImGui::SmallButton("-");
-        if (ImGui::SmallButton("-")) {
+if (ImGui::SmallButton("-")) {
             //will remove current
             apply_scroll_pos = true;
             it = selected_slot_buffer->erase(it);
@@ -56,7 +57,7 @@ void PlaybackEditorWindow::Draw() {
             break;
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("+B")) {
+if (ImGui::SmallButton("+B")) {
             //will copy current to below
             apply_scroll_pos = true;
             it = selected_slot_buffer->insert(it, *it);
@@ -65,7 +66,7 @@ void PlaybackEditorWindow::Draw() {
 
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("+A")) {
+if (ImGui::SmallButton("+A")) {
             //will copy current to above
             apply_scroll_pos = true;
             it = selected_slot_buffer->insert(it + 1, *it);
@@ -87,7 +88,7 @@ void PlaybackEditorWindow::Draw() {
         ImGui::Separator();
 
         //ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_FirstUseEver );
-        if (ImGui::BeginPopupModal("Edit Input", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+if (ImGui::BeginPopupModal(Messages.Edit_Input(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
         {
             if (PlaybackEditorWindow::line_edit_ptr != nullptr) {
                 PlaybackEditorWindow::DrawEditLinePopup(PlaybackEditorWindow::line_edit_ptr);
@@ -107,7 +108,7 @@ void PlaybackEditorWindow::Draw() {
     ImGui::EndChild();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 60);
     
-    if (ImGui::Button("SAVE##playback_editor", ImVec2(60, 29))) {
+if (ImGui::Button(std::string(Messages.Save()) + "##playback_editor", ImVec2(60, 29))) {
         PlaybackEditorWindow::playback_manager.load_into_slot(*selected_slot_buffer, facing_direction_slot_buffers[selected_slot], selected_slot + 1);
     }
     return;
@@ -122,13 +123,13 @@ void PlaybackEditorWindow::DrawEditLinePopup(char* line) {
     const char* direction[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9"};
     //ImGui::Combo("Directions##playback_editor_window", &selected_dir, direction, IM_ARRAYSIZE(direction));
     //ImGui::Columns(1);
-    ImGui::Separator();
+ImGui::Separator();
     ImGui::Columns(3);
     ImGui::Combo("##playback_editor_window", &selected_dir, direction, IM_ARRAYSIZE(direction), ImGuiComboFlags_HeightLargest);
         //ImGui::Columns(3, "keypad#draw_edit_line_popup");
-        ImGui::SetColumnWidth(0, ImGui::CalcTextSize("Directionxxxxxx").x);
-        ImGui::SetColumnWidth(1, ImGui::CalcTextSize("9000").x);
-        ImGui::SetColumnWidth(2, ImGui::CalcTextSize("9000").x);
+ImGui::SetColumnWidth(0, ImGui::CalcTextSize(Messages.Direction()).x);
+ImGui::SetColumnWidth(1, ImGui::CalcTextSize("9000").x);
+ImGui::SetColumnWidth(2, ImGui::CalcTextSize("9000").x);
         //ImGui::Selectable("7", selected_dir[6], ImGuiSelectableFlags_DontClosePopups); ImGui::SameLine(); //ImGui::NextColumn();
         //ImGui::Selectable("8", selected_dir[7], ImGuiSelectableFlags_DontClosePopups); ImGui::SameLine(); ImGui::NextColumn();
         //ImGui::Selectable("9", selected_dir[8], ImGuiSelectableFlags_DontClosePopups); ImGui::NextColumn();
@@ -160,7 +161,7 @@ void PlaybackEditorWindow::DrawEditLinePopup(char* line) {
     ImGui::Separator();
 
 
-    if (ImGui::Button("OK", ImVec2(120, 0))) {
+if (ImGui::Button(Messages.OK(), ImVec2(120, 0))) {
         char input = 0;
         input = selected_dir + 1;
         if (selected_button[0]) {
@@ -184,7 +185,7 @@ void PlaybackEditorWindow::DrawEditLinePopup(char* line) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+if (ImGui::Button(Messages.Cancel(), ImVec2(120, 0))) {
         //selected_dir = { false,false ,false ,false ,false ,false ,false ,false ,false };
         ImGui::CloseCurrentPopup();
     }

@@ -255,6 +255,169 @@
   <data name="Press a key..." xml:space="preserve">
     <value>Press a key...</value>
   </data>
+  <data name="Select game mode:" xml:space="preserve">
+    <value>Select game mode:</value>
+  </data>
+  <data name="Stage" xml:space="preserve">
+    <value>Stage</value>
+  </data>
+  <data name="Player 1" xml:space="preserve">
+    <value>Player 1</value>
+  </data>
+  <data name="Gap:" xml:space="preserve">
+    <value>Gap:</value>
+  </data>
+  <data name="Advantage:" xml:space="preserve">
+    <value>Advantage:</value>
+  </data>
+  <data name="Player 2" xml:space="preserve">
+    <value>Player 2</value>
+  </data>
+  <data name="Player 1:" xml:space="preserve">
+    <value>Player 1:</value>
+  </data>
+  <data name="Player 2:" xml:space="preserve">
+    <value>Player 2:</value>
+  </data>
+  <data name="Copy to clipboard" xml:space="preserve">
+    <value>Copy to clipboard</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="[system] Log has been copied to clipboard&#x0a;" xml:space="preserve">
+    <value>[system] Log has been copied to clipboard
+</value>
+  </data>
+  <data name="Reload custom palettes" xml:space="preserve">
+    <value>Reload custom palettes</value>
+  </data>
+  <data name="Select character" xml:space="preserve">
+    <value>Select character</value>
+  </data>
+  <data name="Select palette" xml:space="preserve">
+    <value>Select palette</value>
+  </data>
+  <data name="Select file" xml:space="preserve">
+    <value>Select file</value>
+  </data>
+  <data name="Gradient generator" xml:space="preserve">
+    <value>Gradient generator</value>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Redo</value>
+  </data>
+  <data name="Cannot save with Highlight mode on!" xml:space="preserve">
+    <value>Cannot save with Highlight mode on!</value>
+  </data>
+  <data name="Save with bloom effect" xml:space="preserve">
+    <value>Save with bloom effect</value>
+  </data>
+  <data name="Bloom effects cannot be changed until a new round is started" xml:space="preserve">
+    <value>Bloom effects cannot be changed until a new round is started</value>
+  </data>
+  <data name="Palette name:" xml:space="preserve">
+    <value>Palette name:</value>
+  </data>
+  <data name="Creator (optional):" xml:space="preserve">
+    <value>Creator (optional):</value>
+  </data>
+  <data name="Palette description (optional):" xml:space="preserve">
+    <value>Palette description (optional):</value>
+  </data>
+  <data name="Save palette" xml:space="preserve">
+    <value>Save palette</value>
+  </data>
+  <data name="Error, no filename given" xml:space="preserve">
+    <value>Error, no filename given</value>
+  </data>
+  <data name="Error, not a valid filename" xml:space="preserve">
+    <value>Error, not a valid filename</value>
+  </data>
+  <data name="'%s' saved successfully" xml:space="preserve">
+    <value>'%s' saved successfully</value>
+  </data>
+  <data name="'%s' save failed" xml:space="preserve">
+    <value>'%s' save failed</value>
+  </data>
+  <data name="'%s' already exists.&#x0a;Are you sure you want to overwrite it?&#x0a;&#x0a;" xml:space="preserve">
+    <value>'%s' already exists.
+Are you sure you want to overwrite it?
+
+</value>
+  </data>
+  <data name="OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Reset palette" xml:space="preserve">
+    <value>Reset palette</value>
+  </data>
+  <data name="Out of bounds" xml:space="preserve">
+    <value>Out of bounds</value>
+  </data>
+  <data name="ONLINE PALETTE" xml:space="preserve">
+    <value>ONLINE PALETTE</value>
+  </data>
+  <data name="Creator: %s" xml:space="preserve">
+    <value>Creator: %s</value>
+  </data>
+  <data name="Description: %s" xml:space="preserve">
+    <value>Description: %s</value>
+  </data>
+  <data name="Has bloom effect" xml:space="preserve">
+    <value>Has bloom effect</value>
+  </data>
+  <data name="Random selection" xml:space="preserve">
+    <value>Random selection</value>
+  </data>
+  <data name="Start index" xml:space="preserve">
+    <value>Start index</value>
+  </data>
+  <data name="End index" xml:space="preserve">
+    <value>End index</value>
+  </data>
+  <data name="Start color" xml:space="preserve">
+    <value>Start color</value>
+  </data>
+  <data name="End color" xml:space="preserve">
+    <value>End color</value>
+  </data>
+  <data name="Swap colors" xml:space="preserve">
+    <value>Swap colors</value>
+  </data>
+  <data name="Generate gradient" xml:space="preserve">
+    <value>Generate gradient</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Recording side: %c" xml:space="preserve">
+    <value>Recording side: %c</value>
+  </data>
+  <data name="Switch recording side" xml:space="preserve">
+    <value>Switch recording side</value>
+  </data>
+  <data name="Add/Remove" xml:space="preserve">
+    <value>Add/Remove</value>
+  </data>
+  <data name="Frame" xml:space="preserve">
+    <value>Frame</value>
+  </data>
+  <data name="Literal" xml:space="preserve">
+    <value>Literal</value>
+  </data>
+  <data name="Command" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="Edit Input" xml:space="preserve">
+    <value>Edit Input</value>
+  </data>
+  <data name="Direction" xml:space="preserve">
+    <value>Direction</value>
+  </data>
   <data name="Bind" xml:space="preserve">
     <value>Bind</value>
   </data>
