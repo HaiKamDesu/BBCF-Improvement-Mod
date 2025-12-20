@@ -199,7 +199,7 @@
     <value>Steam Input parece estar activo.&#xA;Esto deshabilitará algunas funciones de esta sección.</value>
   </data>
   <data name="The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.&#xA;&#xA;The disabled features include:&#xA;- Local Controller Override&#xA;- Opening Joy.cpl" xml:space="preserve">
-    <value>El comportamiento interno de Steam Input oculta algunos controladores del proceso del juego, lo que hace que ciertas funciones relacionadas con controladores sean imposibles o funcionen de forma inesperada.&#xA;&#xA;Las funciones deshabilitadas incluyen:&#xA>- Anulación de controlador local&#xA>- Abrir Joy.cpl</value>
+    <value>El comportamiento interno de Steam Input oculta algunos controladores del proceso del juego, lo que hace que ciertas funciones relacionadas con controladores sean imposibles o funcionen de forma inesperada.&#xA;&#xA;Las funciones deshabilitadas incluyen:&#xA;- Anulación de controlador local&#xA;- Abrir Joy.cpl</value>
   </data>
   <data name="Swap P1 Controller to P2" xml:space="preserve">
     <value>Cambiar el controlador de P1 a P2</value>

@@ -62,7 +62,7 @@
     <ClCompile Include="src\Core\crashdump.cpp" />
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp" />
     <ClCompile Include="src\Core\DirectInputWrapper.cpp" />
-	<ClCompile Include="src\Core\Localization.cpp" />
+    <ClCompile Include="src\Core\Localization.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
@@ -232,16 +232,19 @@
     <None Include="export\dinput8.def" />
     <None Include="LICENSE" />
     <None Include="README.md" />
-    <None Include="resource\localization\Localization.es.resx" />
+    <None Include="resource\localization\Localization.es.resx">
+      <SubType>Designer</SubType>
+    </None>
     <CustomBuild Include="resource\localization\Localization.resx">
       <Message>Generating strongly-typed localization accessors</Message>
-		<Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_localization_bindings.ps1" -ResxPath "$(ProjectDir)resource\localization\Localization.resx" -OutPath "$(ProjectDir)src\Core\LocalizationKeys.autogen.h"</Command>
-		<Outputs>$(ProjectDir)src\Core\LocalizationKeys.autogen.h;%(Outputs)</Outputs>
-		<AdditionalInputs>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_localization_bindings.ps1" -ResxPath "$(ProjectDir)resource\localization\Localization.resx" -OutPath "$(ProjectDir)src\Core\LocalizationKeys.autogen.h"</Command>
+      <Outputs>$(ProjectDir)src\Core\LocalizationKeys.autogen.h;%(Outputs)</Outputs>
+      <AdditionalInputs>
 			$(ProjectDir)resource\localization\Localization.resx;
 			$(ProjectDir)tools\generate_localization_bindings.ps1;
 			%(AdditionalInputs)
 		</AdditionalInputs>
+      <SubType>Designer</SubType>
     </CustomBuild>
     <None Include="resource\palettes.ini" />
     <None Include="resource\settings.ini">
