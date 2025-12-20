@@ -7,6 +7,7 @@
 
 #include "Core/info.h"
 #include "Core/interfaces.h"
+#include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
@@ -14,6 +15,7 @@
 
 #include <imgui.h>
 #include <imgui_impl_dx9.h>
+#include <cstdio>
 #include <ctime>
 
 #define DEFAULT_ALPHA 0.87f
@@ -155,8 +157,17 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	notificationText += " (DEBUG)";
 #endif
 
-	g_notificationBar->AddNotification("%s (Press %s to open the main window)",
-		notificationText.c_str(), Settings::settingsIni.togglebutton.c_str());
+        g_notificationBar->AddLocalizedNotification([notificationText]() {
+                const char* format = Messages.Main_window_notification_format();
+                const auto& toggleButton = Settings::settingsIni.togglebutton;
+
+                const int size = std::snprintf(nullptr, 0, format, notificationText.c_str(), toggleButton.c_str()) + 1;
+                std::string formatted(static_cast<size_t>(size), ' ');
+                std::snprintf(&formatted[0], static_cast<size_t>(size), format,
+                        notificationText.c_str(), toggleButton.c_str());
+
+                return formatted;
+        });
 
 	m_pLogger->Log("[system] Finished initialization\n");
 	m_pLogger->LogSeparator();

@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <exception>
 #include <fstream>
 
 #ifndef _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
@@ -526,6 +527,62 @@ std::string DecodeXmlEntities(std::string value)
                 }
         }
 
+        size_t numericPos = 0;
+        while ((numericPos = value.find("&#", numericPos)) != std::string::npos)
+        {
+                const size_t endPos = value.find(';', numericPos + 2);
+                if (endPos == std::string::npos)
+                {
+                        break;
+                }
+
+                std::string entity = value.substr(numericPos + 2, endPos - numericPos - 2);
+                int base = 10;
+                if (!entity.empty() && (entity[0] == 'x' || entity[0] == 'X'))
+                {
+                        base = 16;
+                        entity = entity.substr(1);
+                }
+
+                char32_t codepoint = 0;
+                try
+                {
+                        codepoint = static_cast<char32_t>(std::stoul(entity, nullptr, base));
+                }
+                catch (const std::exception&)
+                {
+                        numericPos = endPos + 1;
+                        continue;
+                }
+
+                std::string replacement;
+                if (codepoint <= 0x7F)
+                {
+                        replacement.push_back(static_cast<char>(codepoint));
+                }
+                else if (codepoint <= 0x7FF)
+                {
+                        replacement.push_back(static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F)));
+                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                }
+                else if (codepoint <= 0xFFFF)
+                {
+                        replacement.push_back(static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F)));
+                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                }
+                else
+                {
+                        replacement.push_back(static_cast<char>(0xF0 | ((codepoint >> 18) & 0x07)));
+                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                }
+
+                value.replace(numericPos, endPos - numericPos + 1, replacement);
+                numericPos += replacement.size();
+        }
+
         return value;
 }
 
@@ -598,7 +655,10 @@ bool ParseResxContent(const std::string& content, const std::string& sourceLabel
 
         for (auto it = begin; it != end; ++it)
         {
-                std::string key = Trim((*it)[1].str());
+                std::string key = (*it)[1].str();
+                key = DecodeXmlEntities(key);
+                key = Trim(key);
+
                 std::string value = (*it)[2].str();
 
                 value = DecodeXmlEntities(value);
