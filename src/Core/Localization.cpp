@@ -21,382 +21,457 @@ namespace fs = std::experimental::filesystem;
 
 namespace
 {
-const char* kLocalizationDirectory = "resource/localization";
-const char* kLocalizationFileName = "Localization.csv";
-const char* kDisplayNameKey = "_DisplayName";
-const char* kLanguageCodeKey = "_LanguageCode";
-const char* kDefaultLanguageCode = "en";
-const char* kLanguageLogTag = "[Language]";
-const size_t kMissingPreviewLimit = 5;
+	const char* kLocalizationDirectory = "resource/localization";
+	const char* kLocalizationFileName = "Localization.csv";
+	const char* kDisplayNameKey = "_DisplayName";
+	const char* kLanguageCodeKey = "_LanguageCode";
+	const char* kDefaultLanguageCode = "en";
+	const char* kLanguageLogTag = "[Language]";
+	const size_t kMissingPreviewLimit = 5;
 
-extern "C" IMAGE_DOS_HEADER __ImageBase;
+	extern "C" IMAGE_DOS_HEADER __ImageBase;
 
-const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
+	const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
+	std::string WideToUtf8(LPCWSTR value);
 
-struct LanguageDefinition
-{
-        std::string code;
-        std::string displayName;
-        std::string explicitCode;
-        std::unordered_map<std::string, std::string> strings;
-        bool isFallback = false;
-};
+	struct LanguageDefinition
+	{
+		std::string code;
+		std::string displayName;
+		std::string explicitCode;
+		std::unordered_map<std::string, std::string> strings;
+		bool isFallback = false;
+	};
 
-std::string Trim(const std::string& value)
-{
-        const auto first = value.find_first_not_of(" \t\r\n");
-        if (first == std::string::npos)
-        {
-                return "";
-        }
+	std::string Trim(const std::string& value)
+	{
+		const auto first = value.find_first_not_of(" \t\r\n");
+		if (first == std::string::npos)
+		{
+			return "";
+		}
 
-        const auto last = value.find_last_not_of(" \t\r\n");
-        return value.substr(first, last - first + 1);
-}
+		const auto last = value.find_last_not_of(" \t\r\n");
+		return value.substr(first, last - first + 1);
+	}
 
-std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
-{
-        std::vector<std::vector<std::string>> rows;
-        std::vector<std::string> currentRow;
-        std::string currentField;
-        bool inQuotes = false;
+	std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
+	{
+		std::vector<std::vector<std::string>> rows;
+		std::vector<std::string> currentRow;
+		std::string currentField;
+		bool inQuotes = false;
 
-        auto finishField = [&]()
-        {
-                currentRow.push_back(currentField);
-                currentField.clear();
-        };
+		auto finishField = [&]()
+			{
+				currentRow.push_back(currentField);
+				currentField.clear();
+			};
 
-        auto finishRow = [&]()
-        {
-                rows.push_back(currentRow);
-                currentRow.clear();
-        };
+		auto finishRow = [&]()
+			{
+				rows.push_back(currentRow);
+				currentRow.clear();
+			};
 
-        for (size_t i = 0; i < content.size(); ++i)
-        {
-                const char c = content[i];
-                if (inQuotes)
-                {
-                        if (c == '"')
-                        {
-                                if (i + 1 < content.size() && content[i + 1] == '"')
-                                {
-                                        currentField.push_back('"');
-                                        ++i;
-                                }
-                                else
-                                {
-                                        inQuotes = false;
-                                }
-                        }
-                        else
-                        {
-                                currentField.push_back(c);
-                        }
-                }
-                else
-                {
-                        switch (c)
-                        {
-                        case '"':
-                                inQuotes = true;
-                                break;
-                        case ',':
-                                finishField();
-                                break;
-                        case '\n':
-                                finishField();
-                                finishRow();
-                                break;
-                        case '\r':
-                                break;
-                        default:
-                                currentField.push_back(c);
-                                break;
-                        }
-                }
-        }
+		for (size_t i = 0; i < content.size(); ++i)
+		{
+			const char c = content[i];
+			if (inQuotes)
+			{
+				if (c == '"')
+				{
+					if (i + 1 < content.size() && content[i + 1] == '"')
+					{
+						currentField.push_back('"');
+						++i;
+					}
+					else
+					{
+						inQuotes = false;
+					}
+				}
+				else
+				{
+					currentField.push_back(c);
+				}
+			}
+			else
+			{
+				switch (c)
+				{
+				case '"':
+					inQuotes = true;
+					break;
+				case ',':
+					finishField();
+					break;
+				case '\n':
+					finishField();
+					finishRow();
+					break;
+				case '\r':
+					break;
+				default:
+					currentField.push_back(c);
+					break;
+				}
+			}
+		}
 
-        finishField();
-        finishRow();
+		finishField();
+		finishRow();
 
-        while (!rows.empty())
-        {
-                const auto& last = rows.back();
-                const bool allEmpty = std::all_of(last.begin(), last.end(), [](const std::string& field)
-                {
-                        return field.empty();
-                });
-                if (!allEmpty)
-                {
-                        break;
-                }
-                rows.pop_back();
-        }
+		while (!rows.empty())
+		{
+			const auto& last = rows.back();
+			const bool allEmpty = std::all_of(last.begin(), last.end(), [](const std::string& field)
+				{
+					return field.empty();
+				});
+			if (!allEmpty)
+			{
+				break;
+			}
+			rows.pop_back();
+		}
 
-        return rows;
-}
+		return rows;
+	}
 
-std::vector<LanguageDefinition> ParseCsvLanguages(const std::string& content)
-{
-        auto rows = ParseCsv(content);
-        if (rows.empty())
-        {
-                LOG(1, "%s CSV localization contained no rows.", kLanguageLogTag);
-                return {};
-        }
+	std::vector<LanguageDefinition> ParseCsvLanguages(const std::string& content)
+	{
+		auto rows = ParseCsv(content);
+		if (rows.empty())
+		{
+			LOG(1, "%s CSV localization contained no rows.", kLanguageLogTag);
+			return {};
+		}
 
-        const auto& header = rows.front();
-        if (header.size() < 2)
-        {
-                LOG(1, "%s CSV header missing language columns.", kLanguageLogTag);
-                return {};
-        }
+		const auto& header = rows.front();
+		if (header.size() < 2)
+		{
+			LOG(1, "%s CSV header missing language columns.", kLanguageLogTag);
+			return {};
+		}
 
-        std::vector<std::string> languageCodes;
-        for (size_t i = 1; i < header.size(); ++i)
-        {
-                auto code = Trim(header[i]);
-                if (!code.empty())
-                {
-                        languageCodes.push_back(code);
-                }
-        }
+		std::vector<std::string> languageCodes;
+		for (size_t i = 1; i < header.size(); ++i)
+		{
+			auto code = Trim(header[i]);
+			if (!code.empty())
+			{
+				languageCodes.push_back(code);
+			}
+		}
 
-        if (languageCodes.empty())
-        {
-                LOG(1, "%s CSV header listed no languages.", kLanguageLogTag);
-                return {};
-        }
+		if (languageCodes.empty())
+		{
+			LOG(1, "%s CSV header listed no languages.", kLanguageLogTag);
+			return {};
+		}
 
-        std::vector<LanguageDefinition> definitions(languageCodes.size());
-        for (size_t i = 0; i < languageCodes.size(); ++i)
-        {
-                definitions[i].code = languageCodes[i];
-                definitions[i].displayName = languageCodes[i];
-        }
+		std::vector<LanguageDefinition> definitions(languageCodes.size());
+		for (size_t i = 0; i < languageCodes.size(); ++i)
+		{
+			definitions[i].code = languageCodes[i];
+			definitions[i].displayName = languageCodes[i];
+		}
 
-        for (size_t rowIndex = 1; rowIndex < rows.size(); ++rowIndex)
-        {
-                const auto& row = rows[rowIndex];
-                if (row.empty())
-                {
-                        continue;
-                }
+		for (size_t rowIndex = 1; rowIndex < rows.size(); ++rowIndex)
+		{
+			const auto& row = rows[rowIndex];
+			if (row.empty())
+			{
+				continue;
+			}
 
-                const std::string key = Trim(row[0]);
-                if (key.empty())
-                {
-                        continue;
-                }
+			const std::string key = Trim(row[0]);
+			if (key.empty())
+			{
+				continue;
+			}
 
-                for (size_t columnIndex = 0; columnIndex < languageCodes.size(); ++columnIndex)
-                {
-                        const size_t rowColumn = columnIndex + 1;
-                        std::string value;
-                        if (rowColumn < row.size())
-                        {
-                                value = row[rowColumn];
-                        }
+			for (size_t columnIndex = 0; columnIndex < languageCodes.size(); ++columnIndex)
+			{
+				const size_t rowColumn = columnIndex + 1;
+				std::string value;
+				if (rowColumn < row.size())
+				{
+					value = row[rowColumn];
+				}
 
-                        if (key == kDisplayNameKey)
-                        {
-                                definitions[columnIndex].displayName = value;
-                                continue;
-                        }
+				if (key == kDisplayNameKey)
+				{
+					definitions[columnIndex].displayName = value;
+					continue;
+				}
 
-                        if (key == kLanguageCodeKey)
-                        {
-                                definitions[columnIndex].explicitCode = Trim(value);
-                                continue;
-                        }
+				if (key == kLanguageCodeKey)
+				{
+					definitions[columnIndex].explicitCode = Trim(value);
+					continue;
+				}
 
-                        definitions[columnIndex].strings.emplace(key, value);
-                }
-        }
+				definitions[columnIndex].strings.emplace(key, value);
+			}
+		}
 
-        std::vector<LanguageDefinition> languages;
-        std::unordered_map<std::string, size_t> languageIndex;
+		std::vector<LanguageDefinition> languages;
+		std::unordered_map<std::string, size_t> languageIndex;
 
-        for (size_t i = 0; i < definitions.size(); ++i)
-        {
-                auto definition = definitions[i];
-                if (!definition.explicitCode.empty())
-                {
-                        definition.code = definition.explicitCode;
-                }
+		for (size_t i = 0; i < definitions.size(); ++i)
+		{
+			auto definition = definitions[i];
+			if (!definition.explicitCode.empty())
+			{
+				definition.code = definition.explicitCode;
+			}
 
-                if (definition.displayName.empty())
-                {
-                        definition.displayName = definition.code;
-                }
+			if (definition.displayName.empty())
+			{
+				definition.displayName = definition.code;
+			}
 
-                if (definition.strings.empty())
-                {
-                        LOG(1, "%s Language '%s' has no translation entries; skipping.", kLanguageLogTag, definition.code.c_str());
-                        continue;
-                }
+			if (definition.strings.empty())
+			{
+				LOG(1, "%s Language '%s' has no translation entries; skipping.", kLanguageLogTag, definition.code.c_str());
+				continue;
+			}
 
-                const auto existing = languageIndex.find(definition.code);
-                if (existing != languageIndex.end())
-                {
-                        languages[existing->second] = definition;
-                }
-                else
-                {
-                        definition.isFallback = languages.empty();
-                        languageIndex.emplace(definition.code, languages.size());
-                        languages.push_back(definition);
-                }
-        }
+			const auto existing = languageIndex.find(definition.code);
+			if (existing != languageIndex.end())
+			{
+				languages[existing->second] = definition;
+			}
+			else
+			{
+				definition.isFallback = languages.empty();
+				languageIndex.emplace(definition.code, languages.size());
+				languages.push_back(definition);
+			}
+		}
 
-        if (!languages.empty())
-        {
-                languages.front().isFallback = true;
-        }
-        else
-        {
-                LOG(1, "%s CSV did not produce any valid languages.", kLanguageLogTag);
-        }
+		if (!languages.empty())
+		{
+			languages.front().isFallback = true;
+		}
+		else
+		{
+			LOG(1, "%s CSV did not produce any valid languages.", kLanguageLogTag);
+		}
 
-        return languages;
-}
+		return languages;
+	}
 
-std::string LoadEmbeddedLocalizationCsv()
-{
-        HMODULE moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
-        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                reinterpret_cast<LPCWSTR>(&__ImageBase), &moduleHandle))
-        {
-                moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
-        }
+	std::string LoadEmbeddedLocalizationCsv()
+	{
+		HMODULE moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
+		if (!GetModuleHandleExW(
+			GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			reinterpret_cast<LPCWSTR>(&__ImageBase),
+			&moduleHandle))
+		{
+			moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
+		}
 
-        HRSRC resource = FindResourceW(moduleHandle, L"Localization.csv", RT_RCDATA);
-        if (!resource)
-        {
-                LOG(1, "%s Embedded localization CSV not found.", kLanguageLogTag);
-                return {};
-        }
+		struct EnumContext
+		{
+			HMODULE module;
+			std::string* out;
+			bool found = false;
+		} ctx{ moduleHandle, nullptr, false };
 
-        HGLOBAL handle = LoadResource(moduleHandle, resource);
-        if (!handle)
-        {
-                LOG(1, "%s Failed to load embedded localization CSV resource.", kLanguageLogTag);
-                return {};
-        }
+		std::string out;
+		ctx.out = &out;
 
-        const DWORD size = SizeofResource(moduleHandle, resource);
-        const void* data = LockResource(handle);
-        if (!data || size == 0)
-        {
-                LOG(1, "%s Embedded localization CSV was empty.", kLanguageLogTag);
-                return {};
-        }
+		const BOOL enumResult = EnumResourceNamesW(
+			moduleHandle,
+			RT_RCDATA,
+			[](HMODULE, LPCWSTR, LPWSTR name, LONG_PTR param) -> BOOL
+			{
+				auto* ctx = reinterpret_cast<EnumContext*>(param);
 
-        LOG(2, "%s Loaded embedded localization CSV (%lu bytes).", kLanguageLogTag, static_cast<unsigned long>(size));
-        return std::string(static_cast<const char*>(data), static_cast<const char*>(data) + size);
-}
+				// Skip integer IDs (unless you want to handle those too)
+				if (IS_INTRESOURCE(name))
+					return TRUE;
 
-std::string LoadLocalizationCsvFromDisk()
-{
-        const std::vector<fs::path> candidates = {
-                fs::path(kLocalizationDirectory) / kLocalizationFileName,
-                fs::path("localization") / kLocalizationFileName,
-        };
+				std::string rawName = WideToUtf8(name);
+				LOG(2, "%s Found RCDATA resource name rawWideUtf8='%s' (len=%zu)",
+					kLanguageLogTag, rawName.c_str(), rawName.size());
 
-        for (const auto& path : candidates)
-        {
-                if (!fs::exists(path) || !fs::is_regular_file(path))
-                {
-                        continue;
-                }
+				std::string normalized = Localization::StripWrappingQuotes(std::move(rawName));
 
-                std::ifstream file(path, std::ios::binary);
-                if (!file.is_open())
-                {
-                        LOG(1, "%s Failed to open localization CSV on disk: %s", kLanguageLogTag, path.string().c_str());
-                        continue;
-                }
+				std::string lower = normalized;
+				std::transform(lower.begin(), lower.end(), lower.begin(),
+					[](unsigned char c) { return (unsigned char)std::tolower(c); });
 
-                std::stringstream buffer;
-                buffer << file.rdbuf();
-                LOG(2, "%s Loaded localization CSV from disk: %s", kLanguageLogTag, path.string().c_str());
-                return buffer.str();
-        }
+				// Match the embedded CSV by suffix (handles weird prefixes, case, etc.)
+				if (lower.size() < strlen("localization.csv") ||
+					lower.rfind("localization.csv") != (lower.size() - strlen("localization.csv")))
+				{
+					return TRUE;
+				}
 
-        return {};
-}
+				HRSRC resource = FindResourceW(ctx->module, name, RT_RCDATA);
+				if (!resource)
+					return TRUE;
 
-std::vector<LanguageDefinition> LoadCsvLanguages()
-{
-        bool loadedFromDisk = false;
-        std::string csvContent = LoadLocalizationCsvFromDisk();
-        if (!csvContent.empty())
-        {
-                loadedFromDisk = true;
-        }
-        else
-        {
-                csvContent = LoadEmbeddedLocalizationCsv();
-        }
+				HGLOBAL handle = LoadResource(ctx->module, resource);
+				if (!handle)
+					return TRUE;
 
-        if (csvContent.empty())
-        {
-                LOG(1, "%s ERROR: No localization CSV found. Cannot continue.", kLanguageLogTag);
-                return {};
-        }
+				const DWORD size = SizeofResource(ctx->module, resource);
+				const void* data = LockResource(handle);
+				if (!data || size == 0)
+					return TRUE;
 
-        auto languages = ParseCsvLanguages(csvContent);
-        if (languages.empty() && loadedFromDisk)
-        {
-                LOG(1, "%s ERROR: Failed to parse localization CSV on disk; retrying embedded copy.", kLanguageLogTag);
-                csvContent = LoadEmbeddedLocalizationCsv();
-                if (!csvContent.empty())
-                {
-                        languages = ParseCsvLanguages(csvContent);
-                }
-        }
+				ctx->out->assign(static_cast<const char*>(data),
+					static_cast<const char*>(data) + size);
+				ctx->found = true;
 
-        if (languages.empty())
-        {
-                LOG(1, "%s ERROR: Failed to parse localization CSV.", kLanguageLogTag);
-        }
+				// Stop enumeration once found
+				return FALSE;
+			},
+			reinterpret_cast<LONG_PTR>(&ctx));
 
-        std::sort(languages.begin(), languages.end(),
-                [](const LanguageDefinition& a, const LanguageDefinition& b)
-                {
-                        return a.displayName < b.displayName;
-                });
+		if (!enumResult && GetLastError() != ERROR_SUCCESS)
+		{
+			// EnumResourceNamesW returns FALSE both on "we stopped early" and on error.
+			// If ctx.found is true, FALSE is expected.
+			if (!ctx.found)
+			{
+				LOG(1, "%s EnumResourceNamesW failed (err=%lu).", kLanguageLogTag, GetLastError());
+			}
+		}
 
-        if (!languages.empty())
-        {
-                LOG(2, "%s Loaded %zu language(s) from localization CSV.", kLanguageLogTag, languages.size());
-        }
+		if (!ctx.found)
+		{
+			LOG(1, "%s Embedded localization CSV not found (no matching RCDATA names).", kLanguageLogTag);
+			return {};
+		}
 
-        return languages;
-}
+		LOG(2, "%s Loaded embedded localization CSV (%zu bytes).", kLanguageLogTag, out.size());
+		return out;
+	}
 
-std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std::string, std::string>& fallback,
-        const std::unordered_map<std::string, std::string>& language)
-{
-        std::vector<std::string> preview;
-        preview.reserve(kMissingPreviewLimit);
+	std::string LoadLocalizationCsvFromDisk()
+	{
+		const std::vector<fs::path> candidates = {
+				fs::path(kLocalizationDirectory) / kLocalizationFileName,
+				fs::path("localization") / kLocalizationFileName,
+		};
 
-        for (const auto& required : fallback)
-        {
-                if (language.find(required.first) == language.end())
-                {
-                        preview.push_back(required.first);
-                        if (preview.size() >= kMissingPreviewLimit)
-                        {
-                                break;
-                        }
-                }
-        }
+		for (const auto& path : candidates)
+		{
+			if (!fs::exists(path) || !fs::is_regular_file(path))
+			{
+				continue;
+			}
 
-        return preview;
-}
+			std::ifstream file(path, std::ios::binary);
+			if (!file.is_open())
+			{
+				LOG(1, "%s Failed to open localization CSV on disk: %s", kLanguageLogTag, path.string().c_str());
+				continue;
+			}
+
+			std::stringstream buffer;
+			buffer << file.rdbuf();
+			LOG(2, "%s Loaded localization CSV from disk: %s", kLanguageLogTag, path.string().c_str());
+			return buffer.str();
+		}
+
+		return {};
+	}
+
+	std::vector<LanguageDefinition> LoadCsvLanguages()
+	{
+		bool loadedFromDisk = false;
+		std::string csvContent = LoadLocalizationCsvFromDisk();
+		if (!csvContent.empty())
+		{
+			loadedFromDisk = true;
+		}
+		else
+		{
+			csvContent = LoadEmbeddedLocalizationCsv();
+		}
+
+		if (csvContent.empty())
+		{
+			LOG(1, "%s ERROR: No localization CSV found. Cannot continue.", kLanguageLogTag);
+			return {};
+		}
+
+		auto languages = ParseCsvLanguages(csvContent);
+		if (languages.empty() && loadedFromDisk)
+		{
+			LOG(1, "%s ERROR: Failed to parse localization CSV on disk; retrying embedded copy.", kLanguageLogTag);
+			csvContent = LoadEmbeddedLocalizationCsv();
+			if (!csvContent.empty())
+			{
+				languages = ParseCsvLanguages(csvContent);
+			}
+		}
+
+		if (languages.empty())
+		{
+			LOG(1, "%s ERROR: Failed to parse localization CSV.", kLanguageLogTag);
+		}
+
+		std::sort(languages.begin(), languages.end(),
+			[](const LanguageDefinition& a, const LanguageDefinition& b)
+			{
+				return a.displayName < b.displayName;
+			});
+
+		if (!languages.empty())
+		{
+			LOG(2, "%s Loaded %zu language(s) from localization CSV.", kLanguageLogTag, languages.size());
+		}
+
+		return languages;
+	}
+
+	std::string WideToUtf8(LPCWSTR value)
+	{
+		if (!value)
+		{
+			return std::string();
+		}
+
+		const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+		if (length <= 0)
+		{
+			return std::string();
+		}
+
+		std::string output(static_cast<size_t>(length - 1), '\0');
+		WideCharToMultiByte(CP_UTF8, 0, value, -1, &output[0], length, nullptr, nullptr);
+		return output;
+	}
+
+	std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std::string, std::string>& fallback,
+		const std::unordered_map<std::string, std::string>& language)
+	{
+		std::vector<std::string> preview;
+		preview.reserve(kMissingPreviewLimit);
+
+		for (const auto& required : fallback)
+		{
+			if (language.find(required.first) == language.end())
+			{
+				preview.push_back(required.first);
+				if (preview.size() >= kMissingPreviewLimit)
+				{
+					break;
+				}
+			}
+		}
+
+		return preview;
+	}
 
 } // namespace
 std::unordered_map<std::string, std::unordered_map<std::string, std::string>> Localization::m_languageStrings = {};
@@ -408,196 +483,209 @@ const LocalizationKeysAccessor Localization::Strings = {};
 
 const char* LocalizationKeysAccessor::Get(const std::string& key) const
 {
-        return Localization::Translate(key).c_str();
+	return Localization::Translate(key).c_str();
 }
 
 void Localization::Initialize(const std::string& requestedLanguage)
 {
-        if (!m_initialized)
-        {
-                LoadLanguageData();
-                m_initialized = true;
-        }
+	if (!m_initialized)
+	{
+		LoadLanguageData();
+		m_initialized = true;
+	}
 
-        RefreshLanguageStatuses();
+	RefreshLanguageStatuses();
 
-        if (IsLanguageComplete(requestedLanguage))
-        {
-                m_currentLanguage = requestedLanguage;
-        }
-        else
-        {
-                m_currentLanguage = m_fallbackLanguage;
-        }
+	if (IsLanguageComplete(requestedLanguage))
+	{
+		m_currentLanguage = requestedLanguage;
+	}
+	else
+	{
+		m_currentLanguage = m_fallbackLanguage;
+	}
 }
 
 void Localization::Reload(const std::string& requestedLanguage)
 {
-        m_languageStrings.clear();
-        m_languageOptions.clear();
-        m_currentLanguage = kDefaultLanguageCode;
-        m_fallbackLanguage = kDefaultLanguageCode;
-        m_initialized = false;
+	m_languageStrings.clear();
+	m_languageOptions.clear();
+	m_currentLanguage = kDefaultLanguageCode;
+	m_fallbackLanguage = kDefaultLanguageCode;
+	m_initialized = false;
 
-        Initialize(requestedLanguage);
+	Initialize(requestedLanguage);
 }
 
 const std::string& Localization::Translate(const std::string& key)
 {
-        const auto& languageMap = GetLanguageMap(m_currentLanguage);
-        const auto& fallbackMap = GetLanguageMap(m_fallbackLanguage);
+	const auto& languageMap = GetLanguageMap(m_currentLanguage);
+	const auto& fallbackMap = GetLanguageMap(m_fallbackLanguage);
 
-        auto it = languageMap.find(key);
-        if (it != languageMap.end())
-        {
-                return it->second;
-        }
+	auto it = languageMap.find(key);
+	if (it != languageMap.end())
+	{
+		return it->second;
+	}
 
-        auto fallbackIt = fallbackMap.find(key);
-        if (fallbackIt != fallbackMap.end())
-        {
-                return fallbackIt->second;
-        }
+	auto fallbackIt = fallbackMap.find(key);
+	if (fallbackIt != fallbackMap.end())
+	{
+		return fallbackIt->second;
+	}
 
-        auto insertion = m_languageStrings[m_fallbackLanguage].emplace(key, key);
-        return insertion.first->second;
+	auto insertion = m_languageStrings[m_fallbackLanguage].emplace(key, key);
+	return insertion.first->second;
 }
 
 const std::vector<LanguageOption>& Localization::GetAvailableLanguages()
 {
-        return m_languageOptions;
+	return m_languageOptions;
 }
 
 bool Localization::SetCurrentLanguage(const std::string& languageCode)
 {
-        if (!IsLanguageComplete(languageCode))
-        {
-                return false;
-        }
+	if (!IsLanguageComplete(languageCode))
+	{
+		return false;
+	}
 
-        m_currentLanguage = languageCode;
-        return true;
+	m_currentLanguage = languageCode;
+	return true;
 }
 
 const std::string& Localization::GetCurrentLanguage()
 {
-        return m_currentLanguage;
+	return m_currentLanguage;
 }
 
 bool Localization::IsLanguageComplete(const std::string& languageCode)
 {
-        return GetMissingKeyCount(languageCode) == 0;
+	return GetMissingKeyCount(languageCode) == 0;
 }
 
 size_t Localization::GetMissingKeyCount(const std::string& languageCode)
 {
-        const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
-        if (fallbackIt == m_languageStrings.end())
-        {
-                return 0;
-        }
+	const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
+	if (fallbackIt == m_languageStrings.end())
+	{
+		return 0;
+	}
 
-        const auto languageIt = m_languageStrings.find(languageCode);
-        const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
-        const auto& fallbackMap = fallbackIt->second;
+	const auto languageIt = m_languageStrings.find(languageCode);
+	const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
+	const auto& fallbackMap = fallbackIt->second;
 
-        if (fallbackMap.empty())
-        {
-                return 0;
-        }
+	if (fallbackMap.empty())
+	{
+		return 0;
+	}
 
-        size_t missingKeys = 0;
-        for (const auto& required : fallbackMap)
-        {
-                if (languageMap.find(required.first) == languageMap.end())
-                {
-                        ++missingKeys;
-                }
-        }
-        return missingKeys;
+	size_t missingKeys = 0;
+	for (const auto& required : fallbackMap)
+	{
+		if (languageMap.find(required.first) == languageMap.end())
+		{
+			++missingKeys;
+		}
+	}
+	return missingKeys;
+}
+
+std::string Localization::StripWrappingQuotes(std::string s)
+{
+	if (s.size() >= 2)
+	{
+		if ((s.front() == '"' && s.back() == '"') ||
+			(s.front() == '\'' && s.back() == '\''))
+		{
+			return s.substr(1, s.size() - 2);
+		}
+	}
+	return s;
 }
 
 void Localization::LoadLanguageData()
 {
-        auto definitions = LoadCsvLanguages();
-        for (const auto& language : definitions)
-        {
-                m_languageStrings.emplace(language.code, language.strings);
+	auto definitions = LoadCsvLanguages();
+	for (const auto& language : definitions)
+	{
+		m_languageStrings.emplace(language.code, language.strings);
 
-                if (language.isFallback)
-                {
-                        m_fallbackLanguage = language.code;
-                }
+		if (language.isFallback)
+		{
+			m_fallbackLanguage = language.code;
+		}
 
-                LanguageOption option{};
-                option.code = language.code;
-                option.displayName = language.displayName;
-                option.complete = false;
-                option.missingKeys = 0;
-                m_languageOptions.push_back(option);
-        }
+		LanguageOption option{};
+		option.code = language.code;
+		option.displayName = language.displayName;
+		option.complete = false;
+		option.missingKeys = 0;
+		m_languageOptions.push_back(option);
+	}
 
-        if (m_languageStrings.empty())
-        {
-                m_languageStrings.emplace(m_fallbackLanguage, kEmptyLanguage);
+	if (m_languageStrings.empty())
+	{
+		m_languageStrings.emplace(m_fallbackLanguage, kEmptyLanguage);
 
-                LanguageOption option{ m_fallbackLanguage, m_fallbackLanguage, true, 0 };
-                m_languageOptions.push_back(option);
-                LOG(1, "%s No localization resources found; using empty fallback language '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
-        }
+		LanguageOption option{ m_fallbackLanguage, m_fallbackLanguage, true, 0 };
+		m_languageOptions.push_back(option);
+		LOG(1, "%s No localization resources found; using empty fallback language '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
+	}
 
-        if (m_languageStrings.find(m_fallbackLanguage) == m_languageStrings.end() && !m_languageOptions.empty())
-        {
-                m_fallbackLanguage = m_languageOptions.front().code;
-        }
+	if (m_languageStrings.find(m_fallbackLanguage) == m_languageStrings.end() && !m_languageOptions.empty())
+	{
+		m_fallbackLanguage = m_languageOptions.front().code;
+	}
 
-        LOG(2, "%s Fallback language set to '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
+	LOG(2, "%s Fallback language set to '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
 }
 
 void Localization::RefreshLanguageStatuses()
 {
-        const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
-        const auto& fallbackMap = fallbackIt != m_languageStrings.end() ? fallbackIt->second : kEmptyLanguage;
+	const auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
+	const auto& fallbackMap = fallbackIt != m_languageStrings.end() ? fallbackIt->second : kEmptyLanguage;
 
-        for (auto& option : m_languageOptions)
-        {
-                const auto languageIt = m_languageStrings.find(option.code);
-                const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
+	for (auto& option : m_languageOptions)
+	{
+		const auto languageIt = m_languageStrings.find(option.code);
+		const auto& languageMap = languageIt != m_languageStrings.end() ? languageIt->second : kEmptyLanguage;
 
-                option.missingKeys = GetMissingKeyCount(option.code);
-                option.complete = option.missingKeys == 0;
+		option.missingKeys = GetMissingKeyCount(option.code);
+		option.complete = option.missingKeys == 0;
 
-                if (!option.complete && !fallbackMap.empty())
-                {
-                        auto preview = CollectMissingKeysPreview(fallbackMap, languageMap);
-                        LOG(2, "%s Language '%s' missing %zu key(s)%s.", kLanguageLogTag, option.code.c_str(), option.missingKeys,
-                                preview.size() < option.missingKeys ? " (preview)" : "");
-                        for (const auto& key : preview)
-                        {
-                                LOG(2, "%s    missing: %s", kLanguageLogTag, key.c_str());
-                        }
-                }
-        }
+		if (!option.complete && !fallbackMap.empty())
+		{
+			auto preview = CollectMissingKeysPreview(fallbackMap, languageMap);
+			LOG(2, "%s Language '%s' missing %zu key(s)%s.", kLanguageLogTag, option.code.c_str(), option.missingKeys,
+				preview.size() < option.missingKeys ? " (preview)" : "");
+			for (const auto& key : preview)
+			{
+				LOG(2, "%s    missing: %s", kLanguageLogTag, key.c_str());
+			}
+		}
+	}
 }
 
 const std::unordered_map<std::string, std::string>& Localization::GetLanguageMap(const std::string& languageCode)
 {
-        auto languageIt = m_languageStrings.find(languageCode);
-        if (languageIt == m_languageStrings.end())
-        {
-                auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
-                if (fallbackIt != m_languageStrings.end())
-                {
-                        return fallbackIt->second;
-                }
+	auto languageIt = m_languageStrings.find(languageCode);
+	if (languageIt == m_languageStrings.end())
+	{
+		auto fallbackIt = m_languageStrings.find(m_fallbackLanguage);
+		if (fallbackIt != m_languageStrings.end())
+		{
+			return fallbackIt->second;
+		}
 
-                return kEmptyLanguage;
-        }
+		return kEmptyLanguage;
+	}
 
-        return languageIt->second;
+	return languageIt->second;
 }
 
 const std::string& L(const std::string& key)
 {
-        return Localization::Translate(key);
+	return Localization::Translate(key);
 }

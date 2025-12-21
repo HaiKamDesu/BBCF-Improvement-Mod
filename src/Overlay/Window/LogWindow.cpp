@@ -9,21 +9,21 @@ void LogWindow::BeforeDraw()
 
 void LogWindow::Draw()
 {
-if (ImGui::Button(Messages.Clear()))
-{
-m_logger.Clear();
-}
-ImGui::SameLine();
-bool copyPressed = ImGui::Button(Messages.Copy_to_clipboard());
-ImGui::SameLine();
-m_filter.Draw(Messages.Search(), -100.0f);
-ImGui::Separator();
-ImGui::BeginChild("scrolling", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
-        if (copyPressed)
-        {
-                ImGui::LogToClipboard();
-m_logger.Log(Messages.System_log_copied());
-        }
+	if (ImGui::Button(Messages.Clear()))
+	{
+		m_logger.Clear();
+	}
+	ImGui::SameLine();
+	bool copyPressed = ImGui::Button(Messages.Copy_to_clipboard());
+	ImGui::SameLine();
+	m_filter.Draw(Messages.Search(), -100.0f);
+	ImGui::Separator();
+	ImGui::BeginChild("scrolling", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+	if (copyPressed)
+	{
+		ImGui::LogToClipboard();
+		m_logger.Log(Messages.System_log_copied());
+	}
 
 	ImGuiLogBuffer* logBuffer = (ImGuiLogBuffer*)m_logger.GetBuffer();
 	if (m_filter.IsActive())
