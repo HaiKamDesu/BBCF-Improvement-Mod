@@ -739,4 +739,78 @@ Are you sure you want to overwrite it?
   <data name="Direction" xml:space="preserve">
     <value>Direction</value>
   </data>
+  <data name="Active entities: %d" xml:space="preserve">
+    <value>Active entities: %d</value>
+  </data>
+  <data name="Active entities with unk_status2 = 2: %d" xml:space="preserve">
+    <value>Active entities with unk_status2 = 2: %d</value>
+  </data>
+  <data name="Only works during a running replay" xml:space="preserve">
+    <value>Only works during a running replay</value>
+  </data>
+  <data name="Rewind" xml:space="preserve">
+    <value>Rewind</value>
+  </data>
+  <data name="Replay rewind help tooltip" xml:space="preserve">
+    <value>Replay rewind can currently hold up to 10 "checkpoints" at a time to rewind to. These checkpoints are saved as the replay progresses at defined intervals(1s,3s or 9s). With replay interval set to 9s for example you will save checkpoints at second 0,9,18...,90.
+
+You can also change them during the replay itself to refine the rewind, say for example you found something interesting at second 16 while having rewind interval as 9s:
+
+ - Rewind until you reach the checkpoint at second 9
+ - Change the rewind interval to 1s or 3s
+ - Now as it reaches the desired position it will have recorded the previous checkpoints in smaller intervals, allowing you to wait less to reach the desired part / analyze the lead up to it.
+
+You can see the frames of all saved checkpoints and more advanced info on the "Saved Checkpoints Advanced Info" section above.</value>
+  </data>
+  <data name="Rewind Interval" xml:space="preserve">
+    <value>Rewind Interval</value>
+  </data>
+  <data name="Rewind interval help tooltip" xml:space="preserve">
+    <value>Defines the interval to save the rewind "checkpoint". For more info see the help bar on "Rewind" button</value>
+  </data>
+  <data name="1s" xml:space="preserve">
+    <value>1s</value>
+  </data>
+  <data name="3s" xml:space="preserve">
+    <value>3s</value>
+  </data>
+  <data name="9s" xml:space="preserve">
+    <value>9s</value>
+  </data>
+  <data name="Saved Checkpoints Adv. Info" xml:space="preserve">
+    <value>Saved Checkpoints Adv. Info</value>
+  </data>
+  <data name="Rewind pos: +%d" xml:space="preserve">
+    <value>Rewind pos: +%d</value>
+  </data>
+  <data name="snap_apparatus snapshot_count: %d" xml:space="preserve">
+    <value>snap_apparatus snapshot_count: %d</value>
+  </data>
+  <data name="%d: Framecount:%d" xml:space="preserve">
+    <value>%d: Framecount:%d</value>
+  </data>
+  <data name="You cannot use this feature while searching for a ranked match" xml:space="preserve">
+    <value>You cannot use this feature while searching for a ranked match</value>
+  </data>
+  <data name="YOU ARE NOT IN A ROOM OR ONLINE MATCH!" xml:space="preserve">
+    <value>YOU ARE NOT IN A ROOM OR ONLINE MATCH!</value>
+  </data>
+  <data name="Online type: %s" xml:space="preserve">
+    <value>Online type: %s</value>
+  </data>
+  <data name="Improvement Mod users in Room:" xml:space="preserve">
+    <value>Improvement Mod users in Room:</value>
+  </data>
+  <data name="Improvement Mod users in match:" xml:space="preserve">
+    <value>Improvement Mod users in match:</value>
+  </data>
+  <data name="Click to open Steam profile" xml:space="preserve">
+    <value>Click to open Steam profile</value>
+  </data>
+  <data name="Spectator" xml:space="preserve">
+    <value>Spectator</value>
+  </data>
+  <data name="Online room window title format" xml:space="preserve">
+    <value>%s - %s###Room</value>
+  </data>
 </root>
