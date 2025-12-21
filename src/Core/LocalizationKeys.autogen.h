@@ -564,9 +564,6 @@ struct LocalizationKeysAccessor
         // Language selection help
         inline const char* Language_selection_help() const { return Get("Language selection help"); }
 
-        // KoreWaTestoDakeDa
-        inline const char* KoreWaTestoDakeDa() const { return Get("KoreWaTestoDakeDa"); }
-
         // Active entities: %d
         inline const char* Active_entities_d() const { return Get("Active entities: %d"); }
 

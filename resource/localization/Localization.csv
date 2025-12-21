@@ -4,23 +4,23 @@ _DisplayName,English,Español
 Toggle me with %s,Toggle me with %s,Activa la ventana con %s
 Toggle Online with %s,Toggle Online with %s,Abrir en línea con %s
 Toggle HUD with %s,Toggle HUD with %s,Ocultar HUD con %s
-Generate Debug Logs,Generate Debug Logs,Generar registros de depuración
+Generate Debug Logs,Generate Debug Logs,Generar registros de DEBUG
 Debug_log_details,Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.,Escribe DEBUG.txt con información detallada de ejecución. Se guarda en settings.ini para futuras sesiones.
-Online,Online,En línea
+Online,Online,Online
 Gameplay settings,Gameplay settings,Opciones de juego
 Custom palettes,Custom palettes,Paletas personalizadas
 Hitbox overlay,Hitbox overlay,Superposición de hitbox
-FrameHistory,FrameHistory,Historial de cuadros
-Framedata,Framedata,Datos de cuadro
+FrameHistory,FrameHistory,Historial de Frames
+Framedata,Framedata,Datos de Frames
 Avatar settings,Avatar settings,Opciones de avatar
 Controller Settings,Controller Settings,Opciones de control
-Local Controller Override,Local Controller Override,Anulación de controlador local
-Controller_override_help,Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.,Elige qué controlador conectado o el teclado deben ser Jugador 1 y Jugador 2. Usa Actualizar cuando cambien los dispositivos.
-Refresh controllers,Refresh controllers,Actualizar controladores
+Local Controller Override,Local Controller Override,Anulación de mandos local
+Controller_override_help,Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.,"Elige qué controlador o teclado deben ser Jugador 1 y Jugador 2. Utiliza el boton ""Actualizar"" cuando cambien los dispositivos."
+Refresh controllers,Refresh controllers,Actualizar Mandos
 Controller_refresh_help,Reload the controller list and reinitialize input slots to match connected devices.,Recarga la lista de controladores y reinicializa las ranuras de entrada para coincidir con los dispositivos conectados.
 Open Joy.cpl,Open Joy.cpl,Abrir Joy.cpl
 Auto-refresh,Auto-refresh,Actualización automática
-Auto_refresh_warning,"Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.","Actualiza automáticamente las ranuras de controladores cuando cambian los dispositivos. La llamada interna para actualizarlos puede congelar el juego por unos momentos, así que actívalo solo si aceptas pausas cortas."
+Auto_refresh_warning,"Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.","Actualiza automáticamente los mandos cuando cambian los dispositivos. La llamada interna para actualizarlos puede congelar el juego por unos momentos, así que actívalo solo si aceptas pausas cortas."
 No input devices detected.,No input devices detected.,No se detectaron dispositivos de entrada.
 STEAM INPUT: %s,STEAM INPUT: %s,STEAM INPUT: %s
 ON,ON,ACTIVADO
@@ -55,67 +55,67 @@ Clear,Clear,Borrar
 Configure keyboard mapping,Configure keyboard mapping,Configurar asignación de teclado
 Unbound,Unbound,Sin asignar
 Press a key...,Press a key...,Pulsa una tecla...
-Select game mode:,Select game mode:,Select game mode:
+Select game mode:,Select game mode:,Seleccionar Modo de Juego:
 Stage,Stage,Stage
 Player 1,Player 1,Player 1
 Gap:,Gap:,Gap:
-Advantage:,Advantage:,Advantage:
+Advantage:,Advantage:,Ventaja:
 Player 2,Player 2,Player 2
 Player 1:,Player 1:,Player 1:
 Player 2:,Player 2:,Player 2:
 Copy to clipboard,Copy to clipboard,Copiar al portapapeles
 Search,Search,Buscar
 System_log_copied,"[system] Log has been copied to clipboard
-","[system] Log has been copied to clipboard
+","[system] Log fue copiado al clipboard
 "
-Reload custom palettes,Reload custom palettes,Reload custom palettes
-Select character,Select character,Select character
-Select palette,Select palette,Select palette
-Select file,Select file,Select file
-Gradient generator,Gradient generator,Gradient generator
+Reload custom palettes,Reload custom palettes,Actualizar paletas personalizadas
+Select character,Select character,Seleccionar Personaje
+Select palette,Select palette,Seleccionar Paleta
+Select file,Select file,Seleccionar Archivo
+Gradient generator,Gradient generator,Generador de Gradiente
 Undo,Undo,Deshacer
 Redo,Redo,Rehacer
-Cannot save with Highlight mode on!,Cannot save with Highlight mode on!,Cannot save with Highlight mode on!
-Save with bloom effect,Save with bloom effect,Save with bloom effect
-Bloom effects cannot be changed until a new round is started,Bloom effects cannot be changed until a new round is started,Bloom effects cannot be changed until a new round is started
-Palette name:,Palette name:,Palette name:
-Creator (optional):,Creator (optional):,Creator (optional):
-Palette description (optional):,Palette description (optional):,Palette description (optional):
-Save palette,Save palette,Save palette
-"Error, no filename given","Error, no filename given","Error, no filename given"
-"Error, not a valid filename","Error, not a valid filename","Error, not a valid filename"
-'%s' saved successfully,'%s' saved successfully,'%s' saved successfully
-'%s' save failed,'%s' save failed,'%s' save failed
+Cannot save with Highlight mode on!,Cannot save with Highlight mode on!,No se puede guardar con modo Highlight prendido!
+Save with bloom effect,Save with bloom effect,Guardar con efecto bloom
+Bloom effects cannot be changed until a new round is started,Bloom effects cannot be changed until a new round is started,Efectos de Bloom no pueden ser cambiados hasta que empiece un nuevo round
+Palette name:,Palette name:,Nombre de Paleta:
+Creator (optional):,Creator (optional):,Creador (opcional):
+Palette description (optional):,Palette description (optional):,Descripcion (opcional):
+Save palette,Save palette,Guardar paleta
+"Error, no filename given","Error, no filename given","Error, no se dio nombre de archivo"
+"Error, not a valid filename","Error, not a valid filename","Error, el nombre del archivo no es valido"
+'%s' saved successfully,'%s' saved successfully,%s' se guardo correctamente
+'%s' save failed,'%s' save failed,%s' tuvo un error al guardar
 Overwrite_confirmation_prompt,"'%s' already exists.
 Are you sure you want to overwrite it?
 
-","'%s' already exists.
-Are you sure you want to overwrite it?
+","%s' ya existe.
+Estas seguro que quieres sobreescribirlo?
 
 "
 OK,OK,OK
-Reset palette,Reset palette,Reset palette
-Out of bounds,Out of bounds,Out of bounds
-ONLINE PALETTE,ONLINE PALETTE,ONLINE PALETTE
-Creator: %s,Creator: %s,Creator: %s
-Description: %s,Description: %s,Description: %s
-Has bloom effect,Has bloom effect,Has bloom effect
-Random selection,Random selection,Random selection
-Start index,Start index,Start index
-End index,End index,End index
-Start color,Start color,Start color
-End color,End color,End color
-Swap colors,Swap colors,Swap colors
-Generate gradient,Generate gradient,Generate gradient
-Refresh,Refresh,Refresh
-Recording side: %c,Recording side: %c,Recording side: %c
-Switch recording side,Switch recording side,Switch recording side
-Add/Remove,Add/Remove,Add/Remove
+Reset palette,Reset palette,Reiniciar paleta
+Out of bounds,Out of bounds,Fuera de limite
+ONLINE PALETTE,ONLINE PALETTE,PALETA ONLINE
+Creator: %s,Creator: %s,Creador: %s
+Description: %s,Description: %s,Descripcion: %s
+Has bloom effect,Has bloom effect,Tiene efecto Bloom
+Random selection,Random selection,Selección Aleatoria
+Start index,Start index,Index de inicio
+End index,End index,Index final
+Start color,Start color,Color de inicio
+End color,End color,Color final
+Swap colors,Swap colors,Intercambiar colores
+Generate gradient,Generate gradient,Generar gradiente
+Refresh,Refresh,Refrescar
+Recording side: %c,Recording side: %c,Lado de grabacion: %c
+Switch recording side,Switch recording side,Cambiar lado de grabacion
+Add/Remove,Add/Remove,Añadir/Remover
 Frame,Frame,Frame
 Literal,Literal,Literal
-Command,Command,Command
-Edit Input,Edit Input,Edit Input
-Direction,Direction,Direction
+Command,Command,Comando
+Edit Input,Edit Input,Editar Input
+Direction,Direction,Direccion
 Bind,Bind,Vincular
 Menu action,Menu action,Acción de menú
 Battle action,Battle action,Acción en combate
@@ -307,11 +307,10 @@ FrameHistory character load error,THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHA
 Language,Language,Idioma
 Language incomplete label, (Incomplete), (Incompleto)
 Language selection help,Select a language for all UI text. Requires full dictionary coverage.,Selecciona un idioma para todo el texto de la interfaz. Requiere cobertura completa del diccionario.
-KoreWaTestoDakeDa,dsdsd,asasasasa
-Active entities: %d,Active entities: %d,Active entities: %d
-Active entities with unk_status2 = 2: %d,Active entities with unk_status2 = 2: %d,Active entities with unk_status2 = 2: %d
-Only works during a running replay,Only works during a running replay,Only works during a running replay
-Rewind,Rewind,Rewind
+Active entities: %d,Active entities: %d,Activar entidades: %d
+Active entities with unk_status2 = 2: %d,Active entities with unk_status2 = 2: %d,Activar entidades con unk_status2 = 2: %d
+Only works during a running replay,Only works during a running replay,Solo funciona durante una replay
+Rewind,Rewind,Retroceder
 Replay rewind help tooltip,"Replay rewind can currently hold up to 10 ""checkpoints"" at a time to rewind to. These checkpoints are saved as the replay progresses at defined intervals(1s,3s or 9s). With replay interval set to 9s for example you will save checkpoints at second 0,9,18...,90.
 
 You can also change them during the replay itself to refine the rewind, say for example you found something interesting at second 16 while having rewind interval as 9s:
@@ -320,29 +319,30 @@ You can also change them during the replay itself to refine the rewind, say for 
  - Change the rewind interval to 1s or 3s
  - Now as it reaches the desired position it will have recorded the previous checkpoints in smaller intervals, allowing you to wait less to reach the desired part / analyze the lead up to it.
 
-You can see the frames of all saved checkpoints and more advanced info on the ""Saved Checkpoints Advanced Info"" section above.","Replay rewind can currently hold up to 10 ""checkpoints"" at a time to rewind to. These checkpoints are saved as the replay progresses at defined intervals(1s,3s or 9s). With replay interval set to 9s for example you will save checkpoints at second 0,9,18...,90.
+You can see the frames of all saved checkpoints and more advanced info on the ""Saved Checkpoints Advanced Info"" section above.","El rebobinado de la repetición puede almacenar actualmente hasta 10 “checkpoints” al mismo tiempo a los que puedes volver atrás. Estos checkpoints se guardan automáticamente mientras avanza la repetición, en intervalos definidos (1 s, 3 s o 9 s).
+Por ejemplo, si el intervalo de repetición está configurado en 9 s, se guardarán checkpoints en los segundos 0, 9, 18…, 90.
 
-You can also change them during the replay itself to refine the rewind, say for example you found something interesting at second 16 while having rewind interval as 9s:
+También puedes cambiar estos intervalos durante la propia repetición para afinar el rebobinado. Por ejemplo, imagina que encuentras algo interesante en el segundo 16 mientras tienes el intervalo de rebobinado configurado en 9 s:
 
- - Rewind until you reach the checkpoint at second 9
- - Change the rewind interval to 1s or 3s
- - Now as it reaches the desired position it will have recorded the previous checkpoints in smaller intervals, allowing you to wait less to reach the desired part / analyze the lead up to it.
+-Rebobina hasta llegar al checkpoint del segundo 9
+-Cambia el intervalo de rebobinado a 1 s o 3 s
+-A medida que la repetición avance hasta la posición deseada, se habrán registrado checkpoints previos en intervalos más pequeños, lo que te permitirá esperar menos para llegar a la parte que te interesa o analizar mejor lo que ocurrió antes.
 
-You can see the frames of all saved checkpoints and more advanced info on the ""Saved Checkpoints Advanced Info"" section above."
-Rewind Interval,Rewind Interval,Rewind Interval
-Rewind interval help tooltip,"Defines the interval to save the rewind ""checkpoint"". For more info see the help bar on ""Rewind"" button","Defines the interval to save the rewind ""checkpoint"". For more info see the help bar on ""Rewind"" button"
+Puedes ver los fotogramas de todos los checkpoints guardados y más información avanzada en la sección “Saved Checkpoints Advanced Info” que aparece arriba."
+Rewind Interval,Rewind Interval,Intervalo de Rebobinado
+Rewind interval help tooltip,"Defines the interval to save the rewind ""checkpoint"". For more info see the help bar on ""Rewind"" button","Define el intervalo en el que se guarda el “checkpoint” de rebobinado. Para más información, consulta la barra de ayuda del botón “Rewind”."
 1s,1s,1s
 3s,3s,3s
 9s,9s,9s
 Saved Checkpoints Adv. Info,Saved Checkpoints Adv. Info,Saved Checkpoints Adv. Info
-Rewind pos: +%d,Rewind pos: +%d,Rewind pos: +%d
+Rewind pos: +%d,Rewind pos: +%d,Pos de rebobinado: +%d
 snap_apparatus snapshot_count: %d,snap_apparatus snapshot_count: %d,snap_apparatus snapshot_count: %d
-%d: Framecount:%d,%d: Framecount:%d,%d: Framecount:%d
-Ranked_search_warning,You cannot use this feature while searching for a ranked match,You cannot use this feature while searching for a ranked match
-YOU ARE NOT IN A ROOM OR ONLINE MATCH!,YOU ARE NOT IN A ROOM OR ONLINE MATCH!,YOU ARE NOT IN A ROOM OR ONLINE MATCH!
-Online type: %s,Online type: %s,Online type: %s
-Improvement Mod users in Room:,Improvement Mod users in Room:,Improvement Mod users in Room:
-Improvement Mod users in match:,Improvement Mod users in match:,Improvement Mod users in match:
-Click to open Steam profile,Click to open Steam profile,Click to open Steam profile
-Spectator,Spectator,Spectator
+%d: Framecount:%d,%d: Framecount:%d,%d: Cuenta de Frames:%d
+Ranked_search_warning,You cannot use this feature while searching for a ranked match,No puedes utilizar esta funcionalidad mientras buscas una partida
+YOU ARE NOT IN A ROOM OR ONLINE MATCH!,YOU ARE NOT IN A ROOM OR ONLINE MATCH!,NO ESTAS EN UNA SALA O PARTIDA ONLINE!
+Online type: %s,Online type: %s,Tipo de Online: %s
+Improvement Mod users in Room:,Improvement Mod users in Room:,Usuarios de Improvement Mod en Sala:
+Improvement Mod users in match:,Improvement Mod users in match:,Usuarios de Improvement Mod en Partida:
+Click to open Steam profile,Click to open Steam profile,Click para abrir perfil de Steam
+Spectator,Spectator,Espectador
 Online room window title format,%s - %s###Room,%s - %s###Room
