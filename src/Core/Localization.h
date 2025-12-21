@@ -27,7 +27,6 @@ public:
         static const std::string& GetCurrentLanguage();
         static bool IsLanguageComplete(const std::string& languageCode);
         static size_t GetMissingKeyCount(const std::string& languageCode);
-        static std::string StripWrappingQuotes(std::string s);
 
         static const LocalizationKeysAccessor Strings;
 

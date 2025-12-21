@@ -1,5 +1,5 @@
 Param(
-  [Parameter(Mandatory=$true)][string]$ResxPath,
+  [Parameter(Mandatory=$true)][string]$CsvPath,
   [Parameter(Mandatory=$true)][string]$OutPath
 )
 
@@ -24,23 +24,23 @@ function Sanitize-Name([string]$raw, [hashtable]$existing) {
 }
 
 try {
-  if ([string]::IsNullOrWhiteSpace($ResxPath)) { throw "ResxPath is empty" }
+  if ([string]::IsNullOrWhiteSpace($CsvPath)) { throw "CsvPath is empty" }
   if ([string]::IsNullOrWhiteSpace($OutPath))  { throw "OutPath is empty" }
 
-  if (-not (Test-Path -LiteralPath $ResxPath)) {
-    throw "Input resx not found: $ResxPath"
+  if (-not (Test-Path -LiteralPath $CsvPath)) {
+    throw "Input csv not found: $CsvPath"
   }
 
-  [xml]$xml = Get-Content -LiteralPath $ResxPath -Raw -Encoding UTF8
+  $rows = Import-Csv -LiteralPath $CsvPath
 
   $keys = @()
-  foreach ($node in $xml.root.data) {
-    $name = $node.name
+  foreach ($row in $rows) {
+    $name = $row.MethodName
     if ([string]::IsNullOrEmpty($name)) { continue }
     if ($name.StartsWith("_")) { continue }
     $keys += $name
   }
-  if ($keys.Count -eq 0) { throw "No keys found in resx: $ResxPath" }
+  if ($keys.Count -eq 0) { throw "No keys found in csv: $CsvPath" }
 
   $lines = New-Object System.Collections.Generic.List[string]
   $lines.Add("#pragma once")

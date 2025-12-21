@@ -3,7 +3,6 @@
 #include <Windows.h>
 
 #include <algorithm>
-#include <exception>
 #include <fstream>
 
 #ifndef _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
@@ -13,7 +12,6 @@
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
-#include <regex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -24,7 +22,9 @@ namespace fs = std::experimental::filesystem;
 namespace
 {
 const char* kLocalizationDirectory = "resource/localization";
+const char* kLocalizationFileName = "Localization.csv";
 const char* kDisplayNameKey = "_DisplayName";
+const char* kLanguageCodeKey = "_LanguageCode";
 const char* kDefaultLanguageCode = "en";
 const char* kLanguageLogTag = "[Language]";
 const size_t kMissingPreviewLimit = 5;
@@ -32,444 +32,6 @@ const size_t kMissingPreviewLimit = 5;
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
-
-// Compile-time fallback dictionaries to guarantee at least the shipping languages
-// are available even if embedded resources fail to load (e.g., resource section
-// stripped or build misconfigured). These mirror the on-disk .resx contents so
-// format strings remain stable.
-const char* kBuiltInEnglishResx = R"RESX(<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <resheader name="resmimetype">
-    <value>text/microsoft-resx</value>
-  </resheader>
-  <resheader name="version">
-    <value>2.0</value>
-  </resheader>
-  <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <data name="_DisplayName" xml:space="preserve">
-    <value>English</value>
-  </data>
-  <data name="_LanguageCode" xml:space="preserve">
-    <value>en</value>
-  </data>
-  <data name="Toggle UI" xml:space="preserve">
-    <value>Toggle UI</value>
-  </data>
-  <data name="Only show menus in training" xml:space="preserve">
-    <value>Only show menus in training mode</value>
-  </data>
-  <data name="Toggle Netplay UI" xml:space="preserve">
-    <value>Toggle Netplay UI</value>
-  </data>
-  <data name="Hide HUD" xml:space="preserve">
-    <value>Hide HUD</value>
-  </data>
-  <data name="Toggle visible" xml:space="preserve">
-    <value>Toggle visible</value>
-  </data>
-  <data name="Minimize" xml:space="preserve">
-    <value>Minimize</value>
-  </data>
-  <data name="Menu size" xml:space="preserve">
-    <value>Menu size</value>
-  </data>
-  <data name="Rendering settings" xml:space="preserve">
-    <value>Rendering settings</value>
-  </data>
-  <data name="Enable multisampling" xml:space="preserve">
-    <value>Enable multisampling</value>
-  </data>
-  <data name="Anti-aliasing samples" xml:space="preserve">
-    <value>Anti-aliasing samples</value>
-  </data>
-  <data name="V-Sync" xml:space="preserve">
-    <value>V-Sync</value>
-  </data>
-  <data name="Hide menu fullscreen" xml:space="preserve">
-    <value>Hide menu in fullscreen</value>
-  </data>
-  <data name="Menu size help" xml:space="preserve">
-    <value>Adjust the size of the menus in the overlay window.</value>
-  </data>
-  <data name="Multisampling help" xml:space="preserve">
-    <value>Enable or disable multisampling for improved rendering quality.</value>
-  </data>
-  <data name="Anti-aliasing help" xml:space="preserve">
-    <value>Select the number of samples used for anti-aliasing.</value>
-  </data>
-  <data name="V-Sync help" xml:space="preserve">
-    <value>Toggle vertical synchronization to reduce screen tearing.</value>
-  </data>
-  <data name="Hide menu fullscreen help" xml:space="preserve">
-    <value>Hide the overlay menu when the game is in fullscreen mode.</value>
-  </data>
-  <data name="Custom palettes" xml:space="preserve">
-    <value>Custom palettes</value>
-  </data>
-  <data name="Enable custom palettes" xml:space="preserve">
-    <value>Enable custom palettes</value>
-  </data>
-  <data name="Save palettes" xml:space="preserve">
-    <value>Save palettes</value>
-  </data>
-  <data name="Load palettes" xml:space="preserve">
-    <value>Load palettes</value>
-  </data>
-  <data name="Load external palettes" xml:space="preserve">
-    <value>Load external palettes by default</value>
-  </data>
-  <data name="Swap controller" xml:space="preserve">
-    <value>Swap controller positions</value>
-  </data>
-  <data name="Hide palette info" xml:space="preserve">
-    <value>Hide palette info during online matches</value>
-  </data>
-  <data name="Palettes online notice" xml:space="preserve">
-    <value>Palettes may desync online unless both players match.</value>
-  </data>
-  <data name="Controller settings" xml:space="preserve">
-    <value>Controller settings</value>
-  </data>
-  <data name="Primary keyboard" xml:space="preserve">
-    <value>Primary keyboard device</value>
-  </data>
-  <data name="Gamepad input" xml:space="preserve">
-    <value>Gamepad input</value>
-  </data>
-  <data name="Ignore devices help" xml:space="preserve">
-    <value>Filter out devices that should not be used by the game or overlay.</value>
-  </data>
-  <data name="Toggle button" xml:space="preserve">
-    <value>Toggle menu button</value>
-  </data>
-  <data name="Toggle online button" xml:space="preserve">
-    <value>Toggle netplay menu button</value>
-  </data>
-  <data name="Toggle HUD button" xml:space="preserve">
-    <value>Hide HUD button</value>
-  </data>
-  <data name="Save state keybind" xml:space="preserve">
-    <value>Save state keybind</value>
-  </data>
-  <data name="Load state keybind" xml:space="preserve">
-    <value>Load state keybind</value>
-  </data>
-  <data name="Load replay state keybind" xml:space="preserve">
-    <value>Load replay state keybind</value>
-  </data>
-  <data name="Freeze frame keybind" xml:space="preserve">
-    <value>Freeze frame keybind</value>
-  </data>
-  <data name="Step frames keybind" xml:space="preserve">
-    <value>Step frames keybind</value>
-  </data>
-  <data name="Auto archive" xml:space="preserve">
-    <value>Auto archive replays</value>
-  </data>
-  <data name="Upload replay" xml:space="preserve">
-    <value>Upload replay data</value>
-  </data>
-  <data name="Upload replay host" xml:space="preserve">
-    <value>Upload host</value>
-  </data>
-  <data name="Upload replay port" xml:space="preserve">
-    <value>Upload port</value>
-  </data>
-  <data name="Upload replay endpoint" xml:space="preserve">
-    <value>Upload endpoint</value>
-  </data>
-  <data name="Logging" xml:space="preserve">
-    <value>Logging</value>
-  </data>
-  <data name="Enable update checks" xml:space="preserve">
-    <value>Enable update checks</value>
-  </data>
-  <data name="Updates help" xml:space="preserve">
-    <value>Enable or disable automatic update checks for the mod.</value>
-  </data>
-  <data name="Frame history settings" xml:space="preserve">
-    <value>Frame history settings</value>
-  </data>
-  <data name="Frame history width" xml:space="preserve">
-    <value>Frame history width</value>
-  </data>
-  <data name="Frame history height" xml:space="preserve">
-    <value>Frame history height</value>
-  </data>
-  <data name="Frame history spacing" xml:space="preserve">
-    <value>Frame history spacing</value>
-  </data>
-  <data name="Frame advantage settings" xml:space="preserve">
-    <value>Frame advantage settings</value>
-  </data>
-  <data name="Frame advantage toggle" xml:space="preserve">
-    <value>Enable frame advantage overlay</value>
-  </data>
-  <data name="Frame advantage width" xml:space="preserve">
-    <value>Frame advantage width</value>
-  </data>
-  <data name="Frame advantage height" xml:space="preserve">
-    <value>Frame advantage height</value>
-  </data>
-  <data name="Frame advantage spacing" xml:space="preserve">
-    <value>Frame advantage spacing</value>
-  </data>
-  <data name="Avatar settings" xml:space="preserve">
-    <value>Avatar settings</value>
-  </data>
-  <data name="Show avatar" xml:space="preserve">
-    <value>Show avatar</value>
-  </data>
-  <data name="Notifications" xml:space="preserve">
-    <value>Notifications</value>
-  </data>
-  <data name="Language" xml:space="preserve">
-    <value>Language</value>
-  </data>
-  <data name="Language incomplete label" xml:space="preserve">
-    <value>%s - Incomplete (missing %zu keys)</value>
-  </data>
-  <data name="Language selection help" xml:space="preserve">
-    <value>Select the UI language. Incomplete languages cannot be chosen.</value>
-  </data>
-  <data name="Log" xml:space="preserve">
-    <value>Log</value>
-  </data>
-  <data name="States" xml:space="preserve">
-    <value>States</value>
-  </data>
-  <data name="Player count" xml:space="preserve">
-    <value>Current players</value>
-  </data>
-  <data name="Github" xml:space="preserve">
-    <value>Github</value>
-  </data>
-  <data name="Discord" xml:space="preserve">
-    <value>Discord</value>
-  </data>
-</root>)RESX";
-
-const char* kBuiltInSpanishResx = R"RESX(<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <resheader name="resmimetype">
-    <value>text/microsoft-resx</value>
-  </resheader>
-  <resheader name="version">
-    <value>2.0</value>
-  </resheader>
-  <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <data name="_DisplayName" xml:space="preserve">
-    <value>Español</value>
-  </data>
-  <data name="_LanguageCode" xml:space="preserve">
-    <value>es</value>
-  </data>
-  <data name="Toggle UI" xml:space="preserve">
-    <value>Alternar interfaz</value>
-  </data>
-  <data name="Only show menus in training" xml:space="preserve">
-    <value>Mostrar menús solo en entrenamiento</value>
-  </data>
-  <data name="Toggle Netplay UI" xml:space="preserve">
-    <value>Alternar interfaz en línea</value>
-  </data>
-  <data name="Hide HUD" xml:space="preserve">
-    <value>Ocultar HUD</value>
-  </data>
-  <data name="Toggle visible" xml:space="preserve">
-    <value>Alternar visibilidad</value>
-  </data>
-  <data name="Minimize" xml:space="preserve">
-    <value>Minimizar</value>
-  </data>
-  <data name="Menu size" xml:space="preserve">
-    <value>Tamaño del menú</value>
-  </data>
-  <data name="Rendering settings" xml:space="preserve">
-    <value>Configuración de renderizado</value>
-  </data>
-  <data name="Enable multisampling" xml:space="preserve">
-    <value>Habilitar multisampling</value>
-  </data>
-  <data name="Anti-aliasing samples" xml:space="preserve">
-    <value>Antialiasing (muestras)</value>
-  </data>
-  <data name="V-Sync" xml:space="preserve">
-    <value>V-Sync</value>
-  </data>
-  <data name="Hide menu fullscreen" xml:space="preserve">
-    <value>Ocultar menú en pantalla completa</value>
-  </data>
-  <data name="Menu size help" xml:space="preserve">
-    <value>Ajusta el tamaño de los menús en la ventana de la superposición.</value>
-  </data>
-  <data name="Multisampling help" xml:space="preserve">
-    <value>Activa o desactiva el multisampling para mejorar la calidad de renderizado.</value>
-  </data>
-  <data name="Anti-aliasing help" xml:space="preserve">
-    <value>Selecciona el número de muestras usadas para antialiasing.</value>
-  </data>
-  <data name="V-Sync help" xml:space="preserve">
-    <value>Alterna la sincronización vertical para reducir el tearing.</value>
-  </data>
-  <data name="Hide menu fullscreen help" xml:space="preserve">
-    <value>Oculta el menú de la superposición cuando el juego está en pantalla completa.</value>
-  </data>
-  <data name="Custom palettes" xml:space="preserve">
-    <value>Paletas personalizadas</value>
-  </data>
-  <data name="Enable custom palettes" xml:space="preserve">
-    <value>Habilitar paletas personalizadas</value>
-  </data>
-  <data name="Save palettes" xml:space="preserve">
-    <value>Guardar paletas</value>
-  </data>
-  <data name="Load palettes" xml:space="preserve">
-    <value>Cargar paletas</value>
-  </data>
-  <data name="Load external palettes" xml:space="preserve">
-    <value>Cargar paletas externas por defecto</value>
-  </data>
-  <data name="Swap controller" xml:space="preserve">
-    <value>Intercambiar posiciones de mando</value>
-  </data>
-  <data name="Hide palette info" xml:space="preserve">
-    <value>Ocultar info de paleta en partidas online</value>
-  </data>
-  <data name="Palettes online notice" xml:space="preserve">
-    <value>Las paletas pueden desincronizarse online si los jugadores no coinciden.</value>
-  </data>
-  <data name="Controller settings" xml:space="preserve">
-    <value>Configuración de mandos</value>
-  </data>
-  <data name="Primary keyboard" xml:space="preserve">
-    <value>Teclado principal</value>
-  </data>
-  <data name="Gamepad input" xml:space="preserve">
-    <value>Entrada de gamepad</value>
-  </data>
-  <data name="Ignore devices help" xml:space="preserve">
-    <value>Filtra dispositivos que no deben usar el juego o la superposición.</value>
-  </data>
-  <data name="Toggle button" xml:space="preserve">
-    <value>Botón para mostrar menú</value>
-  </data>
-  <data name="Toggle online button" xml:space="preserve">
-    <value>Botón para menú online</value>
-  </data>
-  <data name="Toggle HUD button" xml:space="preserve">
-    <value>Botón para ocultar HUD</value>
-  </data>
-  <data name="Save state keybind" xml:space="preserve">
-    <value>Tecla para guardar estado</value>
-  </data>
-  <data name="Load state keybind" xml:space="preserve">
-    <value>Tecla para cargar estado</value>
-  </data>
-  <data name="Load replay state keybind" xml:space="preserve">
-    <value>Tecla para cargar estado de repetición</value>
-  </data>
-  <data name="Freeze frame keybind" xml:space="preserve">
-    <value>Tecla para congelar fotograma</value>
-  </data>
-  <data name="Step frames keybind" xml:space="preserve">
-    <value>Tecla para avanzar fotogramas</value>
-  </data>
-  <data name="Auto archive" xml:space="preserve">
-    <value>Archivar repeticiones automáticamente</value>
-  </data>
-  <data name="Upload replay" xml:space="preserve">
-    <value>Subir datos de repetición</value>
-  </data>
-  <data name="Upload replay host" xml:space="preserve">
-    <value>Host de subida</value>
-  </data>
-  <data name="Upload replay port" xml:space="preserve">
-    <value>Puerto de subida</value>
-  </data>
-  <data name="Upload replay endpoint" xml:space="preserve">
-    <value>Endpoint de subida</value>
-  </data>
-  <data name="Logging" xml:space="preserve">
-    <value>Registro</value>
-  </data>
-  <data name="Enable update checks" xml:space="preserve">
-    <value>Habilitar comprobación de actualizaciones</value>
-  </data>
-  <data name="Updates help" xml:space="preserve">
-    <value>Activa o desactiva la comprobación automática de actualizaciones del mod.</value>
-  </data>
-  <data name="Frame history settings" xml:space="preserve">
-    <value>Historial de fotogramas</value>
-  </data>
-  <data name="Frame history width" xml:space="preserve">
-    <value>Ancho del historial</value>
-  </data>
-  <data name="Frame history height" xml:space="preserve">
-    <value>Alto del historial</value>
-  </data>
-  <data name="Frame history spacing" xml:space="preserve">
-    <value>Espaciado del historial</value>
-  </data>
-  <data name="Frame advantage settings" xml:space="preserve">
-    <value>Ventaja de fotogramas</value>
-  </data>
-  <data name="Frame advantage toggle" xml:space="preserve">
-    <value>Habilitar superposición de ventaja de fotogramas</value>
-  </data>
-  <data name="Frame advantage width" xml:space="preserve">
-    <value>Ancho de ventaja</value>
-  </data>
-  <data name="Frame advantage height" xml:space="preserve">
-    <value>Alto de ventaja</value>
-  </data>
-  <data name="Frame advantage spacing" xml:space="preserve">
-    <value>Espaciado de ventaja</value>
-  </data>
-  <data name="Avatar settings" xml:space="preserve">
-    <value>Configuración de avatar</value>
-  </data>
-  <data name="Show avatar" xml:space="preserve">
-    <value>Mostrar avatar</value>
-  </data>
-  <data name="Notifications" xml:space="preserve">
-    <value>Notificaciones</value>
-  </data>
-  <data name="Language" xml:space="preserve">
-    <value>Idioma</value>
-  </data>
-  <data name="Language incomplete label" xml:space="preserve">
-    <value>%s - Incompleto (faltan %zu claves)</value>
-  </data>
-  <data name="Language selection help" xml:space="preserve">
-    <value>Selecciona el idioma de la interfaz. Los idiomas incompletos no pueden elegirse.</value>
-  </data>
-  <data name="Log" xml:space="preserve">
-    <value>Registro</value>
-  </data>
-  <data name="States" xml:space="preserve">
-    <value>Estados</value>
-  </data>
-  <data name="Player count" xml:space="preserve">
-    <value>Jugadores actuales</value>
-  </data>
-  <data name="Github" xml:space="preserve">
-    <value>Github</value>
-  </data>
-  <data name="Discord" xml:space="preserve">
-    <value>Discord</value>
-  </data>
-</root>)RESX";
 
 struct LanguageDefinition
 {
@@ -479,21 +41,6 @@ struct LanguageDefinition
         std::unordered_map<std::string, std::string> strings;
         bool isFallback = false;
 };
-
-struct ResxEntry
-{
-        std::string name;
-        std::string baseName;
-        std::string culture;
-        bool hasCulture = false;
-        std::string content;
-        bool fromResource = false;
-};
-
-const std::regex kResxNameRegex(
-    R"((.*?)(?:\.([A-Za-z0-9_-]+))?\.resx$)",
-    std::regex::icase
-);
 
 std::string Trim(const std::string& value)
 {
@@ -507,101 +54,327 @@ std::string Trim(const std::string& value)
         return value.substr(first, last - first + 1);
 }
 
-std::string DecodeXmlEntities(std::string value)
+std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
 {
-        const std::pair<std::string, std::string> replacements[] = {
-                {"&lt;", "<"},
-                {"&gt;", ">"},
-                {"&amp;", "&"},
-                {"&quot;", "\""},
-                {"&apos;", "'"},
+        std::vector<std::vector<std::string>> rows;
+        std::vector<std::string> currentRow;
+        std::string currentField;
+        bool inQuotes = false;
+
+        auto finishField = [&]()
+        {
+                currentRow.push_back(currentField);
+                currentField.clear();
         };
 
-        for (const auto& replacement : replacements)
+        auto finishRow = [&]()
         {
-                size_t position = 0;
-                while ((position = value.find(replacement.first, position)) != std::string::npos)
-                {
-                        value.replace(position, replacement.first.length(), replacement.second);
-                        position += replacement.second.length();
-                }
-        }
+                rows.push_back(currentRow);
+                currentRow.clear();
+        };
 
-        size_t numericPos = 0;
-        while ((numericPos = value.find("&#", numericPos)) != std::string::npos)
+        for (size_t i = 0; i < content.size(); ++i)
         {
-                const size_t endPos = value.find(';', numericPos + 2);
-                if (endPos == std::string::npos)
+                const char c = content[i];
+                if (inQuotes)
                 {
-                        break;
-                }
-
-                std::string entity = value.substr(numericPos + 2, endPos - numericPos - 2);
-                int base = 10;
-                if (!entity.empty() && (entity[0] == 'x' || entity[0] == 'X'))
-                {
-                        base = 16;
-                        entity = entity.substr(1);
-                }
-
-                char32_t codepoint = 0;
-                try
-                {
-                        codepoint = static_cast<char32_t>(std::stoul(entity, nullptr, base));
-                }
-                catch (const std::exception&)
-                {
-                        numericPos = endPos + 1;
-                        continue;
-                }
-
-                std::string replacement;
-                if (codepoint <= 0x7F)
-                {
-                        replacement.push_back(static_cast<char>(codepoint));
-                }
-                else if (codepoint <= 0x7FF)
-                {
-                        replacement.push_back(static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F)));
-                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
-                }
-                else if (codepoint <= 0xFFFF)
-                {
-                        replacement.push_back(static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F)));
-                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                        if (c == '"')
+                        {
+                                if (i + 1 < content.size() && content[i + 1] == '"')
+                                {
+                                        currentField.push_back('"');
+                                        ++i;
+                                }
+                                else
+                                {
+                                        inQuotes = false;
+                                }
+                        }
+                        else
+                        {
+                                currentField.push_back(c);
+                        }
                 }
                 else
                 {
-                        replacement.push_back(static_cast<char>(0xF0 | ((codepoint >> 18) & 0x07)));
-                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
-                        replacement.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-                        replacement.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+                        switch (c)
+                        {
+                        case '"':
+                                inQuotes = true;
+                                break;
+                        case ',':
+                                finishField();
+                                break;
+                        case '\n':
+                                finishField();
+                                finishRow();
+                                break;
+                        case '\r':
+                                break;
+                        default:
+                                currentField.push_back(c);
+                                break;
+                        }
                 }
-
-                value.replace(numericPos, endPos - numericPos + 1, replacement);
-                numericPos += replacement.size();
         }
 
-        return value;
+        finishField();
+        finishRow();
+
+        while (!rows.empty())
+        {
+                const auto& last = rows.back();
+                const bool allEmpty = std::all_of(last.begin(), last.end(), [](const std::string& field)
+                {
+                        return field.empty();
+                });
+                if (!allEmpty)
+                {
+                        break;
+                }
+                rows.pop_back();
+        }
+
+        return rows;
 }
 
-std::string WideToUtf8(LPCWSTR value)
+std::vector<LanguageDefinition> ParseCsvLanguages(const std::string& content)
 {
-    if (!value)
-    {
-        return std::string();
-    }
+        auto rows = ParseCsv(content);
+        if (rows.empty())
+        {
+                LOG(1, "%s CSV localization contained no rows.", kLanguageLogTag);
+                return {};
+        }
 
-    const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
-    if (length <= 0)
-    {
-        return std::string();
-    }
+        const auto& header = rows.front();
+        if (header.size() < 2)
+        {
+                LOG(1, "%s CSV header missing language columns.", kLanguageLogTag);
+                return {};
+        }
 
-    std::string output(static_cast<size_t>(length - 1), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, value, -1, &output[0], length, nullptr, nullptr);
-    return output;
+        std::vector<std::string> languageCodes;
+        for (size_t i = 1; i < header.size(); ++i)
+        {
+                auto code = Trim(header[i]);
+                if (!code.empty())
+                {
+                        languageCodes.push_back(code);
+                }
+        }
+
+        if (languageCodes.empty())
+        {
+                LOG(1, "%s CSV header listed no languages.", kLanguageLogTag);
+                return {};
+        }
+
+        std::vector<LanguageDefinition> definitions(languageCodes.size());
+        for (size_t i = 0; i < languageCodes.size(); ++i)
+        {
+                definitions[i].code = languageCodes[i];
+                definitions[i].displayName = languageCodes[i];
+        }
+
+        for (size_t rowIndex = 1; rowIndex < rows.size(); ++rowIndex)
+        {
+                const auto& row = rows[rowIndex];
+                if (row.empty())
+                {
+                        continue;
+                }
+
+                const std::string key = Trim(row[0]);
+                if (key.empty())
+                {
+                        continue;
+                }
+
+                for (size_t columnIndex = 0; columnIndex < languageCodes.size(); ++columnIndex)
+                {
+                        const size_t rowColumn = columnIndex + 1;
+                        std::string value;
+                        if (rowColumn < row.size())
+                        {
+                                value = row[rowColumn];
+                        }
+
+                        if (key == kDisplayNameKey)
+                        {
+                                definitions[columnIndex].displayName = value;
+                                continue;
+                        }
+
+                        if (key == kLanguageCodeKey)
+                        {
+                                definitions[columnIndex].explicitCode = Trim(value);
+                                continue;
+                        }
+
+                        definitions[columnIndex].strings.emplace(key, value);
+                }
+        }
+
+        std::vector<LanguageDefinition> languages;
+        std::unordered_map<std::string, size_t> languageIndex;
+
+        for (size_t i = 0; i < definitions.size(); ++i)
+        {
+                auto definition = definitions[i];
+                if (!definition.explicitCode.empty())
+                {
+                        definition.code = definition.explicitCode;
+                }
+
+                if (definition.displayName.empty())
+                {
+                        definition.displayName = definition.code;
+                }
+
+                if (definition.strings.empty())
+                {
+                        LOG(1, "%s Language '%s' has no translation entries; skipping.", kLanguageLogTag, definition.code.c_str());
+                        continue;
+                }
+
+                const auto existing = languageIndex.find(definition.code);
+                if (existing != languageIndex.end())
+                {
+                        languages[existing->second] = definition;
+                }
+                else
+                {
+                        definition.isFallback = languages.empty();
+                        languageIndex.emplace(definition.code, languages.size());
+                        languages.push_back(definition);
+                }
+        }
+
+        if (!languages.empty())
+        {
+                languages.front().isFallback = true;
+        }
+        else
+        {
+                LOG(1, "%s CSV did not produce any valid languages.", kLanguageLogTag);
+        }
+
+        return languages;
+}
+
+std::string LoadEmbeddedLocalizationCsv()
+{
+        HMODULE moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&__ImageBase), &moduleHandle))
+        {
+                moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
+        }
+
+        HRSRC resource = FindResourceW(moduleHandle, L"Localization.csv", RT_RCDATA);
+        if (!resource)
+        {
+                LOG(1, "%s Embedded localization CSV not found.", kLanguageLogTag);
+                return {};
+        }
+
+        HGLOBAL handle = LoadResource(moduleHandle, resource);
+        if (!handle)
+        {
+                LOG(1, "%s Failed to load embedded localization CSV resource.", kLanguageLogTag);
+                return {};
+        }
+
+        const DWORD size = SizeofResource(moduleHandle, resource);
+        const void* data = LockResource(handle);
+        if (!data || size == 0)
+        {
+                LOG(1, "%s Embedded localization CSV was empty.", kLanguageLogTag);
+                return {};
+        }
+
+        LOG(2, "%s Loaded embedded localization CSV (%lu bytes).", kLanguageLogTag, static_cast<unsigned long>(size));
+        return std::string(static_cast<const char*>(data), static_cast<const char*>(data) + size);
+}
+
+std::string LoadLocalizationCsvFromDisk()
+{
+        const std::vector<fs::path> candidates = {
+                fs::path(kLocalizationDirectory) / kLocalizationFileName,
+                fs::path("localization") / kLocalizationFileName,
+        };
+
+        for (const auto& path : candidates)
+        {
+                if (!fs::exists(path) || !fs::is_regular_file(path))
+                {
+                        continue;
+                }
+
+                std::ifstream file(path, std::ios::binary);
+                if (!file.is_open())
+                {
+                        LOG(1, "%s Failed to open localization CSV on disk: %s", kLanguageLogTag, path.string().c_str());
+                        continue;
+                }
+
+                std::stringstream buffer;
+                buffer << file.rdbuf();
+                LOG(2, "%s Loaded localization CSV from disk: %s", kLanguageLogTag, path.string().c_str());
+                return buffer.str();
+        }
+
+        return {};
+}
+
+std::vector<LanguageDefinition> LoadCsvLanguages()
+{
+        bool loadedFromDisk = false;
+        std::string csvContent = LoadLocalizationCsvFromDisk();
+        if (!csvContent.empty())
+        {
+                loadedFromDisk = true;
+        }
+        else
+        {
+                csvContent = LoadEmbeddedLocalizationCsv();
+        }
+
+        if (csvContent.empty())
+        {
+                LOG(1, "%s ERROR: No localization CSV found. Cannot continue.", kLanguageLogTag);
+                return {};
+        }
+
+        auto languages = ParseCsvLanguages(csvContent);
+        if (languages.empty() && loadedFromDisk)
+        {
+                LOG(1, "%s ERROR: Failed to parse localization CSV on disk; retrying embedded copy.", kLanguageLogTag);
+                csvContent = LoadEmbeddedLocalizationCsv();
+                if (!csvContent.empty())
+                {
+                        languages = ParseCsvLanguages(csvContent);
+                }
+        }
+
+        if (languages.empty())
+        {
+                LOG(1, "%s ERROR: Failed to parse localization CSV.", kLanguageLogTag);
+        }
+
+        std::sort(languages.begin(), languages.end(),
+                [](const LanguageDefinition& a, const LanguageDefinition& b)
+                {
+                        return a.displayName < b.displayName;
+                });
+
+        if (!languages.empty())
+        {
+                LOG(2, "%s Loaded %zu language(s) from localization CSV.", kLanguageLogTag, languages.size());
+        }
+
+        return languages;
 }
 
 std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std::string, std::string>& fallback,
@@ -625,323 +398,7 @@ std::vector<std::string> CollectMissingKeysPreview(const std::unordered_map<std:
         return preview;
 }
 
-bool AddResxEntry(const std::string& name, std::string content, bool fromResource, std::vector<ResxEntry>& out)
-{
-        std::smatch match;
-        if (!std::regex_match(name, match, kResxNameRegex))
-        {
-                LOG(2, "%s Skipping localization blob with unexpected name: %s", kLanguageLogTag, name.c_str());
-                return false;
-        }
-
-        ResxEntry entry;
-        entry.name = name;
-        entry.baseName = match[1].str();
-        entry.hasCulture = match[2].matched;
-        entry.culture = entry.hasCulture ? match[2].str() : std::string();
-        entry.content = std::move(content);
-        entry.fromResource = fromResource;
-        out.push_back(std::move(entry));
-        return true;
-}
-
-bool ParseResxContent(const std::string& content, const std::string& sourceLabel, LanguageDefinition& outDefinition)
-{
-        std::regex dataRegex(R"(<data\s+name=\"([^\"]+)\"[^>]*>\s*<value>([\s\S]*?)</value>)",
-                std::regex_constants::icase);
-
-        auto begin = std::sregex_iterator(content.begin(), content.end(), dataRegex);
-        auto end = std::sregex_iterator();
-
-        for (auto it = begin; it != end; ++it)
-        {
-                std::string key = (*it)[1].str();
-                key = DecodeXmlEntities(key);
-                key = Trim(key);
-
-                std::string value = (*it)[2].str();
-
-                value = DecodeXmlEntities(value);
-                value = Trim(value);
-
-                if (key == kDisplayNameKey)
-                {
-                        outDefinition.displayName = value;
-                        continue;
-                }
-
-                if (key == "_LanguageCode")
-                {
-                        outDefinition.explicitCode = value;
-                        continue;
-                }
-
-                outDefinition.strings.emplace(std::move(key), std::move(value));
-        }
-
-        if (outDefinition.displayName.empty())
-        {
-                outDefinition.displayName = outDefinition.code;
-        }
-
-        if (outDefinition.strings.empty())
-        {
-                LOG(1, "%s Localization blob %s did not contain any <data> entries with values.", kLanguageLogTag, sourceLabel.c_str());
-                return false;
-        }
-
-        return true;
-}
-
-bool ParseResxFile(const fs::path& path, LanguageDefinition& outDefinition)
-{
-        std::ifstream file(path, std::ios::binary);
-        if (!file.is_open())
-        {
-                LOG(1, "%s Failed to open localization file: %s", kLanguageLogTag, path.string().c_str());
-                return false;
-        }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        return ParseResxContent(buffer.str(), path.string(), outDefinition);
-}
-
-std::vector<ResxEntry> LoadEmbeddedResxEntries()
-{
-        std::vector<ResxEntry> entries;
-
-        HMODULE moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
-        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                reinterpret_cast<LPCWSTR>(&__ImageBase), &moduleHandle))
-        {
-                moduleHandle = reinterpret_cast<HMODULE>(&__ImageBase);
-        }
-
-        struct EnumContext
-        {
-                HMODULE module;
-                std::vector<ResxEntry>* entries;
-        } context{ moduleHandle, &entries };
-
-        const BOOL enumResult = EnumResourceNamesW(moduleHandle, RT_RCDATA,
-                [](HMODULE, LPCWSTR, LPWSTR name, LONG_PTR param) -> BOOL
-                {
-                        if (IS_INTRESOURCE(name))
-                        {
-                                return TRUE;
-                        }
-
-                        auto* ctx = reinterpret_cast<EnumContext*>(param);
-                        auto* out = ctx->entries;
-                        auto rawName = WideToUtf8(name);
-
-                        LOG(2, "%s Found RCDATA resource name rawWideUtf8='%s' (len=%zu)",
-                            kLanguageLogTag, rawName.c_str(), rawName.size());
-                        std::string resourceName = Localization::StripWrappingQuotes(std::move(rawName));
-
-                        LOG(2, "%s Normalized RCDATA resource name='%s' (len=%zu)",
-                            kLanguageLogTag, resourceName.c_str(), resourceName.size());
-
-                        // Case-insensitive check for ".resx"
-                        std::string lower = resourceName;
-                        std::transform(lower.begin(), lower.end(), lower.begin(),
-                            [](unsigned char c) { return (unsigned char)std::tolower(c); });
-
-                        if (lower.rfind(".resx") == std::string::npos)
-                        {
-                            return TRUE;
-                        }
-
-                        HRSRC resource = FindResourceW(ctx->module, name, RT_RCDATA);
-                        if (!resource)
-                        {
-                                return TRUE;
-                        }
-
-                        HGLOBAL handle = LoadResource(ctx->module, resource);
-                        if (!handle)
-                        {
-                                return TRUE;
-                        }
-
-                        const DWORD size = SizeofResource(ctx->module, resource);
-                        const void* data = LockResource(handle);
-                        if (!data || size == 0)
-                        {
-                                return TRUE;
-                        }
-
-                        std::string content(static_cast<const char*>(data), static_cast<const char*>(data) + size);
-                        AddResxEntry(resourceName, std::move(content), true, *out);
-                        return TRUE;
-                },
-                reinterpret_cast<LONG_PTR>(&context));
-
-        if (!enumResult)
-        {
-                LOG(1, "%s EnumResourceNamesW failed while scanning embedded localization resources (err=%lu).", kLanguageLogTag,
-                        GetLastError());
-        }
-
-        if (entries.empty())
-        {
-                LOG(2, "%s No embedded localization resources detected.", kLanguageLogTag);
-        }
-        else
-        {
-                LOG(2, "%s Loaded %zu embedded localization resource(s).", kLanguageLogTag, entries.size());
-        }
-
-        return entries;
-}
-
-std::vector<ResxEntry> LoadFilesystemResxEntries()
-{
-    std::vector<ResxEntry> files;
-    fs::path localizationDir;
-
-    const std::vector<fs::path> candidates = {
-            fs::path(kLocalizationDirectory),
-            fs::path("localization"),
-    };
-
-    for (const auto& candidate : candidates)
-    {
-        if (fs::exists(candidate) && fs::is_directory(candidate))
-        {
-            localizationDir = candidate;
-            break;
-        }
-    }
-
-    if (localizationDir.empty())
-    {
-        LOG(2, "%s Localization directory not found on disk; relying on embedded resources.", kLanguageLogTag);
-        return files;
-    }
-
-    for (const auto& entry : fs::directory_iterator(localizationDir))
-    {
-        if (!fs::is_regular_file(entry.status()) || entry.path().extension() != ".resx")
-        {
-            continue;
-        }
-
-        std::ifstream file(entry.path(), std::ios::binary);
-        if (!file.is_open())
-        {
-            LOG(1, "%s Failed to open localization file on disk: %s", kLanguageLogTag, entry.path().string().c_str());
-            continue;
-        }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        AddResxEntry(entry.path().filename().string(), buffer.str(), false, files);
-    }
-
-    if (files.empty())
-    {
-        LOG(2, "%s No .resx files found in %s.", kLanguageLogTag, localizationDir.string().c_str());
-    }
-
-    return files;
-}
-
-std::string SelectBaseName(const std::vector<ResxEntry>& entries)
-{
-        for (const auto& entry : entries)
-        {
-                if (!entry.hasCulture)
-                {
-                        return entry.baseName;
-                }
-        }
-
-        if (!entries.empty())
-        {
-                return entries.front().baseName;
-        }
-
-        return std::string();
-}
-
-std::vector<LanguageDefinition> LoadResxLanguages()
-{
-        auto entries = LoadEmbeddedResxEntries();
-        //auto fileEntries = LoadFilesystemResxEntries();
-        //entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
-
-        if (entries.empty())
-        {
-            LOG(1, "%s ERROR: No embedded localization resources found. Cannot continue.", kLanguageLogTag);
-            return {}; // languages empty
-        }
-
-        std::vector<LanguageDefinition> languages;
-        if (entries.empty())
-        {
-                return languages;
-        }
-
-        const std::string targetBaseName = SelectBaseName(entries);
-        if (targetBaseName.empty())
-        {
-                LOG(1, "%s No valid localization base name found while loading resx data.", kLanguageLogTag);
-                return languages;
-        }
-
-        std::unordered_map<std::string, size_t> languageIndex;
-
-        for (const auto& entry : entries)
-        {
-                if (entry.baseName != targetBaseName)
-                {
-                        LOG(2, "%s Skipping resx '%s' because base name '%s' does not match '%s'.",
-                                kLanguageLogTag, entry.name.c_str(), entry.baseName.c_str(), targetBaseName.c_str());
-                        continue;
-                }
-
-                LanguageDefinition definition;
-                definition.code = entry.hasCulture ? entry.culture : kDefaultLanguageCode;
-                definition.isFallback = !entry.hasCulture;
-
-                if (!ParseResxContent(entry.content, entry.name, definition))
-                {
-                        continue;
-                }
-
-                if (!definition.explicitCode.empty())
-                {
-                        definition.code = definition.explicitCode;
-                }
-
-                const auto existing = languageIndex.find(definition.code);
-                if (existing != languageIndex.end())
-                {
-                        languages[existing->second] = definition;
-                }
-                else
-                {
-                        languageIndex.emplace(definition.code, languages.size());
-                        languages.push_back(definition);
-                }
-
-                LOG(2, "%s Loaded language '%s' (%s) with %zu entries from %s.", kLanguageLogTag,
-                        definition.code.c_str(), definition.displayName.c_str(), definition.strings.size(),
-                        entry.fromResource ? "embedded resources" : "disk");
-        }
-
-        std::sort(languages.begin(), languages.end(),
-                [](const LanguageDefinition& a, const LanguageDefinition& b)
-                {
-                        return a.displayName < b.displayName;
-                });
-
-        return languages;
-}
 } // namespace
-
 std::unordered_map<std::string, std::unordered_map<std::string, std::string>> Localization::m_languageStrings = {};
 std::vector<LanguageOption> Localization::m_languageOptions = {};
 std::string Localization::m_currentLanguage = kDefaultLanguageCode;
@@ -1060,28 +517,9 @@ size_t Localization::GetMissingKeyCount(const std::string& languageCode)
         return missingKeys;
 }
 
-std::string Localization::StripWrappingQuotes(std::string s)
-{
-    if (s.size() >= 2)
-    {
-        if ((s.front() == '"' && s.back() == '"') ||
-            (s.front() == '\'' && s.back() == '\''))
-        {
-            return s.substr(1, s.size() - 2);
-        }
-    }
-    return s;
-}
-
 void Localization::LoadLanguageData()
 {
-        if (m_languageStrings.empty())
-        {
-            LOG(1, "%s ERROR: Localization failed to load. Aborting language init.", kLanguageLogTag);
-            m_languageStrings.emplace(m_fallbackLanguage, kEmptyLanguage); // optional
-        }
-
-        auto definitions = LoadResxLanguages();
+        auto definitions = LoadCsvLanguages();
         for (const auto& language : definitions)
         {
                 m_languageStrings.emplace(language.code, language.strings);
@@ -1103,7 +541,7 @@ void Localization::LoadLanguageData()
         {
                 m_languageStrings.emplace(m_fallbackLanguage, kEmptyLanguage);
 
-                LanguageOption option{ m_fallbackLanguage, "English", true, 0 };
+                LanguageOption option{ m_fallbackLanguage, m_fallbackLanguage, true, 0 };
                 m_languageOptions.push_back(option);
                 LOG(1, "%s No localization resources found; using empty fallback language '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
         }

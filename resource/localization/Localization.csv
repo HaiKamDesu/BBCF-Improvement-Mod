@@ -1,0 +1,374 @@
+MethodName,en,es
+_LanguageCode,en,es
+_DisplayName,English,Español
+Toggle me with %s,Toggle me with %s,Activa la ventana con %s
+Toggle Online with %s,Toggle Online with %s,Abrir en línea con %s
+Toggle HUD with %s,Toggle HUD with %s,Ocultar HUD con %s
+Generate Debug Logs,Generate Debug Logs,Generar registros de depuración
+Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.,Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.,Escribe DEBUG.txt con información detallada de ejecución. Se guarda en settings.ini para futuras sesiones.
+Online,Online,En línea
+Gameplay settings,Gameplay settings,Opciones de juego
+Custom palettes,Custom palettes,Paletas personalizadas
+Hitbox overlay,Hitbox overlay,Superposición de hitbox
+FrameHistory,FrameHistory,Historial de cuadros
+Framedata,Framedata,Datos de cuadro
+Avatar settings,Avatar settings,Opciones de avatar
+Controller Settings,Controller Settings,Opciones de control
+Local Controller Override,Local Controller Override,Anulación de controlador local
+Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.,Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.,Elige qué controlador conectado o el teclado deben ser Jugador 1 y Jugador 2. Usa Actualizar cuando cambien los dispositivos.
+Refresh controllers,Refresh controllers,Actualizar controladores
+Reload the controller list and reinitialize input slots to match connected devices.,Reload the controller list and reinitialize input slots to match connected devices.,Recarga la lista de controladores y reinicializa las ranuras de entrada para coincidir con los dispositivos conectados.
+Open Joy.cpl,Open Joy.cpl,Abrir Joy.cpl
+Auto-refresh,Auto-refresh,Actualización automática
+"Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.","Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.","Actualiza automáticamente las ranuras de controladores cuando cambian los dispositivos. La llamada interna para actualizarlos puede congelar el juego por unos momentos, así que actívalo solo si aceptas pausas cortas."
+No input devices detected.,No input devices detected.,No se detectaron dispositivos de entrada.
+STEAM INPUT: %s,STEAM INPUT: %s,STEAM INPUT: %s
+ON,ON,ACTIVADO
+OFF,OFF,DESACTIVADO
+"Steam Input appears to be active.
+This will disable some of this section's features.","Steam Input appears to be active.
+This will disable some of this section's features.","Steam Input parece estar activo.
+Esto deshabilitará algunas funciones de esta sección."
+"The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.
+
+The disabled features include:
+- Local Controller Override
+- Opening Joy.cpl","The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.
+
+The disabled features include:
+- Local Controller Override
+- Opening Joy.cpl","El comportamiento interno de Steam Input oculta algunos controladores del proceso del juego, lo que hace que ciertas funciones relacionadas con controladores sean imposibles o funcionen de forma inesperada.
+
+Las funciones deshabilitadas incluyen:
+- Anulación de controlador local
+- Abrir Joy.cpl"
+Swap P1 Controller to P2,Swap P1 Controller to P2,Cambiar el controlador de P1 a P2
+"Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.","Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.",Cambia la asignación del controlador de P1 para que se reconozca como P2. Internamente solo intercambia los controladores de juego de P1 con los de P2.
+Multiple keyboards override,Multiple keyboards override,Reasignación de múltiples teclados
+Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).,Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).,Elige qué teclados físicos deben ser el Jugador 1 cuando haya varios conectados. El resto controlará al Jugador 2 usando sus asignaciones guardadas (por defecto WASD/JIKL).
+No keyboards selected,No keyboards selected,No hay teclados seleccionados
+No keyboards detected.,No keyboards detected.,No se detectaron teclados.
+P1 Keyboards,P1 Keyboards,Teclados de P1
+Map,Map,Asignar
+Rename,Rename,Renombrar
+Ignore,Ignore,Ignorar
+Rename keyboard,Rename keyboard,Renombrar teclado
+Set a custom name for this keyboard.,Set a custom name for this keyboard.,Define un nombre personalizado para este teclado.
+Save,Save,Guardar
+Cancel,Cancel,Cancelar
+Clear,Clear,Borrar
+Configure keyboard mapping,Configure keyboard mapping,Configurar asignación de teclado
+Unbound,Unbound,Sin asignar
+Press a key...,Press a key...,Pulsa una tecla...
+Select game mode:,Select game mode:,Select game mode:
+Stage,Stage,Stage
+Player 1,Player 1,Player 1
+Gap:,Gap:,Gap:
+Advantage:,Advantage:,Advantage:
+Player 2,Player 2,Player 2
+Player 1:,Player 1:,Player 1:
+Player 2:,Player 2:,Player 2:
+Copy to clipboard,Copy to clipboard,Copiar al portapapeles
+Search,Search,Buscar
+"[system] Log has been copied to clipboard
+","[system] Log has been copied to clipboard
+","[system] Log has been copied to clipboard
+"
+Reload custom palettes,Reload custom palettes,Reload custom palettes
+Select character,Select character,Select character
+Select palette,Select palette,Select palette
+Select file,Select file,Select file
+Gradient generator,Gradient generator,Gradient generator
+Undo,Undo,Deshacer
+Redo,Redo,Rehacer
+Cannot save with Highlight mode on!,Cannot save with Highlight mode on!,Cannot save with Highlight mode on!
+Save with bloom effect,Save with bloom effect,Save with bloom effect
+Bloom effects cannot be changed until a new round is started,Bloom effects cannot be changed until a new round is started,Bloom effects cannot be changed until a new round is started
+Palette name:,Palette name:,Palette name:
+Creator (optional):,Creator (optional):,Creator (optional):
+Palette description (optional):,Palette description (optional):,Palette description (optional):
+Save palette,Save palette,Save palette
+"Error, no filename given","Error, no filename given","Error, no filename given"
+"Error, not a valid filename","Error, not a valid filename","Error, not a valid filename"
+'%s' saved successfully,'%s' saved successfully,'%s' saved successfully
+'%s' save failed,'%s' save failed,'%s' save failed
+"'%s' already exists.
+Are you sure you want to overwrite it?
+
+","'%s' already exists.
+Are you sure you want to overwrite it?
+
+","'%s' already exists.
+Are you sure you want to overwrite it?
+
+"
+OK,OK,OK
+Reset palette,Reset palette,Reset palette
+Out of bounds,Out of bounds,Out of bounds
+ONLINE PALETTE,ONLINE PALETTE,ONLINE PALETTE
+Creator: %s,Creator: %s,Creator: %s
+Description: %s,Description: %s,Description: %s
+Has bloom effect,Has bloom effect,Has bloom effect
+Random selection,Random selection,Random selection
+Start index,Start index,Start index
+End index,End index,End index
+Start color,Start color,Start color
+End color,End color,End color
+Swap colors,Swap colors,Swap colors
+Generate gradient,Generate gradient,Generate gradient
+Refresh,Refresh,Refresh
+Recording side: %c,Recording side: %c,Recording side: %c
+Switch recording side,Switch recording side,Switch recording side
+Add/Remove,Add/Remove,Add/Remove
+Frame,Frame,Frame
+Literal,Literal,Literal
+Command,Command,Command
+Edit Input,Edit Input,Edit Input
+Direction,Direction,Direction
+Bind,Bind,Vincular
+Menu action,Menu action,Acción de menú
+Battle action,Battle action,Acción en combate
+Close,Close,Cerrar
+Set all to default,Set all to default,Restablecer todo a los valores predeterminados
+Ignored keyboards,Ignored keyboards,Teclados ignorados
+No ignored keyboards.,No ignored keyboards.,No hay teclados ignorados.
+Unignore,Unignore,Dejar de ignorar
+(connected),(connected),(conectado)
+(not connected),(not connected),(desconectado)
+Mapping for %s,Mapping for %s,Asignación para %s
+Test,Test,Probar
+Player 1 Controller,Player 1 Controller,Controlador del Jugador 1
+Player 2 Controller,Player 2 Controller,Controlador del Jugador 2
+Loaded settings.ini values,Loaded settings.ini values,Valores cargados de settings.ini
+Current online players:,Current online players:,Jugadores en línea actuales:
+<No data>,<No data>,<Sin datos>
+Avatar,Avatar,Avatar
+Color,Color,Color
+Accessory 1,Accessory 1,Accesorio 1
+Accessory 2,Accessory 2,Accesorio 2
+CONNECT TO NETWORK MODE FIRST,CONNECT TO NETWORK MODE FIRST,CONECTA AL MODO EN LÍNEA PRIMERO
+FrameHistory help,"For each non-idle frame, display a column of rectangles with info about it. 
+ 
+For each player : 
+ = The first row displays player state. 
+ - Startup->green 
+ - Active->red 
+ - Recovery->blue 
+ - Blockstun->yellow 
+ - Hitstun->purple 
+ - Hard landing recovery->blush 
+ - Special: hard to classify states(e.g.dashes)->Aquamarine 
+
+ = Second row is for invul/armor. The position of the line segments indicates the attributes, and its color if invul or armor: 
+ - Invul->white 
+ - Armor->brown 
+ - H->top segment 
+ - B->middle segment 
+ - F->bottom segment 
+ - T->left segment 
+ - P->right segment 
+","Para cada cuadro no inactivo, muestra una columna de rectángulos con información. 
+ 
+Para cada jugador: 
+ = La primera fila muestra el estado del jugador. 
+ - Inicio->verde 
+ - Activo->rojo 
+ - Recuperación->azul 
+ - Aturdimiento por bloqueo->amarillo 
+ - Aturdimiento por golpe->morado 
+ - Recuperación por caída dura->rosa 
+ - Especial: estados difíciles de clasificar (p.ej. dashes)->aguamarina 
+
+ = La segunda fila es para invulnerabilidad/armadura. La posición de los segmentos indica los atributos y su color si hay invul o armadura: 
+ - Invul->blanco 
+ - Armadura->marrón 
+ - H->segmento superior 
+ - B->segmento medio 
+ - F->segmento inferior 
+ - T->segmento izquierdo 
+ - P->segmento derecho 
+"
+FrameHistory auto reset help,block auto-reset on an idle frame: Do not overwrite automatically after an idle frame.,Bloquear el reinicio automático en un cuadro inactivo: no sobrescribir automáticamente después de un cuadro inactivo.
+Box width,Box width,Ancho de caja
+Box height,Box height,Alto de caja
+spacing,spacing,Espaciado
+Enable##framehistory_section,Enable##framehistory_section,Activar##framehistory_section
+Auto Reset##Reset after each idle frame,Auto Reset##Reset after each idle frame,Reinicio automático##Reset after each idle frame
+Enable##framedata_section,Enable##framedata_section,Activar##framedata_section
+Advantage on stagger hit,Advantage on stagger hit,Ventaja en golpe tambaleante
+YOU ARE NOT IN MATCH!,YOU ARE NOT IN MATCH!,¡NO ESTÁS EN UNA PARTIDA!
+YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!,YOU ARE NOT IN TRAINING MODE OR REPLAY THEATER!,¡NO ESTÁS EN ENTRENAMIENTO NI EN REPLAY THEATER!
+"YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!","YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!","¡NO ESTÁS EN PARTIDA, ENTRENAMIENTO NI REPLAY THEATER!"
+THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS,THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS,HUBO UN ERROR AL CARGAR UNO O AMBOS PERSONAJES
+Palette editor,Palette editor,Editor de paletas
+YOU ARE NOT IN MATCH! (Replay),YOU ARE NOT IN MATCH!,¡NO ESTÁS EN UNA PARTIDA!
+YOU ARE NOT IN REPLAY MENU!,YOU ARE NOT IN REPLAY MENU!,¡NO ESTÁS EN EL MENÚ DE REPLAY!
+YOU ARE NOT IN CHARACTER SELECTION!,YOU ARE NOT IN CHARACTER SELECTION!,¡NO ESTÁS EN LA SELECCIÓN DE PERSONAJE!
+Hide HUD,Hide HUD,Ocultar HUD
+Toggle Rewind,Toggle Rewind,Alternar rebobinado
+Replay Database,Replay Database,Base de datos de repeticiones
+Enable/Disable Automatic Replay Uploads?,Enable/Disable Automatic Replay Uploads?,¿Activar/Desactivar las cargas automáticas de repeticiones?
+Main window notification format,%s (Press %s to open the main window),%s (Pulsa %s para abrir la ventana principal)
+"IM BOBLEIS can automatically upload your replays to a public central repository.
+
+This feature allows:
+- Easy sharing: Facilitates sharing of replays between players.
+- Community sharing: Contribute to a collection of matches for learning and analysis.
+- Cataloging: Easily search by characters for matchups.
+- Storage: Keep your replays backed up automatically after the 100 limit.
+
+You can access the database using the Replay Database button on the IM main menu.
+
+If you disable it your replays won't be uploaded even if matched with someone with it enabled.
+
+If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.
+
+This has no impact on performance or stability.
+
+Would you like to leave automatic replay uploads on or turn it off?","IM BOBLEIS can automatically upload your replays to a public central repository.
+
+This feature allows:
+- Easy sharing: Facilitates sharing of replays between players.
+- Community sharing: Contribute to a collection of matches for learning and analysis.
+- Cataloging: Easily search by characters for matchups.
+- Storage: Keep your replays backed up automatically after the 100 limit.
+
+You can access the database using the Replay Database button on the IM main menu.
+
+If you disable it your replays won't be uploaded even if matched with someone with it enabled.
+
+If you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.
+
+This has no impact on performance or stability.
+
+Would you like to leave automatic replay uploads on or turn it off?","IM BOBLEIS puede subir automáticamente tus repeticiones a un repositorio público central.
+
+Esta función permite:
+- Uso compartido sencillo: facilita compartir repeticiones entre jugadores.
+- Compartir con la comunidad: contribuye a una colección de partidas para aprender y analizar.
+- Catalogación: busca fácilmente por personajes para estudiar emparejamientos.
+- Almacenamiento: mantiene tus repeticiones respaldadas automáticamente después del límite de 100.
+
+Puedes acceder a la base de datos mediante el botón Replay Database en el menú principal de IM.
+
+Si la desactivas tus repeticiones no se subirán incluso si juegas contra alguien que la tenga activada.
+
+Si deseas volver a activarla o desactivarla puedes abrir este menú con el botón en el menú principal de IM o con settings.ini.
+
+Esto no tiene impacto en el rendimiento ni en la estabilidad.
+
+¿Quieres dejar activadas las cargas automáticas de repeticiones o desactivarlas?"
+Enable/Disable Upload,Enable/Disable Upload,Activar/Desactivar subida
+Discord,Discord,Discord
+Forum,Forum,Foro
+GitHub,GitHub,GitHub
+Player1,Player1,Jugador 1
+Player2,Player2,Jugador 2
+Draw hitbox/hurtbox,Draw hitbox/hurtbox,Dibujar hitbox/hurtbox
+Draw origin,Draw origin,Dibujar origen
+Draw collision,Draw collision,Dibujar colisión
+Draw throw/range boxes,Draw throw/range boxes,Dibujar cajas de agarre/rango
+"The point in space where your character resides. 
+Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.","The point in space where your character resides. 
+Important!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.","El punto en el espacio donde reside tu personaje. 
+Importante: es un único punto; el renderizado muestra dos líneas para facilitar la vista, el punto real está donde se cruzan."
+Defines collision between objects/characters. Also used for throw range checks.,Defines collision between objects/characters. Also used for throw range checks.,Define la colisión entre objetos/personajes. También se usa para comprobar el alcance de agarres.
+Throw range help,"Throw Range Box(yellow): All throws require the throw range check. In order to pass this check the throw range box must overlap target's  collision box.
+
+Move Range Box(green): All throws and some moves require the move range check. In order to pass this check the move range box must overlap the target's origin point.
+
+
+
+How do throws connect?
+
+In order for a throw to connect you must have satisfy the following conditions:
+1: Both players must be on the ground or in the air. This is decided by their origin position, not sprite.
+2: You must pass the move range check.
+3: You must pass the throw range check.
+4: The hitbox of the throw must overlap the hurtbox of the target.
+5: The target must not be throw immune.
+","Caja de rango de agarre (amarillo): todos los agarres requieren superar esta comprobación; la caja debe solaparse con la caja de colisión del objetivo.
+
+Caja de rango de movimiento (verde): todos los agarres y algunos movimientos requieren esta comprobación; la caja debe solaparse con el punto de origen del objetivo.
+
+
+
+¿Cómo conecta un agarre?
+
+Para que conecte debes cumplir: 
+1: Ambos jugadores en tierra o aire (según su origen, no el sprite).
+2: Pasar la comprobación de rango de movimiento.
+3: Pasar la comprobación de rango de agarre.
+4: La hitbox del agarre debe solapar la hurtbox del objetivo.
+5: El objetivo no debe ser inmune a agarres.
+"
+Freeze frame:,Freeze frame:,Congelar cuadro:
+Frame Count,Frame Count,Contador de cuadros
+Reset,Reset,Reiniciar
+Freeze animation,Freeze animation,Congelar animación
+Stop timer,Stop timer,Detener temporizador
+Step frames,Step frames,Avanzar cuadros
+"YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!","YOU ARE NOT IN TRAINING, VERSUS, OR REPLAY!","¡NO ESTÁS EN ENTRENAMIENTO, VERSUS O REPLAY!"
+Game Mode,Game Mode,Modo de juego
+Enable##hitbox_overlay_section,Enable##hitbox_overlay_section,Activar##hitbox_overlay_section
+Custom palette reload,Reload all palettes,Recargar todas las paletas
+Enable##framehistory_section checkbox,Enable##framehistory_section,Activar
+Draw hitbox/hurtbox##hitbox_overlay_section,Draw hitbox/hurtbox,Dibujar hitbox/hurtbox
+Draw origin##hitbox_overlay_section,Draw origin,Dibujar origen
+Draw collision##hitbox_overlay_section,Draw collision,Dibujar colisión
+Step frames##hitbox_overlay_section,Step frames,Avanzar cuadros
+Gameplay settings header,Gameplay settings,Opciones de juego
+Hide HUD checkbox,Hide HUD,Ocultar HUD
+States,States,Estados
+Log,Log,Registro
+Replay Rewind,Replay Rewind,Rebobinado de repetición
+Replay Upload,Replay Upload,Subida de repetición
+Enable##framehistory_section label,Enable,Activar
+Auto Reset label,Auto Reset,Reinicio automático
+FrameHistory width label,Box width,Ancho de caja
+FrameHistory height label,Box height,Alto de caja
+FrameHistory spacing label,spacing,Espaciado
+FrameHistory not enabled message,"YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!","¡NO ESTÁS EN UNA PARTIDA, ENTRENAMIENTO NI REPLAY THEATER!"
+FrameHistory character load error,THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS,HUBO UN ERROR AL CARGAR UNO O AMBOS PERSONAJES
+Language,Language,Idioma
+Language incomplete label,%s - Incomplete (Missing %zu terms),%s - Incompleto (faltan %zu términos)
+Language selection help,Select a language for all UI text. Requires full dictionary coverage.,Selecciona un idioma para todo el texto de la interfaz. Requiere cobertura completa del diccionario.
+KoreWaTestoDakeDa,dsdsd,asasasasa
+Active entities: %d,Active entities: %d,Active entities: %d
+Active entities with unk_status2 = 2: %d,Active entities with unk_status2 = 2: %d,Active entities with unk_status2 = 2: %d
+Only works during a running replay,Only works during a running replay,Only works during a running replay
+Rewind,Rewind,Rewind
+Replay rewind help tooltip,"Replay rewind can currently hold up to 10 ""checkpoints"" at a time to rewind to. These checkpoints are saved as the replay progresses at defined intervals(1s,3s or 9s). With replay interval set to 9s for example you will save checkpoints at second 0,9,18...,90.
+
+You can also change them during the replay itself to refine the rewind, say for example you found something interesting at second 16 while having rewind interval as 9s:
+
+ - Rewind until you reach the checkpoint at second 9
+ - Change the rewind interval to 1s or 3s
+ - Now as it reaches the desired position it will have recorded the previous checkpoints in smaller intervals, allowing you to wait less to reach the desired part / analyze the lead up to it.
+
+You can see the frames of all saved checkpoints and more advanced info on the ""Saved Checkpoints Advanced Info"" section above.","Replay rewind can currently hold up to 10 ""checkpoints"" at a time to rewind to. These checkpoints are saved as the replay progresses at defined intervals(1s,3s or 9s). With replay interval set to 9s for example you will save checkpoints at second 0,9,18...,90.
+
+You can also change them during the replay itself to refine the rewind, say for example you found something interesting at second 16 while having rewind interval as 9s:
+
+ - Rewind until you reach the checkpoint at second 9
+ - Change the rewind interval to 1s or 3s
+ - Now as it reaches the desired position it will have recorded the previous checkpoints in smaller intervals, allowing you to wait less to reach the desired part / analyze the lead up to it.
+
+You can see the frames of all saved checkpoints and more advanced info on the ""Saved Checkpoints Advanced Info"" section above."
+Rewind Interval,Rewind Interval,Rewind Interval
+Rewind interval help tooltip,"Defines the interval to save the rewind ""checkpoint"". For more info see the help bar on ""Rewind"" button","Defines the interval to save the rewind ""checkpoint"". For more info see the help bar on ""Rewind"" button"
+1s,1s,1s
+3s,3s,3s
+9s,9s,9s
+Saved Checkpoints Adv. Info,Saved Checkpoints Adv. Info,Saved Checkpoints Adv. Info
+Rewind pos: +%d,Rewind pos: +%d,Rewind pos: +%d
+snap_apparatus snapshot_count: %d,snap_apparatus snapshot_count: %d,snap_apparatus snapshot_count: %d
+%d: Framecount:%d,%d: Framecount:%d,%d: Framecount:%d
+You cannot use this feature while searching for a ranked match,You cannot use this feature while searching for a ranked match,You cannot use this feature while searching for a ranked match
+YOU ARE NOT IN A ROOM OR ONLINE MATCH!,YOU ARE NOT IN A ROOM OR ONLINE MATCH!,YOU ARE NOT IN A ROOM OR ONLINE MATCH!
+Online type: %s,Online type: %s,Online type: %s
+Improvement Mod users in Room:,Improvement Mod users in Room:,Improvement Mod users in Room:
+Improvement Mod users in match:,Improvement Mod users in match:,Improvement Mod users in match:
+Click to open Steam profile,Click to open Steam profile,Click to open Steam profile
+Spectator,Spectator,Spectator
+Online room window title format,%s - %s###Room,%s - %s###Room
