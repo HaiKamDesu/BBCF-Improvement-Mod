@@ -566,6 +566,72 @@ struct LocalizationKeysAccessor
 
         // KoreWaTestoDakeDa
         inline const char* KoreWaTestoDakeDa() const { return Get("KoreWaTestoDakeDa"); }
+
+        // Active entities: %d
+        inline const char* Active_entities_d() const { return Get("Active entities: %d"); }
+
+        // Active entities with unk_status2 = 2: %d
+        inline const char* Active_entities_with_unk_status2_2_d() const { return Get("Active entities with unk_status2 = 2: %d"); }
+
+        // Only works during a running replay
+        inline const char* Only_works_during_a_running_replay() const { return Get("Only works during a running replay"); }
+
+        // Rewind
+        inline const char* Rewind() const { return Get("Rewind"); }
+
+        // Replay rewind help tooltip
+        inline const char* Replay_rewind_help_tooltip() const { return Get("Replay rewind help tooltip"); }
+
+        // Rewind Interval
+        inline const char* Rewind_Interval() const { return Get("Rewind Interval"); }
+
+        // Rewind interval help tooltip
+        inline const char* Rewind_interval_help_tooltip() const { return Get("Rewind interval help tooltip"); }
+
+        // 1s
+        inline const char* _1s() const { return Get("1s"); }
+
+        // 3s
+        inline const char* _3s() const { return Get("3s"); }
+
+        // 9s
+        inline const char* _9s() const { return Get("9s"); }
+
+        // Saved Checkpoints Adv. Info
+        inline const char* Saved_Checkpoints_Adv_Info() const { return Get("Saved Checkpoints Adv. Info"); }
+
+        // Rewind pos: +%d
+        inline const char* Rewind_pos_d() const { return Get("Rewind pos: +%d"); }
+
+        // snap_apparatus snapshot_count: %d
+        inline const char* snap_apparatus_snapshot_count_d() const { return Get("snap_apparatus snapshot_count: %d"); }
+
+        // %d: Framecount:%d
+        inline const char* _d_Framecount_d() const { return Get("%d: Framecount:%d"); }
+
+        // You cannot use this feature while searching for a ranked match
+        inline const char* You_cannot_use_this_feature_while_searching_for_a_ranked_match() const { return Get("You cannot use this feature while searching for a ranked match"); }
+
+        // YOU ARE NOT IN A ROOM OR ONLINE MATCH!
+        inline const char* YOU_ARE_NOT_IN_A_ROOM_OR_ONLINE_MATCH() const { return Get("YOU ARE NOT IN A ROOM OR ONLINE MATCH!"); }
+
+        // Online type: %s
+        inline const char* Online_type_s() const { return Get("Online type: %s"); }
+
+        // Improvement Mod users in Room:
+        inline const char* Improvement_Mod_users_in_Room() const { return Get("Improvement Mod users in Room:"); }
+
+        // Improvement Mod users in match:
+        inline const char* Improvement_Mod_users_in_match() const { return Get("Improvement Mod users in match:"); }
+
+        // Click to open Steam profile
+        inline const char* Click_to_open_Steam_profile() const { return Get("Click to open Steam profile"); }
+
+        // Spectator
+        inline const char* Spectator() const { return Get("Spectator"); }
+
+        // Online room window title format
+        inline const char* Online_room_window_title_format() const { return Get("Online room window title format"); }
 };
 
 
