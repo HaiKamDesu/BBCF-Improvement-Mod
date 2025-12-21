@@ -154,6 +154,6 @@ void ReplayRewindWindow::Draw()
         }
     }
     else {
-        ImGui::Text(Messages.You_cannot_use_this_feature_while_searching_for_a_ranked_match());
+ImGui::Text(Messages.Ranked_search_warning());
     }
 }

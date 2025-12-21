@@ -19,6 +19,6 @@ namespace ControllerSettings
                         Settings::settingsIni.swapControllerPos = controllerPositionSwapped;
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker(Messages.Changes_P1_Controller_s_assignment_so_it_is_recognized_as_P2_Internally_this_is_just_swapping_p1_with_p2_s_game_controllers());
+ImGui::ShowHelpMarker(Messages.Controller_swap_hint());
         }
 }

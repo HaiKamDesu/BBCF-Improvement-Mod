@@ -82,7 +82,7 @@ void MainWindow::Draw()
 		SetLoggingEnabled(generateDebugLogs);
 	}
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker(Messages.Write_DEBUG_txt_with_detailed_runtime_information_Saved_to_settings_ini_for_future_sessions());
+ImGui::ShowHelpMarker(Messages.Debug_log_details());
 
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted("P$"); ImGui::SameLine();
@@ -428,12 +428,12 @@ void MainWindow::DrawHitboxOverlaySection() const
 		ImGui::Checkbox(Messages.Draw_origin(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawOriginLine);
 		ImGui::SameLine();
-		ImGui::ShowHelpMarker(Messages.The_point_in_space_where_your_character_resides_Important_This_is_a_single_point_the_render_is_composed_of_two_lines_to_facilitate_viewing_the_actual_point_is_where_the_two_lines_touch());
+ImGui::ShowHelpMarker(Messages.Origin_point_note());
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_collision(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCollisionBoxes);
 		ImGui::SameLine();
-		ImGui::ShowHelpMarker(Messages.Defines_collision_between_objects_characters_Also_used_for_throw_range_checks());
+ImGui::ShowHelpMarker(Messages.Collision_box_note());
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_throw_range_boxes(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawRangeCheckBoxes);

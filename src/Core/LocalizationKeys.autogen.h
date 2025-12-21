@@ -18,8 +18,8 @@ struct LocalizationKeysAccessor
         // Generate Debug Logs
         inline const char* Generate_Debug_Logs() const { return Get("Generate Debug Logs"); }
 
-        // Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions.
-        inline const char* Write_DEBUG_txt_with_detailed_runtime_information_Saved_to_settings_ini_for_future_sessions() const { return Get("Write DEBUG.txt with detailed runtime information. Saved to settings.ini for future sessions."); }
+        // Debug_log_details
+        inline const char* Debug_log_details() const { return Get("Debug_log_details"); }
 
         // Online
         inline const char* Online() const { return Get("Online"); }
@@ -48,14 +48,14 @@ struct LocalizationKeysAccessor
         // Local Controller Override
         inline const char* Local_Controller_Override() const { return Get("Local Controller Override"); }
 
-        // Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change.
-        inline const char* Choose_which_connected_controller_or_the_keyboard_should_be_Player_1_and_Player_2_Use_Refresh_when_devices_change() const { return Get("Choose which connected controller or the keyboard should be Player 1 and Player 2. Use Refresh when devices change."); }
+        // Controller_override_help
+        inline const char* Controller_override_help() const { return Get("Controller_override_help"); }
 
         // Refresh controllers
         inline const char* Refresh_controllers() const { return Get("Refresh controllers"); }
 
-        // Reload the controller list and reinitialize input slots to match connected devices.
-        inline const char* Reload_the_controller_list_and_reinitialize_input_slots_to_match_connected_devices() const { return Get("Reload the controller list and reinitialize input slots to match connected devices."); }
+        // Controller_refresh_help
+        inline const char* Controller_refresh_help() const { return Get("Controller_refresh_help"); }
 
         // Open Joy.cpl
         inline const char* Open_Joy_cpl() const { return Get("Open Joy.cpl"); }
@@ -63,8 +63,8 @@ struct LocalizationKeysAccessor
         // Auto-refresh
         inline const char* Auto_refresh() const { return Get("Auto-refresh"); }
 
-        // Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses.
-        inline const char* Automatically_refresh_controller_slots_when_devices_change_The_internal_call_to_refresh_controllers_may_freeze_the_game_for_a_few_moments_so_only_enable_this_if_you_are_okay_with_short_pauses() const { return Get("Automatically refresh controller slots when devices change. The internal call to refresh controllers may freeze the game for a few moments, so only enable this if you are okay with short pauses."); }
+        // Auto_refresh_warning
+        inline const char* Auto_refresh_warning() const { return Get("Auto_refresh_warning"); }
 
         // No input devices detected.
         inline const char* No_input_devices_detected() const { return Get("No input devices detected."); }
@@ -78,23 +78,23 @@ struct LocalizationKeysAccessor
         // OFF
         inline const char* OFF() const { return Get("OFF"); }
 
-        // Steam Input appears to be active.\nThis will disable some of this section's features.
-        inline const char* Steam_Input_appears_to_be_active_This_will_disable_some_of_this_section_s_features() const { return Get("Steam Input appears to be active.\nThis will disable some of this section's features."); }
+        // Steam_input_active_notice
+        inline const char* Steam_input_active_notice() const { return Get("Steam_input_active_notice"); }
 
-        // The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.\n\nThe disabled features include:\n- Local Controller Override\n- Opening Joy.cpl
-        inline const char* The_internal_behavior_of_Steam_Input_hides_some_controllers_from_the_game_s_process_thus_making_some_controller_related_features_impossible_work_in_unintended_ways_The_disabled_features_include_Local_Controller_Override_Opening_Joy_cpl() const { return Get("The internal behavior of Steam Input hides some controllers from the game's process, thus making some controller related features impossible/work in unintended ways.\n\nThe disabled features include:\n- Local Controller Override\n- Opening Joy.cpl"); }
+        // Steam_input_limitations
+        inline const char* Steam_input_limitations() const { return Get("Steam_input_limitations"); }
 
         // Swap P1 Controller to P2
         inline const char* Swap_P1_Controller_to_P2() const { return Get("Swap P1 Controller to P2"); }
 
-        // Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers.
-        inline const char* Changes_P1_Controller_s_assignment_so_it_is_recognized_as_P2_Internally_this_is_just_swapping_p1_with_p2_s_game_controllers() const { return Get("Changes P1 Controller's assignment so it is recognized as P2. Internally, this is just swapping p1 with p2's game controllers."); }
+        // Controller_swap_hint
+        inline const char* Controller_swap_hint() const { return Get("Controller_swap_hint"); }
 
         // Multiple keyboards override
         inline const char* Multiple_keyboards_override() const { return Get("Multiple keyboards override"); }
 
-        // Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL).
-        inline const char* Choose_which_physical_keyboards_should_be_treated_as_Player_1_when_multiple_keyboards_are_connected_All_other_keyboards_will_drive_Player_2_using_their_saved_mappings_defaults_to_WASD_JIKL() const { return Get("Choose which physical keyboards should be treated as Player 1 when multiple keyboards are connected. All other keyboards will drive Player 2 using their saved mappings (defaults to WASD/JIKL)."); }
+        // Keyboard_player1_help
+        inline const char* Keyboard_player1_help() const { return Get("Keyboard_player1_help"); }
 
         // No keyboards selected
         inline const char* No_keyboards_selected() const { return Get("No keyboards selected"); }
@@ -168,8 +168,8 @@ struct LocalizationKeysAccessor
         // Search
         inline const char* Search() const { return Get("Search"); }
 
-        // [system] Log has been copied to clipboard\n
-        inline const char* system_Log_has_been_copied_to_clipboard() const { return Get("[system] Log has been copied to clipboard\n"); }
+        // System_log_copied
+        inline const char* System_log_copied() const { return Get("System_log_copied"); }
 
         // Reload custom palettes
         inline const char* Reload_custom_palettes() const { return Get("Reload custom palettes"); }
@@ -225,8 +225,8 @@ struct LocalizationKeysAccessor
         // '%s' save failed
         inline const char* s_save_failed() const { return Get("'%s' save failed"); }
 
-        // '%s' already exists.\nAre you sure you want to overwrite it?\n\n
-        inline const char* s_already_exists_Are_you_sure_you_want_to_overwrite_it() const { return Get("'%s' already exists.\nAre you sure you want to overwrite it?\n\n"); }
+        // Overwrite_confirmation_prompt
+        inline const char* Overwrite_confirmation_prompt() const { return Get("Overwrite_confirmation_prompt"); }
 
         // OK
         inline const char* OK() const { return Get("OK"); }
@@ -429,8 +429,8 @@ struct LocalizationKeysAccessor
         // Main window notification format
         inline const char* Main_window_notification_format() const { return Get("Main window notification format"); }
 
-        // IM BOBLEIS can automatically upload your replays to a public central repository.\n\nThis feature allows:\n- Easy sharing: Facilitates sharing of replays between players.\n- Community sharing: Contribute to a collection of matches for learning and analysis.\n- Cataloging: Easily search by characters for matchups.\n- Storage: Keep your replays backed up automatically after the 100 limit.\n\nYou can access the database using the Replay Database button on the IM main menu.\n\nIf you disable it your replays won't be uploaded even if matched with someone with it enabled.\n\nIf you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.\n\nThis has no impact on performance or stability.\n\nWould you like to leave automatic replay uploads on or turn it off?
-        inline const char* IM_BOBLEIS_can_automatically_upload_your_replays_to_a_public_central_repository_This_feature_allows_Easy_sharing_Facilitates_sharing_of_replays_between_players_Community_sharing_Contribute_to_a_collection_of_matches_for_learning_and_analysis_Cataloging_Easily_search_by_characters_for_matchups_Storage_Keep_your_replays_backed_up_automatically_after_the_100_limit_You_can_access_the_database_using_the_Replay_Database_button_on_the_IM_main_menu_If_you_disable_it_your_replays_won_t_be_uploaded_even_if_matched_with_someone_with_it_enabled_If_you_wish_to_turn_it_off_on_again_you_can_access_this_menu_using_the_button_on_the_IM_main_menu_or_using_settings_ini_This_has_no_impact_on_performance_or_stability_Would_you_like_to_leave_automatic_replay_uploads_on_or_turn_it_off() const { return Get("IM BOBLEIS can automatically upload your replays to a public central repository.\n\nThis feature allows:\n- Easy sharing: Facilitates sharing of replays between players.\n- Community sharing: Contribute to a collection of matches for learning and analysis.\n- Cataloging: Easily search by characters for matchups.\n- Storage: Keep your replays backed up automatically after the 100 limit.\n\nYou can access the database using the Replay Database button on the IM main menu.\n\nIf you disable it your replays won't be uploaded even if matched with someone with it enabled.\n\nIf you wish to turn it off/on again you can access this menu using the button on the IM main menu or using settings.ini.\n\nThis has no impact on performance or stability.\n\nWould you like to leave automatic replay uploads on or turn it off?"); }
+        // Replay_uploads_description
+        inline const char* Replay_uploads_description() const { return Get("Replay_uploads_description"); }
 
         // Enable/Disable Upload
         inline const char* Enable_Disable_Upload() const { return Get("Enable/Disable Upload"); }
@@ -462,11 +462,11 @@ struct LocalizationKeysAccessor
         // Draw throw/range boxes
         inline const char* Draw_throw_range_boxes() const { return Get("Draw throw/range boxes"); }
 
-        // The point in space where your character resides. \nImportant!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch.
-        inline const char* The_point_in_space_where_your_character_resides_Important_This_is_a_single_point_the_render_is_composed_of_two_lines_to_facilitate_viewing_the_actual_point_is_where_the_two_lines_touch() const { return Get("The point in space where your character resides. \nImportant!: This is a single point, the render is composed of two lines to facilitate viewing, the actual point is where the two lines touch."); }
+        // Origin_point_note
+        inline const char* Origin_point_note() const { return Get("Origin_point_note"); }
 
-        // Defines collision between objects/characters. Also used for throw range checks.
-        inline const char* Defines_collision_between_objects_characters_Also_used_for_throw_range_checks() const { return Get("Defines collision between objects/characters. Also used for throw range checks."); }
+        // Collision_box_note
+        inline const char* Collision_box_note() const { return Get("Collision_box_note"); }
 
         // Throw range help
         inline const char* Throw_range_help() const { return Get("Throw range help"); }
@@ -607,10 +607,10 @@ struct LocalizationKeysAccessor
         inline const char* snap_apparatus_snapshot_count_d() const { return Get("snap_apparatus snapshot_count: %d"); }
 
         // %d: Framecount:%d
-        inline const char* _d_Framecount_d() const { return Get("%d: Framecount:%d"); }
+        inline const char* d_Framecount_d() const { return Get("%d: Framecount:%d"); }
 
-        // You cannot use this feature while searching for a ranked match
-        inline const char* You_cannot_use_this_feature_while_searching_for_a_ranked_match() const { return Get("You cannot use this feature while searching for a ranked match"); }
+        // Ranked_search_warning
+        inline const char* Ranked_search_warning() const { return Get("Ranked_search_warning"); }
 
         // YOU ARE NOT IN A ROOM OR ONLINE MATCH!
         inline const char* YOU_ARE_NOT_IN_A_ROOM_OR_ONLINE_MATCH() const { return Get("YOU ARE NOT IN A ROOM OR ONLINE MATCH!"); }
