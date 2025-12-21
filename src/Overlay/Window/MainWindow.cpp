@@ -140,18 +140,17 @@ void MainWindow::DrawLanguageSelector()
 
 	if (ImGui::BeginCombo(Messages.Language(), preview.c_str()))
 	{
-		for (size_t i = 0; i < options.size(); ++i)
-		{
-			const auto& option = options[i];
-			const bool optionComplete = option.complete;
-			const size_t missingKeys = option.missingKeys;
-			const std::string languageCode = option.code;
+                for (size_t i = 0; i < options.size(); ++i)
+                {
+                        const auto& option = options[i];
+                        const bool optionComplete = option.complete;
+                        const std::string languageCode = option.code;
 
-			std::string label = option.displayName;
-			if (!optionComplete)
-			{
-				label = FormatText(Messages.Language_incomplete_label(), option.displayName.c_str(), missingKeys);
-			}
+                        std::string label = option.displayName;
+                        if (!optionComplete)
+                        {
+                                label += Messages.Language_incomplete_label();
+                        }
 
 			if (!optionComplete)
 			{

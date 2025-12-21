@@ -305,7 +305,7 @@ FrameHistory spacing label,spacing,Espaciado
 FrameHistory not enabled message,"YOU ARE NOT IN A MATCH, IN TRAINING MODE OR REPLAY THEATER!","¡NO ESTÁS EN UNA PARTIDA, ENTRENAMIENTO NI REPLAY THEATER!"
 FrameHistory character load error,THERE WAS AN ERROR LOADING ONE/BOTH OF THE CHARACTERS,HUBO UN ERROR AL CARGAR UNO O AMBOS PERSONAJES
 Language,Language,Idioma
-Language incomplete label,%s - Incomplete (Missing %zu terms),%s - Incompleto (faltan %zu términos)
+Language incomplete label, (Incomplete), (Incompleto)
 Language selection help,Select a language for all UI text. Requires full dictionary coverage.,Selecciona un idioma para todo el texto de la interfaz. Requiere cobertura completa del diccionario.
 KoreWaTestoDakeDa,dsdsd,asasasasa
 Active entities: %d,Active entities: %d,Active entities: %d

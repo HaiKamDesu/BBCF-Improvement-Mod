@@ -43,17 +43,29 @@ namespace
 		bool isFallback = false;
 	};
 
-	std::string Trim(const std::string& value)
-	{
-		const auto first = value.find_first_not_of(" \t\r\n");
-		if (first == std::string::npos)
+		std::string Trim(const std::string& value)
 		{
-			return "";
+			const auto first = value.find_first_not_of(" \\t\\r\\n");
+			if (first == std::string::npos)
+			{
+				return "";
+			}
+
+			const auto last = value.find_last_not_of(" \\t\\r\\n");
+			return value.substr(first, last - first + 1);
 		}
 
-		const auto last = value.find_last_not_of(" \t\r\n");
-		return value.substr(first, last - first + 1);
-	}
+		bool HasLocalizedValue(const std::unordered_map<std::string, std::string>& language,
+			const std::string& key)
+		{
+			const auto it = language.find(key);
+			if (it == language.end())
+			{
+				return false;
+			}
+
+			return !Trim(it->second).empty();
+		}
 
 	std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
 	{
@@ -581,15 +593,15 @@ size_t Localization::GetMissingKeyCount(const std::string& languageCode)
 		return 0;
 	}
 
-	size_t missingKeys = 0;
-	for (const auto& required : fallbackMap)
-	{
-		if (languageMap.find(required.first) == languageMap.end())
-		{
-			++missingKeys;
-		}
-	}
-	return missingKeys;
+        size_t missingKeys = 0;
+        for (const auto& required : fallbackMap)
+        {
+                if (!HasLocalizedValue(languageMap, required.first))
+                {
+                        ++missingKeys;
+                }
+        }
+        return missingKeys;
 }
 
 std::string Localization::StripWrappingQuotes(std::string s)
