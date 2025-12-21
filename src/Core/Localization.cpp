@@ -32,6 +32,7 @@ namespace
 	extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 	const std::unordered_map<std::string, std::string> kEmptyLanguage = {};
+	std::unordered_map<std::string, bool> g_missingLogOnce;
 	std::string WideToUtf8(LPCWSTR value);
 
 	struct LanguageDefinition
@@ -43,17 +44,29 @@ namespace
 		bool isFallback = false;
 	};
 
-	std::string Trim(const std::string& value)
-	{
-		const auto first = value.find_first_not_of(" \t\r\n");
-		if (first == std::string::npos)
+		std::string Trim(const std::string& value)
 		{
-			return "";
+			const char* ws = " \t\r\n"; // real whitespace chars
+
+			const auto first = value.find_first_not_of(ws);
+			if (first == std::string::npos)
+				return "";
+
+			const auto last = value.find_last_not_of(ws);
+			return value.substr(first, last - first + 1);
 		}
 
-		const auto last = value.find_last_not_of(" \t\r\n");
-		return value.substr(first, last - first + 1);
-	}
+		bool HasLocalizedValue(const std::unordered_map<std::string, std::string>& language,
+			const std::string& key)
+		{
+			const auto it = language.find(key);
+			if (it == language.end())
+			{
+				return false;
+			}
+
+			return !Trim(it->second).empty();
+		}
 
 	std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
 	{
@@ -149,6 +162,31 @@ namespace
 		}
 
 		const auto& header = rows.front();
+		// DEBUG: detect malformed rows (wrong column count)
+		{
+			const size_t expectedCols = header.size();
+			size_t mismatchCount = 0;
+
+			for (size_t rowIndex = 1; rowIndex < rows.size(); ++rowIndex)
+			{
+				const auto& row = rows[rowIndex];
+				if (row.empty()) continue;
+
+				if (row.size() != expectedCols)
+				{
+					const std::string keyPreview = (row.size() > 0) ? Trim(row[0]) : "<empty>";
+					LOG(2, "%s CSV row %zu column mismatch: got=%zu expected=%zu key='%s'",
+						kLanguageLogTag, rowIndex, row.size(), expectedCols, keyPreview.c_str());
+
+					if (++mismatchCount >= 10)
+					{
+						LOG(2, "%s CSV row mismatch logging truncated (10 shown).", kLanguageLogTag);
+						break;
+					}
+				}
+			}
+		}
+
 		if (header.size() < 2)
 		{
 			LOG(1, "%s CSV header missing language columns.", kLanguageLogTag);
@@ -169,6 +207,12 @@ namespace
 		{
 			LOG(1, "%s CSV header listed no languages.", kLanguageLogTag);
 			return {};
+		}
+
+		for (size_t i = 0; i < languageCodes.size(); ++i)
+		{
+			LOG(2, "%s CSV language column[%zu] raw='%s' (len=%zu)", kLanguageLogTag,
+				i, languageCodes[i].c_str(), languageCodes[i].size());
 		}
 
 		std::vector<LanguageDefinition> definitions(languageCodes.size());
@@ -213,7 +257,16 @@ namespace
 					continue;
 				}
 
-				definitions[columnIndex].strings.emplace(key, value);
+				// Insert translation (overwrite if duplicate)
+				auto& map = definitions[columnIndex].strings;
+				auto ins = map.emplace(key, value);
+				if (!ins.second)
+				{
+					// Duplicate key: overwrite so the later row wins
+					ins.first->second = value;
+					LOG(2, "%s Duplicate key '%s' for language '%s' (row %zu). Overwriting previous value.",
+						kLanguageLogTag, key.c_str(), definitions[columnIndex].code.c_str(), rowIndex);
+				}
 			}
 		}
 
@@ -404,6 +457,38 @@ namespace
 			return {};
 		}
 
+		// Strip UTF-8 BOM if present (common when CSV is saved as UTF-8 with BOM)
+		if (csvContent.size() >= 3 &&
+			(unsigned char)csvContent[0] == 0xEF &&
+			(unsigned char)csvContent[1] == 0xBB &&
+			(unsigned char)csvContent[2] == 0xBF)
+		{
+			csvContent.erase(0, 3);
+			LOG(2, "%s Stripped UTF-8 BOM from localization CSV.", kLanguageLogTag);
+
+			// DEBUG: dump first line + first bytes to confirm what is really embedded
+			{
+				const size_t previewLen = std::min<size_t>(csvContent.size(), 120);
+				std::string preview(csvContent.data(), csvContent.data() + previewLen);
+
+				// Print first line only (up to newline)
+				auto nl = preview.find('\n');
+				std::string firstLine = (nl == std::string::npos) ? preview : preview.substr(0, nl);
+
+				LOG(2, "%s CSV first line (as parsed bytes) = '%s'", kLanguageLogTag, firstLine.c_str());
+
+				// Hex dump first 32 bytes
+				std::ostringstream hex;
+				hex << std::hex;
+				for (size_t i = 0; i < std::min<size_t>(32, csvContent.size()); ++i)
+				{
+					hex << (int)(unsigned char)csvContent[i] << " ";
+				}
+				LOG(2, "%s CSV first 32 bytes hex = %s", kLanguageLogTag, hex.str().c_str());
+			}
+
+		}
+
 		auto languages = ParseCsvLanguages(csvContent);
 		if (languages.empty() && loadedFromDisk)
 		{
@@ -522,21 +607,85 @@ const std::string& Localization::Translate(const std::string& key)
 	const auto& languageMap = GetLanguageMap(m_currentLanguage);
 	const auto& fallbackMap = GetLanguageMap(m_fallbackLanguage);
 
+	// 1) Try current language
 	auto it = languageMap.find(key);
 	if (it != languageMap.end())
 	{
-		return it->second;
+		// Optional: log when present but empty/whitespace (counts as missing in completeness checks)
+		if (Trim(it->second).empty() && m_currentLanguage != m_fallbackLanguage)
+		{
+			LOG(2, "%s Key '%s' exists in language '%s' but is empty; trying fallback '%s'.",
+				kLanguageLogTag, key.c_str(), m_currentLanguage.c_str(), m_fallbackLanguage.c_str());
+		}
+		else
+		{
+			return it->second;
+		}
+	}
+	else
+	{
+		// Log miss in current language
+		if (m_currentLanguage != m_fallbackLanguage)
+		{
+			const std::string missKey = "miss:" + m_currentLanguage + "->" + m_fallbackLanguage + ":" + key;
+			if (!g_missingLogOnce[missKey])
+			{
+				g_missingLogOnce[missKey] = true;
+				LOG(2, "%s Missing key '%s' in language '%s'; trying fallback '%s'.",
+					kLanguageLogTag, key.c_str(), m_currentLanguage.c_str(), m_fallbackLanguage.c_str());
+			}
+		}
 	}
 
+	// 2) Try fallback language
 	auto fallbackIt = fallbackMap.find(key);
 	if (fallbackIt != fallbackMap.end())
 	{
-		return fallbackIt->second;
+		if (Trim(fallbackIt->second).empty())
+		{
+			LOG(2, "%s Key '%s' exists in fallback language '%s' but is empty; defaulting to key text.",
+				kLanguageLogTag, key.c_str(), m_fallbackLanguage.c_str());
+		}
+		else
+		{
+			return fallbackIt->second;
+		}
+	}
+	else
+	{
+		{
+			const std::string missKey = "miss_fallback:" + m_fallbackLanguage + ":" + key;
+			if (!g_missingLogOnce[missKey])
+			{
+				g_missingLogOnce[missKey] = true;
+				LOG(2, "%s Missing key '%s' in fallback language '%s'; defaulting to key text.",
+					kLanguageLogTag, key.c_str(), m_fallbackLanguage.c_str());
+			}
+		}
+
+		// DEBUG: dump key bytes to detect invisible characters
+		{
+			std::ostringstream hex;
+			hex << std::hex;
+			for (unsigned char ch : key)
+			{
+				hex << (int)ch << " ";
+			}
+			LOG(2, "%s Missing key bytes hex = %s", kLanguageLogTag, hex.str().c_str());
+		}
+
 	}
 
+	// 3) Insert key->key into fallback map so it becomes visible in future lookups
 	auto insertion = m_languageStrings[m_fallbackLanguage].emplace(key, key);
+
+	// Log insertion (helps you find what is being auto-created)
+	LOG(2, "%s Inserted missing key '%s' into fallback language '%s' as literal key text.",
+		kLanguageLogTag, key.c_str(), m_fallbackLanguage.c_str());
+
 	return insertion.first->second;
 }
+
 
 const std::vector<LanguageOption>& Localization::GetAvailableLanguages()
 {
@@ -581,15 +730,15 @@ size_t Localization::GetMissingKeyCount(const std::string& languageCode)
 		return 0;
 	}
 
-	size_t missingKeys = 0;
-	for (const auto& required : fallbackMap)
-	{
-		if (languageMap.find(required.first) == languageMap.end())
-		{
-			++missingKeys;
-		}
-	}
-	return missingKeys;
+        size_t missingKeys = 0;
+        for (const auto& required : fallbackMap)
+        {
+                if (!HasLocalizedValue(languageMap, required.first))
+                {
+                        ++missingKeys;
+                }
+        }
+        return missingKeys;
 }
 
 std::string Localization::StripWrappingQuotes(std::string s)
@@ -640,6 +789,19 @@ void Localization::LoadLanguageData()
 	}
 
 	LOG(2, "%s Fallback language set to '%s'.", kLanguageLogTag, m_fallbackLanguage.c_str());
+	// DEBUG: sanity check for a known key that should exist
+	{
+		const char* testKey = "Main window notification format";
+		for (const auto& kv : m_languageStrings)
+		{
+			const auto& lang = kv.first;
+			const auto& map = kv.second;
+			auto it = map.find(testKey);
+			LOG(2, "%s Sanity: lang='%s' hasKey('%s')=%d",
+				kLanguageLogTag, lang.c_str(), testKey, (it != map.end()) ? 1 : 0);
+		}
+	}
+
 }
 
 void Localization::RefreshLanguageStatuses()
