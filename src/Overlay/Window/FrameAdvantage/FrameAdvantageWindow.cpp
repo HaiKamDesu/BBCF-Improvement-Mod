@@ -33,11 +33,11 @@ void FrameAdvantageWindow::Draw() {
 			color = white;
 
 ImGui::Text(Messages.Player_1());
-ImGui::TextUnformatted(Messages.Gap_());
+ImGui::TextUnformatted(Messages.Gap());
 		ImGui::SameLine();
 		ImGui::TextUnformatted(((playersInteraction.p1GapDisplay != -1) ? std::to_string(playersInteraction.p1GapDisplay) : "").c_str());
 
-ImGui::TextUnformatted(Messages.Advantage_());
+ImGui::TextUnformatted(Messages.Advantage());
 		ImGui::SameLine();
 		std::string str = std::to_string(playersInteraction.frameAdvantageToDisplay);
 		if (playersInteraction.frameAdvantageToDisplay > 0)
@@ -55,11 +55,11 @@ ImGui::TextUnformatted(Messages.Advantage_());
 
 		ImGui::NextColumn();
 ImGui::Text(Messages.Player_2());
-ImGui::TextUnformatted(Messages.Gap_());
+ImGui::TextUnformatted(Messages.Gap());
 		ImGui::SameLine();
 		ImGui::TextUnformatted(((playersInteraction.p2GapDisplay != -1) ? std::to_string(playersInteraction.p2GapDisplay) : "").c_str());
 
-ImGui::TextUnformatted(Messages.Advantage_());
+ImGui::TextUnformatted(Messages.Advantage());
 		ImGui::SameLine();
 		std::string str2 = std::to_string(-playersInteraction.frameAdvantageToDisplay);
 		if (playersInteraction.frameAdvantageToDisplay < 0)

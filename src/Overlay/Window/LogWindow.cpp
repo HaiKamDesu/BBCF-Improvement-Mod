@@ -22,7 +22,7 @@ ImGui::BeginChild("scrolling", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalS
         if (copyPressed)
         {
                 ImGui::LogToClipboard();
-                m_logger.Log(Messages.system_Log_has_been_copied_to_clipboard_n());
+                m_logger.Log(Messages.system_Log_has_been_copied_to_clipboard());
         }
 
 	ImGuiLogBuffer* logBuffer = (ImGuiLogBuffer*)m_logger.GetBuffer();

@@ -138,6 +138,165 @@ struct LocalizationKeysAccessor
         // Press a key...
         inline const char* Press_a_key() const { return Get("Press a key..."); }
 
+        // Select game mode:
+        inline const char* Select_game_mode() const { return Get("Select game mode:"); }
+
+        // Stage
+        inline const char* Stage() const { return Get("Stage"); }
+
+        // Player 1
+        inline const char* Player_1() const { return Get("Player 1"); }
+
+        // Gap:
+        inline const char* Gap() const { return Get("Gap:"); }
+
+        // Advantage:
+        inline const char* Advantage() const { return Get("Advantage:"); }
+
+        // Player 2
+        inline const char* Player_2() const { return Get("Player 2"); }
+
+        // Player 1:
+        inline const char* Player_1_2() const { return Get("Player 1:"); }
+
+        // Player 2:
+        inline const char* Player_2_2() const { return Get("Player 2:"); }
+
+        // Copy to clipboard
+        inline const char* Copy_to_clipboard() const { return Get("Copy to clipboard"); }
+
+        // Search
+        inline const char* Search() const { return Get("Search"); }
+
+        // [system] Log has been copied to clipboard\n
+        inline const char* system_Log_has_been_copied_to_clipboard() const { return Get("[system] Log has been copied to clipboard\n"); }
+
+        // Reload custom palettes
+        inline const char* Reload_custom_palettes() const { return Get("Reload custom palettes"); }
+
+        // Select character
+        inline const char* Select_character() const { return Get("Select character"); }
+
+        // Select palette
+        inline const char* Select_palette() const { return Get("Select palette"); }
+
+        // Select file
+        inline const char* Select_file() const { return Get("Select file"); }
+
+        // Gradient generator
+        inline const char* Gradient_generator() const { return Get("Gradient generator"); }
+
+        // Undo
+        inline const char* Undo() const { return Get("Undo"); }
+
+        // Redo
+        inline const char* Redo() const { return Get("Redo"); }
+
+        // Cannot save with Highlight mode on!
+        inline const char* Cannot_save_with_Highlight_mode_on() const { return Get("Cannot save with Highlight mode on!"); }
+
+        // Save with bloom effect
+        inline const char* Save_with_bloom_effect() const { return Get("Save with bloom effect"); }
+
+        // Bloom effects cannot be changed until a new round is started
+        inline const char* Bloom_effects_cannot_be_changed_until_a_new_round_is_started() const { return Get("Bloom effects cannot be changed until a new round is started"); }
+
+        // Palette name:
+        inline const char* Palette_name() const { return Get("Palette name:"); }
+
+        // Creator (optional):
+        inline const char* Creator_optional() const { return Get("Creator (optional):"); }
+
+        // Palette description (optional):
+        inline const char* Palette_description_optional() const { return Get("Palette description (optional):"); }
+
+        // Save palette
+        inline const char* Save_palette() const { return Get("Save palette"); }
+
+        // Error, no filename given
+        inline const char* Error_no_filename_given() const { return Get("Error, no filename given"); }
+
+        // Error, not a valid filename
+        inline const char* Error_not_a_valid_filename() const { return Get("Error, not a valid filename"); }
+
+        // '%s' saved successfully
+        inline const char* s_saved_successfully() const { return Get("'%s' saved successfully"); }
+
+        // '%s' save failed
+        inline const char* s_save_failed() const { return Get("'%s' save failed"); }
+
+        // '%s' already exists.\nAre you sure you want to overwrite it?\n\n
+        inline const char* s_already_exists_Are_you_sure_you_want_to_overwrite_it() const { return Get("'%s' already exists.\nAre you sure you want to overwrite it?\n\n"); }
+
+        // OK
+        inline const char* OK() const { return Get("OK"); }
+
+        // Reset palette
+        inline const char* Reset_palette() const { return Get("Reset palette"); }
+
+        // Out of bounds
+        inline const char* Out_of_bounds() const { return Get("Out of bounds"); }
+
+        // ONLINE PALETTE
+        inline const char* ONLINE_PALETTE() const { return Get("ONLINE PALETTE"); }
+
+        // Creator: %s
+        inline const char* Creator_s() const { return Get("Creator: %s"); }
+
+        // Description: %s
+        inline const char* Description_s() const { return Get("Description: %s"); }
+
+        // Has bloom effect
+        inline const char* Has_bloom_effect() const { return Get("Has bloom effect"); }
+
+        // Random selection
+        inline const char* Random_selection() const { return Get("Random selection"); }
+
+        // Start index
+        inline const char* Start_index() const { return Get("Start index"); }
+
+        // End index
+        inline const char* End_index() const { return Get("End index"); }
+
+        // Start color
+        inline const char* Start_color() const { return Get("Start color"); }
+
+        // End color
+        inline const char* End_color() const { return Get("End color"); }
+
+        // Swap colors
+        inline const char* Swap_colors() const { return Get("Swap colors"); }
+
+        // Generate gradient
+        inline const char* Generate_gradient() const { return Get("Generate gradient"); }
+
+        // Refresh
+        inline const char* Refresh() const { return Get("Refresh"); }
+
+        // Recording side: %c
+        inline const char* Recording_side_c() const { return Get("Recording side: %c"); }
+
+        // Switch recording side
+        inline const char* Switch_recording_side() const { return Get("Switch recording side"); }
+
+        // Add/Remove
+        inline const char* Add_Remove() const { return Get("Add/Remove"); }
+
+        // Frame
+        inline const char* Frame() const { return Get("Frame"); }
+
+        // Literal
+        inline const char* Literal() const { return Get("Literal"); }
+
+        // Command
+        inline const char* Command() const { return Get("Command"); }
+
+        // Edit Input
+        inline const char* Edit_Input() const { return Get("Edit Input"); }
+
+        // Direction
+        inline const char* Direction() const { return Get("Direction"); }
+
         // Bind
         inline const char* Bind() const { return Get("Bind"); }
 
@@ -407,168 +566,6 @@ struct LocalizationKeysAccessor
 
         // KoreWaTestoDakeDa
         inline const char* KoreWaTestoDakeDa() const { return Get("KoreWaTestoDakeDa"); }
-
-        // Refresh
-        inline const char* Refresh() const { return Get("Refresh"); }
-
-        // Recording side: %c
-        inline const char* Recording_side_c() const { return Get("Recording side: %c"); }
-
-        // Switch recording side
-        inline const char* Switch_recording_side() const { return Get("Switch recording side"); }
-
-        // Add/Remove
-        inline const char* Add_Remove() const { return Get("Add/Remove"); }
-
-        // Frame
-        inline const char* Frame() const { return Get("Frame"); }
-
-        // Literal
-        inline const char* Literal() const { return Get("Literal"); }
-
-        // Command
-        inline const char* Command() const { return Get("Command"); }
-
-        // Edit Input
-        inline const char* Edit_Input() const { return Get("Edit Input"); }
-
-        // Save
-        inline const char* Save() const { return Get("Save"); }
-
-        // Direction
-        inline const char* Direction() const { return Get("Direction"); }
-
-        // OK
-        inline const char* OK() const { return Get("OK"); }
-
-        // Player 1:
-        inline const char* Player_1_() const { return Get("Player 1:"); }
-
-        // Player 2:
-        inline const char* Player_2_() const { return Get("Player 2:"); }
-
-        // Select game mode:
-        inline const char* Select_game_mode_() const { return Get("Select game mode:"); }
-
-        // Copy to clipboard
-        inline const char* Copy_to_clipboard() const { return Get("Copy to clipboard"); }
-
-        // Search
-        inline const char* Search() const { return Get("Search"); }
-
-        // [system] Log has been copied to clipboard\n
-        inline const char* system_Log_has_been_copied_to_clipboard_n() const { return Get("[system] Log has been copied to clipboard\n"); }
-
-        // Stage
-        inline const char* Stage() const { return Get("Stage"); }
-
-        // Reload custom palettes
-        inline const char* Reload_custom_palettes() const { return Get("Reload custom palettes"); }
-
-        // Select character
-        inline const char* Select_character() const { return Get("Select character"); }
-
-        // Select palette
-        inline const char* Select_palette() const { return Get("Select palette"); }
-
-        // Select file
-        inline const char* Select_file() const { return Get("Select file"); }
-
-        // Gradient generator
-        inline const char* Gradient_generator() const { return Get("Gradient generator"); }
-
-        // Undo
-        inline const char* Undo() const { return Get("Undo"); }
-
-        // Redo
-        inline const char* Redo() const { return Get("Redo"); }
-
-        // Cannot save with Highlight mode on!
-        inline const char* Cannot_save_with_Highlight_mode_on() const { return Get("Cannot save with Highlight mode on!"); }
-
-        // Save with bloom effect
-        inline const char* Save_with_bloom_effect() const { return Get("Save with bloom effect"); }
-
-        // Bloom effects cannot be changed until a new round is started
-        inline const char* Bloom_effects_cannot_be_changed_until_a_new_round_is_started() const { return Get("Bloom effects cannot be changed until a new round is started"); }
-
-        // Palette name:
-        inline const char* Palette_name_() const { return Get("Palette name:"); }
-
-        // Creator (optional):
-        inline const char* Creator_optional_() const { return Get("Creator (optional):"); }
-
-        // Palette description (optional):
-        inline const char* Palette_description_optional_() const { return Get("Palette description (optional):"); }
-
-        // Save palette
-        inline const char* Save_palette() const { return Get("Save palette"); }
-
-        // Error, no filename given
-        inline const char* Error_no_filename_given() const { return Get("Error, no filename given"); }
-
-        // Error, not a valid filename
-        inline const char* Error_not_a_valid_filename() const { return Get("Error, not a valid filename"); }
-
-        // '%s' saved successfully
-        inline const char* _s_saved_successfully() const { return Get("'%s' saved successfully"); }
-
-        // '%s' save failed
-        inline const char* _s_save_failed() const { return Get("'%s' save failed"); }
-
-        // '%s' already exists.\nAre you sure you want to overwrite it?\n\n
-        inline const char* _s_already_exists_Are_you_sure_you_want_to_overwrite_it_n_n() const { return Get("'%s' already exists.\nAre you sure you want to overwrite it?\n\n"); }
-
-        // Reset palette
-        inline const char* Reset_palette() const { return Get("Reset palette"); }
-
-        // Out of bounds
-        inline const char* Out_of_bounds() const { return Get("Out of bounds"); }
-
-        // ONLINE PALETTE
-        inline const char* ONLINE_PALETTE() const { return Get("ONLINE PALETTE"); }
-
-        // Creator: %s
-        inline const char* Creator_s() const { return Get("Creator: %s"); }
-
-        // Description: %s
-        inline const char* Description_s() const { return Get("Description: %s"); }
-
-        // Has bloom effect
-        inline const char* Has_bloom_effect() const { return Get("Has bloom effect"); }
-
-        // Random selection
-        inline const char* Random_selection() const { return Get("Random selection"); }
-
-        // Start index
-        inline const char* Start_index() const { return Get("Start index"); }
-
-        // End index
-        inline const char* End_index() const { return Get("End index"); }
-
-        // Start color
-        inline const char* Start_color() const { return Get("Start color"); }
-
-        // End color
-        inline const char* End_color() const { return Get("End color"); }
-
-        // Swap colors
-        inline const char* Swap_colors() const { return Get("Swap colors"); }
-
-        // Generate gradient
-        inline const char* Generate_gradient() const { return Get("Generate gradient"); }
-
-        // Player 1
-        inline const char* Player_1() const { return Get("Player 1"); }
-
-        // Gap:
-        inline const char* Gap_() const { return Get("Gap:"); }
-
-        // Advantage:
-        inline const char* Advantage_() const { return Get("Advantage:"); }
-
-        // Player 2
-        inline const char* Player_2() const { return Get("Player 2"); }
 };
 
 
