@@ -41,7 +41,7 @@ namespace ControllerSettings
                         controllerManager.SetOverrideEnabled(overrideEnabled);
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker(Messages.Choose_which_connected_controller_or_the_keyboard_should_be_Player_1_and_Player_2_Use_Refresh_when_devices_change());
+ImGui::ShowHelpMarker(Messages.Controller_override_help());
 
                 bool showOverrideControls = overrideEnabled && !steamInputLikely;
 

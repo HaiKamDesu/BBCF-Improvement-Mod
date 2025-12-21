@@ -672,7 +672,7 @@ bool PaletteEditorWindow::ShowOverwritePopup(bool* p_open, const wchar_t* wFullP
 
 	if (ImGui::BeginPopupModal("Overwrite?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::Text(Messages.s_already_exists_Are_you_sure_you_want_to_overwrite_it(), filename);
+ImGui::Text(Messages.Overwrite_confirmation_prompt(), filename);
 		ImGui::Separator();
 
 		if (ImGui::Button(Messages.OK(), ImVec2(120, 0)))

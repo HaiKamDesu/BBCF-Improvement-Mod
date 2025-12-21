@@ -30,7 +30,7 @@ namespace ControllerSettings
                         controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker(Messages.Choose_which_physical_keyboards_should_be_treated_as_Player_1_when_multiple_keyboards_are_connected_All_other_keyboards_will_drive_Player_2_using_their_saved_mappings_defaults_to_WASD_JIKL());
+ImGui::ShowHelpMarker(Messages.Keyboard_player1_help());
 
 		if (multiKeyboardOverride)
 		{

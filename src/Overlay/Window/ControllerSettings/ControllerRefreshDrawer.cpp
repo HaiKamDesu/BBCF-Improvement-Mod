@@ -20,7 +20,7 @@ namespace ControllerSettings
                         controllerManager.RefreshDevicesAndReinitializeGame();
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker(Messages.Reload_the_controller_list_and_reinitialize_input_slots_to_match_connected_devices());
+ImGui::ShowHelpMarker(Messages.Controller_refresh_help());
 
                 if (inDevelopmentFeaturesEnabled)
                 {
@@ -53,7 +53,7 @@ namespace ControllerSettings
                         Settings::changeSetting("AutomaticallyUpdateControllers", autoRefreshEnabled ? "1" : "0");
                 }
                 ImGui::SameLine();
-                ImGui::ShowHelpMarker(Messages.Automatically_refresh_controller_slots_when_devices_change_The_internal_call_to_refresh_controllers_may_freeze_the_game_for_a_few_moments_so_only_enable_this_if_you_are_okay_with_short_pauses());
+ImGui::ShowHelpMarker(Messages.Auto_refresh_warning());
 
                 if (inDevelopmentFeaturesEnabled)
                 {
