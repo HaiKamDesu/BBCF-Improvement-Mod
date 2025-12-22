@@ -63,6 +63,11 @@ struct AASTEAM_SystemManager;
 // for BBCF_PAD_SLOT0_PTR_OFFSET.
 namespace
 {
+    bool WineBreakingFeaturesEnabled()
+    {
+        return Settings::settingsIni.EnableWineBreakingFeatures;
+    }
+
     struct SteamInputEnvInfo
     {
         bool anyEnvHit = false;
@@ -1624,6 +1629,13 @@ bool ControllerOverrideManager::IsAutoRefreshEnabled() const
 
 void ControllerOverrideManager::SetControllerPosSwap(bool enabled)
 {
+        if (!WineBreakingFeaturesEnabled())
+        {
+                LOG(1, "[SEP] Controller position swap disabled by EnableWineBreakingFeatures setting.\n");
+                m_ControllerPosSwap = false;
+                return;
+        }
+
         uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
         char*** battle_key_controller = reinterpret_cast<char***>(base + 0x8929c8);
 
@@ -1758,6 +1770,21 @@ uint32_t ControllerOverrideManager::BuildSystemInputWord(SystemControllerSlot sl
 
 void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
 {
+        if (!WineBreakingFeaturesEnabled())
+        {
+                if (enabled)
+                {
+                        LOG(1, "Multiple keyboard override blocked by EnableWineBreakingFeatures setting.\n");
+                }
+
+                if (m_multipleKeyboardOverrideEnabled)
+                {
+                        m_multipleKeyboardOverrideEnabled = false;
+                        Settings::changeSetting("MultipleKeyboardOverrideEnabled", "0");
+                }
+                return;
+        }
+
         if (m_multipleKeyboardOverrideEnabled == enabled)
         {
                 return;
@@ -2425,6 +2452,13 @@ void ControllerOverrideManager::HandleRawInputDeviceChange(HANDLE deviceHandle, 
 
 void ControllerOverrideManager::EnsureRawKeyboardRegistration()
 {
+        if (!WineBreakingFeaturesEnabled())
+        {
+                m_rawKeyboardRegistered = false;
+                LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - skipped due to Wine/Proton compatibility setting.\n");
+                return;
+        }
+
         if (m_rawKeyboardRegistered)
         {
                 return;

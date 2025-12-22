@@ -23,6 +23,7 @@ SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
 SETTING(bool, enableInDevelopmentFeatures, "EnableInDevelopmentFeatures", "0");
 SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
+SETTING(bool, EnableWineBreakingFeatures, "EnableWineBreakingFeatures", "1");
 SETTING(std::string, primaryKeyboardDeviceId, "PrimaryKeyboardDeviceId", "");
 SETTING(std::string, ignoredKeyboardIds, "IgnoredKeyboardIds", "");
 SETTING(std::string, keyboardRenameMap, "KeyboardRenameMap", "");

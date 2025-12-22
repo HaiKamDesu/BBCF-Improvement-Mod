@@ -629,6 +629,21 @@ struct LocalizationKeysAccessor
 
         // Online room window title format
         inline const char* Online_room_window_title_format() const { return Get("Online room window title format"); }
+
+        // Wine or Proton detected
+        inline const char* Wine_or_Proton_detected() const { return Get("Wine or Proton detected"); }
+
+        // Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini.
+        inline const char* Wine_Proton_detected_Controller_overrides_were_disabled_to_prevent_startup_crashes_Re_enable_below_or_set_EnableWineBreakingFeatures_to_1_in_settings_ini() const { return Get("Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini."); }
+
+        // Enable anyway
+        inline const char* Enable_anyway() const { return Get("Enable anyway"); }
+
+        // Keep disabled
+        inline const char* Keep_disabled() const { return Get("Keep disabled"); }
+
+        // Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk.
+        inline const char* Controller_overrides_are_disabled_because_Wine_Proton_was_detected_Edit_EnableWineBreakingFeatures_in_settings_ini_to_enable_them_at_your_own_risk() const { return Get("Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk."); }
 };
 
 

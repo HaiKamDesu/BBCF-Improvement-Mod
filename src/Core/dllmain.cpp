@@ -6,6 +6,7 @@
 #include "ControllerOverrideManager.h"
 #include "DirectInputWrapper.h"
 #include "Localization.h"
+#include "WineCheck.h"
 
 #include "Hooks/hooks_detours.h"
 #include "Hooks/hooks_battle_input.h"
@@ -98,6 +99,14 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 if (!Settings::loadSettingsFile())
                 {
                         ExitProcess(0);
+                }
+
+                const bool wineLikely = WineCheck();
+                if (wineLikely && Settings::settingsIni.EnableWineBreakingFeatures)
+                {
+                        LOG(1, "Wine/Proton detected; disabling Wine-breaking features before initialization.\n");
+                        Settings::changeSetting("EnableWineBreakingFeatures", "0");
+                        Settings::loadSettingsFile();
                 }
 
                 SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);

@@ -346,3 +346,8 @@ Improvement Mod users in match:,Improvement Mod users in match:,Usuarios de Impr
 Click to open Steam profile,Click to open Steam profile,Click para abrir perfil de Steam
 Spectator,Spectator,Espectador
 Online room window title format,%s - %s###Room,%s - %s###Room
+Wine or Proton detected,Wine or Proton detected,Wine o Proton detectado
+Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini.,Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini.,Se detectó Wine/Proton. Las funciones de control se desactivaron para evitar fallos al iniciar. Reactívalas abajo o pon EnableWineBreakingFeatures en 1 en settings.ini.
+Enable anyway,Enable anyway,Activar de todos modos
+Keep disabled,Keep disabled,Mantener desactivado
+Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk.,Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk.,Las funciones de control están desactivadas porque se detectó Wine/Proton. Edita EnableWineBreakingFeatures en settings.ini para activarlas bajo tu propio riesgo.
