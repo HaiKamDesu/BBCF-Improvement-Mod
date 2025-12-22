@@ -106,7 +106,7 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 {
                         LOG(1, "Wine/Proton detected; disabling controller hooks before initialization.\n");
                         Settings::changeSetting("EnableControllerHooks", "0");
-                        Settings::loadSettingsFile();
+                        Settings::settingsIni.EnableControllerHooks = 0;
                 }
 
                 SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);

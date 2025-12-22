@@ -77,7 +77,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
                 {
                         LOG(1, "Wine/Proton detected; disabling hooks that break under Wine.\n");
                         Settings::changeSetting("EnableControllerHooks", "0");
-                        Settings::loadSettingsFile();
+                        Settings::settingsIni.EnableControllerHooks = 0;
                 }
 
                 if (!Settings::settingsIni.ForceEnableControllerSettingHooks)

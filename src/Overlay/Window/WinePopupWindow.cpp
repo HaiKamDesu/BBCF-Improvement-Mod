@@ -45,7 +45,7 @@ void WinePopupWindow::Draw()
         if (ImGui::Button(Messages.Enable_anyway(), buttonSize))
         {
             Settings::changeSetting("EnableControllerHooks", "1");
-            Settings::loadSettingsFile();
+            Settings::settingsIni.EnableControllerHooks = 1;
             ImGui::CloseCurrentPopup();
             Close();
         }
@@ -54,7 +54,7 @@ void WinePopupWindow::Draw()
         if (ImGui::Button(Messages.Keep_disabled(), buttonSize))
         {
             Settings::changeSetting("EnableControllerHooks", "0");
-            Settings::loadSettingsFile();
+            Settings::settingsIni.EnableControllerHooks = 0;
             ImGui::CloseCurrentPopup();
             Close();
         }

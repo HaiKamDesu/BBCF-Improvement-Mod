@@ -29,7 +29,9 @@ namespace ControllerSettings
                         const ImVec4 warningColor = ImVec4(1.0f, 0.95f, 0.55f, 1.0f);
                         ImGui::PushStyleColor(ImGuiCol_Text, warningColor);
                         ImGui::TextWrapped(Messages.Controller_hooks_are_disabled_because_EnableControllerHooks_is_set_to_0());
+                        ImGui::HorizontalSpacing();
                         ImGui::TextWrapped(Messages.This_might_have_been_set_manually_or_after_detecting_Wine_Proton());
+                        ImGui::HorizontalSpacing();
                         ImGui::TextWrapped(Messages.To_force_enable_these_hooks_set_ForceEnableControllerSettingHooks_to_1_at_your_own_risk());
                         ImGui::PopStyleColor();
                         return;
