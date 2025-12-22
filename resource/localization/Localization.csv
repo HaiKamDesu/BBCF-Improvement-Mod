@@ -346,3 +346,10 @@ Improvement Mod users in match:,Improvement Mod users in match:,Usuarios de Impr
 Click to open Steam profile,Click to open Steam profile,Click para abrir perfil de Steam
 Spectator,Spectator,Espectador
 Online room window title format,%s - %s###Room,%s - %s###Room
+Wine or Proton detected,Wine or Proton detected,Wine o Proton detectado
+Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection.,Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection.,Se detectó Wine/Proton. Los ganchos de control se desactivaron para evitar fallos al iniciar. Actívalos abajo o pon ForceEnableControllerSettingHooks en 1 en settings.ini para omitir la detección.
+Enable anyway,Enable anyway,Activar de todos modos
+Keep disabled,Keep disabled,Mantener desactivado
+Controller hooks are disabled because EnableControllerHooks is set to 0.,Controller hooks are disabled because EnableControllerHooks is set to 0.,Los ganchos de control están desactivados porque EnableControllerHooks está en 0.
+This might have been set manually or after detecting Wine/Proton.,This might have been set manually or after detecting Wine/Proton.,Esto se estableció manualmente o automáticamente tras detectar Wine/Proton.
+"To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk.","To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk.",Pon ForceEnableControllerSettingHooks en 1 para reactivar las funcionalidades bajo tu propio riesgo.

@@ -6,6 +6,7 @@
 #include "ControllerOverrideManager.h"
 #include "DirectInputWrapper.h"
 #include "Localization.h"
+#include "WineCheck.h"
 
 #include "Hooks/hooks_detours.h"
 #include "Hooks/hooks_battle_input.h"
@@ -98,6 +99,14 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 if (!Settings::loadSettingsFile())
                 {
                         ExitProcess(0);
+                }
+
+                const bool wineLikely = WineCheck();
+                if (wineLikely && !Settings::settingsIni.ForceEnableControllerSettingHooks && Settings::settingsIni.EnableControllerHooks)
+                {
+                        LOG(1, "Wine/Proton detected; disabling controller hooks before initialization.\n");
+                        Settings::changeSetting("EnableControllerHooks", "0");
+                        Settings::settingsIni.EnableControllerHooks = 0;
                 }
 
                 SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);

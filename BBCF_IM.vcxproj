@@ -61,6 +61,7 @@
     <ClCompile Include="src\Core\interfaces.cpp" />
     <ClCompile Include="src\Core\crashdump.cpp" />
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp" />
+    <ClCompile Include="src\Core\WineCheck.cpp" />
     <ClCompile Include="src\Core\DirectInputWrapper.cpp" />
     <ClCompile Include="src\Core\Localization.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
@@ -75,6 +76,7 @@
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\WinePopupWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerRefreshDrawer.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerSettingsSection.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\KeyboardSeparationDrawer.cpp" />
@@ -178,6 +180,7 @@
     <ClInclude Include="src\Core\crashdump.h" />
     <ClInclude Include="src\Core\ControllerOverrideManager.h" />
     <ClInclude Include="src\Core\DirectInputWrapper.h" />
+    <ClInclude Include="src\Core\WineCheck.h" />
     <ClInclude Include="src\Core\dllmain.h" />
     <ClInclude Include="src\Core\Localization.h" />
     <ClInclude Include="src\Network\NetworkManager.h" />
@@ -195,6 +198,7 @@
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Overlay\Window\LogWindow.h" />
     <ClInclude Include="src\Overlay\Window\MainWindow.h" />
+    <ClInclude Include="src\Overlay\Window\WinePopupWindow.h" />
     <ClInclude Include="src\Overlay\Window\ControllerSettings\ControllerRefreshDrawer.h" />
     <ClInclude Include="src\Overlay\Window\ControllerSettings\ControllerSettingsSection.h" />
     <ClInclude Include="src\Overlay\Window\ControllerSettings\KeyboardSeparationDrawer.h" />

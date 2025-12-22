@@ -629,6 +629,27 @@ struct LocalizationKeysAccessor
 
         // Online room window title format
         inline const char* Online_room_window_title_format() const { return Get("Online room window title format"); }
+
+        // Wine or Proton detected
+        inline const char* Wine_or_Proton_detected() const { return Get("Wine or Proton detected"); }
+
+        // Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection.
+        inline const char* Wine_Proton_detected_Controller_hooks_were_disabled_to_prevent_startup_crashes_Enable_below_or_set_ForceEnableControllerSettingHooks_to_1_in_settings_ini_to_override_detection() const { return Get("Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection."); }
+
+        // Enable anyway
+        inline const char* Enable_anyway() const { return Get("Enable anyway"); }
+
+        // Keep disabled
+        inline const char* Keep_disabled() const { return Get("Keep disabled"); }
+
+        // Controller hooks are disabled because EnableControllerHooks is set to 0.
+        inline const char* Controller_hooks_are_disabled_because_EnableControllerHooks_is_set_to_0() const { return Get("Controller hooks are disabled because EnableControllerHooks is set to 0."); }
+
+        // This might have been set manually or after detecting Wine/Proton.
+        inline const char* This_might_have_been_set_manually_or_after_detecting_Wine_Proton() const { return Get("This might have been set manually or after detecting Wine/Proton."); }
+
+        // To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk.
+        inline const char* To_force_enable_these_hooks_set_ForceEnableControllerSettingHooks_to_1_at_your_own_risk() const { return Get("To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk."); }
 };
 
 

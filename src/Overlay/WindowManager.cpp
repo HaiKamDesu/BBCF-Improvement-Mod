@@ -4,12 +4,14 @@
 #include "NotificationBar/NotificationBar.h"
 #include "WindowContainer/WindowContainer.h"
 #include "Window/LogWindow.h"
+#include "Window/WinePopupWindow.h"
 
 #include "Core/info.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Core/Settings.h"
+#include "Core/WineCheck.h"
 #include "Core/utils.h"
 #include "Web/update_check.h"
 
@@ -66,9 +68,25 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 
 	m_pLogger->Log("[system] Initialization starting...\n");
 
-	m_windowContainer = new WindowContainer();
+        m_windowContainer = new WindowContainer();
 
-	ImGui::StyleColorsDark();
+        const bool wineLikely = WineCheck();
+        if (wineLikely)
+        {
+                if (!Settings::settingsIni.ForceEnableControllerSettingHooks && Settings::settingsIni.EnableControllerHooks)
+                {
+                        LOG(1, "Wine/Proton detected; disabling hooks that break under Wine.\n");
+                        Settings::changeSetting("EnableControllerHooks", "0");
+                        Settings::settingsIni.EnableControllerHooks = 0;
+                }
+
+                if (!Settings::settingsIni.ForceEnableControllerSettingHooks)
+                {
+                        m_windowContainer->GetWindow<WinePopupWindow>(WindowType_WinePopup)->Open();
+                }
+        }
+
+        ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowBorderSize = 1;
 	style.FrameBorderSize = 1;

@@ -82,6 +82,9 @@
     <ClCompile Include="src\Core\DirectInputWrapper.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\WineCheck.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Web\update_check.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -110,6 +113,7 @@
     <ClCompile Include="src\Overlay\Window\DebugWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\WinePopupWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerRefreshDrawer.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\ControllerSettingsSection.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\KeyboardSeparationDrawer.cpp" />
@@ -223,6 +227,9 @@
     <ClInclude Include="src\Core\DirectInputWrapper.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\WineCheck.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="src\Core\dllmain.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -266,6 +273,7 @@
     <ClInclude Include="src\Overlay\Window\ControllerSettings\SteamInputWarningDrawer.h" />
     <ClInclude Include="src\Overlay\Window\PaletteEditorWindow.h" />
     <ClInclude Include="src\Overlay\Window\UpdateNotifierWindow.h" />
+    <ClInclude Include="src\Overlay\Window\WinePopupWindow.h" />
     <ClInclude Include="src\Overlay\WindowContainer\WindowType.h" />
     <ClInclude Include="src\Overlay\WindowContainer\WindowContainer.h" />
     <ClInclude Include="src\Core\interfaces.h">

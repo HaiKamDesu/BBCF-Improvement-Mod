@@ -15,6 +15,7 @@
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
 #include "Overlay/Window/ReplayRewindWindow.h"
+#include "Overlay/Window/WinePopupWindow.h"
 
 #include "Core/info.h"
 #include "Core/logger.h"
@@ -64,14 +65,17 @@ WindowContainer::WindowContainer()
 	AddWindow(WindowType_ReplayDBPopup,
 		new ReplayDBPopupWindow("Replay DB Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
 
-	AddWindow(WindowType_FrameHistory,
-		new FrameHistoryWindow("Frame History", true));
+        AddWindow(WindowType_FrameHistory,
+                new FrameHistoryWindow("Frame History", true));
 
-	AddWindow(WindowType_FrameAdvantage,
-		new FrameAdvantageWindow("Frame Advantage", true, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse));
+        AddWindow(WindowType_FrameAdvantage,
+                new FrameAdvantageWindow("Frame Advantage", true, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse));
 	
         AddWindow(WindowType_ReplayRewind,
                 new ReplayRewindWindow(Messages.Replay_Rewind(), true, *this, ImGuiWindowFlags_NoTitleBar));
+
+        AddWindow(WindowType_WinePopup,
+                new WinePopupWindow("Wine Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
 }
 
 
