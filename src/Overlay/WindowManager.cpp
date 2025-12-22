@@ -73,14 +73,17 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
         const bool wineLikely = WineCheck();
         if (wineLikely)
         {
-                if (Settings::settingsIni.EnableWineBreakingFeatures)
+                if (!Settings::settingsIni.ForceEnableControllerSettingHooks && Settings::settingsIni.EnableControllerHooks)
                 {
                         LOG(1, "Wine/Proton detected; disabling hooks that break under Wine.\n");
-                        Settings::changeSetting("EnableWineBreakingFeatures", "0");
+                        Settings::changeSetting("EnableControllerHooks", "0");
                         Settings::loadSettingsFile();
                 }
 
-                m_windowContainer->GetWindow<WinePopupWindow>(WindowType_WinePopup)->Open();
+                if (!Settings::settingsIni.ForceEnableControllerSettingHooks)
+                {
+                        m_windowContainer->GetWindow<WinePopupWindow>(WindowType_WinePopup)->Open();
+                }
         }
 
         ImGui::StyleColorsDark();

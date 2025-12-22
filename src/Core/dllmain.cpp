@@ -102,10 +102,10 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 }
 
                 const bool wineLikely = WineCheck();
-                if (wineLikely && Settings::settingsIni.EnableWineBreakingFeatures)
+                if (wineLikely && !Settings::settingsIni.ForceEnableControllerSettingHooks && Settings::settingsIni.EnableControllerHooks)
                 {
-                        LOG(1, "Wine/Proton detected; disabling Wine-breaking features before initialization.\n");
-                        Settings::changeSetting("EnableWineBreakingFeatures", "0");
+                        LOG(1, "Wine/Proton detected; disabling controller hooks before initialization.\n");
+                        Settings::changeSetting("EnableControllerHooks", "0");
                         Settings::loadSettingsFile();
                 }
 

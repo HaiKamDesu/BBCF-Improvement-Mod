@@ -63,9 +63,9 @@ struct AASTEAM_SystemManager;
 // for BBCF_PAD_SLOT0_PTR_OFFSET.
 namespace
 {
-    bool WineBreakingFeaturesEnabled()
+    bool ControllerHooksEnabled()
     {
-        return Settings::settingsIni.EnableWineBreakingFeatures;
+        return Settings::settingsIni.ForceEnableControllerSettingHooks || Settings::settingsIni.EnableControllerHooks;
     }
 
     struct SteamInputEnvInfo
@@ -1629,9 +1629,9 @@ bool ControllerOverrideManager::IsAutoRefreshEnabled() const
 
 void ControllerOverrideManager::SetControllerPosSwap(bool enabled)
 {
-        if (!WineBreakingFeaturesEnabled())
+        if (!ControllerHooksEnabled())
         {
-                LOG(1, "[SEP] Controller position swap disabled by EnableWineBreakingFeatures setting.\n");
+                LOG(1, "[SEP] Controller position swap disabled by EnableControllerHooks setting.\n");
                 m_ControllerPosSwap = false;
                 return;
         }
@@ -1770,11 +1770,11 @@ uint32_t ControllerOverrideManager::BuildSystemInputWord(SystemControllerSlot sl
 
 void ControllerOverrideManager::SetMultipleKeyboardOverrideEnabled(bool enabled)
 {
-        if (!WineBreakingFeaturesEnabled())
+        if (!ControllerHooksEnabled())
         {
                 if (enabled)
                 {
-                        LOG(1, "Multiple keyboard override blocked by EnableWineBreakingFeatures setting.\n");
+                        LOG(1, "Multiple keyboard override blocked by EnableControllerHooks setting.\n");
                 }
 
                 if (m_multipleKeyboardOverrideEnabled)
@@ -2452,7 +2452,7 @@ void ControllerOverrideManager::HandleRawInputDeviceChange(HANDLE deviceHandle, 
 
 void ControllerOverrideManager::EnsureRawKeyboardRegistration()
 {
-        if (!WineBreakingFeaturesEnabled())
+        if (!ControllerHooksEnabled())
         {
                 m_rawKeyboardRegistered = false;
                 LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - skipped due to Wine/Proton compatibility setting.\n");

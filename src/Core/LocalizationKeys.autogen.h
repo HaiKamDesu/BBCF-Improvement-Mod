@@ -633,8 +633,8 @@ struct LocalizationKeysAccessor
         // Wine or Proton detected
         inline const char* Wine_or_Proton_detected() const { return Get("Wine or Proton detected"); }
 
-        // Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini.
-        inline const char* Wine_Proton_detected_Controller_overrides_were_disabled_to_prevent_startup_crashes_Re_enable_below_or_set_EnableWineBreakingFeatures_to_1_in_settings_ini() const { return Get("Wine/Proton detected. Controller overrides were disabled to prevent startup crashes. Re-enable below or set EnableWineBreakingFeatures to 1 in settings.ini."); }
+        // Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection.
+        inline const char* Wine_Proton_detected_Controller_hooks_were_disabled_to_prevent_startup_crashes_Enable_below_or_set_ForceEnableControllerSettingHooks_to_1_in_settings_ini_to_override_detection() const { return Get("Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection."); }
 
         // Enable anyway
         inline const char* Enable_anyway() const { return Get("Enable anyway"); }
@@ -642,8 +642,14 @@ struct LocalizationKeysAccessor
         // Keep disabled
         inline const char* Keep_disabled() const { return Get("Keep disabled"); }
 
-        // Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk.
-        inline const char* Controller_overrides_are_disabled_because_Wine_Proton_was_detected_Edit_EnableWineBreakingFeatures_in_settings_ini_to_enable_them_at_your_own_risk() const { return Get("Controller overrides are disabled because Wine/Proton was detected. Edit EnableWineBreakingFeatures in settings.ini to enable them at your own risk."); }
+        // Controller hooks are disabled because EnableControllerHooks is set to 0.
+        inline const char* Controller_hooks_are_disabled_because_EnableControllerHooks_is_set_to_0() const { return Get("Controller hooks are disabled because EnableControllerHooks is set to 0."); }
+
+        // This might have been set manually or after detecting Wine/Proton.
+        inline const char* This_might_have_been_set_manually_or_after_detecting_Wine_Proton() const { return Get("This might have been set manually or after detecting Wine/Proton."); }
+
+        // To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk.
+        inline const char* To_force_enable_these_hooks_set_ForceEnableControllerSettingHooks_to_1_at_your_own_risk() const { return Get("To force enable these hooks, set ForceEnableControllerSettingHooks to 1 at your own risk."); }
 };
 
 

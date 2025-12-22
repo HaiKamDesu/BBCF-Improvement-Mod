@@ -3,6 +3,7 @@
 #include "Core/ControllerOverrideManager.h"
 #include "Core/Localization.h"
 #include "Core/Settings.h"
+#include "Overlay/imgui_utils.h"
 #include "Overlay/Window/ControllerSettings/ControllerRefreshDrawer.h"
 #include "Overlay/Window/ControllerSettings/KeyboardSeparationDrawer.h"
 #include "Overlay/Window/ControllerSettings/LocalControllerOverrideDrawer.h"
@@ -20,10 +21,17 @@ namespace ControllerSettings
                 const bool inDevelopmentFeaturesEnabled = Settings::settingsIni.enableInDevelopmentFeatures;
                 const bool steamInputLikely = inDevelopmentFeaturesEnabled ? controllerManager.IsSteamInputLikelyActive() : false;
 
-                if (!Settings::settingsIni.EnableWineBreakingFeatures)
+                const bool controllerHooksEnabled = Settings::settingsIni.ForceEnableControllerSettingHooks || Settings::settingsIni.EnableControllerHooks;
+
+                if (!controllerHooksEnabled)
                 {
                         ImGui::HorizontalSpacing();
-                        ImGui::TextWrapped(Messages.Controller_overrides_are_disabled_because_Wine_Proton_was_detected_Edit_EnableWineBreakingFeatures_in_settings_ini_to_enable_them_at_your_own_risk());
+                        const ImVec4 warningColor = ImVec4(1.0f, 0.95f, 0.55f, 1.0f);
+                        ImGui::PushStyleColor(ImGuiCol_Text, warningColor);
+                        ImGui::TextWrapped(Messages.Controller_hooks_are_disabled_because_EnableControllerHooks_is_set_to_0());
+                        ImGui::TextWrapped(Messages.This_might_have_been_set_manually_or_after_detecting_Wine_Proton());
+                        ImGui::TextWrapped(Messages.To_force_enable_these_hooks_set_ForceEnableControllerSettingHooks_to_1_at_your_own_risk());
+                        ImGui::PopStyleColor();
                         return;
                 }
 

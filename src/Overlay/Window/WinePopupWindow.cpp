@@ -27,6 +27,7 @@ void WinePopupWindow::Update()
 void WinePopupWindow::Draw()
 {
     ImVec4 black = ImVec4(0.060f, 0.060f, 0.060f, 1.0f);
+    const ImVec4 warningColor = ImVec4(1.0f, 0.95f, 0.55f, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_PopupBg, black);
     ImGui::OpenPopup(Messages.Wine_or_Proton_detected());
@@ -36,12 +37,14 @@ void WinePopupWindow::Draw()
 
     if (ImGui::BeginPopupModal(Messages.Wine_or_Proton_detected(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::TextWrapped(Messages.Wine_Proton_detected_Controller_overrides_were_disabled_to_prevent_startup_crashes_Re_enable_below_or_set_EnableWineBreakingFeatures_to_1_in_settings_ini());
+        ImGui::PushStyleColor(ImGuiCol_Text, warningColor);
+        ImGui::TextWrapped(Messages.Wine_Proton_detected_Controller_hooks_were_disabled_to_prevent_startup_crashes_Enable_below_or_set_ForceEnableControllerSettingHooks_to_1_in_settings_ini_to_override_detection());
+        ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::AlignItemHorizontalCenter(buttonSize.x);
         if (ImGui::Button(Messages.Enable_anyway(), buttonSize))
         {
-            Settings::changeSetting("EnableWineBreakingFeatures", "1");
+            Settings::changeSetting("EnableControllerHooks", "1");
             Settings::loadSettingsFile();
             ImGui::CloseCurrentPopup();
             Close();
@@ -50,7 +53,7 @@ void WinePopupWindow::Draw()
         ImGui::AlignItemHorizontalCenter(buttonSize.x);
         if (ImGui::Button(Messages.Keep_disabled(), buttonSize))
         {
-            Settings::changeSetting("EnableWineBreakingFeatures", "0");
+            Settings::changeSetting("EnableControllerHooks", "0");
             Settings::loadSettingsFile();
             ImGui::CloseCurrentPopup();
             Close();
