@@ -96,8 +96,10 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 {
         try
         {
+                ForceLog("[Init] BBCF_IM_Start entered.\n");
                 if (!Settings::loadSettingsFile())
                 {
+                        ForceLog("[Init] Failed to load settings.ini; exiting.\n");
                         ExitProcess(0);
                 }
 
@@ -110,6 +112,7 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 }
 
                 SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);
+                ForceLog("[Init] Logging configured (generateDebugLogs=%d).\n", Settings::settingsIni.generateDebugLogs);
 
                 if (Settings::WasDebugLoggingSettingMissing())
                 {
@@ -118,24 +121,31 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                 }
 
                 LOG(1, "Starting BBCF_IM_Start thread\n");
+                ForceLog("[Init] Starting initialization thread.\n");
 
                 CreateCustomDirectories();
+                ForceLog("[Init] Custom directories ensured.\n");
                 SetUnhandledExceptionFilter(UnhandledExFilter);
+                ForceLog("[Init] Unhandled exception filter installed.\n");
 
                 logSettingsIni();
                 Settings::initSavedSettings();
+                ForceLog("[Init] Settings initialized and saved settings loaded.\n");
 
                 Localization::Initialize(Settings::settingsIni.language);
+                ForceLog("[Init] Localization initialized for language %s.\n", Settings::settingsIni.language.c_str());
 
                 if (!LoadOriginalDinputDll())
                 {
                         MessageBoxA(nullptr, "Could not load original dinput8.dll!", "BBCFIM", MB_OK);
+                        ForceLog("[Init] Failed to load original dinput8.dll; aborting.\n");
                         ExitProcess(0);
                 }
 
                 if (!placeHooks_detours())
                 {
                         MessageBoxA(nullptr, "Failed IAT hook", "BBCFIM", MB_OK);
+                        ForceLog("[Init] Detours hook placement failed; aborting.\n");
                         ExitProcess(0);
                 }
 
@@ -145,16 +155,20 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
                         // For now, don't hard-fail the entire mod - just log it.
                         // If you prefer, you can pop a MessageBox+ExitProcess instead.
                         LOG(2, "BBCF_IM_Start: Hook_BattleInput failed; P2 input PoC disabled.\n");
+                        ForceLog("[Init] Hook_BattleInput failed; continuing without P2 input hook.\n");
                 }
 
                 if (!InstallSystemInputHook())
                 {
                         LOG(2, "BBCF_IM_Start: InstallSystemInputHook failed; system input override disabled.\n");
+                        ForceLog("[Init] InstallSystemInputHook failed; continuing without system input override.\n");
                 }
 
                 LOG(1, "GetBbcfBaseAdress() = 0x%p\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
+                ForceLog("[Init] Hooks installed; base address resolved to 0x%p.\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
 
                 g_interfaces.pPaletteManager = new PaletteManager();
+                ForceLog("[Init] PaletteManager constructed.\n");
         }
         catch (const std::exception& ex)
         {

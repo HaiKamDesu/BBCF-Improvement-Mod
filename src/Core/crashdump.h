@@ -1,4 +1,10 @@
 #pragma once
+
+// Avoid Windows.h min/max macros clobbering std::min/std::max
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <Windows.h>
 
 // Custom exception handler to generate memory dump upon crash

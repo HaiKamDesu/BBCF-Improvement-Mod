@@ -10,7 +10,7 @@ The logger now produces UTF-8 prefixed output, preserves a crash-safe in-memory 
 - `LOG(level, fmt, ...)` writes when the requested `level` is **less than or equal to** `DEBUG_LOG_LEVEL` (default `5`, where `0` is highest priority and `7` is lowest). The macro is safe to call anywhere; when disabled it becomes a fast guard.
 - Messages are formatted via `printf`-style arguments, prefixed with `[YYYY-MM-DD HH:MM:SS.mmm][T<threadId>][L<level>]`, terminated with a newline, and flushed immediately. The same text is copied into an in-memory ring buffer for crash capture.
 - `LOG_ASM` mirrors `LOG` but wraps the call with `pushad/popad` for naked assembly hooks.
-- `ForceLog(fmt, ...)` bypasses the enable flag, lazily opening the log file if it was never created. Use this in crash/early-failure paths.
+- `ForceLog(fmt, ...)` bypasses the enable flag, lazily opening the log file if it was never created. Use this in crash/early-failure paths. Startup breadcrumbs now rely on `ForceLog` so that even if `GenerateDebugLogs` is off you still get a trace of initialization steps before a crash or silent failure.
 
 ## Where the log file goes
 - `BBCF_IM/DEBUG.txt` (UTF-8 with BOM) is created on demand inside the game directory. The directory is auto-created if missing.

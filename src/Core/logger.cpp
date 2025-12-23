@@ -70,10 +70,10 @@ namespace
         std::string FormatTimestamp(uint64_t timestampMs)
         {
                 using namespace std::chrono;
-                const auto seconds = duration_cast<seconds>(milliseconds(timestampMs));
+                const auto secondsSinceEpoch = duration_cast<seconds>(milliseconds(timestampMs));
                 const auto msRemainder = timestampMs % 1000;
 
-                const std::time_t timeT = seconds.count();
+                const std::time_t timeT = secondsSinceEpoch.count();
                 std::tm localTime{};
                 localtime_s(&localTime, &timeT);
 
