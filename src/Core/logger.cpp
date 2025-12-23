@@ -1,15 +1,34 @@
 #include "logger.h"
 
-#include <ctime>
+#include <array>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <ctime>
+#include <mutex>
 #include <sstream>
 #include <string>
+
+#include <ShlObj.h>
 
 namespace
 {
         FILE* g_oFile = nullptr;
         bool g_isLoggingEnabled = false;
+
+        struct CrashLogEntry
+        {
+                uint64_t timestampMs = 0;
+                DWORD threadId = 0;
+                int level = 0;
+                std::string message;
+        };
+
+        constexpr size_t kCrashRingSize = 2048;
+        std::array<CrashLogEntry, kCrashRingSize> g_crashLogRing{};
+        size_t g_crashLogCount = 0;
+        size_t g_crashLogWriteIndex = 0;
+        std::mutex g_logMutex;
 
         std::string FormatLogMessage(const char* message, va_list args)
         {
@@ -39,6 +58,72 @@ namespace
                 }
 
                 return buffer;
+        }
+
+        uint64_t GetTimestampMs()
+        {
+                using namespace std::chrono;
+                return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+        }
+
+        std::string FormatTimestamp(uint64_t timestampMs)
+        {
+                using namespace std::chrono;
+                const auto seconds = duration_cast<seconds>(milliseconds(timestampMs));
+                const auto msRemainder = timestampMs % 1000;
+
+                const std::time_t timeT = seconds.count();
+                std::tm localTime{};
+                localtime_s(&localTime, &timeT);
+
+                char buffer[64];
+                std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d.%03llu",
+                              localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday,
+                              localTime.tm_hour, localTime.tm_min, localTime.tm_sec,
+                              static_cast<unsigned long long>(msRemainder));
+
+                return buffer;
+        }
+
+        std::string FormatLogPrefix(int level, uint64_t timestampMs, DWORD threadId)
+        {
+                std::ostringstream oss;
+                oss << "[" << FormatTimestamp(timestampMs) << "][T" << threadId << "][L" << level << "] ";
+                return oss.str();
+        }
+
+        std::string BuildLogLine(int level, const char* message, va_list args, uint64_t timestampMs, DWORD threadId)
+        {
+                const std::string body = FormatLogMessage(message, args);
+                if (body.empty())
+                {
+                        return std::string();
+                }
+
+                const std::string prefix = FormatLogPrefix(level, timestampMs, threadId);
+                return prefix + body;
+        }
+
+        void AppendCrashLogEntry(int level, const std::string& message, uint64_t timestampMs, DWORD threadId)
+        {
+                CrashLogEntry entry;
+                entry.timestampMs = timestampMs;
+                entry.threadId = threadId;
+                entry.level = level;
+                entry.message = message;
+
+                const std::lock_guard<std::mutex> lock(g_logMutex);
+                g_crashLogRing[g_crashLogWriteIndex] = std::move(entry);
+                g_crashLogWriteIndex = (g_crashLogWriteIndex + 1) % kCrashRingSize;
+                if (g_crashLogCount < kCrashRingSize)
+                {
+                        ++g_crashLogCount;
+                }
+        }
+
+        void EnsureLogDirectory()
+        {
+                SHCreateDirectoryExW(nullptr, L"BBCF_IM", nullptr);
         }
 }
 
@@ -77,23 +162,30 @@ char* getFullDate()
         return buffer;
 }
 
-void logger(const char* message, ...)
+void logger_with_level(int level, const char* message, ...)
 {
         if (!message || !g_oFile) { return; }
 
         va_list args;
         va_start(args, message);
 
-        const std::string buffer = FormatLogMessage(message, args);
+        const uint64_t timestamp = GetTimestampMs();
+        const DWORD threadId = GetCurrentThreadId();
+        const std::string line = BuildLogLine(level, message, args, timestamp, threadId);
         va_end(args);
 
-        if (buffer.empty())
+        if (line.empty())
         {
                 return;
         }
 
-        fputs(buffer.c_str(), g_oFile);
-        fflush(g_oFile);
+        {
+                const std::lock_guard<std::mutex> lock(g_logMutex);
+                fputs(line.c_str(), g_oFile);
+                fflush(g_oFile);
+        }
+
+        AppendCrashLogEntry(level, line, timestamp, threadId);
 }
 
 void ForceLog(const char* message, ...)
@@ -116,16 +208,23 @@ void ForceLog(const char* message, ...)
         va_list args;
         va_start(args, message);
 
-        const std::string buffer = FormatLogMessage(message, args);
+        const uint64_t timestamp = GetTimestampMs();
+        const DWORD threadId = GetCurrentThreadId();
+        const std::string line = BuildLogLine(0, message, args, timestamp, threadId);
         va_end(args);
 
-        if (buffer.empty())
+        if (line.empty())
         {
                 return;
         }
 
-        fputs(buffer.c_str(), g_oFile);
-        fflush(g_oFile);
+        {
+                const std::lock_guard<std::mutex> lock(g_logMutex);
+                fputs(line.c_str(), g_oFile);
+                fflush(g_oFile);
+        }
+
+        AppendCrashLogEntry(0, line, timestamp, threadId);
 }
 
 void openLogger()
@@ -135,7 +234,8 @@ void openLogger()
                 return;
         }
 
-        g_oFile = fopen("DEBUG.txt", "w");
+        EnsureLogDirectory();
+        g_oFile = _wfopen(L"BBCF_IM\\DEBUG.txt", L"w, ccs=UTF-8");
         if (!g_oFile)
         {
                 g_isLoggingEnabled = false;
@@ -237,4 +337,23 @@ void logD3DPParams(D3DPRESENT_PARAMETERS* pPresentationParameters, bool isOrigin
         LOG(1, "\t- Windowed: %d\n", pPresentationParameters->Windowed);
         LOG(1, "\t- Flags: 0x%p\n", pPresentationParameters->Flags);
         LOG(1, "\t- PresentationInterval: 0x%p\n", pPresentationParameters->PresentationInterval);
+}
+
+std::string GetRecentLogs()
+{
+        const std::lock_guard<std::mutex> lock(g_logMutex);
+        if (g_crashLogCount == 0)
+        {
+                return std::string();
+        }
+
+        std::ostringstream oss;
+        const size_t startIndex = (g_crashLogCount == kCrashRingSize) ? g_crashLogWriteIndex : 0;
+        for (size_t i = 0; i < g_crashLogCount; ++i)
+        {
+                const size_t index = (startIndex + i) % kCrashRingSize;
+                oss << g_crashLogRing[index].message;
+        }
+
+        return oss.str();
 }
