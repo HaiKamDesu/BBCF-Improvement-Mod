@@ -9,3 +9,5 @@
 
 // Custom exception handler to generate memory dump upon crash
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr);
+void InstallCrashHandlers();
+void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog = true);

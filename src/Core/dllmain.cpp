@@ -24,6 +24,7 @@ bool LoadOriginalDinputDll();
 
 // Ensures the original dinput8.dll is loaded before the game calls our export.
 static std::once_flag g_dinputInitOnce;
+static bool g_cleanShutdown = false;
 
 static bool EnsureOriginalDinputLoaded()
 {
@@ -76,11 +77,12 @@ void CreateCustomDirectories()
 
 void BBCF_IM_Shutdown()
 {
-	LOG(1, "BBCF_IM_Shutdown\n");
+        g_cleanShutdown = true;
+        LOG(1, "BBCF_IM_Shutdown\n");
 
-	WindowManager::GetInstance().Shutdown();
-	CleanupInterfaces();
-	closeLogger();
+        WindowManager::GetInstance().Shutdown();
+        CleanupInterfaces();
+        closeLogger();
 }
 
 bool LoadOriginalDinputDll()
@@ -152,10 +154,10 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	LOG(1, "Starting BBCF_IM_Start thread\n");
 	ForceLog("[Init] Starting initialization thread.\n");
 
-	CreateCustomDirectories();
-	ForceLog("[Init] Custom directories ensured.\n");
-	SetUnhandledExceptionFilter(UnhandledExFilter);
-	ForceLog("[Init] Unhandled exception filter installed.\n");
+        CreateCustomDirectories();
+        ForceLog("[Init] Custom directories ensured.\n");
+        InstallCrashHandlers();
+        ForceLog("[Init] Crash handlers installed.\n");
 
 	logSettingsIni();
 	Settings::initSavedSettings();
@@ -221,11 +223,11 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 	{
 	ForceLog("[Init] DllMain PROCESS_ATTACH begin");
 
-	DisableThreadLibraryCalls(hinstDLL);
-	ForceLog("[Init] DisableThreadLibraryCalls done");
+        DisableThreadLibraryCalls(hinstDLL);
+        ForceLog("[Init] DisableThreadLibraryCalls done");
 
-	SetUnhandledExceptionFilter(UnhandledExFilter);
-	ForceLog("[Init] UnhandledExceptionFilter installed in DllMain");
+        InstallCrashHandlers();
+        ForceLog("[Init] Crash handlers installed in DllMain");
 
 	HANDLE hThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)BBCF_IM_Start, hinstDLL, 0, nullptr);
 	if (!hThread)
@@ -243,10 +245,14 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 	break;
 }
 
-		case DLL_PROCESS_DETACH:
-			BBCF_IM_Shutdown();
-			// Do NOT FreeLibrary(hOriginalDinput) here; the game may still be using it during shutdown.
-			break;
-	}
+                case DLL_PROCESS_DETACH:
+                        if (lpReserved == nullptr && !g_cleanShutdown)
+                        {
+                                WriteCrashBundle("DLL unloaded unexpectedly (lpReserved == nullptr)", nullptr, false);
+                        }
+                        BBCF_IM_Shutdown();
+                        // Do NOT FreeLibrary(hOriginalDinput) here; the game may still be using it during shutdown.
+                        break;
+        }
 	return TRUE;
 }
