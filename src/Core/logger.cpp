@@ -193,45 +193,37 @@ void logger_with_level(int level, const char* message, ...)
 
 void ForceLog(const char* message, ...)
 {
-    if (!message)
-    {
-        return;
-    }
+	if (!message)
+	{
+	return;
+}
 
-    va_list args;
-    va_start(args, message);
+	va_list args;
+	va_start(args, message);
 
-    if (!g_oFile)
-    {
-        // Early startup: avoid CRT-heavy logger open (can fast-fail).
-        // Emit via debugger output only.
-        char buf[2048];
-        _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, message, args);
-        OutputDebugStringA(buf);
-        OutputDebugStringA("\n");
+	const uint64_t timestamp = GetTimestampMs();
+	const DWORD threadId = GetCurrentThreadId();
+	const std::string line = BuildLogLine(0, message, args, timestamp, threadId);
 
-        va_end(args);
-        return;
-    }
+	va_end(args);
 
-    const uint64_t timestamp = GetTimestampMs();
-    const DWORD threadId = GetCurrentThreadId();
-    const std::string line = BuildLogLine(0, message, args, timestamp, threadId);
+	if (line.empty())
+	{
+	return;
+}
 
-    va_end(args);
+	if (g_oFile)
+	{
+	const std::lock_guard<std::mutex> lock(g_logMutex);
+	fputs(line.c_str(), g_oFile);
+	fflush(g_oFile);
+}
+	else
+	{
+	OutputDebugStringA(line.c_str());
+}
 
-    if (line.empty())
-    {
-        return;
-    }
-
-    {
-        const std::lock_guard<std::mutex> lock(g_logMutex);
-        fputs(line.c_str(), g_oFile);
-        fflush(g_oFile);
-    }
-
-    AppendCrashLogEntry(0, line, timestamp, threadId);
+	AppendCrashLogEntry(0, line, timestamp, threadId);
 }
 
 void openLogger()
