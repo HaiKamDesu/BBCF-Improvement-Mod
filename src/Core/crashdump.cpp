@@ -84,9 +84,43 @@ namespace
                 return left + L"\\" + right;
         }
 
+        std::wstring GetExecutableDirectory()
+        {
+                wchar_t modulePath[MAX_PATH] = {};
+                const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+                if (length == 0 || length >= MAX_PATH)
+                {
+                        return std::wstring();
+                }
+
+                std::wstring path(modulePath, length);
+                const size_t lastSlash = path.find_last_of(L"\\/");
+                if (lastSlash == std::wstring::npos)
+                {
+                        return std::wstring();
+                }
+
+                return path.substr(0, lastSlash);
+        }
+
+        std::wstring GetCrashRootDirectory()
+        {
+                const std::wstring exeDir = GetExecutableDirectory();
+                if (exeDir.empty())
+                {
+                        return L"BBCF_IM\\CrashReports";
+                }
+
+                return JoinPath(exeDir, L"BBCF_IM\\CrashReports");
+        }
+
         void EnsureDirectory(const std::wstring& path)
         {
-                SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
+                const int result = SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
+                if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
+                {
+                        ForceLog("[Crash] Failed to ensure directory %s (err=%d)\n", ToUtf8(path).c_str(), result);
+                }
         }
 
         void WriteTextFile(const std::wstring& path, const std::string& content)
@@ -173,13 +207,12 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         }
 
         const std::wstring timestamp = BuildTimestamp();
-        const std::wstring crashRoot = L"BBCF_IM\\CrashReports";
+        const std::wstring crashRoot = GetCrashRootDirectory();
         const std::wstring crashDir = JoinPath(crashRoot, L"Crash_" + timestamp);
         const std::wstring dumpPath = JoinPath(crashDir, L"crash.dmp");
         const std::wstring logsPath = JoinPath(crashDir, L"logs.txt");
         const std::wstring contextPath = JoinPath(crashDir, L"crash_context.txt");
 
-        EnsureDirectory(L"BBCF_IM");
         EnsureDirectory(crashRoot);
         EnsureDirectory(crashDir);
 
@@ -209,7 +242,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         wchar_t messageBuffer[MAX_PATH * 2] = {};
         if (pMiniDumpWriteDump)
         {
-                HANDLE hFile = CreateFileW(dumpPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                HANDLE hFile = CreateFileW(dumpPath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
@@ -231,7 +264,9 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 }
                 else
                 {
-                        wsprintf(messageBuffer, _T("Could not create dump file at:\n%ls"), dumpPath.c_str());
+                        const DWORD err = GetLastError();
+                        ForceLog("[Crash] CreateFileW failed for dump path %s (err=%lu)\n", ToUtf8(dumpPath).c_str(), err);
+                        wsprintf(messageBuffer, _T("Could not create dump file at:\n%ls\nError: %lu"), dumpPath.c_str(), err);
                 }
         }
         else
