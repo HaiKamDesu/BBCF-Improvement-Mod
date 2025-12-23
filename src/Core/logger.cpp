@@ -9,6 +9,8 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <fcntl.h>
+#include <io.h>
 
 #include <ShlObj.h>
 
@@ -70,10 +72,10 @@ namespace
         std::string FormatTimestamp(uint64_t timestampMs)
         {
                 using namespace std::chrono;
-                const auto secondsSinceEpoch = duration_cast<seconds>(milliseconds(timestampMs));
+                const auto sec = duration_cast<seconds>(milliseconds(timestampMs));
                 const auto msRemainder = timestampMs % 1000;
 
-                const std::time_t timeT = secondsSinceEpoch.count();
+                const std::time_t timeT = sec.count();
                 std::tm localTime{};
                 localtime_s(&localTime, &timeT);
 
@@ -191,76 +193,112 @@ void logger_with_level(int level, const char* message, ...)
 
 void ForceLog(const char* message, ...)
 {
-        if (!message)
-        {
-                return;
-        }
+    if (!message)
+    {
+        return;
+    }
 
-        if (!g_oFile)
-        {
-                openLogger();
-        }
+    va_list args;
+    va_start(args, message);
 
-        if (!g_oFile)
-        {
-                return;
-        }
+    if (!g_oFile)
+    {
+        // Early startup: avoid CRT-heavy logger open (can fast-fail).
+        // Emit via debugger output only.
+        char buf[2048];
+        _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, message, args);
+        OutputDebugStringA(buf);
+        OutputDebugStringA("\n");
 
-        va_list args;
-        va_start(args, message);
-
-        const uint64_t timestamp = GetTimestampMs();
-        const DWORD threadId = GetCurrentThreadId();
-        const std::string line = BuildLogLine(0, message, args, timestamp, threadId);
         va_end(args);
+        return;
+    }
 
-        if (line.empty())
-        {
-                return;
-        }
+    const uint64_t timestamp = GetTimestampMs();
+    const DWORD threadId = GetCurrentThreadId();
+    const std::string line = BuildLogLine(0, message, args, timestamp, threadId);
 
-        {
-                const std::lock_guard<std::mutex> lock(g_logMutex);
-                fputs(line.c_str(), g_oFile);
-                fflush(g_oFile);
-        }
+    va_end(args);
 
-        AppendCrashLogEntry(0, line, timestamp, threadId);
+    if (line.empty())
+    {
+        return;
+    }
+
+    {
+        const std::lock_guard<std::mutex> lock(g_logMutex);
+        fputs(line.c_str(), g_oFile);
+        fflush(g_oFile);
+    }
+
+    AppendCrashLogEntry(0, line, timestamp, threadId);
 }
 
 void openLogger()
 {
-        if (g_oFile)
-        {
-                return;
-        }
+    if (g_oFile)
+    {
+        return;
+    }
 
-        EnsureLogDirectory();
-        g_oFile = _wfopen(L"BBCF_IM\\DEBUG.txt", L"w, ccs=UTF-8");
-        if (!g_oFile)
-        {
-                g_isLoggingEnabled = false;
-                return;
-        }
+    EnsureLogDirectory();
 
-        char* time = getFullDate();
+    // Use WinAPI to create/overwrite the file safely.
+    HANDLE hFile = CreateFileW(
+        L"BBCF_IM\\DEBUG.txt",
+        GENERIC_WRITE,
+        FILE_SHARE_READ,                 // allow reading while writing
+        nullptr,
+        CREATE_ALWAYS,                   // overwrite each run like "w"
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
 
-        fprintf(g_oFile, "\n\n\n\n");
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        g_isLoggingEnabled = false;
+        return;
+    }
 
-        if (time)
-        {
-                fprintf(g_oFile, "BBCF_FIX START - %s\n", time);
-                free(time);
-        }
-        else
-        {
-                fprintf(g_oFile, "BBCF_FIX START - {Couldn't get the current time}\n");
-        }
+    // Convert HANDLE to CRT FILE* so existing fputs/fprintf code still works.
+    int fd = _open_osfhandle(reinterpret_cast<intptr_t>(hFile), _O_WRONLY | _O_TEXT);
+    if (fd == -1)
+    {
+        CloseHandle(hFile);
+        g_isLoggingEnabled = false;
+        return;
+    }
 
-        fprintf(g_oFile, "/////////////////////////////////////\n");
-        fprintf(g_oFile, "/////////////////////////////////////\n\n");
-        fflush(g_oFile);
+    FILE* f = _fdopen(fd, "w");
+    if (!f)
+    {
+        _close(fd); // this will also close the underlying handle
+        g_isLoggingEnabled = false;
+        return;
+    }
+
+    g_oFile = f;
+    g_isLoggingEnabled = true;
+
+    // --- existing header writing, unchanged ---
+    char* time = getFullDate();
+
+    fprintf(g_oFile, "\n\n\n\n");
+
+    if (time)
+    {
+        fprintf(g_oFile, "BBCF_FIX START - %s\n", time);
+        free(time);
+    }
+    else
+    {
+        fprintf(g_oFile, "BBCF_FIX START - {Couldn't get the current time}\n");
+    }
+
+    fprintf(g_oFile, "/////////////////////////////////////\n");
+    fprintf(g_oFile, "/////////////////////////////////////\n\n");
+    fflush(g_oFile);
 }
+
 
 void closeLogger()
 {

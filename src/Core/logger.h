@@ -18,12 +18,12 @@
 //Use this to log in naked asm functions
 #define LOG_ASM(_level, ...)                                                                                              \
         {                                                                                                                 \
-                __asm{__asm pushad };                                                                                     \
+                __asm { pushad }                                                                                          \
                 if (IsLoggingEnabled() && DEBUG_LOG_LEVEL >= _level)                                                      \
                 {                                                                                                         \
-                        { logger_with_level(_level, __VA_ARGS__); }                                                       \
+                        logger_with_level(_level, __VA_ARGS__);                                                           \
                 }                                                                                                         \
-                __asm{__asm popad };                                                                                      \
+                __asm { popad }                                                                                           \
         }
 
 void logger_with_level(int level, const char* message, ...);
