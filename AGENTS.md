@@ -25,8 +25,8 @@ This handbook is a one-stop map for agents modifying the BBCF Improvement Mod. T
 ## Core systems (`src/Core/`)
 - **`dllmain.cpp`**: Entry point, loader for the original `dinput8.dll`, startup/shutdown choreography, and exported `DirectInput8Create` forwarder.
 - **`Settings.*`**: Parses `settings.ini`, initializes defaults from `settings.def`, persists saved settings, and exposes `settingsIni`/`savedSettings` structs consumed across the codebase.
-- **`logger.*`**: File-based logger with verbosity levels and helper macros (`LOG`, `LOG_ASM`); opens during startup and closes on shutdown.
-- **`crashdump.*`**: Installs `UnhandledExFilter` to produce crash dumps inside `BBCF_IM/` for post-mortem debugging.
+- **`logger.*`**: UTF-8 logger with verbosity levels, thread/level/timestamp prefixes, and an in-memory ring buffer (`GetRecentLogs`) used by crash reporting. Opens `BBCF_IM/DEBUG.txt` during startup and flushes immediately on every write.
+- **`crashdump.*`**: Installs `UnhandledExFilter` to emit enriched crash bundles in `BBCF_IM/CrashReports/Crash_<timestamp>/`, including the `.dmp` with an embedded log user stream, a `logs.txt` snapshot of the ring buffer, and a `crash_context.txt` summary.
 - **`interfaces.*`**: Global `g_interfaces` and `g_tempVals` structs that store pointers to managers (palette, network, overlay, Steam wrappers), Direct3D devices/effects/sprites, and live game state (players, HUD toggles, stage/music selectors). Hooks populate these pointers so overlays and managers can coordinate.
 - **`utils.*`, `info.h`, `keycodes.h`**: Misc helpers (string formatting, file IO, Win32 wrappers), build/version metadata, and virtual-key definitions shared by hotkey code.
 
