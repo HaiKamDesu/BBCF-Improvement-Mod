@@ -8,6 +8,7 @@
 #include <codecvt>
 #include <dbghelp.h>
 #include <limits>
+#include <locale>
 #include <shlobj.h>
 #include <sstream>
 #include <string>
@@ -202,4 +203,6 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 
         MessageBox(NULL, messageBuffer, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
         ExitProcess(0);
+
+        return EXCEPTION_EXECUTE_HANDLER;
 }

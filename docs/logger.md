@@ -1,21 +1,26 @@
-# Logger usage and LOG macro semantics
+# Logger and crash-logging pipeline
 
-This project’s logging is compiled out by default in release builds, which is why a `DEBUG.txt` file might not appear even though the code calls `LOG`. The key pieces live in [`src/Core/logger.h`](../src/Core/logger.h) and [`src/Core/logger.cpp`](../src/Core/logger.cpp).
+The logger now produces UTF-8 prefixed output, preserves a crash-safe in-memory ring buffer, and feeds that data into crash bundles. The key pieces live in [`src/Core/logger.h`](../src/Core/logger.h) and [`src/Core/logger.cpp`](../src/Core/logger.cpp).
 
 ## When logging is enabled
-- Logging code only compiles when either `_DEBUG` is defined **or** `FORCE_LOGGING` is set to `1` in `logger.h`. The shipped configuration has `FORCE_LOGGING 0`, so release builds with `_DEBUG` unset will not emit any logs.
-- To force logs in release, change `#define FORCE_LOGGING 0` to `1` and rebuild. To keep release silent, leave it at `0` and use a Debug configuration instead.
+- The mod enables logging as part of startup (`BBCF_IM_Start`), opening `BBCF_IM/DEBUG.txt`. `SetLoggingEnabled(false)` is the only runtime switch-off and is used during teardown.
+- `IsLoggingEnabled()` checks both the internal flag and the existence of the backing file to keep calls cheap and guard the macros.
 
 ## How LOG works
-- `LOG(level, fmt, ...)` expands to a call to `logger(fmt, ...)` when the requested `level` is **less than or equal to** `DEBUG_LOG_LEVEL` (default `5`, where `0` is highest priority and `7` is lowest). A higher `DEBUG_LOG_LEVEL` allows more verbose output.
-- If logging is disabled by the `_DEBUG`/`FORCE_LOGGING` gate, `LOG` expands to an empty block and produces no code or file output.
-- `LOG_ASM` is identical in spirit but wraps the call with `pushad/popad` for use inside naked assembly hooks.
+- `LOG(level, fmt, ...)` writes when the requested `level` is **less than or equal to** `DEBUG_LOG_LEVEL` (default `5`, where `0` is highest priority and `7` is lowest). The macro is safe to call anywhere; when disabled it becomes a fast guard.
+- Messages are formatted via `printf`-style arguments, prefixed with `[YYYY-MM-DD HH:MM:SS.mmm][T<threadId>][L<level>]`, terminated with a newline, and flushed immediately. The same text is copied into an in-memory ring buffer for crash capture.
+- `LOG_ASM` mirrors `LOG` but wraps the call with `pushad/popad` for naked assembly hooks.
+- `ForceLog(fmt, ...)` bypasses the enable flag, lazily opening the log file if it was never created. Use this in crash/early-failure paths.
 
 ## Where the log file goes
-- `openLogger()` (called from `BBCF_IM_Start` during DLL attach) opens `DEBUG.txt` for writing in the game’s working directory and writes a header with the current timestamp. `closeLogger()` writes a footer and closes the file on shutdown.
-- Every `LOG` call writes directly to `DEBUG.txt` via `vfprintf` and flushes immediately. No external rotation or buffering occurs beyond C stdio.
+- `BBCF_IM/DEBUG.txt` (UTF-8 with BOM) is created on demand inside the game directory. The directory is auto-created if missing.
+- Logs are unbuffered beyond stdio’s internal buffering; every write is flushed so the file remains current in the event of a crash.
+
+## Crash-safe ring buffer
+- `GetRecentLogs()` returns the newest entries stored in a 2,048-line ring buffer held in memory. This data is written into crash bundles and injected as a user stream inside `.dmp` files for post-mortem analysis.
+- The ring buffer captures the same formatted lines that reach disk, giving a consistent view between the bundle and on-disk log.
 
 ## Practical steps to see logs
-1. Decide whether to build with `_DEBUG` defined (Debug configuration) or temporarily set `FORCE_LOGGING` to `1` in `logger.h`.
-2. Rebuild the DLL and drop it next to `BBCF.exe`.
-3. Run the game; after `openLogger()` executes, `DEBUG.txt` should appear beside the executable. The entries from `RegisterCreatedDevice*`, `BounceTrackedDevices`, and any other `LOG` sites will stream there while the process runs.
+1. Build the DLL (Debug or Release) and place it next to `BBCF.exe`.
+2. Run the game; `BBCF_IM/DEBUG.txt` will appear after startup and will include thread/level/timestamp prefixes.
+3. If a crash occurs, look in `BBCF_IM/CrashReports/Crash_<timestamp>/` for `logs.txt` (ring buffer), `crash_context.txt`, and the `.dmp` file with embedded log stream.
