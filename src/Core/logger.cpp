@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <ctime>
+#include <cstdint>
 #include <mutex>
 #include <sstream>
 #include <string>

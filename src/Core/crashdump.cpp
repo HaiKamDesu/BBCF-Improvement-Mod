@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <codecvt>
+#include <cstdint>
 #include <dbghelp.h>
 #include <limits>
 #include <locale>
@@ -14,6 +15,18 @@
 #include <string>
 #include <tchar.h>
 #include <windows.h>
+
+#ifndef MiniDumpWithFullMemoryInfo
+#define MiniDumpWithFullMemoryInfo (0x00000800)
+#endif
+
+#ifndef MiniDumpWithThreadInfo
+#define MiniDumpWithThreadInfo (0x00001000)
+#endif
+
+#ifndef MiniDumpWithUnloadedModules
+#define MiniDumpWithUnloadedModules (0x00002000)
+#endif
 
 namespace
 {
