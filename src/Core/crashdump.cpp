@@ -90,6 +90,7 @@ namespace
                 const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
                 if (length == 0 || length >= MAX_PATH)
                 {
+                        ForceLog("[Crash] GetModuleFileNameW failed (len=%lu err=%lu)\n", length, GetLastError());
                         return std::wstring();
                 }
 
@@ -97,6 +98,7 @@ namespace
                 const size_t lastSlash = path.find_last_of(L"\\/");
                 if (lastSlash == std::wstring::npos)
                 {
+                        ForceLog("[Crash] Failed to locate executable directory for %s\n", ToUtf8(path).c_str());
                         return std::wstring();
                 }
 
@@ -108,6 +110,7 @@ namespace
                 const std::wstring exeDir = GetExecutableDirectory();
                 if (exeDir.empty())
                 {
+                        ForceLog("[Crash] Falling back to relative CrashReports path.\n");
                         return L"BBCF_IM\\CrashReports";
                 }
 
@@ -198,12 +201,19 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 return;
         }
 
+        ForceLog("[Crash] WriteCrashBundle invoked (reason=%s, showDialog=%d)\n",
+                 reason ? reason : "<null>", showDialog ? 1 : 0);
+
         MiniDumpWriteDump_t pMiniDumpWriteDump = nullptr;
 
         HMODULE hLib = LoadLibrary(_T("dbghelp"));
         if (hLib)
         {
                 pMiniDumpWriteDump = reinterpret_cast<MiniDumpWriteDump_t>(GetProcAddress(hLib, "MiniDumpWriteDump"));
+        }
+        else
+        {
+                ForceLog("[Crash] LoadLibrary(dbghelp) failed err=%lu\n", GetLastError());
         }
 
         const std::wstring timestamp = BuildTimestamp();
@@ -213,11 +223,17 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         const std::wstring logsPath = JoinPath(crashDir, L"logs.txt");
         const std::wstring contextPath = JoinPath(crashDir, L"crash_context.txt");
 
+        ForceLog("[Crash] Crash bundle paths: root=%s dir=%s dump=%s\n",
+                 ToUtf8(crashRoot).c_str(),
+                 ToUtf8(crashDir).c_str(),
+                 ToUtf8(dumpPath).c_str());
+
         EnsureDirectory(crashRoot);
         EnsureDirectory(crashDir);
 
         const std::string recentLogs = GetRecentLogs();
         WriteTextFile(logsPath, recentLogs);
+        ForceLog("[Crash] Wrote logs snapshot (%zu bytes) to %s\n", recentLogs.size(), ToUtf8(logsPath).c_str());
 
         std::string context = BuildContextText(ExPtr, dumpPath);
         if (reason)
@@ -227,6 +243,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 context.push_back('\n');
         }
         WriteTextFile(contextPath, context);
+        ForceLog("[Crash] Wrote crash context (%zu bytes) to %s\n", context.size(), ToUtf8(contextPath).c_str());
 
         const std::string payload = BuildUserStreamPayload(context, recentLogs);
         const ULONG payloadSize = static_cast<ULONG>(std::min<size_t>(payload.size(), std::numeric_limits<ULONG>::max()));
@@ -254,10 +271,12 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
 
                         if (!win)
                         {
+                                ForceLog("[Crash] MiniDumpWriteDump failed err=%lu\n", GetLastError());
                                 wsprintf(messageBuffer, _T("MiniDumpWriteDump failed. Error: %u\n%ls"), GetLastError(), dumpPath.c_str());
                         }
                         else
                         {
+                                ForceLog("[Crash] MiniDumpWriteDump succeeded for %s\n", ToUtf8(dumpPath).c_str());
                                 wsprintf(messageBuffer, _T("Crash bundle created:\n%ls"), crashDir.c_str());
                         }
                         CloseHandle(hFile);
@@ -284,6 +303,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
 
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
+        ForceLog("[Crash] UnhandledExFilter invoked.\n");
         WriteCrashBundle("Unhandled exception", ExPtr, true);
 
         ExitProcess(0);
@@ -304,6 +324,7 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         // the standard unhandled filter.
         if (code == STATUS_HEAP_CORRUPTION || code == STATUS_FATAL_APP_EXIT)
         {
+                ForceLog("[Crash] VectoredCrashHandler caught code=0x%08X\n", code);
                 WriteCrashBundle("Vectored crash handler", ExPtr, true);
                 ExitProcess(0);
                 return EXCEPTION_CONTINUE_SEARCH;
@@ -317,7 +338,9 @@ void InstallCrashHandlers()
         if (!g_vectoredHandler)
         {
                 g_vectoredHandler = AddVectoredExceptionHandler(1, VectoredCrashHandler);
+                ForceLog("[Crash] Vectored exception handler installed (%p).\n", g_vectoredHandler);
         }
 
         SetUnhandledExceptionFilter(UnhandledExFilter);
+        ForceLog("[Crash] Unhandled exception filter installed.\n");
 }
