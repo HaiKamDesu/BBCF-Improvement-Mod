@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <codecvt>
+#include <atomic>
 #include <cstdint>
 #include <dbghelp.h>
 #include <limits>
@@ -32,9 +33,20 @@
 #define MiniDumpWithUnloadedModules (0x00002000)
 #endif
 
+#ifndef STATUS_HEAP_CORRUPTION
+#define STATUS_HEAP_CORRUPTION static_cast<DWORD>(0xC0000374L)
+#endif
+
+#ifndef STATUS_FATAL_APP_EXIT
+#define STATUS_FATAL_APP_EXIT static_cast<DWORD>(0x40000015L)
+#endif
+
 namespace
 {
         using MiniDumpWriteDump_t = BOOL(WINAPI*)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, const MINIDUMP_EXCEPTION_INFORMATION*, const MINIDUMP_USER_STREAM_INFORMATION*, const MINIDUMP_CALLBACK_INFORMATION*);
+
+        std::atomic<bool> g_crashBundleWritten{ false };
+        PVOID g_vectoredHandler = nullptr;
 
         std::string ToUtf8(const std::wstring& value)
         {
@@ -72,9 +84,43 @@ namespace
                 return left + L"\\" + right;
         }
 
+        std::wstring GetExecutableDirectory()
+        {
+                wchar_t modulePath[MAX_PATH] = {};
+                const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+                if (length == 0 || length >= MAX_PATH)
+                {
+                        return std::wstring();
+                }
+
+                std::wstring path(modulePath, length);
+                const size_t lastSlash = path.find_last_of(L"\\/");
+                if (lastSlash == std::wstring::npos)
+                {
+                        return std::wstring();
+                }
+
+                return path.substr(0, lastSlash);
+        }
+
+        std::wstring GetCrashRootDirectory()
+        {
+                const std::wstring exeDir = GetExecutableDirectory();
+                if (exeDir.empty())
+                {
+                        return L"BBCF_IM\\CrashReports";
+                }
+
+                return JoinPath(exeDir, L"BBCF_IM\\CrashReports");
+        }
+
         void EnsureDirectory(const std::wstring& path)
         {
-                SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
+                const int result = SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
+                if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
+                {
+                        ForceLog("[Crash] Failed to ensure directory %s (err=%d)\n", ToUtf8(path).c_str(), result);
+                }
         }
 
         void WriteTextFile(const std::wstring& path, const std::string& content)
@@ -145,8 +191,13 @@ namespace
         }
 }
 
-LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
+void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog)
 {
+        if (g_crashBundleWritten.exchange(true))
+        {
+                return;
+        }
+
         MiniDumpWriteDump_t pMiniDumpWriteDump = nullptr;
 
         HMODULE hLib = LoadLibrary(_T("dbghelp"));
@@ -156,20 +207,25 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
         }
 
         const std::wstring timestamp = BuildTimestamp();
-        const std::wstring crashRoot = L"BBCF_IM\\CrashReports";
+        const std::wstring crashRoot = GetCrashRootDirectory();
         const std::wstring crashDir = JoinPath(crashRoot, L"Crash_" + timestamp);
         const std::wstring dumpPath = JoinPath(crashDir, L"crash.dmp");
         const std::wstring logsPath = JoinPath(crashDir, L"logs.txt");
         const std::wstring contextPath = JoinPath(crashDir, L"crash_context.txt");
 
-        EnsureDirectory(L"BBCF_IM");
         EnsureDirectory(crashRoot);
         EnsureDirectory(crashDir);
 
         const std::string recentLogs = GetRecentLogs();
         WriteTextFile(logsPath, recentLogs);
 
-        const std::string context = BuildContextText(ExPtr, dumpPath);
+        std::string context = BuildContextText(ExPtr, dumpPath);
+        if (reason)
+        {
+                context.append("Reason: ");
+                context.append(reason);
+                context.push_back('\n');
+        }
         WriteTextFile(contextPath, context);
 
         const std::string payload = BuildUserStreamPayload(context, recentLogs);
@@ -186,7 +242,7 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
         wchar_t messageBuffer[MAX_PATH * 2] = {};
         if (pMiniDumpWriteDump)
         {
-                HANDLE hFile = CreateFileW(dumpPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                HANDLE hFile = CreateFileW(dumpPath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
@@ -208,7 +264,9 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
                 }
                 else
                 {
-                        wsprintf(messageBuffer, _T("Could not create dump file at:\n%ls"), dumpPath.c_str());
+                        const DWORD err = GetLastError();
+                        ForceLog("[Crash] CreateFileW failed for dump path %s (err=%lu)\n", ToUtf8(dumpPath).c_str(), err);
+                        wsprintf(messageBuffer, _T("Could not create dump file at:\n%ls\nError: %lu"), dumpPath.c_str(), err);
                 }
         }
         else
@@ -218,8 +276,48 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 
         ForceLog("[Crash] Bundle written to %s\n", ToUtf8(crashDir).c_str());
 
-        MessageBox(NULL, messageBuffer, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
+        if (showDialog)
+        {
+                MessageBox(NULL, messageBuffer, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
+        }
+}
+
+LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
+{
+        WriteCrashBundle("Unhandled exception", ExPtr, true);
+
         ExitProcess(0);
 
         return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
+{
+        if (!ExPtr || !ExPtr->ExceptionRecord)
+        {
+                return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        const DWORD code = ExPtr->ExceptionRecord->ExceptionCode;
+
+        // Catch heap corruption and other fail-fast style exceptions that may bypass
+        // the standard unhandled filter.
+        if (code == STATUS_HEAP_CORRUPTION || code == STATUS_FATAL_APP_EXIT)
+        {
+                WriteCrashBundle("Vectored crash handler", ExPtr, true);
+                ExitProcess(0);
+                return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void InstallCrashHandlers()
+{
+        if (!g_vectoredHandler)
+        {
+                g_vectoredHandler = AddVectoredExceptionHandler(1, VectoredCrashHandler);
+        }
+
+        SetUnhandledExceptionFilter(UnhandledExFilter);
 }

@@ -2363,11 +2363,13 @@ void ControllerOverrideManager::SendDeviceChangeBroadcast() const
 
 void ControllerOverrideManager::ReinitializeGameInputs()
 {
+        LOG(1, "ControllerOverrideManager::ReinitializeGameInputs - begin\n");
         BounceTrackedDevices();
         DebugDumpTrackedDevices();
         DebugLogPadSlot0();
         SendDeviceChangeBroadcast();
         RedetectControllers_Internal();
+        LOG(1, "ControllerOverrideManager::ReinitializeGameInputs - end\n");
 }
 
 void ControllerOverrideManager::ProcessPendingDeviceChange()
@@ -3159,8 +3161,10 @@ void ControllerOverrideManager::TryEnumerateWinmmDevices(std::vector<ControllerD
         for (UINT deviceId = 0; deviceId < deviceCount; ++deviceId)
         {
                 JOYCAPSW caps{};
-                if (joyGetDevCapsW(deviceId, &caps, sizeof(caps)) != JOYERR_NOERROR)
+                const MMRESULT capsResult = joyGetDevCapsW(deviceId, &caps, sizeof(caps));
+                if (capsResult != JOYERR_NOERROR)
                 {
+                        LOG(2, "  [WINMM] Device id=%u caps lookup failed err=0x%08X\n", deviceId, capsResult);
                         continue;
                 }
 
@@ -3168,8 +3172,10 @@ void ControllerOverrideManager::TryEnumerateWinmmDevices(std::vector<ControllerD
                 state.dwSize = sizeof(state);
                 state.dwFlags = JOY_RETURNALL;
 
-                if (joyGetPosEx(deviceId, &state) != JOYERR_NOERROR)
+                const MMRESULT posResult = joyGetPosEx(deviceId, &state);
+                if (posResult != JOYERR_NOERROR)
                 {
+                        LOG(2, "  [WINMM] Device id=%u state query failed err=0x%08X\n", deviceId, posResult);
                         continue; // Filter out unplugged or placeholder devices
                 }
 
