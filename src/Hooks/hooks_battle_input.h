@@ -53,8 +53,3 @@ InputState GetLastObservedBattleInput(uint32_t playerIndex);
 
 // Returns the last value that was written back into the game (after overrides).
 InputState GetLastAppliedBattleInput(uint32_t playerIndex);
-
-// PoC toggle: when enabled, pressing down on P1 forces P2 to walk forward. This is
-// useful to keep the original Cheat Engine demonstration available without keeping the
-// hard-coded logic in the hook itself.
-void SetBattleInputDemoEnabled(bool enabled);
