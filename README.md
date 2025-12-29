@@ -37,8 +37,13 @@ To compile, you should only need to load the sln file and compile as-is. No chan
 Copy the compiled binary, settings.ini, and palettes.ini files from the bin/ folder into the game's root folder. The embedded localization resources mean no extra language files are needed at runtime.
 
 
-### FrameHistory: 
-frameHistory is a frame meter with two rows for each character. For each non-idle frame, it displays a column of rectangles. 
+## Crash reports and troubleshooting
+- If the game crashes while the mod is loaded, a bundle is created under `BBCF_IM/CrashReports/Crash_<timestamp>/` containing `crash.dmp`, `logs.txt` (recent log ring buffer), and `crash_context.txt` (exception and mod metadata).
+- Please zip the entire `Crash_<timestamp>` folder and share it with the developers; it already includes the embedded log stream inside the `.dmp` for debugging.
+
+
+### FrameHistory:
+frameHistory is a frame meter with two rows for each character. For each non-idle frame, it displays a column of rectangles.
 - For each player:
     + The first row displays player state. The colors are as follows 
         - Hard landing recovery -> blush
