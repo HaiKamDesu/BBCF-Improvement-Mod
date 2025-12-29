@@ -28,8 +28,6 @@ namespace
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastObservedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastAppliedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
 
-    bool g_demoEnabled = true; // Keep the original PoC behavior active by default for now.
-    bool g_demoShouldForceP2Forward = false;
 
     uint16_t BuildDirectionFromState(const InputState& state)
     {
@@ -49,26 +47,6 @@ namespace
         return INPUT_DIRECTION_NEUTRAL;
     }
 
-    void UpdateDemoOverride(uint32_t playerIndex, const InputState& observed)
-    {
-        if (!g_demoEnabled)
-        {
-            return;
-        }
-
-        if (playerIndex == 0)
-        {
-            // The original PoC trigger: crouch on P1 (direction 2).
-            g_demoShouldForceP2Forward = observed.down && !observed.up && !observed.left && !observed.right;
-        }
-        else if (playerIndex == 1 && g_demoShouldForceP2Forward)
-        {
-            InputState forced{};
-            forced.right = true;
-            OverrideBattleInput(playerIndex, forced, 1);
-        }
-    }
-
     uint16_t __cdecl ProcessBattleInput(uint16_t packedInput, uint32_t playerIndex)
     {
         if (playerIndex >= MAX_BATTLE_PLAYERS)
@@ -77,7 +55,6 @@ namespace
         }
 
         g_lastObservedPacked[playerIndex] = packedInput;
-        UpdateDemoOverride(playerIndex, InputState::FromPackedValue(packedInput));
 
         OverrideState& overrideState = g_overrideState[playerIndex];
         if (overrideState.active)
@@ -224,12 +201,6 @@ InputState GetLastAppliedBattleInput(uint32_t playerIndex)
     }
 
     return InputState::FromPackedValue(g_lastAppliedPacked[playerIndex]);
-}
-
-void SetBattleInputDemoEnabled(bool enabled)
-{
-    g_demoEnabled = enabled;
-    g_demoShouldForceP2Forward = false;
 }
 
 void __declspec(naked) BattleInputWrite_Hook()
