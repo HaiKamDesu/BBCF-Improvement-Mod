@@ -221,6 +221,26 @@ bool SteamMatchmakingWrapper::GetCachedRankedHostLevel(uint64_t steamId, uint32_
 	return false;
 }
 
+bool SteamMatchmakingWrapper::GetCachedRankedHostLevelByLobby(uint64_t lobbyId, uint64_t* outSteamId, uint32_t* outInternalRank) const
+{
+	if (!outSteamId || !outInternalRank || lobbyId == 0u)
+	{
+		return false;
+	}
+
+	for (auto it = m_rankedHostLevelCache.rbegin(); it != m_rankedHostLevelCache.rend(); ++it)
+	{
+		if (it->lobbyId == lobbyId)
+		{
+			*outSteamId = it->steamId;
+			*outInternalRank = it->internalRank;
+			return it->steamId != 0u;
+		}
+	}
+
+	return false;
+}
+
 int SteamMatchmakingWrapper::GetFavoriteGameCount()
 {
 	LOG(7, "SteamMatchmakingWrapper GetFavoriteGameCount\n");

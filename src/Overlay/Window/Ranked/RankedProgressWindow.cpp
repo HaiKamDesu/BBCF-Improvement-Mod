@@ -3157,6 +3157,11 @@ namespace
 		return state == 4 && (state1 == 30 || state1 == 31 || state1 == 34);
 	}
 
+	bool IsRankedSearchResultsMenuState(int state, int state1)
+	{
+		return state == 4 && (state1 == 36 || state1 == 38 || state1 == 39);
+	}
+
 	struct RankedNetworkLite
 	{
 		int state = -1;
@@ -3168,6 +3173,7 @@ namespace
 		int x14 = -1;
 		int xe0 = -1;   // read in RankedStep fn at 004a47c0 — may indicate lobby-closed
 		int xf4 = -1;   // read in RankedStep case 9 — checked == 3 (set format?)
+		int lobbyIndex = -1;
 	};
 
 	struct RankedVictoryStepLite
@@ -3198,7 +3204,7 @@ namespace
 		}
 
 		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
-		if (IsBadReadPtr(network, 0xf8))
+		if (IsBadReadPtr(network, 0x1f0))
 		{
 			return false;
 		}
@@ -3211,6 +3217,7 @@ namespace
 		outState->x14    = *reinterpret_cast<const int*>(network + 0x14);
 		outState->xe0    = *reinterpret_cast<const int*>(network + 0xe0);
 		outState->xf4    = *reinterpret_cast<const int*>(network + 0xf4);
+		outState->lobbyIndex = *reinterpret_cast<const int*>(network + 0x1ec);
 		return true;
 	}
 
@@ -4911,6 +4918,50 @@ namespace
 		return true;
 	}
 
+	bool TryGetRankedPredictionLobbyOpponent(
+		const RankedNetworkLite& networkState,
+		uint64_t* outSteamId,
+		uint32_t* outCharacterId)
+	{
+		if (!outSteamId || !outCharacterId || !g_interfaces.pSteamMatchmakingWrapper || networkState.lobbyIndex < 0)
+		{
+			return false;
+		}
+
+		*outSteamId = 0u;
+		*outCharacterId = kInvalidRankedCharacterId;
+
+		const CSteamID lobbyId = g_interfaces.pSteamMatchmakingWrapper->GetLobbyByIndex(networkState.lobbyIndex);
+		if (lobbyId.ConvertToUint64() == 0u)
+		{
+			return false;
+		}
+
+		const char* const rankHostLevel = g_interfaces.pSteamMatchmakingWrapper->GetLobbyData(lobbyId, "RANK_HOST_LEVEL");
+		if (!rankHostLevel || rankHostLevel[0] == '\0')
+		{
+			return false;
+		}
+
+		uint64_t opponentSteamId = g_interfaces.pSteamMatchmakingWrapper->GetLobbyOwner(lobbyId).ConvertToUint64();
+		if (opponentSteamId == 0u)
+		{
+			uint32_t unusedInternalRank = 0;
+			g_interfaces.pSteamMatchmakingWrapper->GetCachedRankedHostLevelByLobby(
+				lobbyId.ConvertToUint64(),
+				&opponentSteamId,
+				&unusedInternalRank);
+		}
+
+		if (opponentSteamId == 0u)
+		{
+			return false;
+		}
+
+		*outSteamId = opponentSteamId;
+		return true;
+	}
+
 	bool IsRankedPredictionMenuState(const RankedNetworkLite& networkState)
 	{
 		if (networkState.state != 4)
@@ -4919,6 +4970,19 @@ namespace
 		}
 
 		return networkState.state1 >= 43 && networkState.state1 <= 48;
+	}
+
+	bool IsRankedTrainingSearchOpponentPopup(int gameState, const RankedNetworkLite& networkState)
+	{
+		return gameState == GameState_InMatch &&
+			networkState.lobbyIndex >= 0 &&
+			IsRankedSearchResultsMenuState(networkState.state, networkState.state1);
+	}
+
+	bool IsRankedPredictionContextState(int gameState, const RankedNetworkLite& networkState)
+	{
+		return IsRankedPredictionMenuState(networkState) ||
+			IsRankedTrainingSearchOpponentPopup(gameState, networkState);
 	}
 
 	// Returns true whenever the victory screen (gstate 16/17/18) is showing AND ranked
@@ -5255,9 +5319,9 @@ namespace
 			return;
 		}
 		const bool inPostMatchRematch = IsRankedVictoryWindowState(gameState, networkState);
-		const bool predictionContext = IsRankedPredictionMenuState(networkState) || rankedRematchScreen || inPostMatchRematch;
+		const bool predictionContext = IsRankedPredictionContextState(gameState, networkState) || rankedRematchScreen || inPostMatchRematch;
 		const double now = ImGui::GetTime();
-		if (inMatch)
+		if (inMatch && !predictionContext)
 		{
 			// Keep the cache warm with in-match opponent data so it's immediately valid
 			// when the match ends and the post-match rematch lobby appears.
@@ -5291,6 +5355,10 @@ namespace
 		{
 			s_lastPredictionOpponentPollAt = now;
 			hasOpponentSteamId = TryGetRankedPredictionOpponent(&opponentSteamId, &opponentCharacterId);
+			if (!hasOpponentSteamId && IsRankedPredictionContextState(gameState, networkState))
+			{
+				hasOpponentSteamId = TryGetRankedPredictionLobbyOpponent(networkState, &opponentSteamId, &opponentCharacterId);
+			}
 			if (hasOpponentSteamId)
 			{
 				s_lastPredictionOpponentSteamId = opponentSteamId;
@@ -5299,7 +5367,7 @@ namespace
 			}
 		}
 		if (!hasOpponentSteamId &&
-			(IsRankedPredictionMenuState(networkState) || rankedRematchScreen || inPostMatchRematch) &&
+			(predictionContext || rankedRematchScreen || inPostMatchRematch) &&
 			s_lastPredictionOpponentSteamId != 0u &&
 			now < s_lastPredictionOpponentSeenAt + 15.0)
 		{
@@ -5514,13 +5582,25 @@ void DrawRankedProgressOverlayStandalone()
 		s_sawState58ThisVictoryCycle = true;
 	}
 	const bool inMatch = currentGameState == GameState_InMatch;
-	const bool rankedEntryActive = ReadRankedEntryFlag() != 0u;
+	const bool inTrainingMatch = inMatch &&
+		g_gameVals.pGameMode &&
+		*g_gameVals.pGameMode == GameMode_Training;
+	const bool rankedPredictionMenuState = hasNetworkState &&
+		IsRankedPredictionContextState(currentGameState, networkState);
+	const bool rankedSearchResultsMenuState = hasNetworkState &&
+		IsRankedSearchResultsMenuState(networkState.state, networkState.state1);
+	const bool rankedSearchProgressVisible =
+		rankedSearchResultsMenuState &&
+		(!inTrainingMatch || rankedPredictionMenuState);
 	const bool rankedRematchScreen = hasNetworkState &&
 		hasVictoryStep &&
 		IsRankedPredictionRematchScreen(networkState, victoryStep);
 	const bool inPostMatchRematch = hasNetworkState &&
 		IsRankedVictoryWindowState(currentGameState, networkState);
-	if (hasLiveSnapshot || rankedRematchScreen || inPostMatchRematch)
+	const bool rankedEntryActive =
+		(rankedPredictionMenuState || rankedRematchScreen || inPostMatchRematch) &&
+		ReadRankedEntryFlag() != 0u;
+	if (hasLiveSnapshot || rankedSearchProgressVisible || rankedPredictionMenuState || rankedRematchScreen || inPostMatchRematch)
 	{
 		g_rankedOverlayVisibility.stickyRankedSessionVisible = true;
 	}
@@ -5535,8 +5615,12 @@ void DrawRankedProgressOverlayStandalone()
 			currentGameState <= GameState_VictoryScreen2;
 		const bool rankedSessionStillActive =
 			!inMatch &&
-			(rankedEntryActive || rankedRematchScreen || inPostMatchRematch || inPostMatchTransition ||
-			 (hasNetworkState && networkState.state == 4));
+			(rankedSearchProgressVisible ||
+			 rankedPredictionMenuState ||
+			 rankedRematchScreen ||
+			 inPostMatchRematch ||
+			 inPostMatchTransition ||
+			 (hasNetworkState && IsRankedProgressMenuState(networkState.state, networkState.state1)));
 		if (!rankedSessionStillActive)
 		{
 			g_rankedOverlayVisibility.stickyRankedSessionVisible = false;

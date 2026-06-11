@@ -25,6 +25,7 @@ public:
 
 	void CacheRankedHostLevel(CSteamID steamIDLobby, const char* value);
 	bool GetCachedRankedHostLevel(uint64_t steamId, uint32_t* outInternalRank) const;
+	bool GetCachedRankedHostLevelByLobby(uint64_t lobbyId, uint64_t* outSteamId, uint32_t* outInternalRank) const;
 
 	int GetFavoriteGameCount();
 	bool GetFavoriteGame(int iGame, AppId_t *pnAppID, uint32 *pnIP, uint16 *pnConnPort, uint16 *pnQueryPort, uint32 *punFlags, uint32 *pRTime32LastPlayedOnServer);
