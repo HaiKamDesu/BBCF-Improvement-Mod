@@ -159,7 +159,7 @@ bool Settings::loadSettingsFile()
 
         if (debugLoggingSettingMissing)
         {
-                settingsIni.generateDebugLogs = true;
+                settingsIni.generateDebugLogs = false;
         }
 	ForceLog("[Init][Settings] raw settings read complete\n");
 

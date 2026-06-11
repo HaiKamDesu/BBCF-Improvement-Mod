@@ -176,7 +176,7 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 
 	if (Settings::WasDebugLoggingSettingMissing())
 	{
-	LOG(2, "GenerateDebugLogs setting missing in settings.ini; defaulting to enabled and adding it automatically.\n");
+	LOG(2, "GenerateDebugLogs setting missing in settings.ini; defaulting to disabled and adding it automatically.\n");
 	Settings::changeSetting("GenerateDebugLogs", Settings::settingsIni.generateDebugLogs ? "1" : "0");
 }
 

@@ -51,6 +51,11 @@ namespace
 	constexpr float kRankedPromotionCounterMidHigherMultiplier = 2.0f;
 	constexpr float kRankedPromotionCounterHighHigherMultiplier = 1.0f;
 
+	bool IsRankedOverlayDiagnosticsEnabled()
+	{
+		return Settings::settingsIni.enableInDevelopmentFeatures;
+	}
+
 	struct RankedLpBoundsTableEntry
 	{
 		int16_t upperOffset;
@@ -207,6 +212,16 @@ namespace
 			uint32_t metadataNextRank = 0;
 			float progress = 0.0f;
 		};
+
+	bool IsRankedDisplayReadyForOverlay(const RankedProgressDisplayState& state)
+	{
+		return state.valid &&
+			!state.isUnranked &&
+			state.thresholdKnown &&
+			state.characterId != kInvalidRankedCharacterId &&
+			state.characterId < kRankAllCharacterId &&
+			state.visibleRank > 0u;
+	}
 
 	enum class RankedPredictionResultKind
 	{
@@ -3287,6 +3302,11 @@ namespace
 
 	void LogRankedSnapshotCore(const char* tag, const RankedProgressOverlaySnapshot& snapshot)
 	{
+		if (!IsRankedOverlayDiagnosticsEnabled())
+		{
+			return;
+		}
+
 		const uint32_t internalRank = snapshot.rawPackedField00 & 0xFFFFu;
 		const uint32_t uploadedPacked = (internalRank << 16) | (snapshot.packedSubscore & 0xFFFFu);
 		const uint32_t rankProgress = snapshot.currentLp >= snapshot.cumulativeBase
@@ -3341,6 +3361,11 @@ namespace
 
 	void LogRankedDisplayStateCore(const char* tag, const RankedProgressDisplayState& state)
 	{
+		if (!IsRankedOverlayDiagnosticsEnabled())
+		{
+			return;
+		}
+
 		const uint32_t internalRank = VisibleRankToInternalRank(state.visibleRank);
 		const uint32_t uploadedPacked = (internalRank << 16) | (state.packedSubscore & 0xFFFFu);
 		const uint32_t rankProgress = state.currentLp >= state.cumulativeBase
@@ -3384,6 +3409,11 @@ namespace
 
 	void MaybeLogRankedRowDump(uint32_t rowIndex, const uint8_t* rowObject, const RankedProgressOverlaySnapshot& snapshot)
 	{
+		if (!IsRankedOverlayDiagnosticsEnabled())
+		{
+			return;
+		}
+
 		if (!rowObject || rowIndex >= 0x40)
 		{
 			return;
@@ -4595,7 +4625,7 @@ namespace
 			s_last.networkState != snapshot.networkState ||
 			s_last.networkState1 != snapshot.networkState1;
 		g_rankedProgressOverlaySnapshot = snapshot;
-		if (changed)
+		if (changed && IsRankedOverlayDiagnosticsEnabled())
 		{
 			LOG(1, "[RANK][OverlayProgress] active=%d row=%u selector=%u cursor=%u rank=%u prev=%u next=%u lp=%u nextLp=%u remainingLp=%u promotion=%u/%u demotion=%u/%u wins=%u matches=%u remainingMatches=%u percent=%.4f state=%d/%d unranked=%d metadataNext=%u packed00=0x%08X packedSub=%u f4=0x%08X raw04=0x%08X raw0C=0x%08X raw10=0x%08X raw14=0x%08X raw18=0x%08X raw20=0x%08X rawE0=0x%08X rawE4=0x%08X rawE8=0x%08X rawEC=0x%08X\n",
 				snapshot.active ? 1 : 0,
@@ -4640,7 +4670,7 @@ namespace
 
 	void ClearRankedProgressOverlaySnapshot(const char* reason)
 	{
-		if (g_rankedProgressOverlaySnapshot.active)
+		if (g_rankedProgressOverlaySnapshot.active && IsRankedOverlayDiagnosticsEnabled())
 		{
 			LOG(1, "[RANK][OverlayProgress] active=0 reason=%s\n", reason ? reason : "(none)");
 		}
@@ -4953,6 +4983,11 @@ namespace
 		uint64_t opponentSteamId,
 		uint32_t opponentCharacterId)
 	{
+		if (!IsRankedOverlayDiagnosticsEnabled())
+		{
+			return;
+		}
+
 		static uint64_t s_lastSignature = 0;
 		uint64_t signature = 1469598103934665603ull;
 		const auto mixSignature = [&signature](uint64_t value) {
@@ -5214,6 +5249,11 @@ namespace
 			LogRankedPredictionVisibility("setting_disabled", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, 0u, kInvalidRankedCharacterId);
 			return;
 		}
+		if (!IsRankedDisplayReadyForOverlay(self))
+		{
+			LogRankedPredictionVisibility("self_not_ready", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, 0u, kInvalidRankedCharacterId);
+			return;
+		}
 		const bool inPostMatchRematch = IsRankedVictoryWindowState(gameState, networkState);
 		const bool predictionContext = IsRankedPredictionMenuState(networkState) || rankedRematchScreen || inPostMatchRematch;
 		const double now = ImGui::GetTime();
@@ -5300,6 +5340,13 @@ namespace
 			hasOpponentInfo = TryGetCachedLobbyOpponentInfo(opponentSteamId, &opponent);
 		}
 
+		const bool opponentRankKnown = hasOpponentInfo && opponent.valid && opponent.visibleRank > 0u;
+		if (!opponentRankKnown)
+		{
+			LogRankedPredictionVisibility("opponent_rank_not_ready", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, opponentSteamId, opponentCharacterId);
+			return;
+		}
+
 		ImGui::SetNextWindowPos(ImVec2(360.0f, 150.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(520.0f, 196.0f), ImGuiCond_FirstUseEver);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0.0f, 0.0f));
@@ -5311,13 +5358,8 @@ namespace
 		}
 
 		const std::string opponentName = opponent.displayName.empty() ? L("Opponent") : opponent.displayName;
-		const bool opponentRankKnown = hasOpponentInfo && opponent.valid && opponent.visibleRank > 0u;
-		const std::string opponentRank = opponentRankKnown
-			? FormatVisibleRankLabel(opponent.visibleRank, false)
-			: std::string(!hasOpponentSteamId ? L("Waiting for opponent...") : (opponent.pending ? L("Loading rank...") : L("Rank unavailable")));
-		const ImVec4 opponentRankColor = opponentRankKnown
-			? GetVisibleRankColor(opponent.visibleRank, false)
-			: g_rankedOverlayTuning.predictionNothingColor;
+		const std::string opponentRank = FormatVisibleRankLabel(opponent.visibleRank, false);
+		const ImVec4 opponentRankColor = GetVisibleRankColor(opponent.visibleRank, false);
 		ImDrawList* const drawList = ImGui::GetWindowDrawList();
 		const float headerWidth = ImGui::GetContentRegionAvail().x;
 		const std::string headerPrefix = opponentName + " ";
@@ -5331,18 +5373,8 @@ namespace
 
 		RankedPredictionOutcome win{};
 		RankedPredictionOutcome loss{};
-		if (opponentRankKnown)
-		{
-			win = PredictRankedWin(self, opponent.internalRank);
-			loss = PredictRankedLoss(self, opponent.internalRank);
-		}
-		else
-		{
-			win.reason = !hasOpponentSteamId
-				? "Waiting for ranked opponent data."
-				: (!hasOpponentCharacter ? "Opponent lobby rank unavailable." : (opponent.pending ? "Waiting for leaderboard lookup." : "Opponent leaderboard entry unavailable."));
-			loss.reason = win.reason;
-		}
+		win = PredictRankedWin(self, opponent.internalRank);
+		loss = PredictRankedLoss(self, opponent.internalRank);
 
 		const ImGuiStyle& style = ImGui::GetStyle();
 		const float separatorWidth = 1.0f;
@@ -5551,48 +5583,11 @@ void DrawRankedProgressOverlayStandalone()
 		return;
 	}
 
-	ImGui::SetNextWindowPos(ImVec2(360.0f, 20.0f), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(640.0f, 108.0f), ImVec2(10000.0f, 180.0f));
-	const float windowAlpha = showUploadCard ? uploadOverlayAlpha : 1.0f;
-	const ImVec4 windowBgColor = ImVec4(0.06f, 0.06f, 0.08f, 0.92f * windowAlpha);
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, windowBgColor);
-	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, windowAlpha);
 	const bool manualRankedProgressWindow =
 		g_manualRankedProgressOpen &&
 		!hasLiveSnapshot &&
 		!g_rankedOverlayVisibility.stickyRankedSessionVisible &&
 		!showUploadCard;
-	bool* rankedProgressOpenPtr = manualRankedProgressWindow ? &g_manualRankedProgressOpen : nullptr;
-	if (!ImGui::Begin(L("Ranked Progress###RankedProgressOverlay").c_str(), rankedProgressOpenPtr,
-		ImGuiWindowFlags_NoCollapse))
-	{
-		ImGui::End();
-		ImGui::PopStyleVar();
-		ImGui::PopStyleColor();
-		DrawRankedGlobalDialogs();
-		return;
-	}
-
-	ImGui::SetWindowSize(ImVec2(g_rankedOverlayTuning.overlayWidth, 118.0f), ImGuiCond_FirstUseEver);
-	if (ImGui::BeginPopupContextWindow("ranked_progress_context", 1, true))
-	{
-		if (ImGui::MenuItem(L("Ranked ladder").c_str()))
-		{
-			g_showRankedLadderWindow = true;
-		}
-		if (ImGui::MenuItem(L("How does my rank work?").c_str()))
-		{
-			g_rankedRulesDialog.requestOpenForCurrentRank = true;
-		}
-		ImGui::Separator();
-		ImGui::MenuItem(L("Show matches").c_str(), nullptr, &g_rankedProgressTopRowOptions.showMatches);
-		ImGui::MenuItem(L("Show wins").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWins);
-		ImGui::MenuItem(L("Show losses").c_str(), nullptr, &g_rankedProgressTopRowOptions.showLosses);
-		ImGui::MenuItem(L("Show winrate %").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWinrate);
-		ImGui::MenuItem(L("Show character leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement);
-		ImGui::MenuItem(L("Show global leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement);
-		ImGui::EndPopup();
-	}
 
 	RankedProgressDisplayState baseDisplay{};
 	RankedProgressOverlaySnapshot statsSnapshot{};
@@ -5638,10 +5633,7 @@ void DrawRankedProgressOverlayStandalone()
 
 	if (!baseDisplay.valid)
 	{
-		ImGui::TextDisabled("%s", L("No ranked progress data available.").c_str());
-		ImGui::End();
-		ImGui::PopStyleVar();
-		ImGui::PopStyleColor();
+		g_rankedProgressAnimationSnapshot = {};
 		DrawRankedGlobalDialogs();
 		return;
 	}
@@ -5657,6 +5649,50 @@ void DrawRankedProgressOverlayStandalone()
 	BuildAnimatedDisplayState(baseDisplay, &renderedDisplay, &renderedDelta, &deltaAlpha, &animationPhase);
 	promotionDeltaAlpha = ComputeToastAlpha(&g_rankedPromotionToast, renderedDisplay, &promotionDelta);
 	demotionDeltaAlpha = ComputeToastAlpha(&g_rankedDemotionToast, renderedDisplay, &demotionDelta);
+	if (!IsRankedDisplayReadyForOverlay(renderedDisplay))
+	{
+		g_rankedProgressAnimationSnapshot = {};
+		DrawRankedGlobalDialogs();
+		return;
+	}
+
+	ImGui::SetNextWindowPos(ImVec2(360.0f, 20.0f), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(640.0f, 108.0f), ImVec2(10000.0f, 180.0f));
+	const float windowAlpha = showUploadCard ? uploadOverlayAlpha : 1.0f;
+	const ImVec4 windowBgColor = ImVec4(0.06f, 0.06f, 0.08f, 0.92f * windowAlpha);
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, windowBgColor);
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, windowAlpha);
+	bool* rankedProgressOpenPtr = manualRankedProgressWindow ? &g_manualRankedProgressOpen : nullptr;
+	if (!ImGui::Begin(L("Ranked Progress###RankedProgressOverlay").c_str(), rankedProgressOpenPtr,
+		ImGuiWindowFlags_NoCollapse))
+	{
+		ImGui::End();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor();
+		DrawRankedGlobalDialogs();
+		return;
+	}
+
+	ImGui::SetWindowSize(ImVec2(g_rankedOverlayTuning.overlayWidth, 118.0f), ImGuiCond_FirstUseEver);
+	if (ImGui::BeginPopupContextWindow("ranked_progress_context", 1, true))
+	{
+		if (ImGui::MenuItem(L("Ranked ladder").c_str()))
+		{
+			g_showRankedLadderWindow = true;
+		}
+		if (ImGui::MenuItem(L("How does my rank work?").c_str()))
+		{
+			g_rankedRulesDialog.requestOpenForCurrentRank = true;
+		}
+		ImGui::Separator();
+		ImGui::MenuItem(L("Show matches").c_str(), nullptr, &g_rankedProgressTopRowOptions.showMatches);
+		ImGui::MenuItem(L("Show wins").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWins);
+		ImGui::MenuItem(L("Show losses").c_str(), nullptr, &g_rankedProgressTopRowOptions.showLosses);
+		ImGui::MenuItem(L("Show winrate %").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWinrate);
+		ImGui::MenuItem(L("Show character leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement);
+		ImGui::MenuItem(L("Show global leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement);
+		ImGui::EndPopup();
+	}
 	RememberRankedDisplayState(renderedDisplay);
 	const bool wantsLeaderboardPlacements =
 		g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement ||
