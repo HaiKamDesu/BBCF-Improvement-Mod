@@ -241,6 +241,49 @@ bool SteamMatchmakingWrapper::GetCachedRankedHostLevelByLobby(uint64_t lobbyId, 
 	return false;
 }
 
+bool SteamMatchmakingWrapper::GetLatestRankedSelectedLobby(uint64_t* outLobbyId, DWORD* outAgeMs) const
+{
+	if (!outLobbyId || !outAgeMs || m_rankedSelectedLobbyProbe.lobbyId == 0u)
+	{
+		return false;
+	}
+
+	*outLobbyId = m_rankedSelectedLobbyProbe.lobbyId;
+	*outAgeMs = GetTickCount() - m_rankedSelectedLobbyProbe.tick;
+	return true;
+}
+
+bool SteamMatchmakingWrapper::GetLatestCachedRankedHostLevel(uint64_t* outSteamId, uint32_t* outInternalRank, DWORD* outAgeMs) const
+{
+	if (!outSteamId || !outInternalRank || !outAgeMs || m_rankedHostLevelCache.empty())
+	{
+		return false;
+	}
+
+	auto latest = m_rankedHostLevelCache.end();
+	for (auto it = m_rankedHostLevelCache.begin(); it != m_rankedHostLevelCache.end(); ++it)
+	{
+		if (it->steamId == 0u)
+		{
+			continue;
+		}
+		if (latest == m_rankedHostLevelCache.end() || it->tick - latest->tick < 0x80000000u)
+		{
+			latest = it;
+		}
+	}
+
+	if (latest == m_rankedHostLevelCache.end())
+	{
+		return false;
+	}
+
+	*outSteamId = latest->steamId;
+	*outInternalRank = latest->internalRank;
+	*outAgeMs = GetTickCount() - latest->tick;
+	return true;
+}
+
 int SteamMatchmakingWrapper::GetFavoriteGameCount()
 {
 	LOG(7, "SteamMatchmakingWrapper GetFavoriteGameCount\n");
@@ -370,6 +413,11 @@ const char* SteamMatchmakingWrapper::GetLobbyData(CSteamID steamIDLobby, const c
 
 	LOG(2, "%s GetLobbyData steamIDLobby=%llu key='%s' ret='%s'\n",
 		GetLobbyTag(pchKey), steamIDLobby.ConvertToUint64(), pchKey ? pchKey : "<null>", ret ? ret : "<null>");
+	if (pchKey && std::strcmp(pchKey, "PLAYER_PRIVATE_NUM") == 0)
+	{
+		m_rankedSelectedLobbyProbe.lobbyId = steamIDLobby.ConvertToUint64();
+		m_rankedSelectedLobbyProbe.tick = GetTickCount();
+	}
 	if (ret && pchKey && std::strcmp(pchKey, "RANK_HOST_LEVEL") == 0)
 	{
 		CacheRankedHostLevel(steamIDLobby, ret);

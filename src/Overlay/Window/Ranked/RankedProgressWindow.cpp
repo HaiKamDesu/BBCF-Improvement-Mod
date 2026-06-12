@@ -322,6 +322,34 @@ namespace
 	};
 
 	RankedProgressTopRowOptions g_rankedProgressTopRowOptions{};
+	bool g_rankedProgressTopRowOptionsLoaded = false;
+
+	void LoadRankedProgressTopRowOptions()
+	{
+		if (g_rankedProgressTopRowOptionsLoaded)
+		{
+			return;
+		}
+
+		g_rankedProgressTopRowOptions.showMatches = Settings::settingsIni.rankedProgressShowMatches;
+		g_rankedProgressTopRowOptions.showWins = Settings::settingsIni.rankedProgressShowWins;
+		g_rankedProgressTopRowOptions.showLosses = Settings::settingsIni.rankedProgressShowLosses;
+		g_rankedProgressTopRowOptions.showWinrate = Settings::settingsIni.rankedProgressShowWinrate;
+		g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement = Settings::settingsIni.rankedProgressShowCharacterLeaderboardPlacement;
+		g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement = Settings::settingsIni.rankedProgressShowGlobalLeaderboardPlacement;
+		g_rankedProgressTopRowOptionsLoaded = true;
+	}
+
+	void SaveRankedProgressTopRowOption(const char* settingName, bool value, bool* backingField)
+	{
+		if (!settingName || !backingField || *backingField == value)
+		{
+			return;
+		}
+
+		*backingField = value;
+		Settings::changeSetting(settingName, value ? "1" : "0");
+	}
 
 	struct RankedUploadObservationState
 	{
@@ -3173,7 +3201,6 @@ namespace
 		int x14 = -1;
 		int xe0 = -1;   // read in RankedStep fn at 004a47c0 — may indicate lobby-closed
 		int xf4 = -1;   // read in RankedStep case 9 — checked == 3 (set format?)
-		int lobbyIndex = -1;
 	};
 
 	struct RankedVictoryStepLite
@@ -3204,7 +3231,7 @@ namespace
 		}
 
 		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
-		if (IsBadReadPtr(network, 0x1f0))
+		if (IsBadReadPtr(network, 0xf8))
 		{
 			return false;
 		}
@@ -3217,7 +3244,6 @@ namespace
 		outState->x14    = *reinterpret_cast<const int*>(network + 0x14);
 		outState->xe0    = *reinterpret_cast<const int*>(network + 0xe0);
 		outState->xf4    = *reinterpret_cast<const int*>(network + 0xf4);
-		outState->lobbyIndex = *reinterpret_cast<const int*>(network + 0x1ec);
 		return true;
 	}
 
@@ -4882,6 +4908,23 @@ bool CaptureRankedProgressOverlaySnapshot(RankedProgressOverlaySnapshot* outSnap
 
 namespace
 {
+	bool TryGetCurrentPlayerCharacterId(uint32_t* outCharacterId)
+	{
+		if (!outCharacterId || g_interfaces.player1.IsCharDataNullPtr())
+		{
+			return false;
+		}
+
+		const CharData* const charData = g_interfaces.player1.GetData();
+		if (!charData || IsBadReadPtr(charData, sizeof(CharData)) || charData->charIndex < 0 || charData->charIndex >= 64)
+		{
+			return false;
+		}
+
+		*outCharacterId = static_cast<uint32_t>(charData->charIndex);
+		return true;
+	}
+
 	bool TryGetRankedPredictionOpponent(uint64_t* outSteamId, uint32_t* outCharacterId)
 	{
 		if (!outSteamId || !outCharacterId || !g_interfaces.pRoomManager || !g_interfaces.pRoomManager->IsRoomFunctional())
@@ -4918,48 +4961,59 @@ namespace
 		return true;
 	}
 
-	bool TryGetRankedPredictionLobbyOpponent(
-		const RankedNetworkLite& networkState,
-		uint64_t* outSteamId,
-		uint32_t* outCharacterId)
+	bool TryGetRankedSelectedLobby(uint64_t* outLobbyId, DWORD maxAgeMs)
 	{
-		if (!outSteamId || !outCharacterId || !g_interfaces.pSteamMatchmakingWrapper || networkState.lobbyIndex < 0)
+		if (!g_interfaces.pSteamMatchmakingWrapper)
 		{
 			return false;
 		}
 
-		*outSteamId = 0u;
-		*outCharacterId = kInvalidRankedCharacterId;
-
-		const CSteamID lobbyId = g_interfaces.pSteamMatchmakingWrapper->GetLobbyByIndex(networkState.lobbyIndex);
-		if (lobbyId.ConvertToUint64() == 0u)
+		uint64_t lobbyId = 0u;
+		DWORD ageMs = 0;
+		if (!g_interfaces.pSteamMatchmakingWrapper->GetLatestRankedSelectedLobby(&lobbyId, &ageMs))
 		{
 			return false;
 		}
 
-		const char* const rankHostLevel = g_interfaces.pSteamMatchmakingWrapper->GetLobbyData(lobbyId, "RANK_HOST_LEVEL");
-		if (!rankHostLevel || rankHostLevel[0] == '\0')
+		if (outLobbyId)
+		{
+			*outLobbyId = lobbyId;
+		}
+		return lobbyId != 0u && ageMs <= maxAgeMs;
+	}
+
+	bool TryGetRankedPredictionSelectedLobbyOpponent(
+		uint64_t* outSteamId,
+		uint32_t* outCharacterId,
+		DWORD maxAgeMs)
+	{
+		if (!g_interfaces.pSteamMatchmakingWrapper)
 		{
 			return false;
 		}
 
-		uint64_t opponentSteamId = g_interfaces.pSteamMatchmakingWrapper->GetLobbyOwner(lobbyId).ConvertToUint64();
-		if (opponentSteamId == 0u)
-		{
-			uint32_t unusedInternalRank = 0;
-			g_interfaces.pSteamMatchmakingWrapper->GetCachedRankedHostLevelByLobby(
-				lobbyId.ConvertToUint64(),
-				&opponentSteamId,
-				&unusedInternalRank);
-		}
-
-		if (opponentSteamId == 0u)
+		uint64_t lobbyId = 0u;
+		if (!TryGetRankedSelectedLobby(&lobbyId, maxAgeMs))
 		{
 			return false;
 		}
 
-		*outSteamId = opponentSteamId;
-		return true;
+		uint64_t steamId = 0u;
+		uint32_t unusedInternalRank = 0;
+		if (!g_interfaces.pSteamMatchmakingWrapper->GetCachedRankedHostLevelByLobby(lobbyId, &steamId, &unusedInternalRank))
+		{
+			return false;
+		}
+
+		if (outSteamId)
+		{
+			*outSteamId = steamId;
+		}
+		if (outCharacterId)
+		{
+			*outCharacterId = kInvalidRankedCharacterId;
+		}
+		return steamId != 0u;
 	}
 
 	bool IsRankedPredictionMenuState(const RankedNetworkLite& networkState)
@@ -4972,17 +5026,20 @@ namespace
 		return networkState.state1 >= 43 && networkState.state1 <= 48;
 	}
 
-	bool IsRankedTrainingSearchOpponentPopup(int gameState, const RankedNetworkLite& networkState)
+	bool IsRankedTrainingSearchOpponentPopup(int gameMode, const RankedNetworkLite* networkState)
 	{
-		return gameState == GameState_InMatch &&
-			networkState.lobbyIndex >= 0 &&
-			IsRankedSearchResultsMenuState(networkState.state, networkState.state1);
+		(void)networkState;
+		const int gameState = g_gameVals.pGameState ? *g_gameVals.pGameState : -1;
+		return gameMode == GameMode_Training &&
+			gameState == GameState_InMatch &&
+			ReadRankedEntryFlag() != 0u &&
+			TryGetRankedSelectedLobby(nullptr, 1500u);
 	}
 
-	bool IsRankedPredictionContextState(int gameState, const RankedNetworkLite& networkState)
+	bool IsRankedPredictionContextState(int gameMode, const RankedNetworkLite& networkState)
 	{
 		return IsRankedPredictionMenuState(networkState) ||
-			IsRankedTrainingSearchOpponentPopup(gameState, networkState);
+			IsRankedTrainingSearchOpponentPopup(gameMode, &networkState);
 	}
 
 	// Returns true whenever the victory screen (gstate 16/17/18) is showing AND ranked
@@ -5295,6 +5352,7 @@ namespace
 	void DrawRankedPredictionWindow(
 		const RankedProgressDisplayState& self,
 		int gameState,
+		int gameMode,
 		const RankedNetworkLite& networkState,
 		const RankedVictoryStepLite& victoryStep,
 		bool rankedEntryActive,
@@ -5313,13 +5371,19 @@ namespace
 			LogRankedPredictionVisibility("setting_disabled", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, 0u, kInvalidRankedCharacterId);
 			return;
 		}
+		const bool trainingPopupContext = IsRankedTrainingSearchOpponentPopup(gameMode, &networkState);
+		if (inMatch && !trainingPopupContext)
+		{
+			LogRankedPredictionVisibility("in_match", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, 0u, kInvalidRankedCharacterId);
+			return;
+		}
 		if (!IsRankedDisplayReadyForOverlay(self))
 		{
 			LogRankedPredictionVisibility("self_not_ready", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, 0u, kInvalidRankedCharacterId);
 			return;
 		}
 		const bool inPostMatchRematch = IsRankedVictoryWindowState(gameState, networkState);
-		const bool predictionContext = IsRankedPredictionContextState(gameState, networkState) || rankedRematchScreen || inPostMatchRematch;
+		const bool predictionContext = trainingPopupContext || IsRankedPredictionMenuState(networkState) || rankedRematchScreen || inPostMatchRematch;
 		const double now = ImGui::GetTime();
 		if (inMatch && !predictionContext)
 		{
@@ -5355,9 +5419,9 @@ namespace
 		{
 			s_lastPredictionOpponentPollAt = now;
 			hasOpponentSteamId = TryGetRankedPredictionOpponent(&opponentSteamId, &opponentCharacterId);
-			if (!hasOpponentSteamId && IsRankedPredictionContextState(gameState, networkState))
+			if (!hasOpponentSteamId && IsRankedPredictionContextState(gameMode, networkState))
 			{
-				hasOpponentSteamId = TryGetRankedPredictionLobbyOpponent(networkState, &opponentSteamId, &opponentCharacterId);
+				hasOpponentSteamId = TryGetRankedPredictionSelectedLobbyOpponent(&opponentSteamId, &opponentCharacterId, 1500u);
 			}
 			if (hasOpponentSteamId)
 			{
@@ -5506,6 +5570,8 @@ bool IsRankedOverlayRuntimeReady()
 
 void DrawRankedProgressOverlayStandalone()
 {
+	LoadRankedProgressTopRowOptions();
+
 	if (!Settings::settingsIni.showRankedProgress && !g_manualRankedProgressOpen)
 	{
 		ClearRankedProgressOverlaySnapshot("setting_disabled");
@@ -5530,12 +5596,6 @@ void DrawRankedProgressOverlayStandalone()
 
 	RankedProgressOverlaySnapshot snapshot;
 	const bool hasLiveSnapshot = Settings::settingsIni.showRankedProgress && CaptureRankedProgressSnapshotInternal(&snapshot);
-	if (hasLiveSnapshot)
-	{
-		g_manualRankedProgressOpen = false;
-		PublishRankedProgressOverlaySnapshot(snapshot);
-		g_lastRankedOverlayCharacterId = snapshot.rowIndex;
-	}
 
 	RankedUploadOverlayState uploadState;
 	const bool hasUploadState = GetRankedUploadOverlayState(&uploadState);
@@ -5544,9 +5604,9 @@ void DrawRankedProgressOverlayStandalone()
 		HandleRankedUploadAnimationEvent(uploadState);
 	}
 	TryStartObservedRankedUploadAnimation();
-	RankedNetworkLite networkState;
+	RankedNetworkLite networkState{};
 	const bool hasNetworkState = CaptureRankedNetworkLite(&networkState);
-	RankedVictoryStepLite victoryStep;
+	RankedVictoryStepLite victoryStep{};
 	const bool hasVictoryStep = CaptureRankedVictoryStepLite(&victoryStep);
 	const int currentGameState = g_gameVals.pGameState ? *g_gameVals.pGameState : -1;
 	const int currentMatchState = g_gameVals.pMatchState ? *g_gameVals.pMatchState : -1;
@@ -5581,26 +5641,39 @@ void DrawRankedProgressOverlayStandalone()
 	{
 		s_sawState58ThisVictoryCycle = true;
 	}
+	const int currentGameMode = g_gameVals.pGameMode ? *g_gameVals.pGameMode : -1;
 	const bool inMatch = currentGameState == GameState_InMatch;
-	const bool inTrainingMatch = inMatch &&
-		g_gameVals.pGameMode &&
-		*g_gameVals.pGameMode == GameMode_Training;
-	const bool rankedPredictionMenuState = hasNetworkState &&
-		IsRankedPredictionContextState(currentGameState, networkState);
+	const bool inTrainingMatch = inMatch && currentGameMode == GameMode_Training;
+	const bool inOnlineMenu = currentGameMode == GameMode_Online && currentGameState == GameState_MainMenu;
+	const bool liveRankedProgressSnapshot = hasLiveSnapshot && inOnlineMenu;
+	if (liveRankedProgressSnapshot)
+	{
+		g_manualRankedProgressOpen = false;
+		PublishRankedProgressOverlaySnapshot(snapshot);
+		g_lastRankedOverlayCharacterId = snapshot.rowIndex;
+	}
+	const bool rankedTrainingPopupState = IsRankedTrainingSearchOpponentPopup(
+		currentGameMode,
+		hasNetworkState ? &networkState : nullptr);
+	const bool rankedPredictionMenuState =
+		rankedTrainingPopupState ||
+		(inOnlineMenu && hasNetworkState && IsRankedPredictionMenuState(networkState));
 	const bool rankedSearchResultsMenuState = hasNetworkState &&
 		IsRankedSearchResultsMenuState(networkState.state, networkState.state1);
 	const bool rankedSearchProgressVisible =
-		rankedSearchResultsMenuState &&
-		(!inTrainingMatch || rankedPredictionMenuState);
+		inOnlineMenu &&
+		rankedSearchResultsMenuState;
 	const bool rankedRematchScreen = hasNetworkState &&
+		!inMatch &&
 		hasVictoryStep &&
 		IsRankedPredictionRematchScreen(networkState, victoryStep);
 	const bool inPostMatchRematch = hasNetworkState &&
+		!inMatch &&
 		IsRankedVictoryWindowState(currentGameState, networkState);
 	const bool rankedEntryActive =
 		(rankedPredictionMenuState || rankedRematchScreen || inPostMatchRematch) &&
 		ReadRankedEntryFlag() != 0u;
-	if (hasLiveSnapshot || rankedSearchProgressVisible || rankedPredictionMenuState || rankedRematchScreen || inPostMatchRematch)
+	if (liveRankedProgressSnapshot || rankedSearchProgressVisible || rankedPredictionMenuState || rankedRematchScreen || inPostMatchRematch)
 	{
 		g_rankedOverlayVisibility.stickyRankedSessionVisible = true;
 	}
@@ -5620,16 +5693,20 @@ void DrawRankedProgressOverlayStandalone()
 			 rankedRematchScreen ||
 			 inPostMatchRematch ||
 			 inPostMatchTransition ||
-			 (hasNetworkState && IsRankedProgressMenuState(networkState.state, networkState.state1)));
+			 (inOnlineMenu && hasNetworkState && IsRankedProgressMenuState(networkState.state, networkState.state1)));
 		if (!rankedSessionStillActive)
 		{
 			g_rankedOverlayVisibility.stickyRankedSessionVisible = false;
+			if (!hasUploadState && !g_manualRankedProgressOpen)
+			{
+				g_lastRankedOverlayCharacterId = kInvalidRankedCharacterId;
+			}
 		}
 	}
 
 	const float uploadOverlayAlpha = GetUploadOverlayAlpha();
 	const bool showUploadCard = uploadOverlayAlpha > 0.0f;
-	if (!hasLiveSnapshot)
+	if (!liveRankedProgressSnapshot)
 	{
 		bool publishedCachedSnapshot = false;
 		if (g_rankedOverlayVisibility.stickyRankedSessionVisible &&
@@ -5660,7 +5737,7 @@ void DrawRankedProgressOverlayStandalone()
 		}
 	}
 
-	if (!hasLiveSnapshot && !g_rankedOverlayVisibility.stickyRankedSessionVisible && !showUploadCard && !g_manualRankedProgressOpen)
+	if (!liveRankedProgressSnapshot && !g_rankedOverlayVisibility.stickyRankedSessionVisible && !showUploadCard && !g_manualRankedProgressOpen)
 	{
 		g_rankedProgressAnimationSnapshot = {};
 		DrawRankedGlobalDialogs();
@@ -5669,21 +5746,23 @@ void DrawRankedProgressOverlayStandalone()
 
 	const bool manualRankedProgressWindow =
 		g_manualRankedProgressOpen &&
-		!hasLiveSnapshot &&
+		!liveRankedProgressSnapshot &&
 		!g_rankedOverlayVisibility.stickyRankedSessionVisible &&
 		!showUploadCard;
 
 	RankedProgressDisplayState baseDisplay{};
 	RankedProgressOverlaySnapshot statsSnapshot{};
 	bool hasStatsSnapshot = false;
-	if (hasLiveSnapshot)
+	if (liveRankedProgressSnapshot)
 	{
 		baseDisplay = MakeDisplayStateFromSnapshot(snapshot);
 		statsSnapshot = snapshot;
 		hasStatsSnapshot = true;
 		RememberRankedDisplayState(baseDisplay);
 	}
-	else if (g_lastRankedOverlayCharacterId != kInvalidRankedCharacterId &&
+	else if (!inTrainingMatch &&
+		g_rankedOverlayVisibility.stickyRankedSessionVisible &&
+		g_lastRankedOverlayCharacterId != kInvalidRankedCharacterId &&
 		TryGetCachedRankedDisplayState(g_lastRankedOverlayCharacterId, &baseDisplay))
 	{
 		baseDisplay.valid = true;
@@ -5692,6 +5771,25 @@ void DrawRankedProgressOverlayStandalone()
 		{
 			statsSnapshot = g_rankedProgressOverlaySnapshot;
 			hasStatsSnapshot = true;
+		}
+	}
+	else if (rankedTrainingPopupState)
+	{
+		uint32_t currentCharacterId = kInvalidRankedCharacterId;
+		if (TryGetCurrentPlayerCharacterId(&currentCharacterId) &&
+			TryBuildDisplayStateForCharacter(currentCharacterId, nullptr, &baseDisplay))
+		{
+			g_lastRankedOverlayCharacterId = currentCharacterId;
+			baseDisplay.valid = true;
+		}
+		else if (IsRankedOverlayDiagnosticsEnabled())
+		{
+			LOG(1, "[RANK][TrainingEntryUI] no self display currentChar=%u hasNetwork=%d state=%d/%d entry=%u\n",
+				static_cast<unsigned int>(currentCharacterId),
+				hasNetworkState ? 1 : 0,
+				hasNetworkState ? networkState.state : -1,
+				hasNetworkState ? networkState.state1 : -1,
+				static_cast<unsigned int>(ReadRankedEntryFlag()));
 		}
 	}
 	else if (hasUploadState && uploadState.characterId != kInvalidRankedCharacterId)
@@ -5769,12 +5867,42 @@ void DrawRankedProgressOverlayStandalone()
 			g_rankedRulesDialog.requestOpenForCurrentRank = true;
 		}
 		ImGui::Separator();
-		ImGui::MenuItem(L("Show matches").c_str(), nullptr, &g_rankedProgressTopRowOptions.showMatches);
-		ImGui::MenuItem(L("Show wins").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWins);
-		ImGui::MenuItem(L("Show losses").c_str(), nullptr, &g_rankedProgressTopRowOptions.showLosses);
-		ImGui::MenuItem(L("Show winrate %").c_str(), nullptr, &g_rankedProgressTopRowOptions.showWinrate);
-		ImGui::MenuItem(L("Show character leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement);
-		ImGui::MenuItem(L("Show global leaderboard placement").c_str(), nullptr, &g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement);
+		if (ImGui::MenuItem(L("Show matches").c_str(), nullptr, g_rankedProgressTopRowOptions.showMatches))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showMatches;
+			g_rankedProgressTopRowOptions.showMatches = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowMatches", value, &Settings::settingsIni.rankedProgressShowMatches);
+		}
+		if (ImGui::MenuItem(L("Show wins").c_str(), nullptr, g_rankedProgressTopRowOptions.showWins))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showWins;
+			g_rankedProgressTopRowOptions.showWins = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowWins", value, &Settings::settingsIni.rankedProgressShowWins);
+		}
+		if (ImGui::MenuItem(L("Show losses").c_str(), nullptr, g_rankedProgressTopRowOptions.showLosses))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showLosses;
+			g_rankedProgressTopRowOptions.showLosses = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowLosses", value, &Settings::settingsIni.rankedProgressShowLosses);
+		}
+		if (ImGui::MenuItem(L("Show winrate %").c_str(), nullptr, g_rankedProgressTopRowOptions.showWinrate))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showWinrate;
+			g_rankedProgressTopRowOptions.showWinrate = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowWinrate", value, &Settings::settingsIni.rankedProgressShowWinrate);
+		}
+		if (ImGui::MenuItem(L("Show character leaderboard placement").c_str(), nullptr, g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement;
+			g_rankedProgressTopRowOptions.showCharacterLeaderboardPlacement = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowCharacterLeaderboardPlacement", value, &Settings::settingsIni.rankedProgressShowCharacterLeaderboardPlacement);
+		}
+		if (ImGui::MenuItem(L("Show global leaderboard placement").c_str(), nullptr, g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement))
+		{
+			const bool value = !g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement;
+			g_rankedProgressTopRowOptions.showGlobalLeaderboardPlacement = value;
+			SaveRankedProgressTopRowOption("RankedProgressShowGlobalLeaderboardPlacement", value, &Settings::settingsIni.rankedProgressShowGlobalLeaderboardPlacement);
+		}
 		ImGui::EndPopup();
 	}
 	RememberRankedDisplayState(renderedDisplay);
@@ -6019,6 +6147,15 @@ void DrawRankedProgressOverlayStandalone()
 	ImGui::End();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor();
-	DrawRankedPredictionWindow(renderedDisplay, currentGameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, s_sawState58ThisVictoryCycle);
+	DrawRankedPredictionWindow(
+		renderedDisplay,
+		currentGameState,
+		currentGameMode,
+		networkState,
+		victoryStep,
+		rankedEntryActive,
+		inMatch,
+		rankedRematchScreen,
+		s_sawState58ThisVictoryCycle);
 	DrawRankedGlobalDialogs();
 }
