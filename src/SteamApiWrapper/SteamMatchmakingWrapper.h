@@ -14,12 +14,6 @@ struct RankedHostLevelCacheEntry
 	DWORD tick = 0;
 };
 
-struct RankedSelectedLobbyProbe
-{
-	uint64_t lobbyId = 0;
-	DWORD tick = 0;
-};
-
 interface SteamMatchmakingWrapper : public ISteamMatchmaking
 {
 public:
@@ -28,13 +22,9 @@ public:
 	
 	ISteamMatchmaking* m_SteamMatchmaking;
 	std::vector<RankedHostLevelCacheEntry> m_rankedHostLevelCache;
-	RankedSelectedLobbyProbe m_rankedSelectedLobbyProbe;
 
 	void CacheRankedHostLevel(CSteamID steamIDLobby, const char* value);
 	bool GetCachedRankedHostLevel(uint64_t steamId, uint32_t* outInternalRank) const;
-	bool GetCachedRankedHostLevelByLobby(uint64_t lobbyId, uint64_t* outSteamId, uint32_t* outInternalRank) const;
-	bool GetLatestCachedRankedHostLevel(uint64_t* outSteamId, uint32_t* outInternalRank, DWORD* outAgeMs) const;
-	bool GetLatestRankedSelectedLobby(uint64_t* outLobbyId, DWORD* outAgeMs) const;
 
 	int GetFavoriteGameCount();
 	bool GetFavoriteGame(int iGame, AppId_t *pnAppID, uint32 *pnIP, uint16 *pnConnPort, uint16 *pnQueryPort, uint32 *punFlags, uint32 *pRTime32LastPlayedOnServer);
