@@ -89,6 +89,7 @@ const char* TriggerLabel(UnlimitedPlaybackManager::TriggerType t) {
     case UnlimitedPlaybackManager::Trigger_OnHit: return L("On Hit").c_str();
     case UnlimitedPlaybackManager::Trigger_ThrowTech: return L("Throw Tech").c_str();
     case UnlimitedPlaybackManager::Trigger_KeyPress: return L("Key Press").c_str();
+    case UnlimitedPlaybackManager::Trigger_OnLoop: return L("On loop").c_str();
     default: return L("Unknown").c_str();
     }
 }
@@ -99,6 +100,16 @@ const char* SelectionModeLabel(int mode) {
     case UnlimitedPlaybackManager::Selection_Sequential: return L("Sequential").c_str();
     case UnlimitedPlaybackManager::Selection_NonRepeatingRandom: return L("Non-repeating Random").c_str();
     default: return L("Random").c_str();
+    }
+}
+
+const char* LoopResetModeLabel(int mode) {
+    switch (mode) {
+    case UnlimitedPlaybackManager::LoopReset_Middle: return L("Middle").c_str();
+    case UnlimitedPlaybackManager::LoopReset_Left: return L("Left").c_str();
+    case UnlimitedPlaybackManager::LoopReset_Right: return L("Right").c_str();
+    case UnlimitedPlaybackManager::LoopReset_Custom: return L("Custom").c_str();
+    default: return L("Middle").c_str();
     }
 }
 
@@ -531,6 +542,8 @@ void UnlimitedPlaybackWindow::Draw() {
     static int sendSlot = 1;
     static bool keyCaptureMode = false;
     static bool keyCaptureWaitingRelease = false;
+    static bool loopKeyCaptureMode = false;
+    static bool loopKeyCaptureWaitingRelease = false;
     static bool showProfileCompatibilityPopup = false;
     static bool profileCompatibilityCanForce = false;
     static char pendingProfilePath[MAX_PATH] = {};
@@ -572,6 +585,23 @@ void UnlimitedPlaybackWindow::Draw() {
                 mgr.ForceResetTriggers("");
                 keyCaptureMode = false;
                 mgr.PushToast(FormatText(L("Mapped playback bind: %s").c_str(), BindingName(mapped)));
+            }
+        }
+    }
+    if (loopKeyCaptureMode) {
+        if (loopKeyCaptureWaitingRelease) {
+            if (!AnyBindableKeyCurrentlyDown()) {
+                loopKeyCaptureWaitingRelease = false;
+            }
+        } else {
+            const int mapped = CaptureNextPressedVirtualKey();
+            if (mapped != 0) {
+                mgr.SetLoopKeyCode(mapped);
+                Settings::settingsIni.unlimitedPlaybackLoopKeyCode = mapped;
+                Settings::changeSetting("UnlimitedPlaybackLoopKeyCode", std::to_string(mapped));
+                mgr.ForceResetTriggers("");
+                loopKeyCaptureMode = false;
+                mgr.PushToast(FormatText(L("Mapped loop bind: %s").c_str(), BindingName(mapped)));
             }
         }
     }
@@ -1001,7 +1031,8 @@ void UnlimitedPlaybackWindow::Draw() {
         TriggerLabel(UnlimitedPlaybackManager::Trigger_OnBlock),
         TriggerLabel(UnlimitedPlaybackManager::Trigger_OnHit),
         TriggerLabel(UnlimitedPlaybackManager::Trigger_ThrowTech),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_KeyPress)
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_KeyPress),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnLoop)
     };
     ImGui::TextUnformatted(L("Playback Trigger Type").c_str());
     DrawHelpInline(L("Selects the single trigger type that can fire library playback.").c_str());
@@ -1021,13 +1052,15 @@ void UnlimitedPlaybackWindow::Draw() {
     auto selectedTrigger = static_cast<UnlimitedPlaybackManager::TriggerType>(selectedTriggerType);
     auto& triggerConfig = mgr.GetTrigger(selectedTrigger);
     ImGui::Dummy(ImVec2(0, 2));
-    ImGui::TextUnformatted(L("Cooldown Frames").c_str());
-    DrawHelpInline(L("Blocks the same trigger from firing again for this many frames after it activates.").c_str());
-    ImGui::PushItemWidth(-1.0f);
-    ImGui::InputInt("##up_cooldown_frames", &triggerConfig.cooldownFrames);
-    ImGui::PopItemWidth();
-    if (triggerConfig.cooldownFrames < 1) {
-        triggerConfig.cooldownFrames = 1;
+    if (selectedTrigger != UnlimitedPlaybackManager::Trigger_OnLoop) {
+        ImGui::TextUnformatted(L("Cooldown Frames").c_str());
+        DrawHelpInline(L("Blocks the same trigger from firing again for this many frames after it activates.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        ImGui::InputInt("##up_cooldown_frames", &triggerConfig.cooldownFrames);
+        ImGui::PopItemWidth();
+        if (triggerConfig.cooldownFrames < 1) {
+            triggerConfig.cooldownFrames = 1;
+        }
     }
     ImGui::Dummy(ImVec2(0, 4));
     if (selectedTrigger == UnlimitedPlaybackManager::Trigger_KeyPress) {
@@ -1042,6 +1075,80 @@ void UnlimitedPlaybackWindow::Draw() {
         }
         ImGui::SameLine();
         ImGui::TextDisabled("%s", BindingName(triggerConfig.keyCode));
+    }
+    if (selectedTrigger == UnlimitedPlaybackManager::Trigger_OnLoop) {
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", L("Maps the button or key used to start and stop loop playback.").c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::Button((loopKeyCaptureMode ? L("Press any key...") : L("Map Loop Bind")).c_str(), ImVec2(170.0f, 0))) {
+            loopKeyCaptureMode = true;
+            loopKeyCaptureWaitingRelease = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", BindingName(mgr.GetLoopKeyCode()));
+        ImGui::SameLine();
+        ImGui::TextColored(mgr.IsLoopActive() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
+            "%s",
+            mgr.IsLoopActive() ? L("Running").c_str() : L("Stopped").c_str());
+
+        int setupFrames = mgr.GetLoopSetupFrames();
+        ImGui::TextUnformatted(L("Setup Time (frames)").c_str());
+        DrawHelpInline(L("Frames to wait after optional lab reset before playing the next slot.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        if (ImGui::InputInt("##up_loop_setup_frames", &setupFrames)) {
+            mgr.SetLoopSetupFrames(setupFrames);
+            Settings::settingsIni.unlimitedPlaybackLoopSetupFrames = mgr.GetLoopSetupFrames();
+            Settings::changeSetting("UnlimitedPlaybackLoopSetupFrames", std::to_string(mgr.GetLoopSetupFrames()));
+        }
+        ImGui::PopItemWidth();
+
+        int endingFrames = mgr.GetLoopEndingFrames();
+        ImGui::TextUnformatted(L("Ending Time (frames)").c_str());
+        DrawHelpInline(L("Frames to wait after a slot ends before starting the next setup.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        if (ImGui::InputInt("##up_loop_ending_frames", &endingFrames)) {
+            mgr.SetLoopEndingFrames(endingFrames);
+            Settings::settingsIni.unlimitedPlaybackLoopEndingFrames = mgr.GetLoopEndingFrames();
+            Settings::changeSetting("UnlimitedPlaybackLoopEndingFrames", std::to_string(mgr.GetLoopEndingFrames()));
+        }
+        ImGui::PopItemWidth();
+
+        bool restartLabState = mgr.GetLoopRestartLabState();
+        if (ImGui::Checkbox(L("Restart lab state in-between").c_str(), &restartLabState)) {
+            mgr.SetLoopRestartLabState(restartLabState);
+            Settings::settingsIni.unlimitedPlaybackLoopRestartLabState = restartLabState;
+            Settings::changeSetting("UnlimitedPlaybackLoopRestartLabState", restartLabState ? "1" : "0");
+        }
+        if (restartLabState) {
+            const char* resetModes[] = {
+                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Middle),
+                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Left),
+                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Right),
+                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Custom)
+            };
+            int resetMode = mgr.GetLoopRestartMode();
+            ImGui::TextUnformatted(L("Reset Position").c_str());
+            ImGui::PushItemWidth(-1.0f);
+            if (ImGui::Combo("##up_loop_reset_mode", &resetMode, resetModes, IM_ARRAYSIZE(resetModes))) {
+                mgr.SetLoopRestartMode(resetMode);
+                Settings::settingsIni.unlimitedPlaybackLoopRestartMode = mgr.GetLoopRestartMode();
+                Settings::changeSetting("UnlimitedPlaybackLoopRestartMode", std::to_string(mgr.GetLoopRestartMode()));
+            }
+            ImGui::PopItemWidth();
+
+            if (mgr.GetLoopRestartMode() == UnlimitedPlaybackManager::LoopReset_Custom) {
+                if (ImGui::Button(L("Take snapshot").c_str(), ImVec2(170.0f, 0))) {
+                    mgr.CaptureLoopCustomSnapshot();
+                }
+                ImGui::SameLine();
+                ImGui::TextColored(
+                    mgr.HasLoopCustomSnapshot() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
+                    "%s",
+                    mgr.HasLoopCustomSnapshot() ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+            }
+        }
     }
     ImGui::Dummy(ImVec2(0, 8));
     if (ImGui::Button(L("Fix Triggers").c_str())) {

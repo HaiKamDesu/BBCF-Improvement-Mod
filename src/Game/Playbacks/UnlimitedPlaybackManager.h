@@ -2,6 +2,7 @@
 
 #include "Game/Playbacks/PlaybackManager.h"
 #include "Game/Playbacks/CompatibilityManager.h"
+#include "Game/SnapshotApparatus/SnapshotApparatus.h"
 
 #include <array>
 #include <deque>
@@ -29,7 +30,15 @@ public:
         Trigger_OnHit,
         Trigger_ThrowTech,
         Trigger_KeyPress,
+        Trigger_OnLoop,
         Trigger_Count,
+    };
+
+    enum LoopResetMode {
+        LoopReset_Middle = 0,
+        LoopReset_Left = 1,
+        LoopReset_Right = 2,
+        LoopReset_Custom = 3,
     };
 
     struct TriggerConfig {
@@ -45,7 +54,7 @@ public:
         std::string relativePath;
         bool enabled = true;
         float weight = 1.0f;
-        std::array<bool, Trigger_Count> triggerEnabled = { true, true, true, true, true, true };
+        std::array<bool, Trigger_Count> triggerEnabled = { true, true, true, true, true, true, true };
     };
 
     struct CachedPlayback {
@@ -77,6 +86,20 @@ public:
     void SetSelectionMode(int mode);
     bool GetAutoMirrorOnSideSwap() const;
     void SetAutoMirrorOnSideSwap(bool enabled);
+    int GetLoopKeyCode() const;
+    void SetLoopKeyCode(int keyCode);
+    int GetLoopSetupFrames() const;
+    void SetLoopSetupFrames(int frames);
+    int GetLoopEndingFrames() const;
+    void SetLoopEndingFrames(int frames);
+    bool GetLoopRestartLabState() const;
+    void SetLoopRestartLabState(bool enabled);
+    int GetLoopRestartMode() const;
+    void SetLoopRestartMode(int mode);
+    bool IsLoopActive() const;
+    bool HasLoopCustomSnapshot() const;
+    bool CaptureLoopCustomSnapshot();
+    void ClearLoopCustomSnapshot();
 
     const std::vector<PlaybackEntry>& GetEntries() const;
     std::vector<PlaybackEntry>& GetEntriesMutable();
@@ -142,6 +165,10 @@ private:
 
     bool PickEntryIndexForTrigger(TriggerType trigger, size_t* outIndex);
     bool TryFireTrigger(TriggerType trigger, int currentFrame);
+    void ProcessLoopTick(int currentFrame);
+    void StartLoop(int currentFrame);
+    void StopLoop(const char* reason = nullptr);
+    bool TryStartLoopPlayback();
     bool IsKeyPressedEdge(int virtualKey);
     void SyncKeyEdgeState();
     bool IsTriggerKeyDown(int virtualKey) const;
@@ -162,6 +189,11 @@ private:
     void TryRestoreRuntimeSlotAfterPlayback();
     void ResetRuntimePlaybackState(bool discardBackupOnly);
     void StartRuntimePlayback(const std::vector<char>& frames, int facingToLoad);
+    bool EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot = false);
+    bool ApplyLoopRestart();
+    void StartNativeTrainingResetCombo(LoopResetMode mode);
+    void ReleaseNativeTrainingResetCombo();
+    void SendNativeTrainingResetKey(WORD virtualKey, bool keyDown) const;
 
     int m_mode = Mode_Default;
     bool m_initialized = false;
@@ -203,6 +235,27 @@ private:
     bool m_replayRecordingAsP1 = true;
     int m_replayRecordingRound = 0;
     int m_replayRecordingStartFrame = 0;
+    int m_loopKeyCode = VK_F7;
+    int m_loopSetupFrames = 0;
+    int m_loopEndingFrames = 0;
+    bool m_loopRestartLabState = false;
+    int m_loopRestartMode = LoopReset_Middle;
+    bool m_loopActive = false;
+    enum LoopPhase {
+        LoopPhase_Idle = 0,
+        LoopPhase_Setup,
+        LoopPhase_Playing,
+        LoopPhase_Ending,
+    };
+    LoopPhase m_loopPhase = LoopPhase_Idle;
+    int m_loopPhaseStartFrame = -1;
+    bool m_loopRestartAppliedForCycle = false;
+    bool m_loopNativeResetPulseActive = false;
+    unsigned long long m_loopNativeResetReleaseAtMs = 0;
+    std::array<WORD, 3> m_loopNativeResetKeys = {};
+    std::vector<char> m_loopCustomSnapshotBytes;
+    int m_loopCustomSnapshotSize = 0;
+    SnapshotApparatus* m_loopSnapshotApparatus = nullptr;
 
     PlaybackManager m_runtimePlaybackManager;
 };

@@ -417,6 +417,7 @@ std::string TriggerKeyName(UnlimitedPlaybackManager::TriggerType t) {
     case UnlimitedPlaybackManager::Trigger_OnHit: return "onhit";
     case UnlimitedPlaybackManager::Trigger_ThrowTech: return "throwtech";
     case UnlimitedPlaybackManager::Trigger_KeyPress: return "keypress";
+    case UnlimitedPlaybackManager::Trigger_OnLoop: return "onloop";
     default: return "unknown";
     }
 }
@@ -429,6 +430,7 @@ const char* TriggerDisplayName(UnlimitedPlaybackManager::TriggerType t) {
     case UnlimitedPlaybackManager::Trigger_OnHit: return L("On Hit").c_str();
     case UnlimitedPlaybackManager::Trigger_ThrowTech: return L("Throw Tech").c_str();
     case UnlimitedPlaybackManager::Trigger_KeyPress: return L("Key Press").c_str();
+    case UnlimitedPlaybackManager::Trigger_OnLoop: return L("On loop").c_str();
     default: return L("Unknown").c_str();
     }
 }
@@ -441,6 +443,7 @@ UnlimitedPlaybackManager::TriggerType ParseTriggerKey(const std::string& s, bool
     if (s == "onhit") return UnlimitedPlaybackManager::Trigger_OnHit;
     if (s == "throwtech") return UnlimitedPlaybackManager::Trigger_ThrowTech;
     if (s == "keypress") return UnlimitedPlaybackManager::Trigger_KeyPress;
+    if (s == "onloop") return UnlimitedPlaybackManager::Trigger_OnLoop;
     *ok = false;
     return UnlimitedPlaybackManager::Trigger_Wakeup;
 }
@@ -454,7 +457,7 @@ UnlimitedPlaybackManager& UnlimitedPlaybackManager::Instance() {
 UnlimitedPlaybackManager::UnlimitedPlaybackManager() {
     m_mode = Mode_Unlimited;
     for (int i = 0; i < Trigger_Count; ++i) {
-        m_triggers[i].enabled = (i != Trigger_KeyPress);
+        m_triggers[i].enabled = (i != Trigger_KeyPress && i != Trigger_OnLoop);
         m_triggers[i].cooldownFrames = 1;
         m_triggers[i].keyCode = VK_F6;
     }
@@ -471,6 +474,15 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
     const int savedKeyCode = Settings::settingsIni.unlimitedPlaybackTriggerKeyCode;
     if (savedKeyCode != 0) {
         m_triggers[Trigger_KeyPress].keyCode = savedKeyCode;
+    }
+    const int savedLoopKeyCode = Settings::settingsIni.unlimitedPlaybackLoopKeyCode;
+    m_loopKeyCode = savedLoopKeyCode != 0 ? savedLoopKeyCode : VK_F7;
+    m_loopSetupFrames = (std::max)(0, Settings::settingsIni.unlimitedPlaybackLoopSetupFrames);
+    m_loopEndingFrames = (std::max)(0, Settings::settingsIni.unlimitedPlaybackLoopEndingFrames);
+    m_loopRestartLabState = Settings::settingsIni.unlimitedPlaybackLoopRestartLabState;
+    m_loopRestartMode = Settings::settingsIni.unlimitedPlaybackLoopRestartMode;
+    if (m_loopRestartMode < LoopReset_Middle || m_loopRestartMode > LoopReset_Custom) {
+        m_loopRestartMode = LoopReset_Middle;
     }
     m_initialized = true;
 }
@@ -500,6 +512,8 @@ void UnlimitedPlaybackManager::Tick() {
         m_prevOnBlockCondition = false;
         m_prevOnHitCondition = false;
         m_prevThrowTechCondition = false;
+        StopLoop(nullptr);
+        ClearLoopCustomSnapshot();
     } else {
         TryRestoreRuntimeSlotAfterPlayback();
     }
@@ -522,8 +536,16 @@ void UnlimitedPlaybackManager::Tick() {
     const int frame = g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0;
     if (m_lastObservedFrame >= 0 && frame < m_lastObservedFrame) {
         ForceResetTriggers(L("Trigger runtime resynced after training reset.").c_str());
+        if (m_loopActive) {
+            m_loopPhaseStartFrame = frame;
+        }
     }
     m_lastObservedFrame = frame;
+
+    if (m_triggers[Trigger_OnLoop].enabled) {
+        ProcessLoopTick(frame);
+        return;
+    }
 
     TryFireTrigger(Trigger_KeyPress, frame);
     TryFireTrigger(Trigger_Wakeup, frame);
@@ -615,7 +637,7 @@ void UnlimitedPlaybackManager::LogEntryCacheSummary(const char* tag) const {
         const unsigned int frameBytes = cacheLoaded ? static_cast<unsigned int>(cacheIt->second.frames.size()) : 0U;
         const int facing = cacheLoaded ? (cacheIt->second.facingLeft ? 1 : 0) : -1;
         LOG(1,
-            "[UP][DATA]   idx=%u id='%s' name='%s' enabled=%d weight=%.3f rel='%s' cacheLoaded=%d frameBytes=%u facing=%d digest=0x%08X preview='%s' trig=[%d,%d,%d,%d,%d,%d]\n",
+            "[UP][DATA]   idx=%u id='%s' name='%s' enabled=%d weight=%.3f rel='%s' cacheLoaded=%d frameBytes=%u facing=%d digest=0x%08X preview='%s' trig=[%d,%d,%d,%d,%d,%d,%d]\n",
             static_cast<unsigned int>(i),
             entry.id.c_str(),
             entry.name.c_str(),
@@ -632,7 +654,8 @@ void UnlimitedPlaybackManager::LogEntryCacheSummary(const char* tag) const {
             entry.triggerEnabled[2] ? 1 : 0,
             entry.triggerEnabled[3] ? 1 : 0,
             entry.triggerEnabled[4] ? 1 : 0,
-            entry.triggerEnabled[5] ? 1 : 0);
+            entry.triggerEnabled[5] ? 1 : 0,
+            entry.triggerEnabled[6] ? 1 : 0);
     }
 }
 
@@ -682,6 +705,8 @@ void UnlimitedPlaybackManager::OnMatchEnd() {
     m_prevThrowTechCondition = false;
     SyncKeyEdgeState();
     m_keyPressTriggerArmed = false;
+    StopLoop(nullptr);
+    ClearLoopCustomSnapshot();
 }
 
 int UnlimitedPlaybackManager::GetMode() const {
@@ -716,6 +741,57 @@ bool UnlimitedPlaybackManager::GetAutoMirrorOnSideSwap() const {
 
 void UnlimitedPlaybackManager::SetAutoMirrorOnSideSwap(bool enabled) {
     m_autoMirrorOnSideSwap = enabled;
+}
+
+int UnlimitedPlaybackManager::GetLoopKeyCode() const {
+    return m_loopKeyCode;
+}
+
+void UnlimitedPlaybackManager::SetLoopKeyCode(int keyCode) {
+    m_loopKeyCode = keyCode != 0 ? keyCode : VK_F7;
+}
+
+int UnlimitedPlaybackManager::GetLoopSetupFrames() const {
+    return m_loopSetupFrames;
+}
+
+void UnlimitedPlaybackManager::SetLoopSetupFrames(int frames) {
+    m_loopSetupFrames = (std::max)(0, frames);
+}
+
+int UnlimitedPlaybackManager::GetLoopEndingFrames() const {
+    return m_loopEndingFrames;
+}
+
+void UnlimitedPlaybackManager::SetLoopEndingFrames(int frames) {
+    m_loopEndingFrames = (std::max)(0, frames);
+}
+
+bool UnlimitedPlaybackManager::GetLoopRestartLabState() const {
+    return m_loopRestartLabState;
+}
+
+void UnlimitedPlaybackManager::SetLoopRestartLabState(bool enabled) {
+    m_loopRestartLabState = enabled;
+}
+
+int UnlimitedPlaybackManager::GetLoopRestartMode() const {
+    return m_loopRestartMode;
+}
+
+void UnlimitedPlaybackManager::SetLoopRestartMode(int mode) {
+    if (mode < LoopReset_Middle || mode > LoopReset_Custom) {
+        mode = LoopReset_Middle;
+    }
+    m_loopRestartMode = mode;
+}
+
+bool UnlimitedPlaybackManager::IsLoopActive() const {
+    return m_loopActive;
+}
+
+bool UnlimitedPlaybackManager::HasLoopCustomSnapshot() const {
+    return !m_loopCustomSnapshotBytes.empty() && m_loopCustomSnapshotSize > 0;
 }
 
 const std::vector<UnlimitedPlaybackManager::PlaybackEntry>& UnlimitedPlaybackManager::GetEntries() const {
@@ -1204,10 +1280,12 @@ void UnlimitedPlaybackManager::ClearAll() {
     m_entries.clear();
     m_cache.clear();
     for (int i = 0; i < Trigger_Count; ++i) {
-        m_triggers[i].enabled = (i != Trigger_KeyPress);
+        m_triggers[i].enabled = (i != Trigger_KeyPress && i != Trigger_OnLoop);
         m_triggers[i].cooldownFrames = 1;
         m_triggers[i].lastTriggeredFrame = -999999;
     }
+    StopLoop(nullptr);
+    ClearLoopCustomSnapshot();
     m_autoMirrorOnSideSwap = true;
     PushToast(L("Unlimited playback config cleared."));
 }
@@ -1820,6 +1898,267 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
         entry.name.c_str(),
         mirrored ? L(" (mirrored)").c_str() : ""));
     return true;
+}
+
+void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
+    if (m_loopNativeResetPulseActive) {
+        if (GetTickCount64() >= m_loopNativeResetReleaseAtMs) {
+            ReleaseNativeTrainingResetCombo();
+            m_loopRestartAppliedForCycle = true;
+            m_loopPhaseStartFrame = currentFrame;
+        } else {
+            return;
+        }
+    }
+
+    if (IsKeyPressedEdge(m_loopKeyCode)) {
+        if (m_loopActive) {
+            StopLoop(L("Playback loop stopped.").c_str());
+        } else {
+            StartLoop(currentFrame);
+        }
+        return;
+    }
+
+    if (!m_loopActive) {
+        return;
+    }
+
+    if (m_loopPhase == LoopPhase_Setup) {
+        if (!m_loopRestartAppliedForCycle) {
+            ApplyLoopRestart();
+            if (m_loopNativeResetPulseActive) {
+                return;
+            }
+            m_loopRestartAppliedForCycle = true;
+            m_loopPhaseStartFrame = currentFrame;
+        }
+        if ((currentFrame - m_loopPhaseStartFrame) >= m_loopSetupFrames) {
+            if (TryStartLoopPlayback()) {
+                m_loopPhase = LoopPhase_Playing;
+                m_loopPhaseStartFrame = currentFrame;
+            } else {
+                StopLoop(L("Playback loop stopped: no eligible playback.").c_str());
+            }
+        }
+        return;
+    }
+
+    if (m_loopPhase == LoopPhase_Playing) {
+        if (!m_runtimeSlotRestorePending && !m_runtimeSlotBackupValid) {
+            m_loopPhase = LoopPhase_Ending;
+            m_loopPhaseStartFrame = currentFrame;
+        }
+        return;
+    }
+
+    if (m_loopPhase == LoopPhase_Ending) {
+        if ((currentFrame - m_loopPhaseStartFrame) >= m_loopEndingFrames) {
+            m_loopPhase = LoopPhase_Setup;
+            m_loopPhaseStartFrame = currentFrame;
+            m_loopRestartAppliedForCycle = false;
+        }
+    }
+}
+
+void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
+    if (BuildCandidatesForTrigger(Trigger_OnLoop).empty()) {
+        PushToast(L("Playback loop not started: no eligible playback."));
+        return;
+    }
+    if (m_loopRestartLabState &&
+        m_loopRestartMode == LoopReset_Custom &&
+        !HasLoopCustomSnapshot()) {
+        PushToast(L("Playback loop not started: custom snapshot missing."));
+        return;
+    }
+
+    ResetRuntimePlaybackState(false);
+    m_loopActive = true;
+    m_loopPhase = LoopPhase_Setup;
+    m_loopPhaseStartFrame = currentFrame;
+    m_loopRestartAppliedForCycle = false;
+    PushToast(L("Playback loop started."));
+}
+
+void UnlimitedPlaybackManager::StopLoop(const char* reason) {
+    const bool wasActive = m_loopActive;
+    const bool inTrainingMatch =
+        g_gameVals.pGameMode &&
+        g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_Training) &&
+        (*g_gameVals.pGameState == GameState_InMatch) &&
+        (GetGameSceneStatus() >= GameSceneStatus_Running) &&
+        !g_interfaces.player2.IsCharDataNullPtr();
+    if (inTrainingMatch) {
+        ResetRuntimePlaybackState(false);
+    }
+    m_loopActive = false;
+    m_loopPhase = LoopPhase_Idle;
+    m_loopPhaseStartFrame = -1;
+    m_loopRestartAppliedForCycle = false;
+    ReleaseNativeTrainingResetCombo();
+    if (wasActive && reason && reason[0] != '\0') {
+        PushToast(reason);
+    }
+}
+
+bool UnlimitedPlaybackManager::TryStartLoopPlayback() {
+    size_t chosen = 0;
+    if (!PickEntryIndexForTrigger(Trigger_OnLoop, &chosen)) {
+        return false;
+    }
+
+    const auto& entry = m_entries[chosen];
+    const auto cacheIt = m_cache.find(entry.id);
+    if (cacheIt == m_cache.end() || !cacheIt->second.loaded) {
+        PushToast(L("Selected playback cache missing."));
+        return false;
+    }
+
+    std::vector<char> frames = cacheIt->second.frames;
+    int facingToLoad = cacheIt->second.facingLeft ? 1 : 0;
+    bool mirrored = false;
+    bool currentFacingLeft = false;
+    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != cacheIt->second.facingLeft) {
+        mirrored = m_autoMirrorOnSideSwap;
+        if (!m_autoMirrorOnSideSwap) {
+            facingToLoad = currentFacingLeft ? 1 : 0;
+        }
+    }
+
+    BackupRuntimeSlotIfNeeded();
+    StartRuntimePlayback(frames, facingToLoad);
+    m_runtimeSlotRestorePending = true;
+    PushToast(FormatLocalized("Loop played: %s%s",
+        entry.name.c_str(),
+        mirrored ? L(" (mirrored)").c_str() : ""));
+    return true;
+}
+
+bool UnlimitedPlaybackManager::EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot) {
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        if (!preserveCustomSnapshot) {
+            ClearLoopCustomSnapshot();
+        }
+        return false;
+    }
+
+    if (!m_loopSnapshotApparatus) {
+        m_loopSnapshotApparatus = new SnapshotApparatus();
+        return m_loopSnapshotApparatus != nullptr;
+    }
+
+    if (!m_loopSnapshotApparatus->check_if_valid(g_interfaces.player1.GetData(), g_interfaces.player2.GetData())) {
+        delete m_loopSnapshotApparatus;
+        m_loopSnapshotApparatus = new SnapshotApparatus();
+        if (!preserveCustomSnapshot) {
+            ClearLoopCustomSnapshot();
+        }
+    }
+    return m_loopSnapshotApparatus != nullptr;
+}
+
+bool UnlimitedPlaybackManager::CaptureLoopCustomSnapshot() {
+    InitializeIfNeeded();
+    if (!EnsureLoopSnapshotApparatus()) {
+        PushToast(L("Custom loop snapshot failed: lab state unavailable."));
+        return false;
+    }
+
+    m_loopCustomSnapshotBytes.assign(0xA10000, 0);
+    Snapshot* snapshotPtr = reinterpret_cast<Snapshot*>(m_loopCustomSnapshotBytes.data());
+    const bool ok = m_loopSnapshotApparatus->save_snapshot(&snapshotPtr);
+    if (!ok) {
+        ClearLoopCustomSnapshot();
+        PushToast(L("Custom loop snapshot failed."));
+        return false;
+    }
+    m_loopCustomSnapshotSize = m_loopSnapshotApparatus->get_last_saved_snapshot_size();
+    if (m_loopCustomSnapshotSize <= 0 || m_loopCustomSnapshotSize > 0xA10000) {
+        ClearLoopCustomSnapshot();
+        PushToast(L("Custom loop snapshot failed: invalid size."));
+        return false;
+    }
+    PushToast(L("Custom loop snapshot captured for this lab session."));
+    return true;
+}
+
+void UnlimitedPlaybackManager::ClearLoopCustomSnapshot() {
+    m_loopCustomSnapshotBytes.clear();
+    m_loopCustomSnapshotSize = 0;
+}
+
+bool UnlimitedPlaybackManager::ApplyLoopRestart() {
+    if (!m_loopRestartLabState) {
+        return true;
+    }
+
+    const LoopResetMode mode = static_cast<LoopResetMode>(m_loopRestartMode);
+    if (mode == LoopReset_Custom) {
+        if (!HasLoopCustomSnapshot() || !EnsureLoopSnapshotApparatus(true)) {
+            PushToast(L("Custom loop snapshot missing; skipping lab reset."));
+            return false;
+        }
+        const bool ok = m_loopSnapshotApparatus->load_snapshot_sized(
+            m_loopCustomSnapshotBytes.data(),
+            static_cast<size_t>(m_loopCustomSnapshotSize));
+        if (!ok) {
+            PushToast(L("Custom loop snapshot load failed."));
+        }
+        return ok;
+    }
+
+    StartNativeTrainingResetCombo(mode);
+    return true;
+}
+
+void UnlimitedPlaybackManager::StartNativeTrainingResetCombo(LoopResetMode mode) {
+    ReleaseNativeTrainingResetCombo();
+
+    WORD directionVk = 0;
+    WORD alternateDirectionVk = 0;
+    if (mode == LoopReset_Left) {
+        directionVk = VK_LEFT;
+        alternateDirectionVk = 'A';
+    } else if (mode == LoopReset_Right) {
+        directionVk = VK_RIGHT;
+        alternateDirectionVk = 'D';
+    } else {
+        directionVk = VK_DOWN;
+        alternateDirectionVk = 'S';
+    }
+
+    m_loopNativeResetKeys = { directionVk, alternateDirectionVk, VK_BACK };
+    SendNativeTrainingResetKey(directionVk, true);
+    SendNativeTrainingResetKey(alternateDirectionVk, true);
+    SendNativeTrainingResetKey(VK_BACK, true);
+    m_loopNativeResetPulseActive = true;
+    m_loopNativeResetReleaseAtMs = GetTickCount64() + 90;
+}
+
+void UnlimitedPlaybackManager::ReleaseNativeTrainingResetCombo() {
+    if (!m_loopNativeResetPulseActive) {
+        return;
+    }
+
+    SendNativeTrainingResetKey(m_loopNativeResetKeys[2], false);
+    SendNativeTrainingResetKey(m_loopNativeResetKeys[1], false);
+    SendNativeTrainingResetKey(m_loopNativeResetKeys[0], false);
+    m_loopNativeResetKeys = {};
+    m_loopNativeResetPulseActive = false;
+    m_loopNativeResetReleaseAtMs = 0;
+}
+
+void UnlimitedPlaybackManager::SendNativeTrainingResetKey(WORD virtualKey, bool keyDown) const {
+    INPUT input = {};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wScan = static_cast<WORD>(MapVirtualKeyA(virtualKey, MAPVK_VK_TO_VSC));
+    input.ki.dwFlags = KEYEVENTF_SCANCODE | (keyDown ? 0 : KEYEVENTF_KEYUP);
+    if (virtualKey == VK_LEFT || virtualKey == VK_RIGHT || virtualKey == VK_UP || virtualKey == VK_DOWN) {
+        input.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
+    }
+    SendInput(1, &input, sizeof(INPUT));
 }
 
 void UnlimitedPlaybackManager::BackupRuntimeSlotIfNeeded() {
