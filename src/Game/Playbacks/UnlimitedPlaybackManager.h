@@ -99,6 +99,7 @@ public:
     bool IsLoopActive() const;
     bool HasLoopCustomSnapshot() const;
     bool CaptureLoopCustomSnapshot();
+    bool LoadLoopCustomSnapshot();
     void ClearLoopCustomSnapshot();
 
     const std::vector<PlaybackEntry>& GetEntries() const;
@@ -169,6 +170,9 @@ private:
     void StartLoop(int currentFrame);
     void StopLoop(const char* reason = nullptr);
     bool TryStartLoopPlayback();
+    void ResetLoopPlaybackCompletionState();
+    void ObserveLoopPlaybackActionState();
+    bool IsLoopPlaybackAnimationComplete(int currentFrame);
     bool IsKeyPressedEdge(int virtualKey);
     void SyncKeyEdgeState();
     bool IsTriggerKeyDown(int virtualKey) const;
@@ -190,8 +194,11 @@ private:
     void ResetRuntimePlaybackState(bool discardBackupOnly);
     void StartRuntimePlayback(const std::vector<char>& frames, int facingToLoad);
     bool EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot = false);
+    bool RestoreLoopCustomSnapshot(bool showToast);
     bool ApplyLoopRestart();
     void StartNativeTrainingResetCombo(LoopResetMode mode);
+    void CaptureNativeTrainingResetInputSnapshot(LoopResetMode mode);
+    void NeutralizeNativeTrainingResetDirections(LoopResetMode mode);
     void ReleaseNativeTrainingResetCombo();
     void SendNativeTrainingResetKey(WORD virtualKey, bool keyDown) const;
 
@@ -250,11 +257,16 @@ private:
     LoopPhase m_loopPhase = LoopPhase_Idle;
     int m_loopPhaseStartFrame = -1;
     bool m_loopRestartAppliedForCycle = false;
+    bool m_loopPlaybackObservedNonIdle = false;
+    int m_loopPlaybackInputEndedFrame = -1;
+    int m_loopPlaybackIdleSinceFrame = -1;
     bool m_loopNativeResetPulseActive = false;
     unsigned long long m_loopNativeResetReleaseAtMs = 0;
     std::array<WORD, 3> m_loopNativeResetKeys = {};
+    std::vector<WORD> m_loopNativeResetRestoreKeys;
     std::vector<char> m_loopCustomSnapshotBytes;
     int m_loopCustomSnapshotSize = 0;
+    int m_loopCustomSnapshotSlotIndex = -1;
     SnapshotApparatus* m_loopSnapshotApparatus = nullptr;
 
     PlaybackManager m_runtimePlaybackManager;

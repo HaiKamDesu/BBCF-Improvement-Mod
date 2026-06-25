@@ -1143,6 +1143,12 @@ void UnlimitedPlaybackWindow::Draw() {
                     mgr.CaptureLoopCustomSnapshot();
                 }
                 ImGui::SameLine();
+                if (mgr.HasLoopCustomSnapshot()) {
+                    if (ImGui::Button(L("Load snapshot").c_str(), ImVec2(170.0f, 0))) {
+                        mgr.LoadLoopCustomSnapshot();
+                    }
+                    ImGui::SameLine();
+                }
                 ImGui::TextColored(
                     mgr.HasLoopCustomSnapshot() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
                     "%s",

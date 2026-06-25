@@ -99,6 +99,34 @@ bool IsControllerBindingDown(const ControllerBindingDef& binding) {
     return false;
 }
 
+bool IsLoopCompletionIdleAction(const std::string& currentAction) {
+    static const std::array<const char*, 17> idleActions = {
+        "_NEUTRAL",
+        "CmnActStand",
+        "CmnActStandTurn",
+        "CmnActStand2Crouch",
+        "CmnActCrouch",
+        "CmnActCrouchTurn",
+        "CmnActCrouch2Stand",
+        "CmnActFWalk",
+        "CmnActBWalk",
+        "CmnActFDashStop",
+        "CmnActBDashStop",
+        "CmnActJumpPre",
+        "CmnActJumpUpper",
+        "CmnActJumpDown",
+        "CmnActJumpUpperEnd",
+        "CmnActJumpLanding",
+        "CmnActLandingStiffEnd",
+    };
+
+    return std::find(idleActions.begin(), idleActions.end(), currentAction) != idleActions.end();
+}
+
+constexpr int kLoopCompletionMinimumPostInputFrames = 45;
+constexpr int kLoopCompletionIdleStableFrames = 12;
+constexpr int kLoopCompletionNoActionFallbackFrames = 90;
+
 bool PathExists(const std::string& path) {
     const DWORD attrs = GetFileAttributesA(path.c_str());
     return attrs != INVALID_FILE_ATTRIBUTES;
@@ -791,7 +819,8 @@ bool UnlimitedPlaybackManager::IsLoopActive() const {
 }
 
 bool UnlimitedPlaybackManager::HasLoopCustomSnapshot() const {
-    return !m_loopCustomSnapshotBytes.empty() && m_loopCustomSnapshotSize > 0;
+    return m_loopCustomSnapshotSlotIndex >= 0 ||
+        (!m_loopCustomSnapshotBytes.empty() && m_loopCustomSnapshotSize > 0);
 }
 
 const std::vector<UnlimitedPlaybackManager::PlaybackEntry>& UnlimitedPlaybackManager::GetEntries() const {
@@ -1902,6 +1931,7 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
 
 void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     if (m_loopNativeResetPulseActive) {
+        NeutralizeNativeTrainingResetDirections(static_cast<LoopResetMode>(m_loopRestartMode));
         if (GetTickCount64() >= m_loopNativeResetReleaseAtMs) {
             ReleaseNativeTrainingResetCombo();
             m_loopRestartAppliedForCycle = true;
@@ -1945,9 +1975,15 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     }
 
     if (m_loopPhase == LoopPhase_Playing) {
+        ObserveLoopPlaybackActionState();
         if (!m_runtimeSlotRestorePending && !m_runtimeSlotBackupValid) {
-            m_loopPhase = LoopPhase_Ending;
-            m_loopPhaseStartFrame = currentFrame;
+            if (m_loopPlaybackInputEndedFrame < 0) {
+                m_loopPlaybackInputEndedFrame = currentFrame;
+            }
+            if (IsLoopPlaybackAnimationComplete(currentFrame)) {
+                m_loopPhase = LoopPhase_Ending;
+                m_loopPhaseStartFrame = currentFrame;
+            }
         }
         return;
     }
@@ -1978,6 +2014,7 @@ void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
     m_loopPhase = LoopPhase_Setup;
     m_loopPhaseStartFrame = currentFrame;
     m_loopRestartAppliedForCycle = false;
+    ResetLoopPlaybackCompletionState();
     PushToast(L("Playback loop started."));
 }
 
@@ -1997,6 +2034,7 @@ void UnlimitedPlaybackManager::StopLoop(const char* reason) {
     m_loopPhase = LoopPhase_Idle;
     m_loopPhaseStartFrame = -1;
     m_loopRestartAppliedForCycle = false;
+    ResetLoopPlaybackCompletionState();
     ReleaseNativeTrainingResetCombo();
     if (wasActive && reason && reason[0] != '\0') {
         PushToast(reason);
@@ -2030,10 +2068,91 @@ bool UnlimitedPlaybackManager::TryStartLoopPlayback() {
     BackupRuntimeSlotIfNeeded();
     StartRuntimePlayback(frames, facingToLoad);
     m_runtimeSlotRestorePending = true;
+    ResetLoopPlaybackCompletionState();
     PushToast(FormatLocalized("Loop played: %s%s",
         entry.name.c_str(),
         mirrored ? L(" (mirrored)").c_str() : ""));
     return true;
+}
+
+void UnlimitedPlaybackManager::ResetLoopPlaybackCompletionState() {
+    m_loopPlaybackObservedNonIdle = false;
+    m_loopPlaybackInputEndedFrame = -1;
+    m_loopPlaybackIdleSinceFrame = -1;
+}
+
+void UnlimitedPlaybackManager::ObserveLoopPlaybackActionState() {
+    if (!g_interfaces.player1.IsCharDataNullPtr()) {
+        const auto* p1 = g_interfaces.player1.GetData();
+        if (p1 && !IsLoopCompletionIdleAction(std::string(p1->currentAction))) {
+            m_loopPlaybackObservedNonIdle = true;
+        }
+    }
+
+    if (!g_interfaces.player2.IsCharDataNullPtr()) {
+        const auto* p2 = g_interfaces.player2.GetData();
+        if (p2 && !IsLoopCompletionIdleAction(std::string(p2->currentAction))) {
+            m_loopPlaybackObservedNonIdle = true;
+        }
+    }
+}
+
+bool UnlimitedPlaybackManager::IsLoopPlaybackAnimationComplete(int currentFrame) {
+    if (m_loopPlaybackInputEndedFrame < 0) {
+        return false;
+    }
+
+    bool anyPlayerAvailable = false;
+    bool allAvailablePlayersIdle = true;
+
+    if (!g_interfaces.player1.IsCharDataNullPtr()) {
+        const auto* p1 = g_interfaces.player1.GetData();
+        if (p1) {
+            anyPlayerAvailable = true;
+            const bool p1Idle = IsLoopCompletionIdleAction(std::string(p1->currentAction));
+            if (!p1Idle) {
+                m_loopPlaybackObservedNonIdle = true;
+                allAvailablePlayersIdle = false;
+            }
+        }
+    }
+
+    if (!g_interfaces.player2.IsCharDataNullPtr()) {
+        const auto* p2 = g_interfaces.player2.GetData();
+        if (p2) {
+            anyPlayerAvailable = true;
+            const bool p2Idle = IsLoopCompletionIdleAction(std::string(p2->currentAction));
+            if (!p2Idle) {
+                m_loopPlaybackObservedNonIdle = true;
+                allAvailablePlayersIdle = false;
+            }
+        }
+    }
+
+    if (!anyPlayerAvailable) {
+        return true;
+    }
+
+    if (!allAvailablePlayersIdle) {
+        m_loopPlaybackIdleSinceFrame = -1;
+        return false;
+    }
+
+    const int framesSinceInputEnd = currentFrame - m_loopPlaybackInputEndedFrame;
+    if (framesSinceInputEnd < kLoopCompletionMinimumPostInputFrames) {
+        return false;
+    }
+
+    if (m_loopPlaybackIdleSinceFrame < 0) {
+        m_loopPlaybackIdleSinceFrame = currentFrame;
+    }
+    const int stableIdleFrames = currentFrame - m_loopPlaybackIdleSinceFrame;
+    if (m_loopPlaybackObservedNonIdle) {
+        return stableIdleFrames >= kLoopCompletionIdleStableFrames;
+    }
+
+    // If the slot never drove either player into a non-idle action, do not hang the loop forever.
+    return framesSinceInputEnd >= kLoopCompletionNoActionFallbackFrames;
 }
 
 bool UnlimitedPlaybackManager::EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot) {
@@ -2066,27 +2185,68 @@ bool UnlimitedPlaybackManager::CaptureLoopCustomSnapshot() {
         return false;
     }
 
-    m_loopCustomSnapshotBytes.assign(0xA10000, 0);
-    Snapshot* snapshotPtr = reinterpret_cast<Snapshot*>(m_loopCustomSnapshotBytes.data());
-    const bool ok = m_loopSnapshotApparatus->save_snapshot(&snapshotPtr);
-    if (!ok) {
+    const int savedSlot = static_cast<int>(m_loopSnapshotApparatus->snapshot_count % 10);
+    const bool nativeOk = m_loopSnapshotApparatus->save_snapshot(nullptr);
+    if (!nativeOk) {
         ClearLoopCustomSnapshot();
         PushToast(L("Custom loop snapshot failed."));
         return false;
     }
+    m_loopCustomSnapshotSlotIndex = savedSlot;
     m_loopCustomSnapshotSize = m_loopSnapshotApparatus->get_last_saved_snapshot_size();
-    if (m_loopCustomSnapshotSize <= 0 || m_loopCustomSnapshotSize > 0xA10000) {
-        ClearLoopCustomSnapshot();
-        PushToast(L("Custom loop snapshot failed: invalid size."));
-        return false;
-    }
+
+    m_loopCustomSnapshotBytes.clear();
+
     PushToast(L("Custom loop snapshot captured for this lab session."));
     return true;
+}
+
+bool UnlimitedPlaybackManager::LoadLoopCustomSnapshot() {
+    InitializeIfNeeded();
+    return RestoreLoopCustomSnapshot(true);
 }
 
 void UnlimitedPlaybackManager::ClearLoopCustomSnapshot() {
     m_loopCustomSnapshotBytes.clear();
     m_loopCustomSnapshotSize = 0;
+    m_loopCustomSnapshotSlotIndex = -1;
+}
+
+bool UnlimitedPlaybackManager::RestoreLoopCustomSnapshot(bool showToast) {
+    if (!HasLoopCustomSnapshot() || !EnsureLoopSnapshotApparatus(true)) {
+        if (showToast) {
+            PushToast(L("Custom loop snapshot missing."));
+        }
+        return false;
+    }
+
+    if (m_loopCustomSnapshotSlotIndex >= 0) {
+        const unsigned int oldCount = m_loopSnapshotApparatus->snapshot_count;
+        m_loopSnapshotApparatus->snapshot_count = static_cast<unsigned int>(m_loopCustomSnapshotSlotIndex + 1);
+        const bool ok = m_loopSnapshotApparatus->load_snapshot(nullptr);
+        m_loopSnapshotApparatus->snapshot_count = oldCount;
+        if (showToast) {
+            PushToast(ok ? L("Custom loop snapshot loaded.") : L("Custom loop snapshot load failed."));
+        }
+        if (ok) {
+            return true;
+        }
+    }
+
+    if (!m_loopCustomSnapshotBytes.empty() && m_loopCustomSnapshotSize > 0) {
+        const bool ok = m_loopSnapshotApparatus->load_snapshot_sized(
+            m_loopCustomSnapshotBytes.data(),
+            static_cast<size_t>(m_loopCustomSnapshotSize));
+        if (showToast) {
+            PushToast(ok ? L("Custom loop snapshot loaded.") : L("Custom loop snapshot load failed."));
+        }
+        return ok;
+    }
+
+    if (showToast) {
+        PushToast(L("Custom loop snapshot load failed."));
+    }
+    return false;
 }
 
 bool UnlimitedPlaybackManager::ApplyLoopRestart() {
@@ -2096,14 +2256,8 @@ bool UnlimitedPlaybackManager::ApplyLoopRestart() {
 
     const LoopResetMode mode = static_cast<LoopResetMode>(m_loopRestartMode);
     if (mode == LoopReset_Custom) {
-        if (!HasLoopCustomSnapshot() || !EnsureLoopSnapshotApparatus(true)) {
-            PushToast(L("Custom loop snapshot missing; skipping lab reset."));
-            return false;
-        }
-        const bool ok = m_loopSnapshotApparatus->load_snapshot_sized(
-            m_loopCustomSnapshotBytes.data(),
-            static_cast<size_t>(m_loopCustomSnapshotSize));
-        if (!ok) {
+        const bool ok = RestoreLoopCustomSnapshot(false);
+        if (!ok && HasLoopCustomSnapshot()) {
             PushToast(L("Custom loop snapshot load failed."));
         }
         return ok;
@@ -2115,6 +2269,8 @@ bool UnlimitedPlaybackManager::ApplyLoopRestart() {
 
 void UnlimitedPlaybackManager::StartNativeTrainingResetCombo(LoopResetMode mode) {
     ReleaseNativeTrainingResetCombo();
+    CaptureNativeTrainingResetInputSnapshot(mode);
+    NeutralizeNativeTrainingResetDirections(mode);
 
     WORD directionVk = 0;
     WORD alternateDirectionVk = 0;
@@ -2137,6 +2293,54 @@ void UnlimitedPlaybackManager::StartNativeTrainingResetCombo(LoopResetMode mode)
     m_loopNativeResetReleaseAtMs = GetTickCount64() + 90;
 }
 
+void UnlimitedPlaybackManager::CaptureNativeTrainingResetInputSnapshot(LoopResetMode mode) {
+    static const std::array<WORD, 8> directionKeys = {
+        VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, 'A', 'D', 'W', 'S',
+    };
+
+    WORD keepPrimary = VK_DOWN;
+    WORD keepAlternate = 'S';
+    if (mode == LoopReset_Left) {
+        keepPrimary = VK_LEFT;
+        keepAlternate = 'A';
+    } else if (mode == LoopReset_Right) {
+        keepPrimary = VK_RIGHT;
+        keepAlternate = 'D';
+    }
+
+    m_loopNativeResetRestoreKeys.clear();
+    for (WORD key : directionKeys) {
+        if (key == keepPrimary || key == keepAlternate) {
+            continue;
+        }
+        if ((GetAsyncKeyState(key) & 0x8000) != 0) {
+            m_loopNativeResetRestoreKeys.push_back(key);
+        }
+    }
+}
+
+void UnlimitedPlaybackManager::NeutralizeNativeTrainingResetDirections(LoopResetMode mode) {
+    static const std::array<WORD, 8> directionKeys = {
+        VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, 'A', 'D', 'W', 'S',
+    };
+
+    WORD keepPrimary = VK_DOWN;
+    WORD keepAlternate = 'S';
+    if (mode == LoopReset_Left) {
+        keepPrimary = VK_LEFT;
+        keepAlternate = 'A';
+    } else if (mode == LoopReset_Right) {
+        keepPrimary = VK_RIGHT;
+        keepAlternate = 'D';
+    }
+
+    for (WORD key : directionKeys) {
+        if (key != keepPrimary && key != keepAlternate) {
+            SendNativeTrainingResetKey(key, false);
+        }
+    }
+}
+
 void UnlimitedPlaybackManager::ReleaseNativeTrainingResetCombo() {
     if (!m_loopNativeResetPulseActive) {
         return;
@@ -2145,7 +2349,11 @@ void UnlimitedPlaybackManager::ReleaseNativeTrainingResetCombo() {
     SendNativeTrainingResetKey(m_loopNativeResetKeys[2], false);
     SendNativeTrainingResetKey(m_loopNativeResetKeys[1], false);
     SendNativeTrainingResetKey(m_loopNativeResetKeys[0], false);
+    for (WORD key : m_loopNativeResetRestoreKeys) {
+        SendNativeTrainingResetKey(key, true);
+    }
     m_loopNativeResetKeys = {};
+    m_loopNativeResetRestoreKeys.clear();
     m_loopNativeResetPulseActive = false;
     m_loopNativeResetReleaseAtMs = 0;
 }
