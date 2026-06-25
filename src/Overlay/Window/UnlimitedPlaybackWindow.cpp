@@ -108,7 +108,7 @@ const char* LoopResetModeLabel(int mode) {
     case UnlimitedPlaybackManager::LoopReset_Middle: return L("Middle").c_str();
     case UnlimitedPlaybackManager::LoopReset_Left: return L("Left").c_str();
     case UnlimitedPlaybackManager::LoopReset_Right: return L("Right").c_str();
-    case UnlimitedPlaybackManager::LoopReset_Custom: return L("Custom").c_str();
+    case UnlimitedPlaybackManager::LoopReset_Custom: return L("Custom Snapshot").c_str();
     default: return L("Middle").c_str();
     }
 }
@@ -287,7 +287,14 @@ bool NativeFileDialogActive() {
     return g_nativeFileDialogState.active;
 }
 
+bool IsGameWindowFocused() {
+    return g_gameProc.hWndGameWindow && GetForegroundWindow() == g_gameProc.hWndGameWindow;
+}
+
 int CaptureNextPressedVirtualKey() {
+    if (!IsGameWindowFocused()) {
+        return 0;
+    }
     for (int vk = 1; vk < 256; ++vk) {
         if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
             continue;
@@ -315,6 +322,9 @@ int CaptureNextPressedVirtualKey() {
 }
 
 bool AnyBindableKeyCurrentlyDown() {
+    if (!IsGameWindowFocused()) {
+        return false;
+    }
     for (int vk = 1; vk < 256; ++vk) {
         if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
             continue;
@@ -957,27 +967,22 @@ void UnlimitedPlaybackWindow::Draw() {
     if (ImGui::BeginPopupModal(L("Add from Replay").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("%s", L("Capture from replay").c_str());
         if (mgr.IsReplayRecording()) {
-            ImGui::TextDisabled(L("Recording %s inputs (start frame %d)").c_str(),
-                mgr.IsReplayRecordingAsP1() ? "P1" : "P2",
-                mgr.GetReplayRecordingStartFrame());
-            ImGui::InputText(FormatText("%s##replay_capture_name", L("Name").c_str()).c_str(), replayCaptureName, IM_ARRAYSIZE(replayCaptureName));
-            if (ImGui::Button(FormatText("%s##replay_capture", L("Stop and Save").c_str()).c_str())) {
-                mgr.StopReplayRecordingAndSave(replayCaptureName);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(FormatText("%s##replay_capture", L("Cancel").c_str()).c_str())) {
-                mgr.CancelReplayRecording();
+            ImGui::TextWrapped("%s", L("Replay recording is already running. Use the non-modal recording window to stop or cancel.").c_str());
+            if (ImGui::Button(FormatText("%s##replay_capture", L("Close").c_str()).c_str())) {
                 ImGui::CloseCurrentPopup();
             }
         } else {
             ImGui::InputText(FormatText("%s##replay_capture_name", L("Name").c_str()).c_str(), replayCaptureName, IM_ARRAYSIZE(replayCaptureName));
             if (DrawContextButton(L("Record P1 Inputs").c_str(), inReplayMatch)) {
-                mgr.StartReplayRecording(true);
+                if (mgr.StartReplayRecording(true)) {
+                    ImGui::CloseCurrentPopup();
+                }
             }
             ImGui::SameLine();
             if (DrawContextButton(L("Record P2 Inputs").c_str(), inReplayMatch)) {
-                mgr.StartReplayRecording(false);
+                if (mgr.StartReplayRecording(false)) {
+                    ImGui::CloseCurrentPopup();
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button(FormatText("%s##replay_capture", L("Close").c_str()).c_str())) {
@@ -986,6 +991,23 @@ void UnlimitedPlaybackWindow::Draw() {
         }
         ImGui::TextDisabled("%s", L("Replay capture only starts while a replay match is active.").c_str());
         ImGui::EndPopup();
+    }
+    if (mgr.IsReplayRecording()) {
+        ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Appearing);
+        if (ImGui::Begin(L("Replay Recording").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextDisabled(L("Recording %s inputs (start frame %d)").c_str(),
+                mgr.IsReplayRecordingAsP1() ? "P1" : "P2",
+                mgr.GetReplayRecordingStartFrame());
+            ImGui::InputText(FormatText("%s##replay_capture_name_floating", L("Name").c_str()).c_str(), replayCaptureName, IM_ARRAYSIZE(replayCaptureName));
+            if (ImGui::Button(FormatText("%s##replay_capture_floating", L("Stop and Save").c_str()).c_str())) {
+                mgr.StopReplayRecordingAndSave(replayCaptureName);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(FormatText("%s##replay_capture_floating", L("Cancel").c_str()).c_str())) {
+                mgr.CancelReplayRecording();
+            }
+        }
+        ImGui::End();
     }
     ImGui::EndChild();
     ImGui::EndChild();
@@ -1093,25 +1115,25 @@ void UnlimitedPlaybackWindow::Draw() {
             "%s",
             mgr.IsLoopActive() ? L("Running").c_str() : L("Stopped").c_str());
 
-        int setupFrames = mgr.GetLoopSetupFrames();
-        ImGui::TextUnformatted(L("Setup Time (frames)").c_str());
-        DrawHelpInline(L("Frames to wait after optional lab reset before playing the next slot.").c_str());
+        float setupSeconds = mgr.GetLoopSetupSeconds();
+        ImGui::TextUnformatted(L("Setup Time (seconds)").c_str());
+        DrawHelpInline(L("Seconds to show a setup countdown after optional snapshot restore before playing the next slot.").c_str());
         ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputInt("##up_loop_setup_frames", &setupFrames)) {
-            mgr.SetLoopSetupFrames(setupFrames);
-            Settings::settingsIni.unlimitedPlaybackLoopSetupFrames = mgr.GetLoopSetupFrames();
-            Settings::changeSetting("UnlimitedPlaybackLoopSetupFrames", std::to_string(mgr.GetLoopSetupFrames()));
+        if (ImGui::InputFloat("##up_loop_setup_seconds", &setupSeconds, 0.1f, 0.5f, 2)) {
+            mgr.SetLoopSetupSeconds(setupSeconds);
+            Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds = mgr.GetLoopSetupSeconds();
+            Settings::changeSetting("UnlimitedPlaybackLoopSetupSeconds", std::to_string(mgr.GetLoopSetupSeconds()));
         }
         ImGui::PopItemWidth();
 
-        int endingFrames = mgr.GetLoopEndingFrames();
-        ImGui::TextUnformatted(L("Ending Time (frames)").c_str());
-        DrawHelpInline(L("Frames to wait after a slot ends before starting the next setup.").c_str());
+        float endingSeconds = mgr.GetLoopEndingSeconds();
+        ImGui::TextUnformatted(L("Ending Time (seconds)").c_str());
+        DrawHelpInline(L("Seconds to wait after both players return to idle before starting the next setup.").c_str());
         ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputInt("##up_loop_ending_frames", &endingFrames)) {
-            mgr.SetLoopEndingFrames(endingFrames);
-            Settings::settingsIni.unlimitedPlaybackLoopEndingFrames = mgr.GetLoopEndingFrames();
-            Settings::changeSetting("UnlimitedPlaybackLoopEndingFrames", std::to_string(mgr.GetLoopEndingFrames()));
+        if (ImGui::InputFloat("##up_loop_ending_seconds", &endingSeconds, 0.1f, 0.5f, 2)) {
+            mgr.SetLoopEndingSeconds(endingSeconds);
+            Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds = mgr.GetLoopEndingSeconds();
+            Settings::changeSetting("UnlimitedPlaybackLoopEndingSeconds", std::to_string(mgr.GetLoopEndingSeconds()));
         }
         ImGui::PopItemWidth();
 
@@ -1122,39 +1144,38 @@ void UnlimitedPlaybackWindow::Draw() {
             Settings::changeSetting("UnlimitedPlaybackLoopRestartLabState", restartLabState ? "1" : "0");
         }
         if (restartLabState) {
-            const char* resetModes[] = {
-                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Middle),
-                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Left),
-                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Right),
-                LoopResetModeLabel(UnlimitedPlaybackManager::LoopReset_Custom)
-            };
-            int resetMode = mgr.GetLoopRestartMode();
-            ImGui::TextUnformatted(L("Reset Position").c_str());
-            ImGui::PushItemWidth(-1.0f);
-            if (ImGui::Combo("##up_loop_reset_mode", &resetMode, resetModes, IM_ARRAYSIZE(resetModes))) {
-                mgr.SetLoopRestartMode(resetMode);
-                Settings::settingsIni.unlimitedPlaybackLoopRestartMode = mgr.GetLoopRestartMode();
-                Settings::changeSetting("UnlimitedPlaybackLoopRestartMode", std::to_string(mgr.GetLoopRestartMode()));
+            ImGui::TextUnformatted(L("Custom Snapshot").c_str());
+            DrawHelpInline(L("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.").c_str());
+            if (ImGui::Button(L("Save").c_str(), ImVec2(-1.0f, 0))) {
+                mgr.CaptureLoopCustomSnapshot();
             }
-            ImGui::PopItemWidth();
-
-            if (mgr.GetLoopRestartMode() == UnlimitedPlaybackManager::LoopReset_Custom) {
-                if (ImGui::Button(L("Take snapshot").c_str(), ImVec2(170.0f, 0))) {
-                    mgr.CaptureLoopCustomSnapshot();
+            DrawButtonTooltip(L("Save current lab state as the loop restart snapshot.").c_str());
+            if (mgr.HasLoopCustomSnapshot()) {
+                if (ImGui::Button(L("Load").c_str(), ImVec2(-1.0f, 0))) {
+                    mgr.LoadLoopCustomSnapshot();
                 }
-                ImGui::SameLine();
-                if (mgr.HasLoopCustomSnapshot()) {
-                    if (ImGui::Button(L("Load snapshot").c_str(), ImVec2(170.0f, 0))) {
-                        mgr.LoadLoopCustomSnapshot();
-                    }
-                    ImGui::SameLine();
-                }
-                ImGui::TextColored(
-                    mgr.HasLoopCustomSnapshot() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
-                    "%s",
-                    mgr.HasLoopCustomSnapshot() ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+                DrawButtonTooltip(L("Restore the saved loop snapshot now for verification.").c_str());
             }
+            ImGui::TextColored(
+                mgr.HasLoopCustomSnapshot() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
+                "%s",
+                mgr.HasLoopCustomSnapshot() ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
         }
+    }
+    float loopSetupRemaining = 0.0f;
+    float loopSetupTotal = 0.0f;
+    if (mgr.GetLoopSetupCountdown(&loopSetupRemaining, &loopSetupTotal)) {
+        ImGui::OpenPopup(L("Loop Setup Countdown").c_str());
+    }
+    if (ImGui::BeginPopupModal(L("Loop Setup Countdown").c_str(), nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (loopSetupTotal > 0.0f && loopSetupRemaining > 0.0f) {
+            const float progress = loopSetupRemaining / loopSetupTotal;
+            ImGui::ProgressBar(progress, ImVec2(360.0f, 0.0f));
+            ImGui::Text("%s", FormatText(L("%.1f seconds").c_str(), loopSetupRemaining).c_str());
+        } else {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
     ImGui::Dummy(ImVec2(0, 8));
     if (ImGui::Button(L("Fix Triggers").c_str())) {

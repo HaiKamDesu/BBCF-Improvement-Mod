@@ -88,15 +88,16 @@ public:
     void SetAutoMirrorOnSideSwap(bool enabled);
     int GetLoopKeyCode() const;
     void SetLoopKeyCode(int keyCode);
-    int GetLoopSetupFrames() const;
-    void SetLoopSetupFrames(int frames);
-    int GetLoopEndingFrames() const;
-    void SetLoopEndingFrames(int frames);
+    float GetLoopSetupSeconds() const;
+    void SetLoopSetupSeconds(float seconds);
+    float GetLoopEndingSeconds() const;
+    void SetLoopEndingSeconds(float seconds);
     bool GetLoopRestartLabState() const;
     void SetLoopRestartLabState(bool enabled);
     int GetLoopRestartMode() const;
     void SetLoopRestartMode(int mode);
     bool IsLoopActive() const;
+    bool GetLoopSetupCountdown(float* outRemainingSeconds, float* outTotalSeconds) const;
     bool HasLoopCustomSnapshot() const;
     bool CaptureLoopCustomSnapshot();
     bool LoadLoopCustomSnapshot();
@@ -201,6 +202,7 @@ private:
     void NeutralizeNativeTrainingResetDirections(LoopResetMode mode);
     void ReleaseNativeTrainingResetCombo();
     void SendNativeTrainingResetKey(WORD virtualKey, bool keyDown) const;
+    int LoopSecondsToFrames(float seconds) const;
 
     int m_mode = Mode_Default;
     bool m_initialized = false;
@@ -243,8 +245,8 @@ private:
     int m_replayRecordingRound = 0;
     int m_replayRecordingStartFrame = 0;
     int m_loopKeyCode = VK_F7;
-    int m_loopSetupFrames = 0;
-    int m_loopEndingFrames = 0;
+    float m_loopSetupSeconds = 0.0f;
+    float m_loopEndingSeconds = 0.0f;
     bool m_loopRestartLabState = false;
     int m_loopRestartMode = LoopReset_Middle;
     bool m_loopActive = false;

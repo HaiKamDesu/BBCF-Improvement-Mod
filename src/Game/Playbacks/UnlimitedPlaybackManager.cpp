@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
 #include <fstream>
 #include <random>
 #include <sstream>
@@ -82,6 +83,10 @@ bool IsControllerBindCode(int code) {
         code < (kControllerBindBase + static_cast<int>(sizeof(kControllerBindings) / sizeof(kControllerBindings[0])));
 }
 
+bool IsGameWindowFocused() {
+    return g_gameProc.hWndGameWindow && GetForegroundWindow() == g_gameProc.hWndGameWindow;
+}
+
 bool IsControllerBindingDown(const ControllerBindingDef& binding) {
     for (DWORD userIndex = 0; userIndex < XUSER_MAX_COUNT; ++userIndex) {
         XINPUT_STATE state = {};
@@ -126,6 +131,7 @@ bool IsLoopCompletionIdleAction(const std::string& currentAction) {
 constexpr int kLoopCompletionMinimumPostInputFrames = 45;
 constexpr int kLoopCompletionIdleStableFrames = 12;
 constexpr int kLoopCompletionNoActionFallbackFrames = 90;
+constexpr int kLoopNativeResetSettleFrames = 45;
 
 bool PathExists(const std::string& path) {
     const DWORD attrs = GetFileAttributesA(path.c_str());
@@ -505,13 +511,10 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
     }
     const int savedLoopKeyCode = Settings::settingsIni.unlimitedPlaybackLoopKeyCode;
     m_loopKeyCode = savedLoopKeyCode != 0 ? savedLoopKeyCode : VK_F7;
-    m_loopSetupFrames = (std::max)(0, Settings::settingsIni.unlimitedPlaybackLoopSetupFrames);
-    m_loopEndingFrames = (std::max)(0, Settings::settingsIni.unlimitedPlaybackLoopEndingFrames);
+    m_loopSetupSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds);
+    m_loopEndingSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds);
     m_loopRestartLabState = Settings::settingsIni.unlimitedPlaybackLoopRestartLabState;
-    m_loopRestartMode = Settings::settingsIni.unlimitedPlaybackLoopRestartMode;
-    if (m_loopRestartMode < LoopReset_Middle || m_loopRestartMode > LoopReset_Custom) {
-        m_loopRestartMode = LoopReset_Middle;
-    }
+    m_loopRestartMode = LoopReset_Custom;
     m_initialized = true;
 }
 
@@ -779,20 +782,20 @@ void UnlimitedPlaybackManager::SetLoopKeyCode(int keyCode) {
     m_loopKeyCode = keyCode != 0 ? keyCode : VK_F7;
 }
 
-int UnlimitedPlaybackManager::GetLoopSetupFrames() const {
-    return m_loopSetupFrames;
+float UnlimitedPlaybackManager::GetLoopSetupSeconds() const {
+    return m_loopSetupSeconds;
 }
 
-void UnlimitedPlaybackManager::SetLoopSetupFrames(int frames) {
-    m_loopSetupFrames = (std::max)(0, frames);
+void UnlimitedPlaybackManager::SetLoopSetupSeconds(float seconds) {
+    m_loopSetupSeconds = (std::max)(0.0f, seconds);
 }
 
-int UnlimitedPlaybackManager::GetLoopEndingFrames() const {
-    return m_loopEndingFrames;
+float UnlimitedPlaybackManager::GetLoopEndingSeconds() const {
+    return m_loopEndingSeconds;
 }
 
-void UnlimitedPlaybackManager::SetLoopEndingFrames(int frames) {
-    m_loopEndingFrames = (std::max)(0, frames);
+void UnlimitedPlaybackManager::SetLoopEndingSeconds(float seconds) {
+    m_loopEndingSeconds = (std::max)(0.0f, seconds);
 }
 
 bool UnlimitedPlaybackManager::GetLoopRestartLabState() const {
@@ -804,18 +807,40 @@ void UnlimitedPlaybackManager::SetLoopRestartLabState(bool enabled) {
 }
 
 int UnlimitedPlaybackManager::GetLoopRestartMode() const {
-    return m_loopRestartMode;
+    return LoopReset_Custom;
 }
 
 void UnlimitedPlaybackManager::SetLoopRestartMode(int mode) {
-    if (mode < LoopReset_Middle || mode > LoopReset_Custom) {
-        mode = LoopReset_Middle;
-    }
-    m_loopRestartMode = mode;
+    m_loopRestartMode = LoopReset_Custom;
 }
 
 bool UnlimitedPlaybackManager::IsLoopActive() const {
     return m_loopActive;
+}
+
+bool UnlimitedPlaybackManager::GetLoopSetupCountdown(float* outRemainingSeconds, float* outTotalSeconds) const {
+    if (!m_loopActive || m_loopPhase != LoopPhase_Setup || !m_loopRestartAppliedForCycle || !g_gameVals.pFrameCount) {
+        return false;
+    }
+
+    const int totalFrames = LoopSecondsToFrames(m_loopSetupSeconds);
+    if (totalFrames <= 0) {
+        return false;
+    }
+
+    const int endFrame = m_loopPhaseStartFrame + totalFrames;
+    const int remainingFrames = (std::max)(0, endFrame - static_cast<int>(*g_gameVals.pFrameCount));
+    if (remainingFrames <= 0) {
+        return false;
+    }
+
+    if (outRemainingSeconds) {
+        *outRemainingSeconds = static_cast<float>(remainingFrames) / 60.0f;
+    }
+    if (outTotalSeconds) {
+        *outTotalSeconds = static_cast<float>(totalFrames) / 60.0f;
+    }
+    return true;
 }
 
 bool UnlimitedPlaybackManager::HasLoopCustomSnapshot() const {
@@ -1935,7 +1960,7 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
         if (GetTickCount64() >= m_loopNativeResetReleaseAtMs) {
             ReleaseNativeTrainingResetCombo();
             m_loopRestartAppliedForCycle = true;
-            m_loopPhaseStartFrame = currentFrame;
+            m_loopPhaseStartFrame = currentFrame + kLoopNativeResetSettleFrames;
         } else {
             return;
         }
@@ -1963,7 +1988,7 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
             m_loopRestartAppliedForCycle = true;
             m_loopPhaseStartFrame = currentFrame;
         }
-        if ((currentFrame - m_loopPhaseStartFrame) >= m_loopSetupFrames) {
+        if ((currentFrame - m_loopPhaseStartFrame) >= LoopSecondsToFrames(m_loopSetupSeconds)) {
             if (TryStartLoopPlayback()) {
                 m_loopPhase = LoopPhase_Playing;
                 m_loopPhaseStartFrame = currentFrame;
@@ -1989,7 +2014,7 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     }
 
     if (m_loopPhase == LoopPhase_Ending) {
-        if ((currentFrame - m_loopPhaseStartFrame) >= m_loopEndingFrames) {
+        if ((currentFrame - m_loopPhaseStartFrame) >= LoopSecondsToFrames(m_loopEndingSeconds)) {
             m_loopPhase = LoopPhase_Setup;
             m_loopPhaseStartFrame = currentFrame;
             m_loopRestartAppliedForCycle = false;
@@ -2003,7 +2028,6 @@ void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
         return;
     }
     if (m_loopRestartLabState &&
-        m_loopRestartMode == LoopReset_Custom &&
         !HasLoopCustomSnapshot()) {
         PushToast(L("Playback loop not started: custom snapshot missing."));
         return;
@@ -2254,17 +2278,11 @@ bool UnlimitedPlaybackManager::ApplyLoopRestart() {
         return true;
     }
 
-    const LoopResetMode mode = static_cast<LoopResetMode>(m_loopRestartMode);
-    if (mode == LoopReset_Custom) {
-        const bool ok = RestoreLoopCustomSnapshot(false);
-        if (!ok && HasLoopCustomSnapshot()) {
-            PushToast(L("Custom loop snapshot load failed."));
-        }
-        return ok;
+    const bool ok = RestoreLoopCustomSnapshot(false);
+    if (!ok && HasLoopCustomSnapshot()) {
+        PushToast(L("Custom loop snapshot load failed."));
     }
-
-    StartNativeTrainingResetCombo(mode);
-    return true;
+    return ok;
 }
 
 void UnlimitedPlaybackManager::StartNativeTrainingResetCombo(LoopResetMode mode) {
@@ -2367,6 +2385,13 @@ void UnlimitedPlaybackManager::SendNativeTrainingResetKey(WORD virtualKey, bool 
         input.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
     }
     SendInput(1, &input, sizeof(INPUT));
+}
+
+int UnlimitedPlaybackManager::LoopSecondsToFrames(float seconds) const {
+    if (seconds <= 0.0f) {
+        return 0;
+    }
+    return static_cast<int>(std::ceil(seconds * 60.0f));
 }
 
 void UnlimitedPlaybackManager::BackupRuntimeSlotIfNeeded() {
@@ -2591,6 +2616,9 @@ void UnlimitedPlaybackManager::SyncKeyEdgeState() {
 }
 
 bool UnlimitedPlaybackManager::IsTriggerKeyDown(int virtualKey) const {
+    if (!IsGameWindowFocused()) {
+        return false;
+    }
     if (IsControllerBindCode(virtualKey)) {
         return IsControllerBindingDown(kControllerBindings[virtualKey - kControllerBindBase]);
     }
@@ -2601,6 +2629,15 @@ bool UnlimitedPlaybackManager::IsTriggerKeyDown(int virtualKey) const {
 }
 
 bool UnlimitedPlaybackManager::IsKeyPressedEdge(int virtualKey) {
+    if (!IsGameWindowFocused()) {
+        if (IsControllerBindCode(virtualKey)) {
+            const int index = virtualKey - kControllerBindBase;
+            m_prevControllerBindDown[static_cast<size_t>(index)] = false;
+        } else if (virtualKey > 0 && virtualKey < 256) {
+            m_prevKeyDown[virtualKey] = false;
+        }
+        return false;
+    }
     if (IsControllerBindCode(virtualKey)) {
         const int index = virtualKey - kControllerBindBase;
         const bool isDown = IsControllerBindingDown(kControllerBindings[index]);
