@@ -41,8 +41,8 @@ New-Item -ItemType Directory -Force $outRoot | Out-Null
 
 Copy-Item (Join-Path $repoRoot "bin\$Configuration\dinput8.dll") (Join-Path $stage "dinput8.dll") -Force
 Copy-Item (Join-Path $repoRoot "bin\$Configuration\BBCFIMUpdater.exe") (Join-Path $stage "BBCFIMUpdater.exe") -Force
-Copy-Item (Join-Path $repoRoot "resource\settings.ini") (Join-Path $stage "settings.ini.default") -Force
-Copy-Item (Join-Path $repoRoot "resource\palettes.ini") (Join-Path $stage "palettes.ini.default") -Force
+Copy-Item (Join-Path $repoRoot "resource\settings.ini") (Join-Path $stage "settings.ini") -Force
+Copy-Item (Join-Path $repoRoot "resource\palettes.ini") (Join-Path $stage "palettes.ini") -Force
 Copy-Item (Join-Path $repoRoot "resource\settings.ini") (Join-Path $stage "BBCF_IM\Updater\defaults\settings.ini.default") -Force
 Copy-Item (Join-Path $repoRoot "resource\palettes.ini") (Join-Path $stage "BBCF_IM\Updater\defaults\palettes.ini.default") -Force
 Copy-Item (Join-Path $repoRoot "USER_README.txt") (Join-Path $stage "USER_README.txt") -Force

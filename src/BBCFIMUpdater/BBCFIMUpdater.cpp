@@ -353,8 +353,8 @@ namespace
 			{ L"dinput8.dll", L"dinput8.dll" },
 			{ L"BBCFIMUpdater.exe", L"BBCF_IM\\Updater\\BBCFIMUpdater.exe" },
 			{ L"USER_README.txt", L"USER_README.txt" },
-			{ L"settings.ini.default", L"BBCF_IM\\Updater\\defaults\\settings.ini.default" },
-			{ L"palettes.ini.default", L"BBCF_IM\\Updater\\defaults\\palettes.ini.default" }
+			{ L"BBCF_IM\\Updater\\defaults\\settings.ini.default", L"BBCF_IM\\Updater\\defaults\\settings.ini.default" },
+			{ L"BBCF_IM\\Updater\\defaults\\palettes.ini.default", L"BBCF_IM\\Updater\\defaults\\palettes.ini.default" }
 		};
 
 		for (size_t i = 0; i < sizeof(ops) / sizeof(ops[0]); ++i)
@@ -370,7 +370,7 @@ namespace
 
 		if (!MergeIni(Combine(h.installRoot, L"settings.ini"),
 			Combine(backupDir, L"BBCF_IM\\Updater\\defaults\\settings.ini.default"),
-			Combine(h.stagedRoot, L"settings.ini.default")))
+			Combine(h.stagedRoot, L"BBCF_IM\\Updater\\defaults\\settings.ini.default")))
 		{
 			Log(h, "settings.ini merge failed.");
 			Rollback(h, backupDir, touched);
@@ -379,7 +379,7 @@ namespace
 
 		if (!MergeIni(Combine(h.installRoot, L"palettes.ini"),
 			Combine(backupDir, L"BBCF_IM\\Updater\\defaults\\palettes.ini.default"),
-			Combine(h.stagedRoot, L"palettes.ini.default")))
+			Combine(h.stagedRoot, L"BBCF_IM\\Updater\\defaults\\palettes.ini.default")))
 		{
 			Log(h, "palettes.ini merge failed.");
 			Rollback(h, backupDir, touched);

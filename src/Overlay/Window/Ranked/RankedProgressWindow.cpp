@@ -5443,13 +5443,20 @@ namespace
 			return;
 		}
 
+		static bool s_rankedPredictionWindowOpen = true;
+		s_rankedPredictionWindowOpen = true;
 		ImGui::SetNextWindowPos(ImVec2(360.0f, 150.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(520.0f, 196.0f), ImGuiCond_FirstUseEver);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0.0f, 0.0f));
-		if (!ImGui::Begin(L("Ranked Prediction###RankedPredictionOverlay").c_str(), nullptr, ImGuiWindowFlags_NoCollapse))
+		if (!ImGui::Begin(L("Ranked Prediction###RankedPredictionOverlay").c_str(), &s_rankedPredictionWindowOpen, ImGuiWindowFlags_NoCollapse))
 		{
 			ImGui::End();
 			ImGui::PopStyleVar();
+			if (!s_rankedPredictionWindowOpen)
+			{
+				Settings::settingsIni.showRankedPrediction = false;
+				Settings::changeSetting("ShowRankedPrediction", "0");
+			}
 			return;
 		}
 
@@ -5475,6 +5482,11 @@ namespace
 		{
 			ImGui::End();
 			ImGui::PopStyleVar();
+			if (!s_rankedPredictionWindowOpen)
+			{
+				Settings::settingsIni.showRankedPrediction = false;
+				Settings::changeSetting("ShowRankedPrediction", "0");
+			}
 			LogRankedPredictionVisibility("prediction_unknown", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, opponentSteamId, opponentCharacterId);
 			return;
 		}
@@ -5498,6 +5510,11 @@ namespace
 		DrawRankedPredictionOutcomeColumn(L("Loss").c_str(), g_rankedOverlayTuning.predictionLossColor, loss, columnWidth, columnHeight);
 		ImGui::End();
 		ImGui::PopStyleVar();
+		if (!s_rankedPredictionWindowOpen)
+		{
+			Settings::settingsIni.showRankedPrediction = false;
+			Settings::changeSetting("ShowRankedPrediction", "0");
+		}
 	}
 }
 
@@ -5762,13 +5779,20 @@ void DrawRankedProgressOverlayStandalone()
 	const ImVec4 windowBgColor = ImVec4(0.06f, 0.06f, 0.08f, 0.92f * windowAlpha);
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, windowBgColor);
 	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, windowAlpha);
-	bool* rankedProgressOpenPtr = manualRankedProgressWindow ? &g_manualRankedProgressOpen : nullptr;
-	if (!ImGui::Begin(L("Ranked Progress###RankedProgressOverlay").c_str(), rankedProgressOpenPtr,
+	static bool s_rankedProgressWindowOpen = true;
+	s_rankedProgressWindowOpen = true;
+	if (!ImGui::Begin(L("Ranked Progress###RankedProgressOverlay").c_str(), &s_rankedProgressWindowOpen,
 		ImGuiWindowFlags_NoCollapse))
 	{
 		ImGui::End();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleColor();
+		if (!s_rankedProgressWindowOpen)
+		{
+			Settings::settingsIni.showRankedProgress = false;
+			Settings::changeSetting("ShowRankedProgress", "0");
+			g_manualRankedProgressOpen = false;
+		}
 		DrawRankedGlobalDialogs();
 		return;
 	}
@@ -5838,6 +5862,12 @@ void DrawRankedProgressOverlayStandalone()
 		ImGui::End();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleColor();
+		if (!s_rankedProgressWindowOpen)
+		{
+			Settings::settingsIni.showRankedProgress = false;
+			Settings::changeSetting("ShowRankedProgress", "0");
+			g_manualRankedProgressOpen = false;
+		}
 		DrawRankedGlobalDialogs();
 		return;
 	}
@@ -6078,6 +6108,12 @@ void DrawRankedProgressOverlayStandalone()
 	ImGui::End();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor();
+	if (!s_rankedProgressWindowOpen)
+	{
+		Settings::settingsIni.showRankedProgress = false;
+		Settings::changeSetting("ShowRankedProgress", "0");
+		g_manualRankedProgressOpen = false;
+	}
 	DrawRankedPredictionWindow(renderedDisplay, currentGameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, s_sawState58ThisVictoryCycle);
 	DrawRankedGlobalDialogs();
 }
