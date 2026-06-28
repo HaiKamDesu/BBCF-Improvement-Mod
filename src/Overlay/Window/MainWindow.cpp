@@ -257,23 +257,21 @@ void MainWindow::DrawFrameHistorySection() const
 	//	ImGui::TextDisabled("THIS FEATURE CURRENTLY DOES NOT SUPPORT MIRRORS! IF IT ISN'T A MIRROR THERE WAS AN ERROR LOADING ONE OF THE CHARACTERS");
 	//	return;
 	//}
-	static bool isOpen = false;
-
 	FrameHistoryWindow* frameHistWin = m_pWindowContainer->GetWindow<FrameHistoryWindow>(WindowType_FrameHistory);
 
-
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen);
+	bool isOpen = Settings::settingsIni.frameHistoryEnabled;
+	if (ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen))
+	{
+		Settings::settingsIni.frameHistoryEnabled = isOpen;
+		Settings::changeSetting("FrameHistoryEnabled", isOpen ? "1" : "0");
+	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_help());
 	if (isOpen)
-	{
 		frameHistWin->Open();
-	}
 	else
-	{
 		frameHistWin->Close();
-	}
 
 	ImGui::HorizontalSpacing();
 	if (ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))

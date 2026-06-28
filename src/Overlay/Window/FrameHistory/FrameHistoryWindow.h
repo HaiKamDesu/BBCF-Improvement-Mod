@@ -2,6 +2,7 @@
 
 #include "Overlay/Window/IWindow.h"
 #include "Core/interfaces.h"
+#include "Core/Settings.h"
 #include "Game/CharData.h"
 #include "FrameHistory.h"
 
@@ -24,6 +25,8 @@ public:
 			height = g_modVals.frame_history_height;
 			spacing = g_modVals.frame_history_spacing;
 			resetting = g_modVals.frame_history_auto_reset;
+			if (Settings::settingsIni.frameHistoryEnabled)
+				Open();
 		}
 
 	void Update() override;

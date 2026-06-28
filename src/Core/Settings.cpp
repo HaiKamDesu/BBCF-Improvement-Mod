@@ -170,6 +170,20 @@ bool Settings::loadSettingsFile()
         {
                 settingsIni.generateDebugLogs = true;
         }
+
+        // Seed new keys into existing settings.ini files that pre-date them.
+        // Without this, the first save via changeSetting hits the slow "append" path and
+        // any I/O failure silently discards the value. After seeding, the key already
+        // exists so subsequent saves use the fast "replace" path.
+        if (IsSettingMissingInIni(L"FrameHistoryEnabled", strINIPath)) {
+                ForceLog("[Init][Settings] seeding missing key FrameHistoryEnabled\n");
+                changeSetting("FrameHistoryEnabled", settingsIni.frameHistoryEnabled ? "1" : "0");
+        }
+        if (IsSettingMissingInIni(L"FrameHistoryAutoReset", strINIPath)) {
+                ForceLog("[Init][Settings] seeding missing key FrameHistoryAutoReset\n");
+                changeSetting("FrameHistoryAutoReset", settingsIni.frameHistoryAutoReset ? "1" : "0");
+        }
+
 	ForceLog("[Init][Settings] raw settings read complete\n");
 
 	// Set buttons back to default if their values are incorrect
@@ -244,58 +258,35 @@ bool Settings::WasDebugLoggingSettingMissing()
 {
         return debugLoggingSettingMissing;
 }
-//int Settings::changeSetting(std::string setting_name, std::string new_value) { return 1; }
+// changeSetting: write a key=value pair into the [Settings] section of settings.ini.
+//
+// Previous implementation used fstream line-by-line replace/append. That broke silently
+// when the user's settings.ini contained multiple [Settings] section headers (an artifact
+// of the auto-updater merging new template blocks). New keys were appended at end-of-file
+// (under a later [Settings] header) while GetPrivateProfileString only ever reads from the
+// FIRST [Settings] section — so the written value was never read back on next startup.
+//
+// WritePrivateProfileStringW targets the first matching section by spec, handles both
+// updating existing keys and inserting new ones, and requires no temp-file dance.
 int Settings::changeSetting(std::string setting_name, std::string new_value) {
-	//return 1;
-	std::string filename = "settings.ini";
-	std::string tempfilename = "temp_settings.ini";
-
-	std::fstream inputFile(filename, std::ios::in);
-	std::fstream tempFile(tempfilename, std::ios::out);
-
-	
-	if (!(inputFile.is_open() && tempFile.is_open())) {
-		LOG(2, "[error] Settings::changeSetting: Unable to open the file.");
+	// Resolve absolute path — WritePrivateProfileString ignores relative paths (looks in
+	// Windows dir instead of CWD), so we must pass a full path.
+	wchar_t wAbsPath[MAX_PATH] = {};
+	if (_wfullpath(wAbsPath, L"settings.ini", MAX_PATH) == nullptr) {
+		LOG(2, "[error] Settings::changeSetting: Unable to resolve absolute path.");
 		return 1;
 	}
-	else{
 
-		bool found_flag = false;
-		std::string line;
-		std::regex pattern("^\\s*" + setting_name + "\\s*=");
+	wchar_t wKey[512] = {};
+	wchar_t wVal[4096] = {};
+	MultiByteToWideChar(CP_ACP, 0, setting_name.c_str(), -1, wKey, 512);
+	MultiByteToWideChar(CP_ACP, 0, new_value.c_str(), -1, wVal, 4096);
 
-		while (getline(inputFile, line)) {
-			if (std::regex_search(line,pattern)) {
-				tempFile << setting_name << " = " << new_value << std::endl;
-				found_flag = true;
-			}
-			else {
-				tempFile << line << std::endl;
-			}
-		}
-		if (found_flag == false) {
-			//if the setting is not found, add it
-			tempFile << "# " << setting_name << " added automatically #" << std::endl;
-			tempFile << setting_name << " = " << new_value << std::endl;
-		}
-		inputFile.close();
-		tempFile.close();
-
-		if (remove(filename.c_str()) != 0) {
-			//perror("Error deleting original file");
-			LOG(2, "[error] Settings::changeSetting:Error deleting original file");
-			return 1;
-		}
-
-		if (rename(tempfilename.c_str(), filename.c_str()) != 0) {
-			//perror("Error renaming temporary file");
-			LOG(2, "[error]  Settings::changeSetting: Error renaming temporary file");
-			return 1;
-		}
-
-		LOG(2, "Settings::changeSetting: File updated successfully.");
-		std::cout << "File updated successfully." << std::endl;
+	if (!WritePrivateProfileStringW(L"Settings", wKey, wVal, wAbsPath)) {
+		LOG(2, "[error] Settings::changeSetting: WritePrivateProfileStringW failed (GLE=%lu).", GetLastError());
+		return 1;
 	}
-	
+
+	LOG(2, "Settings::changeSetting: File updated successfully.");
 	return 0;
 }
