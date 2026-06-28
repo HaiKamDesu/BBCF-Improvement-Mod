@@ -9,14 +9,20 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
+$infoPath = Join-Path $repoRoot "src\Core\info.h"
+$infoText = Get-Content -Raw $infoPath
+
 if ([string]::IsNullOrWhiteSpace($Tag)) {
-    $infoPath = Join-Path $repoRoot "src\Core\info.h"
-    $infoText = Get-Content -Raw $infoPath
     if ($infoText -notmatch '#define\s+MOD_VERSION\s+"([^"]+)"') {
         throw "Could not infer MOD_VERSION from $infoPath"
     }
     $Tag = $Matches[1]
 }
+
+if ($infoText -notmatch '#define\s+MOD_MINIMUM_FROM_VERSION\s+"([^"]+)"') {
+    throw "Could not infer MOD_MINIMUM_FROM_VERSION from $infoPath"
+}
+$minimumFromVersion = $Matches[1]
 
 if ($Tag -notmatch '^v?\d+\.\d+(\.\d+)?(\.\d+)?$') {
     throw "Tag must be semantic version text, e.g. v5.0"
@@ -60,7 +66,7 @@ $manifest = [ordered]@{
     assetName = $zipName
     sha256 = $sha
     entryDll = "dinput8.dll"
-    minimumSupportedVersion = "v3.110"
+    minimumSupportedVersion = $minimumFromVersion
 }
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 4

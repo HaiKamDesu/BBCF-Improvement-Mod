@@ -3,6 +3,14 @@
 #define MOD_VERSION_NUM	MOD_VERSION " Oceanya Edition"
 #define MOD_WINDOW_TITLE "BBCF IM"
 
+// Minimum installed version that can autoupdate directly to this release.
+// Bump this when the zip format changes in a way that older IsAllowedEntryPath
+// validators would reject (e.g. new file types at the zip root). Users below
+// this version are automatically offered the nearest compatible intermediate
+// release instead, then chain-update on the next session.
+// Leave at "v3.110" when the zip format is unchanged.
+#define MOD_MINIMUM_FROM_VERSION "v3.110"
+
 #define MOD_FORCE_DISABLE_UPDATE_CHECK 0
 
 // Links
