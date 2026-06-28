@@ -21,7 +21,8 @@ namespace Updater
 		UpdateCheckStatus_NetworkError,
 		UpdateCheckStatus_ParseError,
 		UpdateCheckStatus_InvalidRelease,
-		UpdateCheckStatus_InvalidManifest
+		UpdateCheckStatus_InvalidManifest,
+		UpdateCheckStatus_VersionTooOld
 	};
 
 	struct GitHubReleaseAsset

@@ -41,8 +41,6 @@ New-Item -ItemType Directory -Force $outRoot | Out-Null
 
 Copy-Item (Join-Path $repoRoot "bin\$Configuration\dinput8.dll") (Join-Path $stage "dinput8.dll") -Force
 Copy-Item (Join-Path $repoRoot "bin\$Configuration\BBCFIMUpdater.exe") (Join-Path $stage "BBCFIMUpdater.exe") -Force
-Copy-Item (Join-Path $repoRoot "resource\settings.ini") (Join-Path $stage "settings.ini") -Force
-Copy-Item (Join-Path $repoRoot "resource\palettes.ini") (Join-Path $stage "palettes.ini") -Force
 Copy-Item (Join-Path $repoRoot "resource\settings.ini") (Join-Path $stage "BBCF_IM\Updater\defaults\settings.ini.default") -Force
 Copy-Item (Join-Path $repoRoot "resource\palettes.ini") (Join-Path $stage "BBCF_IM\Updater\defaults\palettes.ini.default") -Force
 Copy-Item (Join-Path $repoRoot "USER_README.txt") (Join-Path $stage "USER_README.txt") -Force
@@ -72,8 +70,6 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 Remove-Item -Force (Join-Path $outRoot "BBCFIMUpdater.exe") -ErrorAction SilentlyContinue
 Remove-Item -Force (Join-Path $outRoot "BBCFIMUpdater.pdb") -ErrorAction SilentlyContinue
 Remove-Item -Force (Join-Path $outRoot "dinput8.dll") -ErrorAction SilentlyContinue
-Remove-Item -Force (Join-Path $outRoot "settings.ini") -ErrorAction SilentlyContinue
-Remove-Item -Force (Join-Path $outRoot "palettes.ini") -ErrorAction SilentlyContinue
 
 Write-Host "Wrote $zipPath"
 Write-Host "Wrote $manifestPath"

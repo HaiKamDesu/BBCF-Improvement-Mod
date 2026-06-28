@@ -87,43 +87,58 @@ namespace Updater
 			return result;
 		}
 
-		const GitHubRelease& release = newerReleases.front();
-
-		const GitHubReleaseAsset* manifestAsset = nullptr;
-		for (size_t i = 0; i < release.assets.size(); ++i)
+		for (size_t i = 0; i < newerReleases.size(); ++i)
 		{
-			if (release.assets[i].name == "update-manifest.json")
+			const GitHubRelease& release = newerReleases[i];
+
+			const GitHubReleaseAsset* manifestAsset = nullptr;
+			for (size_t j = 0; j < release.assets.size(); ++j)
 			{
-				manifestAsset = &release.assets[i];
-				break;
+				if (release.assets[j].name == "update-manifest.json")
+				{
+					manifestAsset = &release.assets[j];
+					break;
+				}
 			}
-		}
 
-		if (!manifestAsset)
-		{
-			result.status = UpdateCheckStatus_InvalidRelease;
-			result.message = "Release is missing update-manifest.json.";
+			if (!manifestAsset)
+			{
+				result.status = UpdateCheckStatus_InvalidRelease;
+				result.message = "Release is missing update-manifest.json.";
+				return result;
+			}
+
+			if (manifestAsset->browserDownloadUrl.compare(0, 8, "https://") != 0)
+			{
+				result.status = UpdateCheckStatus_InvalidRelease;
+				result.message = "Manifest asset download URL is not HTTPS.";
+				return result;
+			}
+
+			std::string manifestJson;
+			if (!GetText(ToWideAscii(manifestAsset->browserDownloadUrl), manifestJson, error))
+			{
+				result.status = UpdateCheckStatus_NetworkError;
+				result.message = error;
+				return result;
+			}
+
+			EvaluateGitHubReleaseForUpdate(release, manifestJson, currentVersion, includePrereleases, result);
+
+			if (result.status == UpdateCheckStatus_UpdateAvailable)
+			{
+				result.update.releaseNotes = newerReleases;
+				return result;
+			}
+
+			if (result.status == UpdateCheckStatus_VersionTooOld)
+				continue;
+
 			return result;
 		}
 
-		if (manifestAsset->browserDownloadUrl.compare(0, 8, "https://") != 0)
-		{
-			result.status = UpdateCheckStatus_InvalidRelease;
-			result.message = "Manifest asset download URL is not HTTPS.";
-			return result;
-		}
-
-		std::string manifestJson;
-		if (!GetText(ToWideAscii(manifestAsset->browserDownloadUrl), manifestJson, error))
-		{
-			result.status = UpdateCheckStatus_NetworkError;
-			result.message = error;
-			return result;
-		}
-
-		EvaluateGitHubReleaseForUpdate(release, manifestJson, currentVersion, includePrereleases, result);
-		if (result.status == UpdateCheckStatus_UpdateAvailable)
-			result.update.releaseNotes = newerReleases;
+		result.status = UpdateCheckStatus_NoUpdate;
+		result.message = "No compatible update found in selected update channel.";
 		return result;
 	}
 

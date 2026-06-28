@@ -78,6 +78,8 @@ namespace Updater
 				lower == "bbcfimupdater.exe" ||
 				lower == "settings.ini.default" ||
 				lower == "palettes.ini.default" ||
+				lower == "settings.ini" ||
+				lower == "palettes.ini" ||
 				lower == "user_readme.txt")
 			{
 				return true;

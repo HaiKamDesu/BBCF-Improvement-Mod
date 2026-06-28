@@ -295,6 +295,18 @@ namespace Updater
 			return false;
 		}
 
+		if (!manifest.minimumSupportedVersion.empty())
+		{
+			SemVersion minimum;
+			if (TryParseSemVersion(manifest.minimumSupportedVersion, minimum) &&
+				CompareSemVersion(currentVersion, minimum) < 0)
+			{
+				outResult.status = UpdateCheckStatus_VersionTooOld;
+				outResult.message = "Current version is too old for this update; an intermediate update is required first.";
+				return false;
+			}
+		}
+
 		const GitHubReleaseAsset* packageAsset = FindAssetByName(release, manifest.assetName);
 		if (!packageAsset)
 		{

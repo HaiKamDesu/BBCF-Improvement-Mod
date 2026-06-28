@@ -137,11 +137,12 @@ bool Settings::loadSettingsFile()
 
         if (GetFileAttributes(strINIPath) == 0xFFFFFFFF)
         {
-                ForceLog("[Init][Settings] settings.ini missing\n");
-                MessageBoxA(NULL, "Settings INI File Was Not Found!", "Error", MB_OK);
-                return false;
+                ForceLog("[Init][Settings] settings.ini missing, using defaults\n");
         }
+        else
+        {
 	ForceLog("[Init][Settings] settings.ini exists\n");
+        }
 
         void* iniPtr = 0;
 
