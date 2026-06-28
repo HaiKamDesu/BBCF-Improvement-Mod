@@ -10,8 +10,8 @@
 #include <cstddef>
 #include <deque>
 
-// maximum number of frames to be kept track of in the history
-const size_t HISTORY_DEPTH = 100;
+// default maximum number of frames — overridden at runtime by window width
+const int HISTORY_DEPTH_DEFAULT = 500;
 
 /// An arbitrary, and abstract categorization of player state, several of these
 /// are difficult to determine, they are here as a reminder to future
@@ -112,7 +112,7 @@ public:
 
     // Update history with new data
     // Overwrites old history if both players have been previously idle
-    void updateHistory(bool resetting);
+    void updateHistory(bool resetting, bool countEmptyFrames, int maxHistoryFrames);
 
     StatePairQueue& read();
     // void updateJonBMaps();
@@ -156,6 +156,8 @@ private:
 
 std::array<float, 3> kindtoColor(FrameKind kind);
 std::array<float, 3> attributetoColor(Attribute attr, std::array<Attribute, 3> rgb_attr);
+const char* kindToString(FrameKind kind);
+std::string attributeToString(Attribute attr);
 
 const std::array<float, 3> GREEN = { 0, 1, 0 };
 const std::array<float, 3> RED = { 1, 0, 0 };

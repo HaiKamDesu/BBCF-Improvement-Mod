@@ -283,6 +283,15 @@ void MainWindow::DrawFrameHistorySection() const
 	ImGui::ShowHelpMarker(Messages.FrameHistory_auto_reset_help());
 
 	ImGui::HorizontalSpacing();
+	if (ImGui::Checkbox(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
+	{
+		Settings::settingsIni.frameHistoryCountEmptyFrames = frameHistWin->countEmptyFrames;
+		Settings::changeSetting("FrameHistoryCountEmptyFrames", frameHistWin->countEmptyFrames ? "1" : "0");
+	}
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.FrameHistory_count_empty_frames_help());
+
+	ImGui::HorizontalSpacing();
 	if (ImGui::SliderFloat(Messages.Box_width(), &frameHistWin->width, 1., 100.)) {
 		Settings::changeSetting("FrameHistoryWidth", std::to_string(frameHistWin->width));
 	}

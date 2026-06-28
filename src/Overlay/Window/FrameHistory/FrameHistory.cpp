@@ -260,9 +260,35 @@ bool FrameHistory::getPlayerFrameStates(CharData* player1,
     }
 }
 
+const char* kindToString(FrameKind kind) {
+    if (static_cast<int>(kind & FrameKind::Blockstun) != 0) return "Blockstun";
+    if (static_cast<int>(kind & FrameKind::Hitstun) != 0) return "Hitstun";
+    if ((static_cast<int>(kind) & static_cast<int>(FrameKind::NonDeterministicActive)) == static_cast<int>(FrameKind::NonDeterministicActive)) return "Active (non-det.)";
+    if (static_cast<int>(kind & FrameKind::Active) != 0) return "Active";
+    if (static_cast<int>(kind & FrameKind::Startup) != 0) return "Startup";
+    if ((static_cast<int>(kind) & static_cast<int>(FrameKind::NonDeterministicRecovery)) == static_cast<int>(FrameKind::NonDeterministicRecovery)) return "Recovery (non-det.)";
+    if (static_cast<int>(kind & FrameKind::Recovery) != 0) return "Recovery";
+    if (static_cast<int>(kind & FrameKind::HardLanding) != 0) return "Hard Landing";
+    if (static_cast<int>(kind & FrameKind::Special) != 0) return "Special";
+    return "Idle";
+}
+
+std::string attributeToString(Attribute attr) {
+    if (attr == Attribute::N) return "None";
+    std::string res;
+    if (bool(attr & Attribute::GP)) res += "GP ";
+    if (bool(attr & Attribute::H))  res += "H ";
+    if (bool(attr & Attribute::B))  res += "B ";
+    if (bool(attr & Attribute::F))  res += "F ";
+    if (bool(attr & Attribute::T))  res += "T ";
+    if (bool(attr & Attribute::P))  res += "P ";
+    if (!res.empty() && res.back() == ' ') res.pop_back();
+    return res;
+}
+
 /// update the history queue with the new player states. Only call after the
 /// game time has moved and by NO MORE than 1 frame
-void FrameHistory::updateHistory(bool resetting) {
+void FrameHistory::updateHistory(bool resetting, bool countEmptyFrames, int maxHistoryFrames) {
     CharData* p1 = g_interfaces.player1.GetData();
     CharData* p2 = g_interfaces.player2.GetData();
 
@@ -286,15 +312,17 @@ void FrameHistory::updateHistory(bool resetting) {
 
     // TODO: If you add attack and guardp, add them to this condition
     // Reset on completely idle frames
-    if (
-         (states[0].kind == FrameKind::Idle
-         && states[0].invul == Attribute::N)
-         &&
-         (states[1].kind == FrameKind::Idle
-         && states[1].invul == Attribute::N)
-       )
-    {
+    bool bothIdle = (states[0].kind == FrameKind::Idle && states[0].invul == Attribute::N)
+                 && (states[1].kind == FrameKind::Idle && states[1].invul == Attribute::N);
+
+    if (bothIdle) {
         is_old = true;
+        if (countEmptyFrames) {
+            while (queue.size() >= (size_t)maxHistoryFrames) {
+                queue.pop_front();
+            }
+            queue.push_back(states);
+        }
     }
     else {
         // if something is happening, push the info. But not before clearing out
@@ -302,10 +330,10 @@ void FrameHistory::updateHistory(bool resetting) {
             queue.clear();
         }
 
-        while (queue.size() >= HISTORY_DEPTH) {
+        while (queue.size() >= (size_t)maxHistoryFrames) {
             queue.pop_front();
         }
-        
+
         queue.push_back(states);
         is_old = false;
     }

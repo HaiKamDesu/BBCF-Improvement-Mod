@@ -180,6 +180,8 @@ Para cada jugador:
  - P->segmento derecho 
 "
 FrameHistory auto reset help,block auto-reset on an idle frame: Do not overwrite automatically after an idle frame.,Bloquear el reinicio automático en un cuadro inactivo: no sobrescribir automáticamente después de un cuadro inactivo.
+Count empty frames##framehistory,Count empty frames##framehistory,Contar frames vacíos##framehistory
+FrameHistory count empty frames help,Also record frames where both players are idle. Keeps the counter running during neutral instead of pausing.,También registra frames en los que ambos jugadores están inactivos. Mantiene el contador activo durante el neutral.
 Box width,Box width,Ancho de caja
 Box height,Box height,Alto de caja
 spacing,spacing,Espaciado

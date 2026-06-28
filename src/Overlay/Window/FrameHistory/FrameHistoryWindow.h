@@ -16,6 +16,8 @@ public:
 	int last_frame = 0;
 
 	bool resetting = true;
+	bool countEmptyFrames = false;
+	int maxHistoryFrames = HISTORY_DEPTH_DEFAULT;
 	FrameHistory history;
 
 	FrameHistoryWindow(const std::string& windowTitle, bool windowClosable,
@@ -25,6 +27,7 @@ public:
 			height = g_modVals.frame_history_height;
 			spacing = g_modVals.frame_history_spacing;
 			resetting = g_modVals.frame_history_auto_reset;
+			countEmptyFrames = Settings::settingsIni.frameHistoryCountEmptyFrames;
 			if (Settings::settingsIni.frameHistoryEnabled)
 				Open();
 		}

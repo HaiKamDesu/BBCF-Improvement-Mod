@@ -369,6 +369,12 @@ struct LocalizationKeysAccessor
         // FrameHistory auto reset help
         inline const char* FrameHistory_auto_reset_help() const { return Get("FrameHistory auto reset help"); }
 
+        // Count empty frames##framehistory
+        inline const char* Count_empty_frames_framehistory() const { return Get("Count empty frames##framehistory"); }
+
+        // FrameHistory count empty frames help
+        inline const char* FrameHistory_count_empty_frames_help() const { return Get("FrameHistory count empty frames help"); }
+
         // Box width
         inline const char* Box_width() const { return Get("Box width"); }
 

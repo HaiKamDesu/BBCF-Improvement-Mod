@@ -1,91 +1,28 @@
 #include "FrameHistoryWindow.h"
 #include "Game/gamestates.h"
 
-
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
+#include "Core/Settings.h"
 #include "Game/gamestates.h"
 #include "imgui_internal.h"
 #include "Core/utils.h"
 
 #include <array>
 #include <vector>
+#include <algorithm>
 #include <cmath>
 
-#define MAX(a,b)            (((a) > (b)) ? (a) : (b))
-#define MIN(a,b)            (((a) > (b)) ? (b) : (a))
+#define FH_MAX(a,b) (((a) > (b)) ? (a) : (b))
+#define FH_MIN(a,b) (((a) > (b)) ? (b) : (a))
 
 
-std::vector<std::array<ImVec2, 2>> DottedLine(ImVec2 start, ImVec2 end, int divisions, float empty_ratio) {
-	std::vector<std::array<ImVec2, 2>> dotted_line = std::vector<std::array<ImVec2, 2>>();
-	ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
-	float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
-
-	direction.x /= length;
-	direction.y /= length;
-
-	float seg_len = length / divisions;
-	float sep_len = seg_len * empty_ratio;
-	seg_len *= 1 - empty_ratio;
-
-
-	for (int i = 0; i < divisions; ++i) {
-		std::array<ImVec2, 2> segment = {
-		  ImVec2(start.x + direction.x * i * (seg_len + sep_len), start.y + direction.y * i * (seg_len + sep_len)),
-		  ImVec2(start.x + direction.x * (i + 1) * (seg_len + sep_len) - sep_len * direction.x, start.y + direction.y * (i + 1) * (seg_len + sep_len) - sep_len * direction.y
-				 ) };
-		dotted_line.push_back(segment);
-	}
-	return dotted_line;
+static void DrawBox(ImDrawList* dl, ImVec2 pos, float w, float h, ImColor col) {
+	dl->AddRectFilled(pos, ImVec2(pos.x + w, pos.y + h), (ImU32)col);
 }
 
-void DrawSegWithOffset(ImDrawList* drawlist, ImVec2 offset, ImVec2 seg_start, ImVec2 seg_end) {
-	seg_start.x += offset.x;
-	seg_end.x += offset.x;
-	seg_start.y += offset.y;
-	seg_end.y += offset.y;
-	drawlist->AddLine(seg_start, seg_end, IM_COL32(255, 255, 255, 255), 1.);
-}
-
-ImVec2 MakeBox(ImColor color, ImVec2 offset, float width, float height) {
-
-
-	// Get the current ImGui cursor position
-	// ImVec2 p = ImGui::GetCursorScreenPos();
-	ImVec2 p = offset;
-
-	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-	// Draw a rectangle with color
-	draw_list->AddRectFilled(
-		p, ImVec2(p.x + width, p.y + height),
-		(ImU32)color);
-
-
-
-	return ImVec2(p.x + width, p.y + height);
-}
-
-
-ImVec2 MakeBall(ImColor color, float radius_proportion, ImVec2 offset, float width, float height) {
-
-  radius_proportion = MAX(MIN(radius_proportion, 1.), 0.);
-  
-  ImVec2 center = ImVec2(offset.x + width * 0.5, offset.y + height * 0.5);
-
-  float radius = radius_proportion * MIN(width, height) * 0.5;
-
-  ImDrawList *draw_list = ImGui::GetWindowDrawList();
-
-  // Draw a rectangle with color
-  draw_list->AddCircleFilled(
-      center, radius,
-      (ImU32)color);
-
-  // Advance the ImGui cursor to claim space in the window (otherwise the window
-  // will appear small and needs to be resized)
-
-  return ImVec2(offset.x + width, offset.y + height);
+static bool IsHovering(ImVec2 pos, float w, float h) {
+	return ImGui::IsMouseHoveringRect(pos, ImVec2(pos.x + w, pos.y + h));
 }
 
 bool FrameHistoryWindow::hasWorldTimeMoved() {
@@ -93,7 +30,6 @@ bool FrameHistoryWindow::hasWorldTimeMoved() {
 	last_frame = *g_gameVals.pFrameCount;
 	return res;
 }
-
 
 void FrameHistoryWindow::Update()
 {
@@ -103,234 +39,210 @@ void FrameHistoryWindow::Update()
 		return;
 	}
 
-	// May want to come up with our own function to check if time moved.
-	// The current implementation doesn't check if we missed frames.
 	if (!g_interfaces.player1.IsCharDataNullPtr() &&
 		!g_interfaces.player2.IsCharDataNullPtr() && hasWorldTimeMoved()) {
-
-		history.updateHistory(resetting);
+		history.updateHistory(resetting, countEmptyFrames, maxHistoryFrames);
 	}
 
 	BeforeDraw();
 
-	// TODO: Try using beginchild instead. If this continues causing problems with other windows.
+	// Enforce minimum window size: padding + P1 block + padding + P2 block + padding
+	// padding = height * 0.5, each player block = 2*height + spacing
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+		float pad = height * 0.5f;
+		float block_h = 2.f * height + spacing;
+		float min_inner_h = 3.f * pad + 2.f * block_h;
+		// label col ~22px, at least 1 frame col, X button ~20px
+		float min_inner_w = 22.f + (width + spacing) + 20.f;
+		ImGui::SetNextWindowSizeConstraints(
+			ImVec2(min_inner_w + style.WindowPadding.x * 2.f, min_inner_h + style.WindowPadding.y * 2.f),
+			ImVec2(FLT_MAX, FLT_MAX));
+	}
+
 	ImGui::Begin("##FrameHistory", nullptr, m_windowFlags);
-
 	Draw();
-
 	ImGui::End();
+
+	// Close requested via the in-window X button
+	if (!m_windowOpen) {
+		Settings::settingsIni.frameHistoryEnabled = false;
+		Settings::changeSetting("FrameHistoryEnabled", "0");
+	}
 
 	AfterDraw();
 }
 
-// Use this to push styles and such
 void FrameHistoryWindow::BeforeDraw() {}
-// pop styles, clean up drawing state
 void FrameHistoryWindow::AfterDraw() {}
 
-void FrameHistoryWindow::Draw() {
-		// CharData* p1 = g_interfaces.player1.GetData();
-		// CharData* p2 = g_interfaces.player2.GetData();
-		// if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
-		// 	ImGui::TextDisabled("UNABLE TO LOAD CharData");
-		// 	return;
-		// }
-		// if (p1->charIndex == p2->charIndex) {
-		// 	ImGui::TextDisabled("DOES NOT WORK IN MIRRORS!");
-		// 	return;
-		// }
-		// Define the colors for invul types
-		ImColor color_inv = ImColor(255, 255, 255);
-		ImColor color_gp = ImColor(122, 85, 61);
-		// borrow the history queue
-		StatePairQueue& queue = history.read();
-		int frame_idx = 0;
+void FrameHistoryWindow::Draw()
+{
+	ImDrawList* dl = ImGui::GetWindowDrawList();
 
-ImGui::Text(Messages.Player_1());
-		// Rows starting point. Be careful where you place this
-		ImVec2 cursor_p = ImGui::GetCursorScreenPos();
+	// --- Layout constants ---
+	const float pad        = height * 0.5f;   // half box height, used as top/bottom/mid padding
+	const float block_h    = 2.f * height + spacing;  // one player's two-row block height
+	const float label_w    = ImGui::CalcTextSize("P1").x + 8.f;
+	const float btn_size   = 12.f;
+	const float btn_margin = 4.f;
 
-		float text_vertical_spacing = 20.;
-		const int rows = 2 * 2;
+	// Available content area
+	const ImVec2 content_start = ImGui::GetCursorScreenPos();
+	const float avail_w = ImGui::GetContentRegionAvail().x;
+	const float avail_h = ImGui::GetContentRegionAvail().y;
 
+	// Bars area: content minus label column and X button column
+	const float bars_w = avail_w - label_w - btn_size - btn_margin * 2.f;
 
+	// Update max frames dynamically from window width (used next Update tick)
+	{
+		int newMax = (int)(bars_w / (width + spacing));
+		if (newMax < 1) newMax = 1;
+		if (newMax > HISTORY_DEPTH_DEFAULT) newMax = HISTORY_DEPTH_DEFAULT;
+		maxHistoryFrames = newMax;
+	}
 
+	// --- Anchor positions ---
+	// P1: top-anchored with half-box padding
+	const float p1_y = content_start.y + pad;
+	// P2: bottom-anchored with half-box padding
+	float p2_y = content_start.y + avail_h - pad - block_h;
+	// Guard against overlap when window is too small
+	p2_y = FH_MAX(p2_y, p1_y + block_h + pad);
 
+	const float bars_x = content_start.x + label_w;
 
-		// Reclaim space after player 1 rows so Player 2 appears below
-		ImGui::Dummy(ImVec2(0, (height + spacing) * ((rows >> 1) - 1) + height));
-ImGui::Text(Messages.Player_2());
-		for (StatePairQueue::reverse_iterator elem = queue.rbegin(); elem != queue.rend(); ++elem) {
-			PlayerFrameState p1state = elem->front();
-			PlayerFrameState p2state = elem->back();
+	// Divider line extents: slightly beyond P1 top and P2 bottom
+	const float div_top    = p1_y - height * 0.25f;
+	const float div_bottom = p2_y + block_h + height * 0.25f;
 
-			// determine colors
-			// Need to make it more rubust later, format of the colors:
-			// col_arr[0xb]: [p1_r1_r, p1_r1_g, p1_r1_b, ?, ?, ?, p2_r1_r, p2_r1_g, p2_r1_b, ?, ?, ? ]
-			std::array<float, 3 * rows> col_arr;
+	// --- Reserve content area for ImGui layout ---
+	ImGui::Dummy(ImVec2(avail_w, avail_h));
 
+	// --- Draw P1 / P2 labels (vertically centered in their respective blocks) ---
+	{
+		ImVec2 sz = ImGui::CalcTextSize("P1");
+		dl->AddText(ImVec2(content_start.x + (label_w - sz.x) * 0.5f,
+		                   p1_y + (block_h - sz.y) * 0.5f),
+		            IM_COL32(255, 255, 255, 255), "P1");
+	}
+	{
+		ImVec2 sz = ImGui::CalcTextSize("P2");
+		dl->AddText(ImVec2(content_start.x + (label_w - sz.x) * 0.5f,
+		                   p2_y + (block_h - sz.y) * 0.5f),
+		            IM_COL32(255, 255, 255, 255), "P2");
+	}
 
-			std::array<float, 3> color;
-			color = kindtoColor(p1state.kind);
-			std::copy(std::begin(color), std::end(color), std::begin(col_arr));
+	// --- X (close) button, right-aligned, vertically centered ---
+	{
+		ImVec2 btn_min = ImVec2(content_start.x + avail_w - btn_margin - btn_size,
+		                        content_start.y + (avail_h - btn_size) * 0.5f);
+		ImVec2 btn_max = ImVec2(btn_min.x + btn_size, btn_min.y + btn_size);
 
+		bool hovered = ImGui::IsMouseHoveringRect(btn_min, btn_max);
+		ImU32 bg_col = hovered ? IM_COL32(180, 50, 50, 220) : IM_COL32(120, 120, 120, 150);
+		dl->AddRectFilled(btn_min, btn_max, bg_col, 2.f);
 
-			color = kindtoColor(p2state.kind);
-			std::copy(std::begin(color), std::end(color), std::begin(col_arr) + 6 * 1);
-			
-			/*Setting invuln colors here until we get around to simplifying the way the colors for the non - invul row works,
-				too confusing as of now*/
-			ImColor color_curr_inv_p1 = color_inv;
-			ImColor color_curr_inv_p2 = color_inv;
-			if (bool(p1state.invul & Attribute::GP)) {
-				color_curr_inv_p1 = color_gp;
+		float xm = 2.5f;
+		dl->AddLine(ImVec2(btn_min.x + xm, btn_min.y + xm),
+		            ImVec2(btn_max.x - xm, btn_max.y - xm),
+		            IM_COL32(255, 255, 255, 255), 1.5f);
+		dl->AddLine(ImVec2(btn_max.x - xm, btn_min.y + xm),
+		            ImVec2(btn_min.x + xm, btn_max.y - xm),
+		            IM_COL32(255, 255, 255, 255), 1.5f);
+
+		if (hovered && ImGui::IsMouseClicked(0)) {
+			m_windowOpen = false;
+		}
+	}
+
+	// --- Frame columns ---
+	StatePairQueue& queue = history.read();
+
+	const ImColor color_inv(255, 255, 255);
+	const ImColor color_gp(122, 85, 61);
+
+	float col_x = bars_x;
+	int frame_idx = 0;
+
+	for (StatePairQueue::reverse_iterator elem = queue.rbegin(); elem != queue.rend(); ++elem) {
+		const PlayerFrameState& p1s = elem->front();
+		const PlayerFrameState& p2s = elem->back();
+
+		// Colors for main state row
+		std::array<float, 3> c1 = kindtoColor(p1s.kind);
+		std::array<float, 3> c2 = kindtoColor(p2s.kind);
+
+		ImColor inv_p1 = bool(p1s.invul & Attribute::GP) ? color_gp : color_inv;
+		ImColor inv_p2 = bool(p2s.invul & Attribute::GP) ? color_gp : color_inv;
+
+		// --- P1 row 1: main state ---
+		{
+			ImVec2 pos = ImVec2(col_x, p1_y);
+			DrawBox(dl, pos, width, height, ImColor(c1[0], c1[1], c1[2]));
+			if (IsHovering(pos, width, height))
+				ImGui::SetTooltip("P1: %s", kindToString(p1s.kind));
+		}
+
+		// --- P1 row 2: invul ---
+		{
+			ImVec2 pos = ImVec2(col_x, p1_y + height + spacing);
+			DrawBox(dl, pos, width, height, ImColor(0, 0, 0));
+			if (IsHovering(pos, width, height)) {
+				std::string s = attributeToString(p1s.invul);
+				ImGui::SetTooltip("P1 invul: %s", s.c_str());
 			}
-			if (bool(p2state.invul & Attribute::GP)) {
-				color_curr_inv_p2 = color_gp;
+			if (bool(p1s.invul & Attribute::T))
+				DrawBox(dl, ImVec2(pos.x + width - width/5.f, pos.y), width/5.f, height, inv_p1);
+			if (bool(p1s.invul & Attribute::P))
+				DrawBox(dl, pos, width/5.f, height, inv_p1);
+			if (bool(p1s.invul & Attribute::H))
+				DrawBox(dl, pos, width, height/5.f, inv_p1);
+			if (bool(p1s.invul & Attribute::B))
+				DrawBox(dl, ImVec2(pos.x, pos.y + height/2.f - height/10.f), width, height/5.f, inv_p1);
+			if (bool(p1s.invul & Attribute::F))
+				DrawBox(dl, ImVec2(pos.x, pos.y + height - height/5.f), width, height/5.f, inv_p1);
+		}
+
+		// --- P2 row 1: main state ---
+		{
+			ImVec2 pos = ImVec2(col_x, p2_y);
+			DrawBox(dl, pos, width, height, ImColor(c2[0], c2[1], c2[2]));
+			if (IsHovering(pos, width, height))
+				ImGui::SetTooltip("P2: %s", kindToString(p2s.kind));
+		}
+
+		// --- P2 row 2: invul ---
+		{
+			ImVec2 pos = ImVec2(col_x, p2_y + height + spacing);
+			DrawBox(dl, pos, width, height, ImColor(0, 0, 0));
+			if (IsHovering(pos, width, height)) {
+				std::string s = attributeToString(p2s.invul);
+				ImGui::SetTooltip("P2 invul: %s", s.c_str());
 			}
+			if (bool(p2s.invul & Attribute::T))
+				DrawBox(dl, ImVec2(pos.x + width - width/5.f, pos.y), width/5.f, height, inv_p2);
+			if (bool(p2s.invul & Attribute::P))
+				DrawBox(dl, pos, width/5.f, height, inv_p2);
+			if (bool(p2s.invul & Attribute::H))
+				DrawBox(dl, pos, width, height/5.f, inv_p2);
+			if (bool(p2s.invul & Attribute::B))
+				DrawBox(dl, ImVec2(pos.x, pos.y + height/2.f - height/10.f), width, height/5.f, inv_p2);
+			if (bool(p2s.invul & Attribute::F))
+				DrawBox(dl, ImVec2(pos.x, pos.y + height - height/5.f), width, height/5.f, inv_p2);
+		}
 
-			ImVec2 prev_cursor_p = cursor_p;
+		// --- Dividers every 5 frames (major every 25) ---
+		if ((frame_idx + 1) % 5 == 0) {
+			float div_x = col_x + width + spacing * 0.5f;
+			bool major = (frame_idx + 1) % 25 == 0;
+			ImU32 div_col  = major ? IM_COL32(255, 255, 255, 210) : IM_COL32(255, 255, 255, 90);
+			float div_thick = major ? 1.5f : 1.0f;
+			dl->AddLine(ImVec2(div_x, div_top), ImVec2(div_x, div_bottom), div_col, div_thick);
+		}
 
-			float next_x;
-
-			// NOTE: Add a -3 to the indices beyond this point (since the loop below expects to pass 6 indices for each i (iteration)
-			// But, these outside calls only increment by 3
-
-			// draw a box, mind how much it has moved beyond the (width, height)
-			// Draw box & write the new cursor pos
-			cursor_p = MakeBox(ImColor(col_arr[0], col_arr[1], col_arr[2]), cursor_p, width, height);
-			
-		
-
-			// Remember where the box finished drawing, to get the new column
-			next_x = cursor_p.x + spacing;
-
-			for (int i = 1; i < (rows >> 1); ++i) {
-				// carriage return 
-				cursor_p = ImVec2(prev_cursor_p.x, cursor_p.y + spacing);
-
-				auto cursor_p2 = cursor_p;
-
-				cursor_p = MakeBox(ImColor(0, 0, 0), cursor_p, width, height);
-
-				
-				// TODO: Could do with a more concise implementation
-				auto cursor_tmp = cursor_p2;
-				if (bool(p1state.invul & Attribute::T)) {
-					cursor_tmp.x = cursor_p2.x + width - width / 5;
-					MakeBox(color_curr_inv_p1, cursor_tmp, width / 5, height);
-				};
-				if (bool(p1state.invul & Attribute::P)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.x = cursor_p2.x;
-					MakeBox(color_curr_inv_p1, cursor_tmp, width / 5, height);
-				};
-				if (bool(p1state.invul & Attribute::H)) {
-					// the lines have 1/8th of the element height
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y;
-					MakeBox(color_curr_inv_p1, cursor_tmp, width, height / 5);
-				};
-				if (bool(p1state.invul & Attribute::B)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y + height / 2 - ((height / 5) / 2);
-					MakeBox(color_curr_inv_p1, cursor_tmp, width, height / 5);
-				}
-				if (bool(p1state.invul & Attribute::F)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y + height - (height / 5);
-					MakeBox(color_curr_inv_p1, cursor_tmp, width, height / 5);
-
-				}
-
-
-			}
-			cursor_p.x = prev_cursor_p.x;
-			cursor_p.y += text_vertical_spacing + spacing;
-
-			// add another -3 to the indices beyond this point
-			cursor_p = MakeBox(ImColor(
-				col_arr[(rows >> 1) * 3 + 0], 
-				col_arr[(rows >> 1) * 3 + 1], 
-				col_arr[(rows >> 1) * 3 + 2])
-				, cursor_p, width, height);
-			
-			for (int i = (rows >> 1) + 1; i < rows; ++i) {
-
-				// carriage return 
-				cursor_p = ImVec2(prev_cursor_p.x, cursor_p.y + spacing);
-
-				auto cursor_p2 = cursor_p;
-				
-				cursor_p = MakeBox(ImColor(0, 0, 0), cursor_p, width, height);
-				
-
-				auto cursor_tmp = cursor_p2;
-				if (bool(p2state.invul & Attribute::T)) {
-					cursor_tmp.x = cursor_p2.x + width - width / 5;
-					MakeBox(color_curr_inv_p2, cursor_tmp, width / 5, height);
-				};
-				if (bool(p2state.invul & Attribute::P)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.x = cursor_p2.x;
-					MakeBox(color_curr_inv_p2, cursor_tmp, width / 5, height);
-				};
-				if (bool(p2state.invul & Attribute::H)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y;
-					MakeBox(color_curr_inv_p2, cursor_tmp, width, height / 5);
-				};
-				if (bool(p2state.invul & Attribute::B)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y + height / 2 - ((height / 5) / 2);
-					MakeBox(color_curr_inv_p2, cursor_tmp, width, height / 5);
-				}
-				if (bool(p2state.invul & Attribute::F)) {
-					cursor_tmp = cursor_p2;
-					cursor_tmp.y = cursor_p2.y + height - (height / 5);
-					MakeBox(color_curr_inv_p2, cursor_tmp, width, height / 5);
-
-				}
-
-			}
-			cursor_p.x = next_x;
-			cursor_p.y = prev_cursor_p.y;
-
-			ImVec2 line_start = ImVec2(0., height * -0.25);
-			ImVec2 line_end = ImVec2(0., ((rows - 1) >> 1) * (height + spacing) + height * 1.25);
-			float length_y = line_end.y - line_start.y;
-
-			ImVec2 midpoint_p1 = ImVec2((prev_cursor_p.x + cursor_p.x + width) * 0.5, cursor_p.y);
-			ImVec2 midpoint_p2 = ImVec2(midpoint_p1.x, midpoint_p1.y + length_y + text_vertical_spacing + spacing - height * 0.25);
-
-
-			// Draw markings, use a different thickness based on i
-			if ((frame_idx + 1) % 4 == 0 && (frame_idx + 1) != 0) {
-				float emptiness = 0.5;
-				int dashes = 10;
-				if ((frame_idx + 1) % 16 == 0) {
-					dashes = 1;
-					emptiness = 0.;
-				}
-
-				ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-
-				// halfway between the boxes
-				std::vector<std::array<ImVec2, 2>> dotted_line = DottedLine(
-					line_start,
-					// take off the last bit of spacing (notice we add height at the end)
-					line_end,
-					dashes,
-					emptiness);
-				for (auto line : dotted_line) {
-					DrawSegWithOffset(draw_list, midpoint_p1, line[0], line[1]);
-					DrawSegWithOffset(draw_list, midpoint_p2, line[0], line[1]);
-				}
-
-			}
-
-
-			++frame_idx;
-		}	
+		col_x += width + spacing;
+		++frame_idx;
+	}
 }
