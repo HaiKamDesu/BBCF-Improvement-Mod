@@ -14,6 +14,8 @@ namespace Updater
 
 		UpdateCheckResult CheckLatestRelease(const SemVersion& currentVersion) const;
 		UpdateCheckResult CheckForUpdates(const SemVersion& currentVersion, bool includePrereleases) const;
+		bool FetchAllReleases(std::vector<GitHubRelease>& outReleases, std::string& error) const;
+		bool FetchText(const std::wstring& url, std::string& outText, std::string& error) const;
 
 	private:
 		bool GetText(const std::wstring& url, std::string& outText, std::string& error) const;

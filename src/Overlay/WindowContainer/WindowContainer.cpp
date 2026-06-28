@@ -18,6 +18,7 @@
 #include "Overlay/Window/WinePopupWindow.h"
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/Window/NetworkSquareColorWindow.h"
+#include "Overlay/Window/ReleaseCheckerWindow.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
 #include "Overlay/Window/UnlimitedReplayTakeoverWindow.h"
@@ -96,5 +97,8 @@ WindowContainer::WindowContainer()
                         new UnlimitedReplayTakeoverWindow("Unlimited Replay Takeover (BETA)", true, *this));
         }
 #endif
+
+        AddWindow(WindowType_ReleaseChecker,
+                new ReleaseCheckerWindow("Releases##checker", true, ImGuiWindowFlags_NoCollapse));
 }
 

@@ -51,6 +51,7 @@ namespace Updater
 		void OpenPopup();
 		void SkipCurrentVersion();
 		void StartUpdate();
+		void StartInstallRelease(const GitHubRelease& release);
 		void DrawSkippedLink();
 		void DrawSkippedMainMenuLink();
 		UpdateUiSnapshot GetSnapshot();
@@ -61,8 +62,10 @@ namespace Updater
 
 		static DWORD WINAPI CheckThreadProc(LPVOID param);
 		static DWORD WINAPI ApplyThreadProc(LPVOID param);
+		static DWORD WINAPI InstallReleaseThreadProc(LPVOID param);
 		void CheckThread();
 		void ApplyThread();
+		void InstallReleaseThread();
 		void SetErrorLocked(const std::string& error);
 		void SetAvailableLocked(const AvailableUpdate& update, bool skipped);
 		bool IsSkippedVersionLocked(const AvailableUpdate& update) const;
@@ -70,6 +73,7 @@ namespace Updater
 		CRITICAL_SECTION m_lock;
 		UpdateUiSnapshot m_snapshot;
 		AvailableUpdate m_update;
+		GitHubRelease m_pendingInstallRelease;
 		bool m_hasUpdate = false;
 		bool m_checkStarted = false;
 		bool m_applyStarted = false;

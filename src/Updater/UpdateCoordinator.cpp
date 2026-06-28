@@ -320,6 +320,115 @@ namespace Updater
 		}
 	}
 
+	void UpdateCoordinator::StartInstallRelease(const GitHubRelease& release)
+	{
+		EnterCriticalSection(&m_lock);
+		if (m_applyStarted)
+		{
+			LeaveCriticalSection(&m_lock);
+			return;
+		}
+		m_applyStarted = true;
+		m_pendingInstallRelease = release;
+		m_progressPercent = 0;
+		m_snapshot.progressPercent = 0;
+		m_snapshot.state = UpdateUiState_Downloading;
+		m_snapshot.statusText = "Fetching update manifest...";
+		m_snapshot.errorText.clear();
+		m_snapshot.hasUpdate = true;
+		m_hasUpdate = true;
+		m_snapshot.tag = release.tagName;
+		m_snapshot.name = release.name;
+		m_snapshot.body = release.body;
+		m_snapshot.publishedAt = release.publishedAt;
+		m_snapshot.releaseUrl = release.htmlUrl;
+		m_snapshot.releaseNotes.clear();
+		m_snapshot.autoApplySupported = true;
+		m_snapshot.autoApplyDisabledReason.clear();
+		m_snapshot.developmentChannel = false;
+		LeaveCriticalSection(&m_lock);
+
+		CloseHandle(CreateThread(nullptr, 0, InstallReleaseThreadProc, this, 0, nullptr));
+	}
+
+	DWORD WINAPI UpdateCoordinator::InstallReleaseThreadProc(LPVOID param)
+	{
+		static_cast<UpdateCoordinator*>(param)->InstallReleaseThread();
+		return 0;
+	}
+
+	void UpdateCoordinator::InstallReleaseThread()
+	{
+		EnterCriticalSection(&m_lock);
+		GitHubRelease release = m_pendingInstallRelease;
+		LeaveCriticalSection(&m_lock);
+
+		const GitHubReleaseAsset* manifestAsset = nullptr;
+		for (size_t i = 0; i < release.assets.size(); ++i)
+		{
+			if (release.assets[i].name == "update-manifest.json")
+			{
+				manifestAsset = &release.assets[i];
+				break;
+			}
+		}
+		if (!manifestAsset || manifestAsset->browserDownloadUrl.compare(0, 8, "https://") != 0)
+		{
+			SetErrorLocked("Release is missing a valid update-manifest.json.");
+			return;
+		}
+
+		GitHubReleaseClient client;
+		std::string manifestJson, error;
+		const std::wstring manifestUrl(manifestAsset->browserDownloadUrl.begin(),
+			manifestAsset->browserDownloadUrl.end());
+		if (!client.FetchText(manifestUrl, manifestJson, error))
+		{
+			SetErrorLocked(error);
+			return;
+		}
+
+		UpdateManifest manifest;
+		if (!ParseUpdateManifestJson(manifestJson, manifest, error))
+		{
+			SetErrorLocked(error);
+			return;
+		}
+		if (!ValidateUpdateManifest(manifest, error))
+		{
+			SetErrorLocked(error);
+			return;
+		}
+
+		const GitHubReleaseAsset* packageAsset = nullptr;
+		for (size_t i = 0; i < release.assets.size(); ++i)
+		{
+			if (release.assets[i].name == manifest.assetName)
+			{
+				packageAsset = &release.assets[i];
+				break;
+			}
+		}
+		if (!packageAsset || packageAsset->browserDownloadUrl.compare(0, 8, "https://") != 0)
+		{
+			SetErrorLocked("Release is missing the package asset referenced by its manifest.");
+			return;
+		}
+
+		EnterCriticalSection(&m_lock);
+		m_update.release = release;
+		m_update.manifest = manifest;
+		m_update.manifestAsset = *manifestAsset;
+		m_update.packageAsset = *packageAsset;
+		m_update.autoApplySupported = true;
+		m_update.autoApplyDisabledReason.clear();
+		m_snapshot.statusText = "Downloading update package...";
+		m_snapshot.state = UpdateUiState_Downloading;
+		LeaveCriticalSection(&m_lock);
+
+		ApplyThread();
+	}
+
 	void UpdateCoordinator::SetErrorLocked(const std::string& error)
 	{
 		EnterCriticalSection(&m_lock);

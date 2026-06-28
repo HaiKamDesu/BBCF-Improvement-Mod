@@ -21,3 +21,4 @@ docs/Research/BBCF-Ghidra-Project/
 
 # URT automation local outputs.
 tools/urt_automation/runtime/
+/.claude/worktrees

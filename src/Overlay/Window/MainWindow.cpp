@@ -257,39 +257,28 @@ void MainWindow::DrawFrameHistorySection() const
 	//	ImGui::TextDisabled("THIS FEATURE CURRENTLY DOES NOT SUPPORT MIRRORS! IF IT ISN'T A MIRROR THERE WAS AN ERROR LOADING ONE OF THE CHARACTERS");
 	//	return;
 	//}
+	static bool isOpen = false;
+
 	FrameHistoryWindow* frameHistWin = m_pWindowContainer->GetWindow<FrameHistoryWindow>(WindowType_FrameHistory);
 
+
 	ImGui::HorizontalSpacing();
-	bool isOpen = Settings::settingsIni.frameHistoryEnabled;
-	if (ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen))
-	{
-		Settings::settingsIni.frameHistoryEnabled = isOpen;
-		Settings::changeSetting("FrameHistoryEnabled", isOpen ? "1" : "0");
-	}
+	ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen);
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_help());
 	if (isOpen)
+	{
 		frameHistWin->Open();
+	}
 	else
+	{
 		frameHistWin->Close();
+	}
 
 	ImGui::HorizontalSpacing();
-	if (ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))
-	{
-		Settings::settingsIni.frameHistoryAutoReset = frameHistWin->resetting;
-		Settings::changeSetting("FrameHistoryAutoReset", frameHistWin->resetting ? "1" : "0");
-	}
+	ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting);
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_auto_reset_help());
-
-	ImGui::HorizontalSpacing();
-	if (ImGui::Checkbox(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
-	{
-		Settings::settingsIni.frameHistoryCountEmptyFrames = frameHistWin->countEmptyFrames;
-		Settings::changeSetting("FrameHistoryCountEmptyFrames", frameHistWin->countEmptyFrames ? "1" : "0");
-	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(Messages.FrameHistory_count_empty_frames_help());
 
 	ImGui::HorizontalSpacing();
 	if (ImGui::SliderFloat(Messages.Box_width(), &frameHistWin->width, 1., 100.)) {
@@ -566,6 +555,10 @@ void MainWindow::DrawLinkButtons() const
 
 	ImGui::SameLine();
 	ImGui::ButtonUrl(Messages.GitHub(), MOD_LINK_GITHUB, BTN_SIZE);
+
+	ImGui::SameLine();
+	if (ImGui::Button("Releases##checker", BTN_SIZE))
+		m_pWindowContainer->GetWindow(WindowType_ReleaseChecker)->ToggleOpen();
 
 }
 

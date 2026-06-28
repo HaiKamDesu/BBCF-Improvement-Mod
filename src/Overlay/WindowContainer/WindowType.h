@@ -22,4 +22,5 @@ enum WindowType_
         WindowType_UnlimitedPlayback,
         WindowType_NetworkSquareColor,
         WindowType_UnlimitedReplayTakeover,
+        WindowType_ReleaseChecker,
 };

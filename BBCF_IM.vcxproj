@@ -102,6 +102,7 @@
     <ClCompile Include="src\Overlay\Window\ControllerSettings\MultipleKeyboardOverrideDrawer.cpp" />
     <ClCompile Include="src\Overlay\Window\ControllerSettings\SteamInputWarningDrawer.cpp" />
     <ClCompile Include="src\Overlay\Window\PaletteEditorWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\ReleaseCheckerWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\UpdateNotifierWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\IWindow.cpp" />
     <ClCompile Include="src\D3D9EXWrapper\D3DXMath.cpp" />
@@ -242,6 +243,7 @@
     <ClInclude Include="src\Overlay\Window\ControllerSettings\MultipleKeyboardOverrideDrawer.h" />
     <ClInclude Include="src\Overlay\Window\ControllerSettings\SteamInputWarningDrawer.h" />
     <ClInclude Include="src\Overlay\Window\PaletteEditorWindow.h" />
+    <ClInclude Include="src\Overlay\Window\ReleaseCheckerWindow.h" />
     <ClInclude Include="src\Overlay\Window\UpdateNotifierWindow.h" />
     <ClInclude Include="src\Overlay\Window\IWindow.h" />
     <ClInclude Include="src\D3D9EXWrapper\D3DXMath.h" />
