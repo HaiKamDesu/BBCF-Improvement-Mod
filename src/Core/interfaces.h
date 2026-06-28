@@ -117,6 +117,7 @@ struct modValues_t {
 	float frame_history_width;
 	float frame_history_height;
 	float frame_history_spacing;
+	bool frame_history_auto_reset;
 };
 //temporary placeholders until wrappers are created / final addresses updated
 struct temps_t

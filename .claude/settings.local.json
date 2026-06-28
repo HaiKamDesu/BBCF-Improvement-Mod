@@ -58,7 +58,8 @@
       "Bash(powershell.exe *)",
       "Bash(\"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\.vcxproj.user\")",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\BBCF_IM.sln\" /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143)",
-      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\BBCF_IM.sln\" /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)"
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\BBCF_IM.sln\" /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m:1 /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)"
     ]
   }
 }

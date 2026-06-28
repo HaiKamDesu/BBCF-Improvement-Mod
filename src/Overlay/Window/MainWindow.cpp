@@ -25,6 +25,7 @@
 
 #include "imgui_internal.h"
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -85,6 +86,8 @@ void MainWindow::Draw()
 	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.Debug_log_details());
+	ImGui::SameLine();
+	DrawSettingsIniButton();
 
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted("P$"); ImGui::SameLine();
@@ -103,7 +106,7 @@ void MainWindow::Draw()
 	DrawFrameAdvantageSection();
 	DrawAvatarSection();
 	DrawControllerSettingSection();
-	DrawLoadedSettingsValuesSection();
+	DrawSettingsIniModal();
 	DrawUtilButtons();
 
 	ImGui::VerticalSpacing(5);
@@ -273,7 +276,11 @@ void MainWindow::DrawFrameHistorySection() const
 	}
 
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting);
+	if (ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))
+	{
+		Settings::settingsIni.frameHistoryAutoReset = frameHistWin->resetting;
+		Settings::changeSetting("FrameHistoryAutoReset", frameHistWin->resetting ? "1" : "0");
+	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_auto_reset_help());
 
@@ -555,28 +562,204 @@ void MainWindow::DrawLinkButtons() const
 
 }
 
-void MainWindow::DrawLoadedSettingsValuesSection() const
+namespace {
+	// --- value widgets: return true if the value changed this frame ---
+
+	static bool DrawValueWidget(const char* id, bool& val)
+	{
+		return ImGui::Checkbox(id, &val);
+	}
+	static bool DrawValueWidget(const char* id, int& val)
+	{
+		ImGui::PushItemWidth(-1);
+		bool r = ImGui::InputInt(id, &val);
+		ImGui::PopItemWidth();
+		return r;
+	}
+	static bool DrawValueWidget(const char* id, float& val)
+	{
+		ImGui::PushItemWidth(-1);
+		bool r = ImGui::InputFloat(id, &val, 0.0f, 0.0f, 4);
+		ImGui::PopItemWidth();
+		return r;
+	}
+	static bool DrawValueWidget(const char* id, std::string& val)
+	{
+		char buf[1024];
+		strncpy_s(buf, sizeof(buf), val.c_str(), _TRUNCATE);
+		ImGui::PushItemWidth(-1);
+		bool r = ImGui::InputText(id, buf, sizeof(buf));
+		ImGui::PopItemWidth();
+		if (r) val = buf;
+		return r;
+	}
+
+	// --- restart-required key set ---
+
+	static bool IsRestartRequired(const char* iniKey)
+	{
+		static const char* const kRestartKeys[] = {
+			"RenderingWidth", "RenderingHeight", "Viewport", "AntiAliasing", "V-sync", "MenuSize",
+			"DinputDllWrapper",
+			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks",
+			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
+			nullptr
+		};
+		for (int i = 0; kRestartKeys[i]; ++i)
+			if (_stricmp(iniKey, kRestartKeys[i]) == 0) return true;
+		return false;
+	}
+
+	// --- serialization ---
+
+	static std::string SettingValueToString(bool val)   { return val ? "1" : "0"; }
+	static std::string SettingValueToString(int val)    { return std::to_string(val); }
+	static std::string SettingValueToString(float val)
+	{
+		std::ostringstream oss;
+		oss << val;
+		return oss.str();
+	}
+	static std::string SettingValueToString(const std::string& val) { return val; }
+}
+
+void MainWindow::DrawSettingsIniButton()
 {
-	if (!ImGui::CollapsingHeader(Messages.Loaded_settings_ini_values()))
-		return;
+	if (ImGui::Button("Settings.ini"))
+	{
+		m_settingsDraft = Settings::settingsIni;
+		m_settingsSortOrder = SettingsSortOrder::Default;
 
-	// Not using ImGui columns here because they are bugged if the window has always_autoresize flag. The window 
-	// starts extending to infinity, if the left edge of the window touches any edges of the screen
-
-	std::ostringstream oss;
-
-	ImGui::BeginChild("loaded_settings", ImVec2(0, 300.0f), true, ImGuiWindowFlags_HorizontalScrollbar);
-
-	//X-Macro
+		// Build row list. Each row has a draw lambda (returns true if the widget changed this frame)
+		// and a differsFromOriginal lambda (compares draft vs live settings, checked only on change).
+		m_settingRows.clear();
+		m_needsRestart = false;
 #define SETTING(_type, _var, _inistring, _defaultval) \
-	oss << " " << _inistring; \
-	ImGui::TextUnformatted(oss.str().c_str()); ImGui::SameLine(ImGui::GetWindowWidth() * 0.6f); \
-	oss.str(""); \
-	oss << "= " << Settings::settingsIni.##_var; \
-	ImGui::TextUnformatted(oss.str().c_str()); ImGui::Separator(); \
-	oss.str("");
+		m_settingRows.push_back({ \
+			_inistring, \
+			[this]() -> bool { \
+				char buf[128] = "##"; \
+				strncat_s(buf, sizeof(buf), _inistring, _TRUNCATE); \
+				return DrawValueWidget(buf, m_settingsDraft._var); \
+			}, \
+			[this]() -> bool { return m_settingsDraft._var != Settings::settingsIni._var; }, \
+			IsRestartRequired(_inistring) \
+		});
 #include "Core/settings.def"
 #undef SETTING
 
+		ImGui::OpenPopup("Settings.ini##modal");
+	}
+}
+
+void MainWindow::DrawSettingsIniModal()
+{
+	if (m_settingRows.empty())
+		return;
+
+	const float footerHeight = m_needsRestart ? 60.0f : 36.0f;
+
+	ImGui::SetNextWindowSize(ImVec2(560, 580), ImGuiCond_Always);
+	if (!ImGui::BeginPopupModal("Settings.ini##modal", nullptr, ImGuiWindowFlags_NoResize))
+		return;
+
+	ImGui::BeginChild("##settings_scroll", ImVec2(0, -footerHeight), true);
+
+	ImGui::Columns(2, "##settings_cols", true);
+	ImGui::SetColumnWidth(0, 260.0f);
+
+	// Clickable header to cycle sort order
+	const char* sortSuffix =
+		m_settingsSortOrder == SettingsSortOrder::Ascending  ? " [A-Z]" :
+		m_settingsSortOrder == SettingsSortOrder::Descending ? " [Z-A]" : " [--]";
+	char sortHdr[32];
+	snprintf(sortHdr, sizeof(sortHdr), "Setting%s", sortSuffix);
+	if (ImGui::Selectable(sortHdr))
+	{
+		if (m_settingsSortOrder == SettingsSortOrder::Default)
+			m_settingsSortOrder = SettingsSortOrder::Ascending;
+		else if (m_settingsSortOrder == SettingsSortOrder::Ascending)
+			m_settingsSortOrder = SettingsSortOrder::Descending;
+		else
+			m_settingsSortOrder = SettingsSortOrder::Default;
+	}
+	ImGui::NextColumn();
+	ImGui::TextUnformatted("Value");
+	ImGui::NextColumn();
+	ImGui::Separator();
+
+	// Build sorted index over m_settingRows
+	const size_t rowCount = m_settingRows.size();
+	std::vector<size_t> order(rowCount);
+	for (size_t i = 0; i < rowCount; ++i) order[i] = i;
+	if (m_settingsSortOrder == SettingsSortOrder::Ascending)
+		std::sort(order.begin(), order.end(), [this](size_t a, size_t b) {
+			return m_settingRows[a].name < m_settingRows[b].name;
+		});
+	else if (m_settingsSortOrder == SettingsSortOrder::Descending)
+		std::sort(order.begin(), order.end(), [this](size_t a, size_t b) {
+			return m_settingRows[a].name > m_settingRows[b].name;
+		});
+
+	bool anyRestartRowChangedThisFrame = false;
+	for (size_t i = 0; i < rowCount; ++i)
+	{
+		SettingRow& row = m_settingRows[order[i]];
+		ImGui::TextUnformatted(row.name.c_str());
+		ImGui::NextColumn();
+		if (row.draw() && row.isRestartRequired)
+			anyRestartRowChangedThisFrame = true;
+		ImGui::NextColumn();
+	}
+
+	// Only recompute m_needsRestart when a restart-relevant widget actually changed
+	if (anyRestartRowChangedThisFrame)
+	{
+		m_needsRestart = false;
+		for (SettingRow& row : m_settingRows)
+			if (row.isRestartRequired && row.differsFromOriginal()) {
+				m_needsRestart = true;
+				break;
+			}
+	}
+
+	ImGui::Columns(1);
 	ImGui::EndChild();
+
+	if (m_needsRestart)
+		ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+			"Some changes require a restart to take effect.");
+
+	if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		ImGui::CloseCurrentPopup();
+
+	ImGui::SameLine();
+
+	const char* saveLabel = m_needsRestart ? "Save and Restart" : "Save";
+	if (ImGui::Button(saveLabel, ImVec2(m_needsRestart ? 150.0f : 120.0f, 0)))
+	{
+#define SETTING(_type, _var, _inistring, _defaultval) \
+		if (m_settingsDraft._var != Settings::settingsIni._var) { \
+			Settings::changeSetting(_inistring, SettingValueToString(m_settingsDraft._var)); \
+			Settings::settingsIni._var = m_settingsDraft._var; \
+		}
+#include "Core/settings.def"
+#undef SETTING
+
+		ImGui::CloseCurrentPopup();
+
+		if (m_needsRestart)
+		{
+			wchar_t exePath[MAX_PATH] = {};
+			GetModuleFileNameW(NULL, exePath, MAX_PATH);
+			STARTUPINFOW si = { sizeof(si) };
+			PROCESS_INFORMATION pi = {};
+			CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			ExitProcess(0);
+		}
+	}
+
+	ImGui::EndPopup();
 }

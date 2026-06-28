@@ -1,7 +1,13 @@
 #pragma once
 #include "IWindow.h"
 
+#include "Core/Settings.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
+
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
 
 class MainWindow : public IWindow
 {
@@ -19,7 +25,8 @@ private:
 	void DrawUtilButtons() const;
 	void DrawCurrentPlayersCount() const;
 	void DrawLinkButtons() const;
-	void DrawLoadedSettingsValuesSection() const;
+	void DrawSettingsIniButton();
+	void DrawSettingsIniModal();
         void DrawCustomPalettesSection() const;
         void DrawHitboxOverlaySection() const;
         void DrawGameplaySettingSection() const;
@@ -31,4 +38,15 @@ private:
         void DrawLanguageSelector();
 	const ImVec2 BTN_SIZE = ImVec2(60, 20);
 	WindowContainer* m_pWindowContainer = nullptr;
+	settingsIni_t m_settingsDraft{};
+	enum class SettingsSortOrder : int { Default = 0, Ascending, Descending };
+	SettingsSortOrder m_settingsSortOrder = SettingsSortOrder::Default;
+	bool m_needsRestart = false;
+	struct SettingRow {
+		std::string name;
+		std::function<bool()> draw;               // draws widget; returns true if changed this frame
+		std::function<bool()> differsFromOriginal; // returns true if draft != original
+		bool isRestartRequired;
+	};
+	std::vector<SettingRow> m_settingRows;
 };

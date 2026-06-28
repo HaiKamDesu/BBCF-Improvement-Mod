@@ -57,6 +57,7 @@ SETTING(bool, autoArchive, "autoArchive", "0");
 SETTING(float, FrameHistoryWidth, "FrameHistoryWidth", "12.0");
 SETTING(float, FrameHistoryHeight, "FrameHistoryHeight", "20.0");
 SETTING(float, FrameHistorySpacing, "FrameHistorySpacing", "6.0");
+SETTING(bool, frameHistoryAutoReset, "FrameHistoryAutoReset", "1");
 SETTING(std::string, language, "Language", "en");
 SETTING(int, unlimitedPlaybackTriggerKeyCode, "UnlimitedPlaybackTriggerKeyCode", "0");
 SETTING(int, unlimitedPlaybackLoopKeyCode, "UnlimitedPlaybackLoopKeyCode", "0");
