@@ -60,7 +60,18 @@
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\BBCF_IM.sln\" /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143)",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:\\\\\\\\Users\\\\\\\\Usuario\\\\\\\\source\\\\\\\\repos\\\\\\\\HaiKamDesu\\\\\\\\BBCF-Improvement-Mod\\\\\\\\BBCF_IM.sln\" /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m:1 /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)",
-      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/.claude/worktrees/agent-a3fc6510f5f8bc8e3/BBCF_IM.vcxproj /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)"
+      "Bash(rg *)",
+      "Bash(objdump -f /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/dinput8.dll)",
+      "Bash(objdump -f /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/BBCFIMUpdater.exe)",
+      "Bash(objdump -p /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/dinput8.dll)",
+      "Bash(osslsigncode verify *)",
+      "Bash(objdump -x /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/dinput8.dll)",
+      "Bash(objdump -x /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/BBCFIMUpdater.exe)",
+      "Bash(objdump -p /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/BBCFIMUpdater.exe)",
+      "Bash(objdump -h /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/dinput8.dll)",
+      "Bash(objdump -h /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/BBCFIMUpdater.exe)",
+      "Skill(artifact-design)",
+      "Artifact"
     ]
   }
 }
