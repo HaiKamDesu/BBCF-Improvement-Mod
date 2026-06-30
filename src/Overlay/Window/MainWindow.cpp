@@ -140,17 +140,17 @@ void MainWindow::DrawLanguageSelector()
 
 	if (ImGui::BeginCombo(Messages.Language(), preview.c_str()))
 	{
-                for (size_t i = 0; i < options.size(); ++i)
-                {
-                        const auto& option = options[i];
-                        const bool optionComplete = option.complete;
-                        const std::string languageCode = option.code;
+		for (size_t i = 0; i < options.size(); ++i)
+		{
+			const auto& option = options[i];
+			const bool optionComplete = option.complete;
+			const std::string languageCode = option.code;
 
-                        std::string label = option.displayName;
-                        if (!optionComplete)
-                        {
-                                label += Messages.Language_incomplete_label();
-                        }
+			std::string label = option.displayName;
+			if (!optionComplete)
+			{
+				label += Messages.Language_incomplete_label();
+			}
 
 			if (!optionComplete)
 			{
@@ -257,28 +257,39 @@ void MainWindow::DrawFrameHistorySection() const
 	//	ImGui::TextDisabled("THIS FEATURE CURRENTLY DOES NOT SUPPORT MIRRORS! IF IT ISN'T A MIRROR THERE WAS AN ERROR LOADING ONE OF THE CHARACTERS");
 	//	return;
 	//}
-	static bool isOpen = false;
-
 	FrameHistoryWindow* frameHistWin = m_pWindowContainer->GetWindow<FrameHistoryWindow>(WindowType_FrameHistory);
 
-
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen);
+	bool isOpen = Settings::settingsIni.frameHistoryEnabled;
+	if (ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen))
+	{
+		Settings::settingsIni.frameHistoryEnabled = isOpen;
+		Settings::changeSetting("FrameHistoryEnabled", isOpen ? "1" : "0");
+	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_help());
 	if (isOpen)
-	{
 		frameHistWin->Open();
-	}
 	else
-	{
 		frameHistWin->Close();
-	}
 
 	ImGui::HorizontalSpacing();
-	ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting);
+	if (ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))
+	{
+		Settings::settingsIni.frameHistoryAutoReset = frameHistWin->resetting;
+		Settings::changeSetting("FrameHistoryAutoReset", frameHistWin->resetting ? "1" : "0");
+	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.FrameHistory_auto_reset_help());
+
+	ImGui::HorizontalSpacing();
+	if (ImGui::Checkbox(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
+	{
+		Settings::settingsIni.frameHistoryCountEmptyFrames = frameHistWin->countEmptyFrames;
+		Settings::changeSetting("FrameHistoryCountEmptyFrames", frameHistWin->countEmptyFrames ? "1" : "0");
+	}
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.FrameHistory_count_empty_frames_help());
 
 	ImGui::HorizontalSpacing();
 	if (ImGui::SliderFloat(Messages.Box_width(), &frameHistWin->width, 1., 100.)) {
@@ -429,12 +440,12 @@ void MainWindow::DrawHitboxOverlaySection() const
 		ImGui::Checkbox(Messages.Draw_origin(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawOriginLine);
 		ImGui::SameLine();
-ImGui::ShowHelpMarker(Messages.Origin_point_note());
+		ImGui::ShowHelpMarker(Messages.Origin_point_note());
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_collision(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawCollisionBoxes);
 		ImGui::SameLine();
-ImGui::ShowHelpMarker(Messages.Collision_box_note());
+		ImGui::ShowHelpMarker(Messages.Collision_box_note());
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_throw_range_boxes(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawRangeCheckBoxes);
@@ -612,8 +623,10 @@ namespace {
 
 	// --- serialization ---
 
-	static std::string SettingValueToString(bool val)   { return val ? "1" : "0"; }
-	static std::string SettingValueToString(int val)    { return std::to_string(val); }
+	// --- serialization ---
+
+	static std::string SettingValueToString(bool val) { return val ? "1" : "0"; }
+	static std::string SettingValueToString(int val) { return std::to_string(val); }
 	static std::string SettingValueToString(float val)
 	{
 		std::ostringstream oss;
@@ -670,7 +683,7 @@ void MainWindow::DrawSettingsIniModal()
 
 	// Clickable header to cycle sort order
 	const char* sortSuffix =
-		m_settingsSortOrder == SettingsSortOrder::Ascending  ? " [A-Z]" :
+		m_settingsSortOrder == SettingsSortOrder::Ascending ? " [A-Z]" :
 		m_settingsSortOrder == SettingsSortOrder::Descending ? " [Z-A]" : " [--]";
 	char sortHdr[32];
 	snprintf(sortHdr, sizeof(sortHdr), "Setting%s", sortSuffix);
@@ -694,12 +707,12 @@ void MainWindow::DrawSettingsIniModal()
 	for (size_t i = 0; i < rowCount; ++i) order[i] = i;
 	if (m_settingsSortOrder == SettingsSortOrder::Ascending)
 		std::sort(order.begin(), order.end(), [this](size_t a, size_t b) {
-			return m_settingRows[a].name < m_settingRows[b].name;
-		});
+		return m_settingRows[a].name < m_settingRows[b].name;
+			});
 	else if (m_settingsSortOrder == SettingsSortOrder::Descending)
 		std::sort(order.begin(), order.end(), [this](size_t a, size_t b) {
-			return m_settingRows[a].name > m_settingRows[b].name;
-		});
+		return m_settingRows[a].name > m_settingRows[b].name;
+			});
 
 	bool anyRestartRowChangedThisFrame = false;
 	for (size_t i = 0; i < rowCount; ++i)
