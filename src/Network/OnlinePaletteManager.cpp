@@ -4,6 +4,8 @@
 
 #include "Core/logger.h"
 #include "Core/interfaces.h"
+#include "Game/gamestates.h"
+
 OnlinePaletteManager::OnlinePaletteManager(PaletteManager* pPaletteManager, CharPaletteHandle* pP1CharPalHandle,
 	CharPaletteHandle* pP2CharPalHandle, RoomManager* pRoomManager)
 	: m_pPaletteManager(pPaletteManager), m_pP1CharPalHandle(pP1CharPalHandle), 
@@ -36,6 +38,9 @@ void OnlinePaletteManager::RecvPaletteDataPacket(Packet* packet)
 {
 	LOG(2, "OnlinePaletteManager::RecvPaletteDataPacket\n");
 
+	if (!g_modVals.enableForeignPalettes)
+		return;
+
 	uint16_t matchPlayerIndex = m_pRoomManager->GetPlayerMatchPlayerIndexByRoomMemberIndex(packet->roomMemberIndex);
 	CharPaletteHandle& charPalHandle = GetPlayerCharPaletteHandle(matchPlayerIndex);
 
@@ -47,15 +52,15 @@ void OnlinePaletteManager::RecvPaletteDataPacket(Packet* packet)
 		return;
 	}
 
-	if (g_modVals.enableForeignPalettes)
-	{
-		m_pPaletteManager->ReplacePaletteFile((const char*)packet->data, (PaletteFile)packet->part, charPalHandle);
-	}
+	m_pPaletteManager->ReplacePaletteFile((const char*)packet->data, (PaletteFile)packet->part, charPalHandle);
 }
 
 void OnlinePaletteManager::RecvPaletteInfoPacket(Packet* packet)
 {
 	LOG(2, "OnlinePaletteManager::RecvPaletteInfoPacket\n");
+
+	if (!g_modVals.enableForeignPalettes)
+		return;
 
 	uint16_t matchPlayerIndex = m_pRoomManager->GetPlayerMatchPlayerIndexByRoomMemberIndex(packet->roomMemberIndex);
 	CharPaletteHandle& charPalHandle = GetPlayerCharPaletteHandle(matchPlayerIndex);
@@ -68,10 +73,7 @@ void OnlinePaletteManager::RecvPaletteInfoPacket(Packet* packet)
 		return;
 	}
 
-	if (g_modVals.enableForeignPalettes)
-	{
-		m_pPaletteManager->SetCurrentPalInfo(charPalHandle, *(IMPL_info_t*)packet->data);
-	}
+	m_pPaletteManager->SetCurrentPalInfo(charPalHandle, *(IMPL_info_t*)packet->data);
 }
 
 void OnlinePaletteManager::ProcessSavedPalettePackets()
