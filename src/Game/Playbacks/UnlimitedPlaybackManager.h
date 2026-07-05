@@ -194,6 +194,7 @@ private:
     void TryRestoreRuntimeSlotAfterPlayback();
     void ResetRuntimePlaybackState(bool discardBackupOnly);
     void StartRuntimePlayback(const std::vector<char>& frames, int facingToLoad);
+    void ExecutePendingPlayNow();
     bool EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot = false);
     bool RestoreLoopCustomSnapshot(bool showToast);
     bool ApplyLoopRestart();
@@ -233,6 +234,8 @@ private:
     int m_lastObservedFrame = -1;
     bool m_runtimeSlotBackupValid = false;
     bool m_runtimeSlotRestorePending = false;
+    bool m_pendingPlayNowRequested = false;
+    size_t m_pendingPlayNowIndex = 0;
     bool m_runtimeSlotBackupFacingLeft = false;
     std::vector<char> m_runtimeSlotBackupFrames;
     int m_runtimeSlotNumber = 1;

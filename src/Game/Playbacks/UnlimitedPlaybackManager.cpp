@@ -537,6 +537,7 @@ void UnlimitedPlaybackManager::Tick() {
         // Match-end cleanup now runs from MatchState::OnMatchEnd while the training block is still valid.
         // Once we're out of training, only clear our own bookkeeping and avoid touching native playback state.
         ResetRuntimePlaybackState(true);
+        m_pendingPlayNowRequested = false;
         m_lastObservedFrame = -1;
         m_prevWakeupCondition = false;
         m_prevGapCondition = false;
@@ -547,6 +548,7 @@ void UnlimitedPlaybackManager::Tick() {
         ClearLoopCustomSnapshot();
     } else {
         TryRestoreRuntimeSlotAfterPlayback();
+        ExecutePendingPlayNow();
     }
 
     if (!inTrainingMatch || !m_triggerRuntimeEnabled || m_profileRuntimeSuppressedUntilReset) {
@@ -1304,6 +1306,33 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
         return false;
     }
 
+    // Defer the actual playback start to Tick() (the game's own logic-tick hook) instead of
+    // firing it here, which runs from the render/Present hook (UI button click). Starting
+    // playback off the logic tick can misalign the first sampled frame by one tick relative to
+    // the native playback engine, which is enough to break tightly-timed inputs like microdashes.
+    m_pendingPlayNowIndex = idx;
+    m_pendingPlayNowRequested = true;
+    return true;
+}
+
+void UnlimitedPlaybackManager::ExecutePendingPlayNow() {
+    if (!m_pendingPlayNowRequested) {
+        return;
+    }
+    m_pendingPlayNowRequested = false;
+
+    const size_t idx = m_pendingPlayNowIndex;
+    if (idx >= m_entries.size()) {
+        return;
+    }
+
+    const auto& entry = m_entries[idx];
+    auto it = m_cache.find(entry.id);
+    if (it == m_cache.end() || !it->second.loaded) {
+        PushToast(L("Failed loading entry."));
+        return;
+    }
+
     std::vector<char> frames = it->second.frames;
     int facingToLoad = it->second.facingLeft ? 1 : 0;
     bool mirrored = false;
@@ -1324,7 +1353,6 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
         facingToLoad,
         mirrored ? 1 : 0);
     PushToast(FormatLocalized("Played: %s%s", entry.name.c_str(), mirrored ? L(" (mirrored)").c_str() : ""));
-    return true;
 }
 
 void UnlimitedPlaybackManager::ClearAll() {
