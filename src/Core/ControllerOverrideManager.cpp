@@ -2625,12 +2625,17 @@ bool ControllerOverrideManager::RefreshDevices()
 
         LOG(1, "ControllerOverrideManager::RefreshDevices - begin (override=%d)\n", m_overrideEnabled ? 1 : 0);
         const size_t previousHash = m_lastDeviceHash;
+        const size_t previousRawHidCount = m_lastRawHidCount;
         CollectDevices();
         EnsureSelectionsValid();
         m_lastRefresh = GetTickCount64();
         m_lastDeviceHash = HashDevices(m_devices);
-        const bool devicesChanged = (m_lastDeviceHash != previousHash);
-        LOG(1, "ControllerOverrideManager::RefreshDevices - end (devices=%zu, hash=%zu changed=%d)\n", m_devices.size(), m_lastDeviceHash, devicesChanged ? 1 : 0);
+        // Also treat a change in raw HID gamepad count as a device change. This handles
+        // Steam Input: the DualSense is hidden from our DInput enumeration (hash stays flat)
+        // but rawHidCount still ticks up, so we can still trigger reinit and let the game's
+        // own DInput calls (which Steam does hook) pick up the controller.
+        const bool devicesChanged = (m_lastDeviceHash != previousHash) || (m_lastRawHidCount != previousRawHidCount);
+        LOG(1, "ControllerOverrideManager::RefreshDevices - end (devices=%zu, hash=%zu rawHid=%zu changed=%d)\n", m_devices.size(), m_lastDeviceHash, m_lastRawHidCount, devicesChanged ? 1 : 0);
         return devicesChanged;
 }
 
@@ -2883,7 +2888,9 @@ void ControllerOverrideManager::ReinitializeGameInputs()
         DebugLogPadSlot0();
         SendDeviceChangeBroadcast();
         RedetectControllers_Internal();
-        LOG(1, "ControllerOverrideManager::ReinitializeGameInputs - end\n");
+        DebugLogPadSlot0();
+        LOG(1, "ControllerOverrideManager::ReinitializeGameInputs - end (trackedA=%zu trackedW=%zu)\n",
+                m_trackedDevicesA.size(), m_trackedDevicesW.size());
 }
 
 void ControllerOverrideManager::ProcessPendingDeviceChange()
@@ -3694,6 +3701,8 @@ bool ControllerOverrideManager::CollectDevices()
                 rawInputDevices.size(),
                 envInfo.ignoreDeviceEntryCount,
                 envInfo.ignoreDevicesLength);
+
+        m_lastRawHidCount = rawInputDevices.size();
 
         return diSuccess || !winmmDevices.empty();
 }

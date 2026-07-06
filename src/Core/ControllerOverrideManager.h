@@ -236,6 +236,7 @@ private:
         bool m_multipleKeyboardOverrideEnabled = false;
         ULONGLONG m_lastRefresh = 0;
         size_t m_lastDeviceHash = 0;
+        size_t m_lastRawHidCount = 0;
         bool m_steamInputLikely = false;
         std::atomic<bool> m_deviceChangeQueued{ false };
         std::atomic<bool> m_mappingPopupActive{ false };
