@@ -71,7 +71,20 @@
       "Bash(objdump -h /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/dinput8.dll)",
       "Bash(objdump -h /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/bin/Release/BBCFIMUpdater.exe)",
       "Skill(artifact-design)",
-      "Artifact"
+      "Artifact",
+      "Bash(xargs -I{} echo {})",
+      "Bash(iconv -f UTF-16LE -t UTF-8 tools/bbcf_disasm_ascii.txt)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 tools/bbcf_disasm_ascii.txt -o /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/5520b999-dd74-496f-9a2e-f058d13924eb/scratchpad/disasm.txt)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(grep --encoding=ASCII -c \"Microsoft\" tools/bbcf_disasm_ascii.txt)",
+      "Bash(grep --encoding=ASCII -n \"esi+0Ch\" tools/bbcf_disasm_ascii.txt)",
+      "Bash(grep -n -A1 'mov         eax,dword ptr \\\\[esi\\\\]$' /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/5520b999-dd74-496f-9a2e-f058d13924eb/scratchpad/disasm_clean.txt)",
+      "Bash(/mnt/c/Windows/System32/cmd.exe *)",
+      "Bash(grep -A2 \"push        ebp$\")",
+      "Bash(grep -B1 \"sub         esp,34h$\")",
+      "Bash(grep -n -A9 \"^  0056B1F0: push        ebp$\")",
+      "Bash(mkdir -p .claude/skills/bbcf-re-workflow .codex/skills/bbcf-re-workflow)",
+      "Bash(cp .agents/skills/bbcf-re-workflow/SKILL.md .claude/skills/bbcf-re-workflow/SKILL.md)"
     ]
   }
 }

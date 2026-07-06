@@ -1,0 +1,18 @@
+Address: 0056b1f0
+Bytes (40): 55 8B EC 83 EC 34 A1 B8 E0 A0 00 33 C5 89 45 FC 53 56 57 8B F9 E8 36 13 FF FF 8B D8 E8 3F 77 FE FF 89 45 D4 E8 87 AD FF
+
+0056b1f0: PUSH EBP                       bytes=55 len=1
+0056b1f1: MOV EBP,ESP                    bytes=8B EC len=2
+0056b1f3: SUB ESP,0x34                   bytes=83 EC 34 len=3
+0056b1f6: MOV EAX,[0x00a0e0b8]           bytes=A1 B8 E0 A0 00 len=5
+0056b1fb: XOR EAX,EBP                    bytes=33 C5 len=2
+0056b1fd: MOV dword ptr [EBP + -0x4],EAX bytes=89 45 FC len=3
+0056b200: PUSH EBX                       bytes=53 len=1
+0056b201: PUSH ESI                       bytes=56 len=1
+0056b202: PUSH EDI                       bytes=57 len=1
+0056b203: MOV EDI,ECX                    bytes=8B F9 len=2
+0056b205: CALL 0x0055c540                bytes=E8 36 13 FF FF len=5
+0056b20a: MOV EBX,EAX                    bytes=8B D8 len=2
+0056b20c: CALL 0x00552950                bytes=E8 3F 77 FE FF len=5
+0056b211: MOV dword ptr [EBP + -0x2c],EAX bytes=89 45 D4 len=3
+0056b214: CALL 0x00565fa0                bytes=E8 87 AD FF FF len=5

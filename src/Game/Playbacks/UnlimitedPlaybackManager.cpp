@@ -518,6 +518,29 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
     m_initialized = true;
 }
 
+// Runs from a hook on FUN_0056B1F0 (the game's per-logic-tick Update, confirmed via Ghidra
+// decompile - see docs/Research/PlaybackTimingAddendumReport.txt), which calls the per-player
+// input consumer (including the native playback-slot reader) before it ever reaches the
+// GetFrameCounter hook that Tick() runs from. Firing StartRuntimePlayback() from Tick() means the
+// consumer for the current tick has already read the pre-playback state, so the recording's first
+// frame is silently skipped and everything starts one real tick late. Running the same write here
+// instead lands before that tick's read, matching how the native training menu's own "start
+// playback" (also just a write to the same fields, from the menu-input code path) behaves.
+// Only "Play Now" is moved here: it's a simple, already-decided user-intent flag with no
+// real-time game-state dependency, so checking it one tick earlier carries no risk. The
+// trigger-based auto-play paths (wakeup/gap/on-hit/loop/etc.) are NOT moved here because their
+// condition checks in Tick() do depend on real-time state that may not be updated yet at this
+// earlier point in the frame; they keep their existing (correct, already-tested) detection timing
+// and so still have the same one-tick-late start as before - a known follow-up, not fixed by this.
+void UnlimitedPlaybackManager::RunPreTick() {
+    static bool loggedAlive = false;
+    if (!loggedAlive) {
+        LOG(7, "[UP][diag] RunPreTick hook is alive (first call).\n");
+        loggedAlive = true;
+    }
+    ExecutePendingPlayNow();
+}
+
 void UnlimitedPlaybackManager::Tick() {
     InitializeIfNeeded();
     PruneExpiredToasts();
@@ -548,7 +571,10 @@ void UnlimitedPlaybackManager::Tick() {
         ClearLoopCustomSnapshot();
     } else {
         TryRestoreRuntimeSlotAfterPlayback();
-        ExecutePendingPlayNow();
+        // NOTE: the "Play Now" pending request is now executed from RunPreTick() (hooked earlier
+        // in the frame, before the game's active-slot playback input read), not here - see
+        // RunPreTick() for why.
+        LogSlot4PlaybackDiagnostics();
     }
 
     if (!inTrainingMatch || !m_triggerRuntimeEnabled || m_profileRuntimeSuppressedUntilReset) {
@@ -1312,6 +1338,7 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
     // the native playback engine, which is enough to break tightly-timed inputs like microdashes.
     m_pendingPlayNowIndex = idx;
     m_pendingPlayNowRequested = true;
+    LOG(7, "[UP][diag] PlayEntryNow queued idx=%u\n", static_cast<unsigned int>(idx));
     return true;
 }
 
@@ -1319,16 +1346,21 @@ void UnlimitedPlaybackManager::ExecutePendingPlayNow() {
     if (!m_pendingPlayNowRequested) {
         return;
     }
+    LOG(7, "[UP][diag] ExecutePendingPlayNow: consuming pending request, idx=%u\n",
+        static_cast<unsigned int>(m_pendingPlayNowIndex));
     m_pendingPlayNowRequested = false;
 
     const size_t idx = m_pendingPlayNowIndex;
     if (idx >= m_entries.size()) {
+        LOG(7, "[UP][diag] ExecutePendingPlayNow: idx out of range (entries=%u)\n",
+            static_cast<unsigned int>(m_entries.size()));
         return;
     }
 
     const auto& entry = m_entries[idx];
     auto it = m_cache.find(entry.id);
     if (it == m_cache.end() || !it->second.loaded) {
+        LOG(7, "[UP][diag] ExecutePendingPlayNow: cache miss/not loaded for entry '%s'\n", entry.name.c_str());
         PushToast(L("Failed loading entry."));
         return;
     }
@@ -1353,6 +1385,84 @@ void UnlimitedPlaybackManager::ExecutePendingPlayNow() {
         facingToLoad,
         mirrored ? 1 : 0);
     PushToast(FormatLocalized("Played: %s%s", entry.name.c_str(), mirrored ? L(" (mirrored)").c_str() : ""));
+}
+
+// DEV-ONLY DIAGNOSTIC (compiled out entirely unless DEBUG_LOG_LEVEL is bumped to 7 in logger.h):
+// traces raw slot-4 playback stepping (native playback_position + the two bytes it's currently
+// reading, plus both players' action/blockstun/hitstun) regardless of whether playback was
+// started via "Play Now" or via native menu playback into CF slot 4 - lets us diff both against
+// each other frame-by-frame. Useful again any time Unlimited Playback timing is suspected to have
+// drifted from native training-menu playback; kept rather than deleted for that reason.
+void UnlimitedPlaybackManager::LogSlot4PlaybackDiagnostics() {
+#if DEBUG_LOG_LEVEL >= 7
+    if (!m_runtimePlaybackManager.playback_control_p || !m_runtimePlaybackManager.active_slot_p ||
+        !m_runtimePlaybackManager.bbcf_base_adress) {
+        return;
+    }
+
+    short control = 0;
+    std::memcpy(&control, m_runtimePlaybackManager.playback_control_p, sizeof(short));
+    int activeSlot = -1;
+    std::memcpy(&activeSlot, m_runtimePlaybackManager.active_slot_p, sizeof(int));
+
+    const bool slot4Active = (control == 3) && (activeSlot == 3); // active_slot is 0-indexed
+    if (!slot4Active) {
+        if (m_diagSlot4WasActive) {
+            LOG(7, "[UP][diag] slot4 playback ended. lastPos=%d\n", m_diagSlot4LastLoggedPosition);
+        }
+        m_diagSlot4WasActive = false;
+        m_diagSlot4LastLoggedPosition = -2;
+        return;
+    }
+
+    const int position = *reinterpret_cast<int*>(m_runtimePlaybackManager.bbcf_base_adress + 0x13AD940);
+
+    if (!m_diagSlot4WasActive) {
+        LOG(7, "[UP][diag] slot4 playback started. viaRuntimeTrigger=%d\n",
+            m_runtimeSlotRestorePending ? 1 : 0);
+        m_diagSlot4WasActive = true;
+    }
+
+    {
+        // Log every tick unconditionally (no dedup on position change) - a dedup gate here
+        // previously hid whether a position was ever actually observed vs. skipped when it
+        // advanced more than once between two samples, which matters for pinning down exactly
+        // when each tick's real observation happens relative to position advancement.
+        char inputByte = 0;
+        char auxByte = 0;
+        if (m_runtimePlaybackManager.slots.size() >= 4 &&
+            m_runtimePlaybackManager.slots[3].start_of_slot_inputs_p && position >= 0) {
+            inputByte = *(m_runtimePlaybackManager.slots[3].start_of_slot_inputs_p + position * 2);
+            auxByte = *(m_runtimePlaybackManager.slots[3].start_of_slot_inputs_p + position * 2 + 1);
+        }
+        const int frame = g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : -1;
+
+        const char* p1Action = "";
+        int p1ActionTime = -1, p1Blockstun = -1, p1Hitstun = -1;
+        const char* p2Action = "";
+        int p2ActionTime = -1, p2Blockstun = -1, p2Hitstun = -1;
+        if (!g_interfaces.player1.IsCharDataNullPtr()) {
+            const auto* p1 = g_interfaces.player1.GetData();
+            p1Action = p1->currentAction;
+            p1ActionTime = p1->actionTime;
+            p1Blockstun = p1->blockstun;
+            p1Hitstun = p1->hitstun;
+        }
+        if (!g_interfaces.player2.IsCharDataNullPtr()) {
+            const auto* p2 = g_interfaces.player2.GetData();
+            p2Action = p2->currentAction;
+            p2ActionTime = p2->actionTime;
+            p2Blockstun = p2->blockstun;
+            p2Hitstun = p2->hitstun;
+        }
+
+        LOG(7, "[UP][diag] frame=%d pbPos=%d input=0x%02X aux=0x%02X | p1=%s t=%d bs=%d hs=%d | p2=%s t=%d bs=%d hs=%d\n",
+            frame, position, static_cast<unsigned char>(inputByte), static_cast<unsigned char>(auxByte),
+            p1Action, p1ActionTime, p1Blockstun, p1Hitstun,
+            p2Action, p2ActionTime, p2Blockstun, p2Hitstun);
+        m_diagSlot4LastLoggedPosition = position;
+    }
+#endif
 }
 
 void UnlimitedPlaybackManager::ClearAll() {
@@ -2553,8 +2663,20 @@ void UnlimitedPlaybackManager::StartRuntimePlayback(const std::vector<char>& fra
     m_runtimePlaybackManager.load_raw_into_slot(frames, facingToLoad, m_runtimeSlotNumber);
     m_runtimePlaybackManager.set_active_slot(m_runtimeSlotNumber);
     m_runtimePlaybackManager.set_playback_type(0);
-    m_runtimePlaybackManager.set_playback_position(0);
+    // Position must be written AFTER the control transition to 3 (set_playback_control() calls
+    // the native training-state setter, which appears to touch the playback cursor as part of
+    // entering state 3).
+    //
+    // Writing -1, not 0: measured via live logging (see docs/Research - UnlimitedPlaybackManager
+    // diagnostics) that starting at position 0 makes the native per-tick consumer read frame 1 as
+    // its first applied input, not frame 0 - a consistent, constant one-index offset for the
+    // entire playback (not a one-time startup delay; a real recorded frame is silently never
+    // applied). This is consistent with the consumer using pre-increment semantics (increment the
+    // cursor, THEN read at the new value) - so it needs to start one below the first real index.
+    // Native training-menu-triggered playback does not exhibit this, implying its own reset state
+    // already sits at -1 before the consumer's first increment.
     m_runtimePlaybackManager.set_playback_control(3);
+    m_runtimePlaybackManager.set_playback_position(-1);
 
     int afterControl = -1;
     int afterActiveSlot = -1;

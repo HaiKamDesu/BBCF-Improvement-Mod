@@ -75,6 +75,11 @@ public:
 
     void InitializeIfNeeded();
     void Tick();
+    // Called from a hook point that runs BEFORE the game reads this tick's active-slot playback
+    // input (earlier in the frame than Tick()/GetFrameCounter). Only handles the parts of
+    // starting playback that have no real-time game-state dependency (i.e. "Play Now"), so that
+    // the recorded input takes effect on the same tick as the request rather than one tick late.
+    void RunPreTick();
     void OnMatchInit();
     void ForceResetTriggers(const char* toastText = nullptr);
     void OnMatchEnd();
@@ -195,6 +200,7 @@ private:
     void ResetRuntimePlaybackState(bool discardBackupOnly);
     void StartRuntimePlayback(const std::vector<char>& frames, int facingToLoad);
     void ExecutePendingPlayNow();
+    void LogSlot4PlaybackDiagnostics();
     bool EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot = false);
     bool RestoreLoopCustomSnapshot(bool showToast);
     bool ApplyLoopRestart();
@@ -236,6 +242,8 @@ private:
     bool m_runtimeSlotRestorePending = false;
     bool m_pendingPlayNowRequested = false;
     size_t m_pendingPlayNowIndex = 0;
+    bool m_diagSlot4WasActive = false;
+    int m_diagSlot4LastLoggedPosition = -2;
     bool m_runtimeSlotBackupFacingLeft = false;
     std::vector<char> m_runtimeSlotBackupFrames;
     int m_runtimeSlotNumber = 1;

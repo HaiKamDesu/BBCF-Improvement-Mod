@@ -8938,6 +8938,32 @@ void __declspec(naked)GetFrameCounter()
 	}
 }
 
+// Hooks the entry of the game's per-logic-tick Update (Ghidra FUN_0056B1F0, confirmed via
+// docs/Research/PlaybackTimingAddendumReport.txt). This runs strictly earlier in the frame than
+// GetFrameCounter above - specifically before the per-player input consumer (which reads the
+// active training-playback slot) - see UnlimitedPlaybackManager::RunPreTick() for why that
+// ordering matters. Only the first 6 bytes of the function's prologue are overwritten
+// (push ebp; mov ebp,esp; sub esp,0x34 - three complete instructions, no mid-instruction split),
+// which are reconstructed below before jumping back.
+DWORD UnlimitedPlaybackPreTickJmpBackAddr = 0;
+void __declspec(naked) UnlimitedPlaybackPreTickHook()
+{
+	LOG_ASM(7, "UnlimitedPlaybackPreTickHook\n");
+
+	__asm pushad
+	UnlimitedPlaybackManager::Instance().RunPreTick();
+	__asm popad
+
+	_asm
+	{
+		// original code
+		push ebp
+		mov ebp, esp
+		sub esp, 34h
+		jmp[UnlimitedPlaybackPreTickJmpBackAddr]
+	}
+}
+
 DWORD GetRoomOneJmpBackAddr = 0;
 void __declspec(naked)GetRoomOne()
 {
@@ -9198,6 +9224,18 @@ bool placeHooks_bbcf()
 
 	GetFrameCounterJmpBackAddr = HookManager::SetHook("GetFrameCounter", "\x8b\x06\xff\x46\x0c",
 		"xxxxx", 5, GetFrameCounter);
+
+	// Entry of the game's per-logic-tick Update (Ghidra FUN_0056B1F0). Pattern covers 11 whole
+	// instructions (26 bytes, verified unique in the full binary) for reliable matching, but only
+	// the first 6 bytes (3 instructions: push ebp; mov ebp,esp; sub esp,0x34) are overwritten -
+	// see UnlimitedPlaybackPreTickHook above. The "mov eax,[__security_cookie]" instruction's
+	// 4-byte absolute address operand is wildcarded ('?'): it's rebased at load time (this game
+	// has ASLR), so hardcoding Ghidra's static-image-base bytes here made the signature scan fail
+	// at runtime (0 matches) even though it matched Ghidra's own byte dump exactly. Only the CALL's
+	// rel32 displacement is safe to keep fixed - relative displacements are base-independent.
+	UnlimitedPlaybackPreTickJmpBackAddr = HookManager::SetHook("UnlimitedPlaybackPreTick",
+		"\x55\x8b\xec\x83\xec\x34\xa1\xb8\xe0\xa0\x00\x33\xc5\x89\x45\xfc\x53\x56\x57\x8b\xf9\xe8\x36\x13\xff\xff",
+		"xxxxxxx????xxxxxxxxxxxxxxx", 6, UnlimitedPlaybackPreTickHook);
 
 	GetRoomOneJmpBackAddr = HookManager::SetHook("GetRoomOne", "\x0f\xb7\x06\x50\x8b\xcb",
 		"xxxxxx", 6, GetRoomOne);
