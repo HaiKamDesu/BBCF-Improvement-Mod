@@ -119,6 +119,17 @@ Keep in mind that the mod may partially, or completely stop working whenever a n
 Changelog
 
 ===============================
+30-06-2026 -- version 3.111
+===============================
+Bugfixes:
+- Fixed a crash occurring in Ranked mode related to palette handling (+@GrimFlash)
+- Fixed a crash occurring when exiting the Replay Theater after changing a replay's favorite status
+- Fixed replay list to use the /download endpoint with a smaller page size (+@Tadatys)
+
+Changes:
+- The UploadReplayDatabase server address in settings.ini will now be automatically updated to the new server address(http://89.167.76.6) if it was previously set to the old one(http://50.118.225.175). Custom server addresses are left untouched.
+
+===============================
 26-11-2025 -- version 3.110
 ===============================
 Features:
