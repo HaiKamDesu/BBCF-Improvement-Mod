@@ -608,6 +608,7 @@ Reset the current library and clear all loaded entries?,Reset the current librar
 Reset,Reset,Restablecer
 Delete Entry?,Delete Entry?,¿Eliminar entrada?
 Delete this playback entry from the library?,Delete this playback entry from the library?,¿Eliminar esta entrada de playback de la biblioteca?
+Delete these %d playback entries from the library?,Delete these %d playback entries from the library?,¿Eliminar estas %d entradas de playback de la biblioteca?
 Capture Slot,Capture Slot,Ranura de captura
 Edit Library Entry,Edit Library Entry,Editar entrada de biblioteca
 Weight,Weight,Peso
@@ -657,6 +658,7 @@ Replay recording cancelled (too short).,Replay recording cancelled (too short).,
 Replay recording cancelled (failed reading replay frames).,Replay recording cancelled (failed reading replay frames).,Grabación cancelada (falló la lectura de frames).
 Replay recording saved to library.,Replay recording saved to library.,Grabación de replay guardada en la biblioteca.
 Entry removed.,Entry removed.,Entrada eliminada.
+%d entries removed.,%d entries removed.,%d entradas eliminadas.
 Entry renamed.,Entry renamed.,Entrada renombrada.
 Sending to a CF slot works only during a training match.,Sending to a CF slot works only during a training match.,Enviar a una ranura CF solo funciona en Training.
 Failed loading entry.,Failed loading entry.,Error al cargar la entrada.
@@ -688,9 +690,11 @@ Triggered [%s]: %s%s,Triggered [%s]: %s%s,Activado [%s]: %s%s
 Slot %d,Slot %d,Ranura %d
 Replay %s,Replay %s,Replay %s
 Slot moved.,Slot moved.,Ranura movida.
+Slots moved.,Slots moved.,Ranuras movidas.
 All slots enabled.,All slots enabled.,Todas las ranuras activadas.
 All slots disabled.,All slots disabled.,Todas las ranuras desactivadas.
 Dragged slot: %s,Dragged slot: %s,Ranura arrastrada: %s
+Dragged %d slots,Dragged %d slots,%d ranuras arrastradas
 Current Slot - %s,Current Slot - %s,Ranura actual - %s
 Slot list,Slot list,Lista de ranuras
 Move up,Move up,Subir

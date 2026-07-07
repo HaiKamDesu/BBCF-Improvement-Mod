@@ -22,6 +22,7 @@
 #include <string>
 #include <thread>
 #include <algorithm>
+#include <set>
 #include <vector>
 
 namespace {
@@ -490,6 +491,31 @@ int AdjustSelectedEntryAfterMove(int selectedEntry, int fromIndex, int toIndex) 
     return selectedEntry;
 }
 
+// Click-selection helper shared by the library slot list. `ctrlHeld` toggles the clicked
+// slot in/out of the selection; `shiftHeld` selects the contiguous range from `anchor` to
+// `clickedIndex` (replacing the current selection), matching common file-explorer behavior.
+void ApplySlotSelectionClick(std::set<int>& selection, int& anchor, int clickedIndex, bool ctrlHeld, bool shiftHeld) {
+    if (ctrlHeld) {
+        if (selection.count(clickedIndex)) {
+            selection.erase(clickedIndex);
+        } else {
+            selection.insert(clickedIndex);
+        }
+        anchor = clickedIndex;
+    } else if (shiftHeld && anchor >= 0) {
+        selection.clear();
+        const int lo = (std::min)(anchor, clickedIndex);
+        const int hi = (std::max)(anchor, clickedIndex);
+        for (int k = lo; k <= hi; ++k) {
+            selection.insert(k);
+        }
+    } else {
+        selection.clear();
+        selection.insert(clickedIndex);
+        anchor = clickedIndex;
+    }
+}
+
 int ComputeMoveTargetFromInsertionIndex(int fromIndex, int insertionIndex, int entryCount) {
     if (fromIndex < 0 || fromIndex >= entryCount || insertionIndex < 0 || insertionIndex > entryCount) {
         return fromIndex;
@@ -537,8 +563,9 @@ void UnlimitedPlaybackWindow::Draw() {
         return true;
     };
 
-    static int selectedEntry = -1;
-    static int entryPendingDelete = -1;
+    static std::set<int> selectedEntries;
+    static int selectionAnchor = -1;
+    static std::vector<int> entriesPendingDelete;
     static int entryPendingEdit = -1;
     static int entryPendingSend = -1;
     static int entryPendingSetIndex = -1;
@@ -768,8 +795,8 @@ void UnlimitedPlaybackWindow::Draw() {
         ImGui::GetStyle().ItemSpacing.y;
     ImGui::BeginChild("up_library_entries", ImVec2(0, -libraryControlsHeight), true);
     const auto& entries = mgr.GetEntries();
-    int entryMoveFrom = -1;
-    int entryMoveTo = -1;
+    std::vector<int> entryMoveFromList;
+    int entryMoveInsertion = -1;
     for (int i = 0; i < static_cast<int>(entries.size()); ++i) {
         const auto& e = entries[i];
         ImGui::PushID(i);
@@ -778,18 +805,41 @@ void UnlimitedPlaybackWindow::Draw() {
         const float controlsWidth = (iconButtonWidth * 3.0f) + (rowSpacing * 2.0f);
         bool enabled = e.enabled;
         if (ImGui::Checkbox("##enabled", &enabled)) {
-            mgr.GetEntriesMutable()[i].enabled = enabled;
+            if (selectedEntries.size() > 1 && selectedEntries.count(i)) {
+                std::vector<size_t> indices(selectedEntries.begin(), selectedEntries.end());
+                mgr.SetEntriesEnabled(indices, enabled);
+            } else {
+                mgr.GetEntriesMutable()[i].enabled = enabled;
+            }
         }
         ImGui::SameLine();
         const float labelWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x - controlsWidth - 8.0f);
-        if (ImGui::Selectable(e.name.c_str(), selectedEntry == i, 0, ImVec2(labelWidth, 0.0f))) {
-            selectedEntry = i;
+        if (ImGui::Selectable(e.name.c_str(), selectedEntries.count(i) != 0, 0, ImVec2(labelWidth, 0.0f))) {
+            const bool ctrlHeld = ImGui::GetIO().KeyCtrl;
+            const bool shiftHeld = ImGui::GetIO().KeyShift;
+            ApplySlotSelectionClick(selectedEntries, selectionAnchor, i, ctrlHeld, shiftHeld);
         }
         const ImVec2 slotMin = ImGui::GetItemRectMin();
         const ImVec2 slotMax = ImGui::GetItemRectMax();
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-            ImGui::SetDragDropPayload(kUnlimitedPlaybackDragDropPayload, &i, sizeof(i));
-            ImGui::Text("%s", FormatText(L("Dragged slot: %s").c_str(), e.name.c_str()).c_str());
+            std::vector<int> dragIndices;
+            if (selectedEntries.size() > 1 && selectedEntries.count(i)) {
+                dragIndices.assign(selectedEntries.begin(), selectedEntries.end());
+            } else {
+                dragIndices.assign({ i });
+                selectedEntries.clear();
+                selectedEntries.insert(i);
+                selectionAnchor = i;
+            }
+            ImGui::SetDragDropPayload(
+                kUnlimitedPlaybackDragDropPayload,
+                dragIndices.data(),
+                dragIndices.size() * sizeof(int));
+            if (dragIndices.size() > 1) {
+                ImGui::Text("%s", FormatText(L("Dragged %d slots").c_str(), static_cast<int>(dragIndices.size())).c_str());
+            } else {
+                ImGui::Text("%s", FormatText(L("Dragged slot: %s").c_str(), e.name.c_str()).c_str());
+            }
             ImGui::EndDragDropSource();
         }
         if (ImGui::BeginDragDropTarget()) {
@@ -797,25 +847,29 @@ void UnlimitedPlaybackWindow::Draw() {
                 ImGuiDragDropFlags_AcceptBeforeDelivery |
                 ImGuiDragDropFlags_AcceptNoDrawDefaultRect;
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kUnlimitedPlaybackDragDropPayload, flags)) {
-                if (payload->DataSize == sizeof(int)) {
-                    const int from = *static_cast<const int*>(payload->Data);
+                if (payload->DataSize > 0 && payload->DataSize % sizeof(int) == 0) {
+                    const int* fromData = static_cast<const int*>(payload->Data);
+                    const int fromCount = payload->DataSize / static_cast<int>(sizeof(int));
                     const int entryCount = static_cast<int>(entries.size());
-                    if (from >= 0 && from < entryCount) {
+                    bool allValid = fromCount > 0;
+                    for (int k = 0; k < fromCount && allValid; ++k) {
+                        if (fromData[k] < 0 || fromData[k] >= entryCount) {
+                            allValid = false;
+                        }
+                    }
+                    if (allValid) {
                         const float midpointY = (slotMin.y + slotMax.y) * 0.5f;
                         const bool insertAfterHovered = ImGui::GetIO().MousePos.y >= midpointY;
                         const int insertionIndex = i + (insertAfterHovered ? 1 : 0);
-                        const int to = ComputeMoveTargetFromInsertionIndex(from, insertionIndex, entryCount);
-                        if (to != from) {
-                            const float y = insertAfterHovered ? slotMax.y : slotMin.y;
-                            ImGui::GetWindowDrawList()->AddLine(
-                                ImVec2(slotMin.x, y),
-                                ImVec2(slotMax.x, y),
-                                IM_COL32(120, 200, 255, 220),
-                                1.5f);
-                            if (payload->IsDelivery()) {
-                                entryMoveFrom = from;
-                                entryMoveTo = to;
-                            }
+                        const float y = insertAfterHovered ? slotMax.y : slotMin.y;
+                        ImGui::GetWindowDrawList()->AddLine(
+                            ImVec2(slotMin.x, y),
+                            ImVec2(slotMax.x, y),
+                            IM_COL32(120, 200, 255, 220),
+                            1.5f);
+                        if (payload->IsDelivery()) {
+                            entryMoveFromList.assign(fromData, fromData + fromCount);
+                            entryMoveInsertion = insertionIndex;
                         }
                     }
                 }
@@ -837,15 +891,24 @@ void UnlimitedPlaybackWindow::Draw() {
                     L("Export playback entry file dialog open...").c_str(),
                     i);
             }
-            const bool canMoveUp = entries.size() > 1 && i > 0;
-            const bool canMoveDown = entries.size() > 1 && i < static_cast<int>(entries.size()) - 1;
+            std::vector<int> moveGroup;
+            if (selectedEntries.size() > 1 && selectedEntries.count(i)) {
+                moveGroup.assign(selectedEntries.begin(), selectedEntries.end());
+            } else {
+                moveGroup.assign({ i });
+            }
+            std::sort(moveGroup.begin(), moveGroup.end());
+            const int moveGroupMin = moveGroup.front();
+            const int moveGroupMax = moveGroup.back();
+            const bool canMoveUp = entries.size() > 1 && moveGroupMin > 0;
+            const bool canMoveDown = entries.size() > 1 && moveGroupMax < static_cast<int>(entries.size()) - 1;
             if (ImGui::MenuItem(L("Move up").c_str(), nullptr, false, canMoveUp)) {
-                entryMoveFrom = i;
-                entryMoveTo = i - 1;
+                entryMoveFromList = moveGroup;
+                entryMoveInsertion = moveGroupMin - 1;
             }
             if (ImGui::MenuItem(L("Move down").c_str(), nullptr, false, canMoveDown)) {
-                entryMoveFrom = i;
-                entryMoveTo = i + 1;
+                entryMoveFromList = moveGroup;
+                entryMoveInsertion = moveGroupMax + 2;
             }
             if (ImGui::MenuItem(L("Set index...").c_str(), nullptr, false, entries.size() > 1)) {
                 entryPendingSetIndex = i;
@@ -879,18 +942,26 @@ void UnlimitedPlaybackWindow::Draw() {
         DrawButtonTooltip(L("Edit").c_str());
         ImGui::SameLine();
         if (DrawMiniIconButton("X", true)) {
-            entryPendingDelete = i;
+            if (selectedEntries.size() > 1 && selectedEntries.count(i)) {
+                entriesPendingDelete.assign(selectedEntries.begin(), selectedEntries.end());
+            } else {
+                entriesPendingDelete.assign({ i });
+            }
             openDeleteEntryConfirmModal = true;
         }
         DrawButtonTooltip(L("Delete").c_str());
         ImGui::PopID();
     }
-    if (entryMoveFrom >= 0 && entryMoveTo >= 0 &&
-        entryMoveFrom < static_cast<int>(mgr.GetEntries().size()) &&
-        entryMoveTo < static_cast<int>(mgr.GetEntries().size())) {
-        const int oldSelectedEntry = selectedEntry;
-        if (mgr.MoveEntry(static_cast<size_t>(entryMoveFrom), static_cast<size_t>(entryMoveTo))) {
-            selectedEntry = AdjustSelectedEntryAfterMove(oldSelectedEntry, entryMoveFrom, entryMoveTo);
+    if (!entryMoveFromList.empty() && entryMoveInsertion >= 0) {
+        std::vector<size_t> fromIndices(entryMoveFromList.begin(), entryMoveFromList.end());
+        std::sort(fromIndices.begin(), fromIndices.end());
+        size_t insertedAt = 0;
+        if (mgr.MoveEntries(fromIndices, static_cast<size_t>(entryMoveInsertion), &insertedAt)) {
+            selectedEntries.clear();
+            for (size_t k = 0; k < fromIndices.size(); ++k) {
+                selectedEntries.insert(static_cast<int>(insertedAt + k));
+            }
+            selectionAnchor = static_cast<int>(insertedAt);
         }
     }
     ImGui::EndChild();
@@ -1211,7 +1282,8 @@ void UnlimitedPlaybackWindow::Draw() {
         CenterNextButtonsRow(170.0f + ImGui::GetStyle().ItemSpacing.x);
         if (ImGui::Button(L("Reset").c_str())) {
             mgr.ClearAll();
-            selectedEntry = -1;
+            selectedEntries.clear();
+            selectionAnchor = -1;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -1220,7 +1292,7 @@ void UnlimitedPlaybackWindow::Draw() {
         }
         ImGui::EndPopup();
     }
-    if (openDeleteEntryConfirmModal && entryPendingDelete >= 0 && entryPendingDelete < static_cast<int>(mgr.GetEntries().size())) {
+    if (openDeleteEntryConfirmModal && !entriesPendingDelete.empty()) {
         const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
         ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(500.0f, 0.0f), ImGuiCond_Appearing);
@@ -1228,23 +1300,48 @@ void UnlimitedPlaybackWindow::Draw() {
         openDeleteEntryConfirmModal = false;
     }
     if (ImGui::BeginPopupModal(L("Delete Entry?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        DrawCenteredPopupText(L("Delete this playback entry from the library?").c_str());
+        if (entriesPendingDelete.size() > 1) {
+            DrawCenteredPopupText(FormatText(
+                L("Delete these %d playback entries from the library?").c_str(),
+                static_cast<int>(entriesPendingDelete.size())).c_str());
+        } else {
+            DrawCenteredPopupText(L("Delete this playback entry from the library?").c_str());
+        }
         CenterNextButtonsRow(190.0f + ImGui::GetStyle().ItemSpacing.x);
         if (ImGui::Button(FormatText("%s##confirm_entry", L("Delete").c_str()).c_str())) {
-            if (entryPendingDelete >= 0 && entryPendingDelete < static_cast<int>(mgr.GetEntries().size())) {
-                mgr.RemoveEntryByIndex(static_cast<size_t>(entryPendingDelete));
-                if (selectedEntry == entryPendingDelete) {
-                    selectedEntry = -1;
-                } else if (selectedEntry > entryPendingDelete) {
-                    --selectedEntry;
+            std::vector<size_t> indicesToDelete(entriesPendingDelete.begin(), entriesPendingDelete.end());
+            mgr.RemoveEntriesByIndices(indicesToDelete);
+            std::sort(entriesPendingDelete.begin(), entriesPendingDelete.end());
+            const auto shiftAfterDeletes = [](int idx) {
+                int shifted = idx;
+                for (int deletedIdx : entriesPendingDelete) {
+                    if (deletedIdx < idx) {
+                        --shifted;
+                    }
+                }
+                return shifted;
+            };
+            std::set<int> adjustedSelection;
+            for (int idx : selectedEntries) {
+                if (std::find(entriesPendingDelete.begin(), entriesPendingDelete.end(), idx) != entriesPendingDelete.end()) {
+                    continue;
+                }
+                adjustedSelection.insert(shiftAfterDeletes(idx));
+            }
+            selectedEntries = adjustedSelection;
+            if (selectionAnchor >= 0) {
+                if (std::find(entriesPendingDelete.begin(), entriesPendingDelete.end(), selectionAnchor) != entriesPendingDelete.end()) {
+                    selectionAnchor = -1;
+                } else {
+                    selectionAnchor = shiftAfterDeletes(selectionAnchor);
                 }
             }
-            entryPendingDelete = -1;
+            entriesPendingDelete.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button(FormatText("%s##confirm_entry", L("Cancel").c_str()).c_str())) {
-            entryPendingDelete = -1;
+            entriesPendingDelete.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -1277,9 +1374,15 @@ void UnlimitedPlaybackWindow::Draw() {
             if (ImGui::Button(FormatText("%s##set_index", L("Move").c_str()).c_str())) {
                 const int from = entryPendingSetIndex;
                 const int to = entrySetIndexValue - 1;
-                const int oldSelectedEntry = selectedEntry;
                 if (mgr.MoveEntry(static_cast<size_t>(from), static_cast<size_t>(to))) {
-                    selectedEntry = AdjustSelectedEntryAfterMove(oldSelectedEntry, from, to);
+                    std::set<int> adjustedSelection;
+                    for (int idx : selectedEntries) {
+                        adjustedSelection.insert(AdjustSelectedEntryAfterMove(idx, from, to));
+                    }
+                    selectedEntries = adjustedSelection;
+                    if (selectionAnchor >= 0) {
+                        selectionAnchor = AdjustSelectedEntryAfterMove(selectionAnchor, from, to);
+                    }
                 }
                 entryPendingSetIndex = -1;
                 ImGui::CloseCurrentPopup();

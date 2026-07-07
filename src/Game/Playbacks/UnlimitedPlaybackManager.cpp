@@ -1093,6 +1093,32 @@ bool UnlimitedPlaybackManager::RemoveEntryByIndex(size_t idx) {
     return true;
 }
 
+int UnlimitedPlaybackManager::RemoveEntriesByIndices(const std::vector<size_t>& indices) {
+    InitializeIfNeeded();
+
+    std::vector<size_t> sortedIndices(indices.begin(), indices.end());
+    std::sort(sortedIndices.begin(), sortedIndices.end());
+
+    int removedCount = 0;
+    for (auto it = sortedIndices.rbegin(); it != sortedIndices.rend(); ++it) {
+        const size_t idx = *it;
+        if (idx >= m_entries.size()) {
+            continue;
+        }
+        m_cache.erase(m_entries[idx].id);
+        m_entries.erase(m_entries.begin() + static_cast<std::ptrdiff_t>(idx));
+        ++removedCount;
+    }
+    if (removedCount > 0) {
+        for (int i = 0; i < Trigger_Count; ++i) {
+            m_sequentialIndex[i] = 0;
+            m_nonRepeatPools[i].clear();
+        }
+        PushToast(removedCount == 1 ? L("Entry removed.") : FormatText(L("%d entries removed.").c_str(), removedCount));
+    }
+    return removedCount;
+}
+
 bool UnlimitedPlaybackManager::MoveEntry(size_t fromIdx, size_t toIdx) {
     InitializeIfNeeded();
 
@@ -1109,6 +1135,78 @@ bool UnlimitedPlaybackManager::MoveEntry(size_t fromIdx, size_t toIdx) {
     }
     PushToast(L("Slot moved."));
     return true;
+}
+
+bool UnlimitedPlaybackManager::MoveEntries(const std::vector<size_t>& fromIndicesSorted, size_t insertionIndex, size_t* outInsertedAt) {
+    InitializeIfNeeded();
+
+    if (fromIndicesSorted.empty() || insertionIndex > m_entries.size()) {
+        return false;
+    }
+    for (size_t idx : fromIndicesSorted) {
+        if (idx >= m_entries.size()) {
+            return false;
+        }
+    }
+
+    std::vector<bool> isMoved(m_entries.size(), false);
+    for (size_t idx : fromIndicesSorted) {
+        isMoved[idx] = true;
+    }
+
+    size_t removedBeforeInsertion = 0;
+    for (size_t idx : fromIndicesSorted) {
+        if (idx < insertionIndex) {
+            ++removedBeforeInsertion;
+        }
+    }
+
+    std::vector<PlaybackEntry> moved;
+    moved.reserve(fromIndicesSorted.size());
+    std::vector<PlaybackEntry> remaining;
+    remaining.reserve(m_entries.size() - fromIndicesSorted.size());
+    for (size_t i = 0; i < m_entries.size(); ++i) {
+        if (isMoved[i]) {
+            moved.push_back(std::move(m_entries[i]));
+        } else {
+            remaining.push_back(std::move(m_entries[i]));
+        }
+    }
+
+    size_t insertAt = insertionIndex - removedBeforeInsertion;
+    if (insertAt > remaining.size()) {
+        insertAt = remaining.size();
+    }
+
+    remaining.insert(
+        remaining.begin() + static_cast<std::ptrdiff_t>(insertAt),
+        std::make_move_iterator(moved.begin()),
+        std::make_move_iterator(moved.end()));
+    m_entries = std::move(remaining);
+
+    for (int i = 0; i < Trigger_Count; ++i) {
+        m_sequentialIndex[i] = 0;
+        m_nonRepeatPools[i].clear();
+    }
+    if (outInsertedAt) {
+        *outInsertedAt = insertAt;
+    }
+    PushToast(L("Slots moved."));
+    return true;
+}
+
+void UnlimitedPlaybackManager::SetEntriesEnabled(const std::vector<size_t>& indices, bool enabled) {
+    InitializeIfNeeded();
+
+    for (size_t idx : indices) {
+        if (idx < m_entries.size()) {
+            m_entries[idx].enabled = enabled;
+        }
+    }
+    for (int i = 0; i < Trigger_Count; ++i) {
+        m_sequentialIndex[i] = 0;
+        m_nonRepeatPools[i].clear();
+    }
 }
 
 void UnlimitedPlaybackManager::SetAllEntriesEnabled(bool enabled) {

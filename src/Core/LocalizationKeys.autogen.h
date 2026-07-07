@@ -1326,6 +1326,9 @@ struct LocalizationKeysAccessor
         // Delete this playback entry from the library?
         inline const char* Delete_this_playback_entry_from_the_library() const { return Get("Delete this playback entry from the library?"); }
 
+        // Delete these %d playback entries from the library?
+        inline const char* Delete_these_d_playback_entries_from_the_library() const { return Get("Delete these %d playback entries from the library?"); }
+
         // Capture Slot
         inline const char* Capture_Slot() const { return Get("Capture Slot"); }
 
@@ -1473,6 +1476,9 @@ struct LocalizationKeysAccessor
         // Entry removed.
         inline const char* Entry_removed() const { return Get("Entry removed."); }
 
+        // %d entries removed.
+        inline const char* d_entries_removed() const { return Get("%d entries removed."); }
+
         // Entry renamed.
         inline const char* Entry_renamed() const { return Get("Entry renamed."); }
 
@@ -1566,6 +1572,9 @@ struct LocalizationKeysAccessor
         // Slot moved.
         inline const char* Slot_moved() const { return Get("Slot moved."); }
 
+        // Slots moved.
+        inline const char* Slots_moved() const { return Get("Slots moved."); }
+
         // All slots enabled.
         inline const char* All_slots_enabled() const { return Get("All slots enabled."); }
 
@@ -1574,6 +1583,9 @@ struct LocalizationKeysAccessor
 
         // Dragged slot: %s
         inline const char* Dragged_slot_s() const { return Get("Dragged slot: %s"); }
+
+        // Dragged %d slots
+        inline const char* Dragged_d_slots() const { return Get("Dragged %d slots"); }
 
         // Current Slot - %s
         inline const char* Current_Slot_s() const { return Get("Current Slot - %s"); }

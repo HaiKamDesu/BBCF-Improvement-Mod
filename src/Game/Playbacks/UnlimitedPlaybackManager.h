@@ -124,8 +124,11 @@ public:
     bool IsReplayRecordingAsP1() const;
     int GetReplayRecordingStartFrame() const;
     bool RemoveEntryByIndex(size_t idx);
+    int RemoveEntriesByIndices(const std::vector<size_t>& indices);
     bool MoveEntry(size_t fromIdx, size_t toIdx);
+    bool MoveEntries(const std::vector<size_t>& fromIndicesSorted, size_t insertionIndex, size_t* outInsertedAt = nullptr);
     void SetAllEntriesEnabled(bool enabled);
+    void SetEntriesEnabled(const std::vector<size_t>& indices, bool enabled);
     bool RenameEntry(size_t idx, const std::string& newName);
 
     bool LoadEntryIntoSlot(size_t idx, int slot);

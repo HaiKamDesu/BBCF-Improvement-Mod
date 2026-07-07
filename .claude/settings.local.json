@@ -84,7 +84,8 @@
       "Bash(grep -B1 \"sub         esp,34h$\")",
       "Bash(grep -n -A9 \"^  0056B1F0: push        ebp$\")",
       "Bash(mkdir -p .claude/skills/bbcf-re-workflow .codex/skills/bbcf-re-workflow)",
-      "Bash(cp .agents/skills/bbcf-re-workflow/SKILL.md .claude/skills/bbcf-re-workflow/SKILL.md)"
+      "Bash(cp .agents/skills/bbcf-re-workflow/SKILL.md .claude/skills/bbcf-re-workflow/SKILL.md)",
+      "Bash(pwsh -NoProfile -File tools/generate_localization_bindings.ps1)"
     ]
   }
 }
