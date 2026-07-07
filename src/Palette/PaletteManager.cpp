@@ -132,6 +132,9 @@ void PaletteManager::ApplyDefaultCustomPalette(CharIndex charIndex, CharPaletteH
 	const int curPalIndex = charPalHandle.GetOrigPalIndex();
 	const char* curPalName = m_paletteSlots[charIndex][curPalIndex].c_str();
 
+	LOG(1, "ApplyDefaultCustomPalette char=%s slot=%d -> ini entry='%s'\n",
+		getCharacterNameByIndexA(charIndex).c_str(), curPalIndex, curPalName);
+
 	if (strncmp(curPalName, "", IMPL_PALNAME_LENGTH) == 0 ||
 		strncmp(curPalName, "Default", IMPL_PALNAME_LENGTH) == 0)
 		return;
@@ -674,10 +677,16 @@ void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 
 void PaletteManager::OnMatchInit(Player& playerOne, Player& playerTwo)
 {
+	LOG(1, "PaletteManager::OnMatchInit -- P1 --\n");
 	playerOne.GetPalHandle().OnMatchInit();
+
+	LOG(1, "PaletteManager::OnMatchInit -- P2 --\n");
 	playerTwo.GetPalHandle().OnMatchInit();
 
+	LOG(1, "PaletteManager::OnMatchInit applying default for P1\n");
 	ApplyDefaultCustomPalette((CharIndex)playerOne.GetData()->charIndex, playerOne.GetPalHandle());
+
+	LOG(1, "PaletteManager::OnMatchInit applying default for P2\n");
 	ApplyDefaultCustomPalette((CharIndex)playerTwo.GetData()->charIndex, playerTwo.GetPalHandle());
 }
 

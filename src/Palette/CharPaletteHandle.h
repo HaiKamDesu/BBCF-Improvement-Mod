@@ -32,6 +32,15 @@ class CharPaletteHandle
 	int m_selectedCustomPalIndex;
 	bool m_updateLocked;
 
+	// UpdatePalette() hot-swaps *m_pCurPalIndex between m_switchPalIndex1/2 to force a
+	// redraw, which permanently mutates the native slot value in game memory. These
+	// remember the last pair we toggled and which slot of it was the player's real
+	// choice, so OnMatchInit can tell "our own toggle artifact" apart from a genuine
+	// new native color pick.
+	int m_lastLogicalPalIndex = -1;
+	int m_lastTogglePairA = -1;
+	int m_lastTogglePairB = -1;
+
 public:
 	void SetPointerPalIndex(int* pPalIdx);
 	void SetPointerBasePal(char* pPalBaseAddr);
