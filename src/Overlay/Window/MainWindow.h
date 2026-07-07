@@ -4,6 +4,8 @@
 #include "Core/Settings.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 
+#include "imgui.h"
+
 #include <functional>
 #include <string>
 #include <utility>
@@ -42,6 +44,7 @@ private:
 	enum class SettingsSortOrder : int { Default = 0, Ascending, Descending };
 	SettingsSortOrder m_settingsSortOrder = SettingsSortOrder::Default;
 	bool m_needsRestart = false;
+	ImGuiTextFilter m_settingsFilter;
 	struct SettingRow {
 		std::string name;
 		std::function<bool()> draw;               // draws widget; returns true if changed this frame

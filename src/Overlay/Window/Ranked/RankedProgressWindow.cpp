@@ -223,6 +223,17 @@ namespace
 			state.visibleRank > 0u;
 	}
 
+	// Looser than IsRankedDisplayReadyForOverlay: accepts unranked/no-threshold
+	// characters so the main progress card still shows (as "Unranked") instead
+	// of not appearing at all. Used for the main card, not the win/loss prediction
+	// card, which genuinely needs known rank bounds to compute a prediction.
+	bool IsRankedDisplayValidForOverlay(const RankedProgressDisplayState& state)
+	{
+		return state.valid &&
+			state.characterId != kInvalidRankedCharacterId &&
+			state.characterId < kRankAllCharacterId;
+	}
+
 	enum class RankedPredictionResultKind
 	{
 		Unknown,
@@ -3994,31 +4005,11 @@ namespace
 		g_rankedUploadObservation.startedAtMs = GetTickCount64();
 		g_rankedUploadObservation.attemptedCharacterId = attemptedCharacterId;
 		g_rankedUploadObservation.uploadedScore = uploadedScore;
-		bool capturedAny = false;
-		if (attemptedCharacterId < g_rankedUploadObservation.baselineStates.size())
-		{
-			RankedProgressDisplayState state{};
-			if (TryBuildDisplayStateForCharacter(attemptedCharacterId, nullptr, &state) && state.valid)
-			{
-				g_rankedUploadObservation.baselineStates[attemptedCharacterId] = state;
-				g_rankedUploadObservation.hasBaseline[attemptedCharacterId] = 1;
-				capturedAny = true;
-			}
-		}
-		else
-		{
-			capturedAny = TryCaptureAllRankedDisplayStates(
-				&g_rankedUploadObservation.baselineStates,
-				&g_rankedUploadObservation.hasBaseline);
-		}
+		bool capturedAny = TryCaptureAllRankedDisplayStates(
+			&g_rankedUploadObservation.baselineStates,
+			&g_rankedUploadObservation.hasBaseline);
 		uint32_t cachedBaselineCount = 0;
-		const uint32_t cacheStart = attemptedCharacterId < g_lastKnownRankDisplayByCharacter.size()
-			? attemptedCharacterId
-			: 0u;
-		const uint32_t cacheEnd = attemptedCharacterId < g_lastKnownRankDisplayByCharacter.size()
-			? attemptedCharacterId + 1u
-			: static_cast<uint32_t>(g_lastKnownRankDisplayByCharacter.size());
-		for (uint32_t characterId = cacheStart; characterId < cacheEnd; ++characterId)
+		for (uint32_t characterId = 0; characterId < g_lastKnownRankDisplayByCharacter.size(); ++characterId)
 		{
 			RankedProgressDisplayState cachedState{};
 			if (TryGetCachedRankedDisplayState(characterId, &cachedState) && cachedState.valid)
@@ -4104,22 +4095,7 @@ namespace
 
 		std::array<RankedProgressDisplayState, 64> currentStates{};
 		std::array<uint8_t, 64> hasCurrentState{};
-		bool capturedCurrent = false;
-		if (g_rankedUploadObservation.attemptedCharacterId < currentStates.size())
-		{
-			RankedProgressDisplayState state{};
-			if (TryBuildDisplayStateForCharacter(g_rankedUploadObservation.attemptedCharacterId, nullptr, &state) && state.valid)
-			{
-				currentStates[g_rankedUploadObservation.attemptedCharacterId] = state;
-				hasCurrentState[g_rankedUploadObservation.attemptedCharacterId] = 1;
-				capturedCurrent = true;
-			}
-		}
-		else
-		{
-			capturedCurrent = TryCaptureAllRankedDisplayStates(&currentStates, &hasCurrentState);
-		}
-		if (!capturedCurrent)
+		if (!TryCaptureAllRankedDisplayStates(&currentStates, &hasCurrentState))
 		{
 			return;
 		}
@@ -5335,7 +5311,8 @@ namespace
 		bool rankedEntryActive,
 		bool inMatch,
 		bool rankedRematchScreen,
-		bool sawState58ThisVictoryCycle)
+		bool sawState58ThisVictoryCycle,
+		bool forceOpponentRankRefresh)
 	{
 		static uint64_t s_lastPredictionOpponentSteamId = 0;
 		static uint32_t s_lastPredictionOpponentCharacterId = kInvalidRankedCharacterId;
@@ -5420,7 +5397,7 @@ namespace
 		const bool hasOpponentCharacter = opponentCharacterId < kRankAllCharacterId;
 		if (hasOpponentSteamId && hasOpponentCharacter)
 		{
-			g_rankedOpponentLookup.Tick(opponentSteamId, opponentCharacterId, rankedRematchScreen);
+			g_rankedOpponentLookup.Tick(opponentSteamId, opponentCharacterId, rankedRematchScreen || forceOpponentRankRefresh);
 		}
 		LogRankedPredictionVisibility("draw", gameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, sawState58ThisVictoryCycle, opponentSteamId, opponentCharacterId);
 		RankedOpponentInfo opponent{};
@@ -5767,7 +5744,7 @@ void DrawRankedProgressOverlayStandalone()
 		}
 	}
 
-	if (!IsRankedDisplayReadyForOverlay(baseDisplay))
+	if (!IsRankedDisplayValidForOverlay(baseDisplay))
 	{
 		DrawRankedGlobalDialogs();
 		return;
@@ -5857,7 +5834,7 @@ void DrawRankedProgressOverlayStandalone()
 	float demotionDeltaAlpha = 0.0f;
 	uint32_t animationPhase = 0;
 	BuildAnimatedDisplayState(baseDisplay, &renderedDisplay, &renderedDelta, &deltaAlpha, &animationPhase);
-	if (!IsRankedDisplayReadyForOverlay(renderedDisplay))
+	if (!IsRankedDisplayValidForOverlay(renderedDisplay))
 	{
 		ImGui::End();
 		ImGui::PopStyleVar();
@@ -5890,7 +5867,8 @@ void DrawRankedProgressOverlayStandalone()
 	const std::string characterName = getCharacterNameByIndexA(static_cast<int>(renderedDisplay.characterId));
 	const std::string rankLabel = FormatVisibleRankLabel(renderedDisplay.visibleRank, renderedDisplay.isUnranked);
 	const ImVec4 rankColor = GetVisibleRankColor(renderedDisplay.visibleRank, renderedDisplay.isUnranked);
-	const ImU32 rankColorU32 = ImGui::ColorConvertFloat4ToU32(rankColor);
+	const ImU32 rankColorU32 = ImGui::ColorConvertFloat4ToU32(
+		ImVec4(rankColor.x, rankColor.y, rankColor.z, rankColor.w * windowAlpha));
 	const ImVec2 startPos = ImGui::GetCursorScreenPos();
 	ImDrawList* const drawList = ImGui::GetWindowDrawList();
 	const uint32_t matches = hasStatsSnapshot ? statsSnapshot.totalPoints : 0u;
@@ -5980,8 +5958,8 @@ void DrawRankedProgressOverlayStandalone()
 	const float barWidth = availableBarWidth > 320.0f ? availableBarWidth : 320.0f;
 	const ImVec2 barPos = ImGui::GetCursorScreenPos();
 	const ImVec2 barSize(barWidth, g_rankedOverlayTuning.barHeight);
-	const ImU32 bgColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.16f, 0.17f, 0.19f, 0.96f));
-	const ImU32 borderColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.36f, 0.37f, 0.41f, 1.0f));
+	const ImU32 bgColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.16f, 0.17f, 0.19f, 0.96f * windowAlpha));
+	const ImU32 borderColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.36f, 0.37f, 0.41f, 1.0f * windowAlpha));
 	drawList->AddRectFilled(barPos, ImVec2(barPos.x + barSize.x, barPos.y + barSize.y), bgColor, 5.0f);
 	const float fillWidth = barSize.x * renderedDisplay.progress;
 	if (fillWidth > 0.0f)
@@ -6114,6 +6092,12 @@ void DrawRankedProgressOverlayStandalone()
 		Settings::changeSetting("ShowRankedProgress", "0");
 		g_manualRankedProgressOpen = false;
 	}
-	DrawRankedPredictionWindow(renderedDisplay, currentGameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, s_sawState58ThisVictoryCycle);
+	// Force a fresh opponent leaderboard lookup once per finished match (not just at
+	// end-of-set), so a mid-set rank-up is reflected instead of showing the stale
+	// pre-set rank for the rest of the set. RequestOpponentEntry() still throttles
+	// this to one Steam call every 5s, so this can't reintroduce per-frame lag.
+	const bool matchUploadCompletedThisCycle = inPostMatchRematch &&
+		g_rankedUploadCompletionSerial > g_uploadSerialAtMatchEntry;
+	DrawRankedPredictionWindow(renderedDisplay, currentGameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, s_sawState58ThisVictoryCycle, matchUploadCompletedThisCycle);
 	DrawRankedGlobalDialogs();
 }

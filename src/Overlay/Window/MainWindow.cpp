@@ -642,6 +642,7 @@ void MainWindow::DrawSettingsIniButton()
 	{
 		m_settingsDraft = Settings::settingsIni;
 		m_settingsSortOrder = SettingsSortOrder::Default;
+		m_settingsFilter.Clear();
 
 		// Build row list. Each row has a draw lambda (returns true if the widget changed this frame)
 		// and a differsFromOriginal lambda (compares draft vs live settings, checked only on change).
@@ -675,6 +676,8 @@ void MainWindow::DrawSettingsIniModal()
 	ImGui::SetNextWindowSize(ImVec2(560, 580), ImGuiCond_Always);
 	if (!ImGui::BeginPopupModal("Settings.ini##modal", nullptr, ImGuiWindowFlags_NoResize))
 		return;
+
+	m_settingsFilter.Draw("Search##settings_filter", -1.0f);
 
 	ImGui::BeginChild("##settings_scroll", ImVec2(0, -footerHeight), true);
 
@@ -718,6 +721,8 @@ void MainWindow::DrawSettingsIniModal()
 	for (size_t i = 0; i < rowCount; ++i)
 	{
 		SettingRow& row = m_settingRows[order[i]];
+		if (!m_settingsFilter.PassFilter(row.name.c_str()))
+			continue;
 		ImGui::TextUnformatted(row.name.c_str());
 		ImGui::NextColumn();
 		if (row.draw() && row.isRestartRequired)
@@ -772,6 +777,20 @@ void MainWindow::DrawSettingsIniModal()
 			CloseHandle(pi.hThread);
 			ExitProcess(0);
 		}
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Restart Game", ImVec2(120, 0)))
+	{
+		wchar_t exePath[MAX_PATH] = {};
+		GetModuleFileNameW(NULL, exePath, MAX_PATH);
+		STARTUPINFOW si = { sizeof(si) };
+		PROCESS_INFORMATION pi = {};
+		CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		ExitProcess(0);
 	}
 
 	ImGui::EndPopup();
