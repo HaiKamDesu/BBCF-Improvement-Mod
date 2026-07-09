@@ -1522,7 +1522,12 @@ namespace
         void DebugLogPadSlot0()
         {
                 auto ppDev = GetBbcfPadSlot0Ptr();
-                IDirectInputDevice8W* dev = ppDev ? *ppDev : nullptr;
+                if (!ppDev || IsBadReadPtr(ppDev, sizeof(*ppDev)))
+                {
+                        LOG(1, "[BBCF] PadSlot0 - slot addr=%p not readable (game DI possibly uninitialized)\n", ppDev);
+                        return;
+                }
+                IDirectInputDevice8W* dev = *ppDev;
                 LOG(1, "[BBCF] PadSlot0 ptr from game table = %p (slot addr=%p)\n", dev, ppDev);
         }
 
@@ -2761,12 +2766,23 @@ void ControllerOverrideManager::TickAutoRefresh()
         {
                 LOG(1, "ControllerOverrideManager::TickAutoRefresh - clearing queued refresh because controller hooks are disabled\n");
                 m_deviceChangeQueued.store(false, std::memory_order_relaxed);
+                m_steamPendingStartMs = 0;
                 return;
         }
 
         if (!IsSafeToRefreshGameInputsNow())
         {
                 return;
+        }
+
+        // When Steam Input is pending (virtual device not yet visible to DInput), we re-queue
+        // after each poll. Rate-limit those re-polls to once per second so we don't hammer
+        // DInput enumeration every frame.
+        if (m_steamPendingStartMs != 0 && m_lastRefresh > 0)
+        {
+                const ULONGLONG now = GetTickCount64();
+                if ((now - m_lastRefresh) < 1000)
+                        return;
         }
 
         m_deviceChangeQueued.store(false, std::memory_order_relaxed);
@@ -2887,6 +2903,7 @@ void ControllerOverrideManager::ReinitializeGameInputs()
         DebugDumpTrackedDevices();
         DebugLogPadSlot0();
         SendDeviceChangeBroadcast();
+        DebugLogPadSlot0();  // after broadcast, before redetect — shows if WM_DEVICECHANGE caused game to init the slot
         RedetectControllers_Internal();
         DebugLogPadSlot0();
         LOG(1, "ControllerOverrideManager::ReinitializeGameInputs - end (trackedA=%zu trackedW=%zu)\n",
@@ -2913,8 +2930,12 @@ void ControllerOverrideManager::ProcessPendingDeviceChange()
 
         m_deviceChangeQueued.store(false, std::memory_order_relaxed);
 
+        const size_t prevDinputHash = m_lastDeviceHash;
         const bool devicesChanged = RefreshDevices();
-        if (!devicesChanged)
+        // Skip early only when nothing changed AND we are not already in a Steam pending poll loop.
+        // If Steam pending is active we must keep checking even on "no change" frames so we don't
+        // drop the re-queue when rawHid/DInput state is stable between polls.
+        if (!devicesChanged && m_steamPendingStartMs == 0)
         {
                 LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - device hash unchanged, skipping reinitialize\n");
                 return;
@@ -2922,6 +2943,38 @@ void ControllerOverrideManager::ProcessPendingDeviceChange()
 
         if (m_autoRefreshEnabled)
         {
+                const bool dinputChanged = (m_lastDeviceHash != prevDinputHash);
+                if (m_steamInputLikely && !dinputChanged)
+                {
+                        // Steam virtual device not yet visible to DInput (only rawHid changed).
+                        // Poll every ~1s until Steam's virtual device appears in DInput enumeration,
+                        // then fire reinit. This mirrors game startup: by the time the game's own
+                        // DI init runs at startup, Steam's device is already fully initialized.
+                        const ULONGLONG now = GetTickCount64();
+                        if (m_steamPendingStartMs == 0)
+                        {
+                                m_steamPendingStartMs = now;
+                                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam Input pending: controller detected via rawHid but not yet visible to DInput, polling until visible\n");
+                        }
+                        const ULONGLONG elapsedMs = now - m_steamPendingStartMs;
+                        if (elapsedMs > 120000)
+                        {
+                                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending timeout (>120s), giving up\n");
+                                m_steamPendingStartMs = 0;
+                                return;
+                        }
+                        LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending (%llums elapsed), DInput hash still unchanged, re-queuing\n", elapsedMs);
+                        m_deviceChangeQueued.store(true, std::memory_order_relaxed);
+                        return;
+                }
+
+                if (m_steamPendingStartMs != 0)
+                {
+                        LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending resolved after %llums: DInput hash changed, firing reinit\n",
+                                GetTickCount64() - m_steamPendingStartMs);
+                        m_steamPendingStartMs = 0;
+                }
+
                 LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - auto refreshing controllers\n");
                 ReinitializeGameInputs();
         }
@@ -3686,10 +3739,11 @@ bool ControllerOverrideManager::CollectDevices()
         bool rawSuggestsFiltering = (!rawInputDevices.empty() && rawInputDevices.size() > diGamepadCount) || rawDeviceMissingInDirectInput;
         bool winmmSuggestsFiltering = !winmmDevices.empty() && winmmDevices.size() > diGamepadCount;
 
-        // Consider Steam Input active only when (a) the SDL ignore list length matches the large Steam Input profile and
-        // (b) at least one gamepad remains visible to DirectInput. Module presence and filtering hints are logged for
-        // diagnostics but no longer drive the decision to avoid false positives when SteamInput DLLs are loaded for other reasons.
-        m_steamInputLikely = envLikely && anyListedGamepad;
+        // Consider Steam Input active when the SDL ignore list looks like Steam Input (envLikely) AND either
+        // (a) at least one gamepad is still visible to DInput (Steam virtual device already present), or
+        // (b) a raw HID gamepad is missing from DInput (rawSuggestsFiltering) — this is the case when
+        // Steam has hidden the physical device but its virtual DInput device isn't ready yet.
+        m_steamInputLikely = envLikely && (anyListedGamepad || rawSuggestsFiltering);
 
         LOG(1, "[SteamInputDetect] final steamInputLikely=%d (envLikely=%d moduleLoaded=%d rawSuggestsFiltering=%d winmmSuggestsFiltering=%d rawMissing=%d rawCount=%zu envIgnoreEntries=%zu envLen=%lu)\n",
                 m_steamInputLikely ? 1 : 0,

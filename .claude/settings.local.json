@@ -86,7 +86,22 @@
       "Bash(mkdir -p .claude/skills/bbcf-re-workflow .codex/skills/bbcf-re-workflow)",
       "Bash(cp .agents/skills/bbcf-re-workflow/SKILL.md .claude/skills/bbcf-re-workflow/SKILL.md)",
       "Bash(pwsh -NoProfile -File tools/generate_localization_bindings.ps1)",
-      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /t:BBCF_IM)"
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /t:BBCF_IM)",
+      "Bash(curl -s \"https://api.github.com/repos/HaiKamDesu/BBCF-Improvement-Mod/releases?per_page=100\" -H \"Accept: application/vnd.github+json\")",
+      "Bash(grep -rli \"d-code\\\\|dcode\\\\|d_code\\\\|playercode\\\\|player code\" .)",
+      "Bash(grep -rli \"intro\" .)",
+      "Bash(grep -rli \"confirm\" .)",
+      "Bash(grep -rli \"rollback\" .)",
+      "Bash(grep -rli \"persist\" .)",
+      "Bash(unzip -l bin/Debug/BBCF.IM.win-x86.v7.2.zip)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; ls -la \"{}\"')",
+      "Bash(\"/mnt/c/Windows/System32/powershell.exe\" -File tools/generate_localization_bindings.ps1)",
+      "Bash(xxd)",
+      "Bash(grep \"WM_DEVICECHANGE\\\\|HandleWindowMessage\\\\|RefreshDevices\\\\|CollectDevices\\\\|ProcessPendingDeviceChange\\\\|ReinitializeGameInputs\\\\|BounceTrackedDevices\\\\|TickAutoRefresh\\\\|IsSafeToRefreshGameInputsNow\\\\|PadSlot0\\\\|rawHid\\\\|rawCount\\\\|SteamInputDetect\\\\|crash\\\\|exception\\\\|unhandled\\\\|GetGameState\\\\|sceneStatus\\\\|TitleScreen\\\\|MenuScreen\\\\|changed=1\\\\|changed=0\" \"/mnt/d/User/Downloads/IM Debugging/Controller stuff from shiburizu/Debug_1.txt\")",
+      "Read(//tmp/**)",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /t:BBCF_IM /nologo)",
+      "Read(//home/usuario/.claude/skills/**)",
+      "Read(//home/usuario/.claude/**)"
     ]
   }
 }
