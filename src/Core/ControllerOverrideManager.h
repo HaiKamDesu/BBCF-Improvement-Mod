@@ -239,6 +239,7 @@ private:
         size_t m_lastRawHidCount = 0;
         bool m_steamInputLikely = false;
         ULONGLONG m_steamPendingStartMs = 0;
+        ULONGLONG m_secondReinitDueMs = 0;
         std::atomic<bool> m_deviceChangeQueued{ false };
         std::atomic<bool> m_mappingPopupActive{ false };
 

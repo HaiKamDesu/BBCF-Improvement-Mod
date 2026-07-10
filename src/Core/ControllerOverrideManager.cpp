@@ -2757,6 +2757,24 @@ void ControllerOverrideManager::RefreshDevicesAndReinitializeGame()
 
 void ControllerOverrideManager::TickAutoRefresh()
 {
+        // One-shot follow-up reinit scheduled after an auto reinit. The first reinit after
+        // the game's DI subsystem is freshly created reliably creates the DInput device but
+        // the game does not bind it to its pad slot; a second reinit does (this mirrors the
+        // manual F1 > Controller Settings refresh, which works in every configuration).
+        if (m_secondReinitDueMs != 0)
+        {
+                if (!ControllerHooksEnabled())
+                {
+                        m_secondReinitDueMs = 0;
+                }
+                else if (GetTickCount64() >= m_secondReinitDueMs && IsSafeToRefreshGameInputsNow())
+                {
+                        m_secondReinitDueMs = 0;
+                        LOG(1, "ControllerOverrideManager::TickAutoRefresh - firing scheduled follow-up reinit\n");
+                        ReinitializeGameInputs();
+                }
+        }
+
         if (!m_deviceChangeQueued.load(std::memory_order_relaxed))
         {
                 return;
@@ -2947,28 +2965,28 @@ void ControllerOverrideManager::ProcessPendingDeviceChange()
                 if (m_steamInputLikely && !dinputChanged)
                 {
                         // Steam virtual device not yet visible to DInput (only rawHid changed).
-                        // Poll every ~1s until Steam's virtual device appears in DInput enumeration,
-                        // then fire reinit. This mirrors game startup: by the time the game's own
-                        // DI init runs at startup, Steam's device is already fully initialized.
+                        // Optionally give DInput a short window to catch up (AutoRefreshSteamGraceMs),
+                        // then fire reinit anyway: Steam's virtual pad may NEVER appear in our own
+                        // enumeration, yet the game's _create_pad_input_controllers can still
+                        // bind it (the manual F1 refresh works with Steam Input on).
+                        const ULONGLONG graceMs = static_cast<ULONGLONG>(
+                                (std::max)(0, Settings::settingsIni.autoRefreshSteamGraceMs));
                         const ULONGLONG now = GetTickCount64();
                         if (m_steamPendingStartMs == 0)
                         {
                                 m_steamPendingStartMs = now;
-                                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam Input pending: controller detected via rawHid but not yet visible to DInput, polling until visible\n");
                         }
                         const ULONGLONG elapsedMs = now - m_steamPendingStartMs;
-                        if (elapsedMs > 120000)
+                        if (elapsedMs < graceMs)
                         {
-                                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending timeout (>120s), giving up\n");
-                                m_steamPendingStartMs = 0;
+                                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending (%llums/%llums elapsed), DInput hash still unchanged, re-queuing\n", elapsedMs, graceMs);
+                                m_deviceChangeQueued.store(true, std::memory_order_relaxed);
                                 return;
                         }
-                        LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending (%llums elapsed), DInput hash still unchanged, re-queuing\n", elapsedMs);
-                        m_deviceChangeQueued.store(true, std::memory_order_relaxed);
-                        return;
+                        LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pad not visible to DInput after %llums (grace %llums), firing reinit anyway\n", elapsedMs, graceMs);
+                        m_steamPendingStartMs = 0;
                 }
-
-                if (m_steamPendingStartMs != 0)
+                else if (m_steamPendingStartMs != 0)
                 {
                         LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - Steam pending resolved after %llums: DInput hash changed, firing reinit\n",
                                 GetTickCount64() - m_steamPendingStartMs);
@@ -2977,6 +2995,12 @@ void ControllerOverrideManager::ProcessPendingDeviceChange()
 
                 LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - auto refreshing controllers\n");
                 ReinitializeGameInputs();
+
+                // The first reinit after the game's DI subsystem is created does not bind the
+                // new device to the game's pad slot; a second one does. Schedule it.
+                const int followupMs = (std::max)(0, Settings::settingsIni.autoRefreshFollowupDelayMs);
+                m_secondReinitDueMs = GetTickCount64() + followupMs;
+                LOG(1, "ControllerOverrideManager::ProcessPendingDeviceChange - scheduled follow-up reinit in %dms\n", followupMs);
         }
         else
         {
@@ -3177,6 +3201,11 @@ bool ControllerOverrideManager::GetKeyboardStateSnapshot(HANDLE deviceHandle, st
         return true;
 }
 
+// Timer that keeps auto-refresh ticking while the game's logic loop is paused
+// (focus loss / Steam overlay freeze BBCF's frame loop, but its window message
+// pump keeps running - proven by WM_DEVICECHANGE arriving during the freeze).
+static const UINT_PTR kAutoRefreshTimerId = 0xB1CF01;
+
 void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam)
 {
         if (!ControllerHooksEnabled())
@@ -3185,6 +3214,24 @@ void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPA
                 {
                         m_deviceChangeQueued.store(false, std::memory_order_relaxed);
                 }
+                return;
+        }
+
+        if (msg == WM_TIMER && wParam == kAutoRefreshTimerId)
+        {
+                const bool anythingPending = m_deviceChangeQueued.load(std::memory_order_relaxed)
+                        || m_steamPendingStartMs != 0
+                        || m_secondReinitDueMs != 0;
+                if (!anythingPending)
+                {
+                        if (g_gameProc.hWndGameWindow)
+                        {
+                                KillTimer(g_gameProc.hWndGameWindow, kAutoRefreshTimerId);
+                        }
+                        LOG(1, "ControllerOverrideManager::HandleWindowMessage - auto refresh timer idle, killed\n");
+                        return;
+                }
+                TickAutoRefresh();
                 return;
         }
 
@@ -3222,6 +3269,14 @@ void ControllerOverrideManager::HandleWindowMessage(UINT msg, WPARAM wParam, LPA
         case DBT_DEVNODES_CHANGED:
                 LOG(1, "ControllerOverrideManager::HandleWindowMessage - WM_DEVICECHANGE wParam=0x%08lX lParam=0x%08lX\n", wParam, lParam);
                 m_deviceChangeQueued.store(true, std::memory_order_relaxed);
+                // Keep ticking via the message pump even if the game's frame loop is paused
+                // (focus loss / Steam overlay); the timer self-kills once nothing is pending.
+                if (g_gameProc.hWndGameWindow)
+                {
+                        const UINT timerMs = static_cast<UINT>(
+                                (std::max)(10, Settings::settingsIni.autoRefreshTimerIntervalMs));
+                        SetTimer(g_gameProc.hWndGameWindow, kAutoRefreshTimerId, timerMs, nullptr);
+                }
                 RefreshKeyboardDevices();
                 break;
         default:
