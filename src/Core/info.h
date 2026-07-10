@@ -1,5 +1,5 @@
 #pragma once
-#define MOD_VERSION	"v7.2"
+#define MOD_VERSION	"v7.3"
 #define MOD_VERSION_NUM	MOD_VERSION " Oceanya Edition"
 #define MOD_WINDOW_TITLE "BBCF IM"
 
@@ -9,7 +9,7 @@
 // this version are automatically offered the nearest compatible intermediate
 // release instead, then chain-update on the next session.
 // Leave at "v3.110" when the zip format is unchanged.
-#define MOD_MINIMUM_FROM_VERSION "v3.110"
+#define MOD_MINIMUM_FROM_VERSION "v7.2"
 
 #define MOD_FORCE_DISABLE_UPDATE_CHECK 0
 
