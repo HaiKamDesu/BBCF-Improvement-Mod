@@ -14,13 +14,16 @@ public:
 	void SendPalettePackets();
 	void RecvPaletteDataPacket(Packet* packet);
 	void RecvPaletteInfoPacket(Packet* packet);
+	void RecvPaletteDownloadPermissionPacket(Packet* packet);
 	void ProcessSavedPalettePackets();
 	void ClearSavedPalettePacketQueues();
 	void OnMatchInit();
 	void OnUpdate();
+	bool CanDownloadPalette(uint16_t matchPlayerIndex) const;
 
 private:
 	bool IsPaletteHandleReady(const CharPaletteHandle& charPalHandle) const;
+	void SendPaletteDownloadPermissionPacket(uint16_t roomMemberIndex);
 	void SendPaletteInfoPacket(CharPaletteHandle& charPalHandle, uint16_t roomMemberIndex);
 	void SendPaletteDataPackets(CharPaletteHandle& charPalHandle, uint16_t roomMemberIndex);
 	void ProcessSavedPaletteInfoPackets();
@@ -63,4 +66,5 @@ private:
 	RoomManager* m_pRoomManager;
 	bool m_matchInitPending = false;
 	bool m_loggedMatchInitWait = false;
+	bool m_playerPaletteDownloadPermissions[2] = {};
 };

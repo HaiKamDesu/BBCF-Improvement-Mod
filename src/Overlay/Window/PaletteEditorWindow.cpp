@@ -195,7 +195,7 @@ void PaletteEditorWindow::ShowAllPaletteSelections(const std::string& windowID)
 		}
 		else
 		{
-			ShowOnlinePaletteResetButton(g_interfaces.player1, thisPlayerMatchPlayerIndex, p1BtnText);
+			ShowOnlinePaletteResetButton(g_interfaces.player1, 0, p1BtnText);
 		}
 
 		if (thisPlayerMatchPlayerIndex == 1)
@@ -204,7 +204,7 @@ void PaletteEditorWindow::ShowAllPaletteSelections(const std::string& windowID)
 		}
 		else
 		{
-			ShowOnlinePaletteResetButton(g_interfaces.player2, thisPlayerMatchPlayerIndex, p2BtnText);
+			ShowOnlinePaletteResetButton(g_interfaces.player2, 1, p2BtnText);
 		}
 
 		ImGui::EndGroup();
@@ -709,7 +709,7 @@ void PaletteEditorWindow::CheckSelectedPalOutOfBound()
 	}
 }
 
-void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t thisPlayerMatchPlayerIndex, const char* btnText)
+void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t matchPlayerIndex, const char* btnText)
 {
 	CharPaletteHandle& charPalHandle = playerHandle.GetPalHandle();
 	CharIndex charIndex = (CharIndex)playerHandle.GetData()->charIndex;
@@ -724,6 +724,18 @@ void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uin
 
 	ImGui::HoverTooltip(Messages.Reset_palette());
 
+	if (g_interfaces.pOnlinePaletteManager->CanDownloadPalette(matchPlayerIndex))
+	{
+		char downloadButtonId[48];
+		sprintf_s(downloadButtonId, " Download ##download%s", btnText);
+		ImGui::SameLine();
+		if (ImGui::Button(downloadButtonId))
+		{
+			DownloadOnlinePalette(playerHandle, matchPlayerIndex);
+		}
+		ImGui::HoverTooltip("Download palette");
+	}
+
 	// Dummy button
 	ImGui::SameLine();
 	ImGui::Button(btnText);
@@ -736,6 +748,32 @@ void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uin
 	ImGui::TextUnformatted(palInfo.palName);
 
 	ShowHoveredPaletteInfoToolTip(palInfo, charIndex, 0);
+}
+
+void PaletteEditorWindow::DownloadOnlinePalette(Player& playerHandle, uint16_t matchPlayerIndex)
+{
+	if (!g_interfaces.pOnlinePaletteManager->CanDownloadPalette(matchPlayerIndex))
+		return;
+
+	CharIndex charIndex = (CharIndex)playerHandle.GetData()->charIndex;
+	IMPL_data_t curPalData = g_interfaces.pPaletteManager->GetCurrentPalData(playerHandle.GetPalHandle());
+	std::string savedPalName;
+
+	if (g_interfaces.pPaletteManager->WriteDownloadedPaletteToFile(charIndex, &curPalData, &savedPalName))
+	{
+		g_imGuiLogger->Log("[system] Downloaded palette '%s%s' for %s.\n",
+			savedPalName.c_str(),
+			IMPL_FILE_EXTENSION,
+			getCharacterNameByIndexA(charIndex).c_str());
+
+		g_imGuiLogger->EnableLog(false);
+		g_interfaces.pPaletteManager->ReloadAllPalettes();
+		g_imGuiLogger->EnableLog(true);
+	}
+	else
+	{
+		g_imGuiLogger->Log("[error] Failed to download opponent palette.\n");
+	}
 }
 
 void PaletteEditorWindow::ShowPaletteSelectButton(Player& playerHandle, const char* btnText, const char* popupID)
@@ -1066,4 +1104,3 @@ void PaletteEditorWindow::GenerateGradient(int idx1, int idx2, int color1, int c
 
 	g_interfaces.pPaletteManager->ReplacePaletteFile(m_paletteEditorArray, m_selectedFile, *m_selectedCharPalHandle);
 }
-

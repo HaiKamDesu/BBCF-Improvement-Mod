@@ -7,6 +7,7 @@
 #include "Game/Player.h"
 
 #include <vector>
+#include <string>
 
 class PaletteManager
 {
@@ -18,6 +19,7 @@ public:
 	bool PushImplFileIntoVector(IMPL_t &filledPal);
 	bool PushImplFileIntoVector(CharIndex charIndex, IMPL_data_t &filledPalData);
 	bool WritePaletteToFile(CharIndex charIndex, IMPL_data_t *filledPalData);
+	bool WriteDownloadedPaletteToFile(CharIndex charIndex, IMPL_data_t* filledPalData, std::string* savedPalName = nullptr);
 
 	void LoadAllPalettes();
 	void ReloadAllPalettes();

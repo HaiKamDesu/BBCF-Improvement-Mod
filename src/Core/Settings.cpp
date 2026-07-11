@@ -58,6 +58,7 @@ void Settings::applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters)
 		Settings::settingsIni.uploadReplayDataHost = "89.167.76.6";
 	}
 	g_modVals.enableForeignPalettes = Settings::settingsIni.loadforeignpalettes;
+	g_modVals.allowPaletteDownloads = Settings::settingsIni.allowPaletteDownloads;
 	g_modVals.save_states_save_keycode = Settings::getButtonValue(settingsIni.saveStateKeybind);
 	g_modVals.save_states_load_keycode = Settings::getButtonValue(settingsIni.loadStateKeybind);
 	g_modVals.replay_takeover_load_keycode = Settings::getButtonValue(settingsIni.loadReplayStateKeybind);

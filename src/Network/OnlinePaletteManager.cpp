@@ -4,6 +4,7 @@
 
 #include "Core/logger.h"
 #include "Core/interfaces.h"
+#include "Core/Settings.h"
 #include "Game/gamestates.h"
 
 OnlinePaletteManager::OnlinePaletteManager(PaletteManager* pPaletteManager, CharPaletteHandle* pP1CharPalHandle,
@@ -30,6 +31,7 @@ void OnlinePaletteManager::SendPalettePackets()
 		return;
 	}
 
+	SendPaletteDownloadPermissionPacket(thisPlayerMatchPlayerIndex);
 	SendPaletteInfoPacket(charPalHandle, thisPlayerMatchPlayerIndex);
 	SendPaletteDataPackets(charPalHandle, thisPlayerMatchPlayerIndex);
 }
@@ -76,6 +78,19 @@ void OnlinePaletteManager::RecvPaletteInfoPacket(Packet* packet)
 	m_pPaletteManager->SetCurrentPalInfo(charPalHandle, *(IMPL_info_t*)packet->data);
 }
 
+void OnlinePaletteManager::RecvPaletteDownloadPermissionPacket(Packet* packet)
+{
+	LOG(2, "OnlinePaletteManager::RecvPaletteDownloadPermissionPacket\n");
+
+	uint16_t matchPlayerIndex = m_pRoomManager->GetPlayerMatchPlayerIndexByRoomMemberIndex(packet->roomMemberIndex);
+	if (matchPlayerIndex > 1 || packet->dataSize < sizeof(bool))
+		return;
+
+	bool allowDownload = false;
+	memcpy_s(&allowDownload, sizeof(allowDownload), packet->data, sizeof(allowDownload));
+	m_playerPaletteDownloadPermissions[matchPlayerIndex] = allowDownload;
+}
+
 void OnlinePaletteManager::ProcessSavedPalettePackets()
 {
 	LOG(2, "OnlinePaletteManager::ProcessSavedPalettePackets\n");
@@ -95,12 +110,16 @@ void OnlinePaletteManager::ClearSavedPalettePacketQueues()
 	m_unprocessedPaletteFiles = {};
 	m_matchInitPending = false;
 	m_loggedMatchInitWait = false;
+	m_playerPaletteDownloadPermissions[0] = false;
+	m_playerPaletteDownloadPermissions[1] = false;
 }
 
 void OnlinePaletteManager::OnMatchInit()
 {
 	LOG(2, "OnlinePaletteManager::OnMatchInit\n");
 
+	m_playerPaletteDownloadPermissions[0] = false;
+	m_playerPaletteDownloadPermissions[1] = false;
 	m_matchInitPending = true;
 	m_loggedMatchInitWait = false;
 	OnUpdate();
@@ -145,6 +164,29 @@ void OnlinePaletteManager::OnUpdate()
 	}
 
 	ProcessSavedPalettePackets();
+}
+
+bool OnlinePaletteManager::CanDownloadPalette(uint16_t matchPlayerIndex) const
+{
+	if (matchPlayerIndex > 1)
+		return false;
+
+	return m_playerPaletteDownloadPermissions[matchPlayerIndex];
+}
+
+void OnlinePaletteManager::SendPaletteDownloadPermissionPacket(uint16_t roomMemberIndex)
+{
+	LOG(2, "OnlinePaletteManager::SendPaletteDownloadPermissionPacket\n");
+
+	bool allowDownload = Settings::settingsIni.allowPaletteDownloads;
+	Packet packet = Packet(
+		(char*)&allowDownload,
+		(uint16_t)sizeof(allowDownload),
+		PacketType_PaletteDownloadPermission,
+		roomMemberIndex
+	);
+
+	m_pRoomManager->SendPacketToSameMatchIMPlayers(&packet);
 }
 
 void OnlinePaletteManager::SendPaletteInfoPacket(CharPaletteHandle& charPalHandle, uint16_t roomMemberIndex)

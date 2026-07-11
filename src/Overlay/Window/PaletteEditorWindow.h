@@ -81,7 +81,8 @@ private:
 	void ReloadSavedPalette(const char* palName);
 	bool ShowOverwritePopup(bool *p_open, const wchar_t* wFullPath, const char* filename);
 	void CheckSelectedPalOutOfBound();
-	void ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t thisPlayerMatchPlayerIndex, const char* btnText);
+	void ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t matchPlayerIndex, const char* btnText);
+	void DownloadOnlinePalette(Player& playerHandle, uint16_t matchPlayerIndex);
 	void ShowPaletteSelectButton(Player & playerHandle, const char* btnText, const char* popupID);
 	void ShowPaletteSelectPopup(CharPaletteHandle& charPalHandle, CharIndex charIndex, const char* popupID);
 	void ShowHoveredPaletteInfoToolTip(const IMPL_info_t& palInfo, CharIndex charIndex, int palIndex);

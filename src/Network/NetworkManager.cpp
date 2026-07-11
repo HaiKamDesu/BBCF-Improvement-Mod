@@ -75,6 +75,13 @@ void NetworkManager::RecvPacket(Packet* packet)
 		}
 		break;
 
+	case PacketType_PaletteDownloadPermission:
+		if (g_interfaces.pRoomManager->IsPacketFromSameMatchNonSpectator(packet))
+		{
+			g_interfaces.pOnlinePaletteManager->RecvPaletteDownloadPermissionPacket(packet);
+		}
+		break;
+
 	case PacketType_GameMode:
 		if (g_interfaces.pRoomManager->IsPacketFromSameMatchNonSpectator(packet) &&
 			*g_gameVals.pGameState == GameState_CharacterSelectionScreen)

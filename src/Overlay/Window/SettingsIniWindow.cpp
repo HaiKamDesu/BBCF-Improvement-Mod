@@ -59,6 +59,7 @@ namespace {
 		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked", "Opens the ranked list filter window when the ranked player list is visible." },
 		{ "RankedListSortMode", "Ranked list sort mode", "Ranked", "Sort mode used by the ranked list filter window." },
 		{ "LoadForeignPalettesToggleDefault", "Load foreign palettes by default", "Palettes", "Default state for loading opponent or foreign custom palettes." },
+		{ "AllowPaletteDownloads", "Allow palette downloads", "Palettes", "Allows opponents to save your visible custom palette from the match UI." },
 		{ "SwapControllerPos", "Swap controller positions", "Controller", "Swaps local controller positions. Disabled on startup if known crash risk is detected." },
 		{ "EnableControllerHooks", "Enable controller hooks", "Controller", "Enables controller setting hooks used by the mod's controller tools." },
 		{ "ForceEnableControllerSettingHooks", "Force controller hooks", "Controller", "Overrides Wine/Proton safety detection and forces controller hooks on." },

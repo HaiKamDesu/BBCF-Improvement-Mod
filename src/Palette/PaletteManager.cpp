@@ -11,6 +11,7 @@
 #include <atlstr.h>
 #include <sstream>
 #include <random>
+#include <cctype>
 
 #define MAX_NUM_OF_PAL_SLOTS 24
 const char* implTemplates[]
@@ -519,6 +520,63 @@ bool PaletteManager::WritePaletteToFile(CharIndex charIndex, IMPL_data_t *filled
 		LOG(2, "\tCouldn't open %s!\n", strerror(errno));
 		g_imGuiLogger->Log("[error] Unable to open '%s' : %s\n", path.c_str(), strerror(errno));
 		return false;
+	}
+
+	return true;
+}
+
+bool PaletteManager::WriteDownloadedPaletteToFile(CharIndex charIndex, IMPL_data_t* filledPalData, std::string* savedPalName)
+{
+	LOG(2, "WriteDownloadedPaletteToFile\n");
+
+	if (!filledPalData || charIndex >= getCharactersCount())
+		return false;
+
+	std::string baseName;
+	for (int i = 0; i < IMPL_PALNAME_LENGTH && filledPalData->palInfo.palName[i] != '\0'; ++i)
+	{
+		const unsigned char c = static_cast<unsigned char>(filledPalData->palInfo.palName[i]);
+		if (std::isalnum(c) || c == '_' || c == '-' || c == '.' || c == ' ')
+		{
+			baseName.push_back(static_cast<char>(c));
+		}
+	}
+
+	while (!baseName.empty() && (baseName.back() == ' ' || baseName.back() == '.'))
+	{
+		baseName.pop_back();
+	}
+
+	if (baseName.empty() ||
+		baseName == "Default" ||
+		baseName == "Random" ||
+		baseName == "Random_Exclude_Default")
+	{
+		baseName = "DownloadedPalette";
+	}
+
+	std::string finalName = baseName;
+	std::string folder = std::string("BBCF_IM\\Palettes\\") + getCharacterNameByIndexA(charIndex) + "\\";
+
+	for (int suffix = 2; suffix < 1000; ++suffix)
+	{
+		const std::string path = folder + finalName + IMPL_FILE_EXTENSION;
+		if (GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES)
+			break;
+
+		finalName = baseName + "_" + std::to_string(suffix);
+	}
+
+	IMPL_data_t paletteToWrite = *filledPalData;
+	memset(paletteToWrite.palInfo.palName, 0, IMPL_PALNAME_LENGTH);
+	strncpy(paletteToWrite.palInfo.palName, finalName.c_str(), IMPL_PALNAME_LENGTH - 1);
+
+	if (!WritePaletteToFile(charIndex, &paletteToWrite))
+		return false;
+
+	if (savedPalName)
+	{
+		*savedPalName = finalName;
 	}
 
 	return true;
