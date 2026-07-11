@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cstdio>
 #include <set>
+#include <string>
 
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "ole32.lib")
@@ -99,6 +100,55 @@ namespace Updater
 			const size_t pos = path.find_last_of(L"\\/");
 			return pos == std::wstring::npos ? L"" : path.substr(0, pos);
 		}
+
+		std::string FormatWindowsError(const char* prefix, DWORD errorCode)
+		{
+			char message[512] = {};
+			FormatMessageA(
+				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+				nullptr,
+				errorCode,
+				0,
+				message,
+				sizeof(message),
+				nullptr);
+
+			std::string result = prefix;
+			result += " Windows error ";
+			char code[32] = {};
+			std::snprintf(code, sizeof(code), "%lu", errorCode);
+			result += code;
+			if (message[0])
+			{
+				result += ": ";
+				result += message;
+				while (!result.empty() && (result[result.size() - 1] == '\r' || result[result.size() - 1] == '\n' || result[result.size() - 1] == '.'))
+					result.erase(result.size() - 1);
+			}
+			result += ".";
+			return result;
+		}
+
+		bool LooksLikeSecuritySoftwareBlock(DWORD errorCode)
+		{
+			return errorCode == ERROR_ACCESS_DENIED ||
+				errorCode == ERROR_SHARING_VIOLATION ||
+				errorCode == ERROR_LOCK_VIOLATION ||
+				errorCode == ERROR_FILE_NOT_FOUND ||
+				errorCode == ERROR_PATH_NOT_FOUND
+#ifdef ERROR_VIRUS_INFECTED
+				|| errorCode == ERROR_VIRUS_INFECTED
+#endif
+#ifdef ERROR_VIRUS_DELETED
+				|| errorCode == ERROR_VIRUS_DELETED
+#endif
+				;
+		}
+
+		void AppendSecuritySoftwareHint(std::string& error)
+		{
+			error += " Antivirus or security software may be blocking the updater. Add your BlazBlue Centralfiction installation folder as an antivirus exclusion, then retry.";
+		}
 	}
 
 	bool DownloadFileWithProgress(
@@ -118,13 +168,27 @@ namespace Updater
 
 		EnsureDirectoryRecursive(GetParentDirectory(tempPath));
 		EnsureDirectoryRecursive(GetParentDirectory(finalPath));
-		DeleteFileW(tempPath.c_str());
-		DeleteFileW(finalPath.c_str());
+		if (!DeleteFileW(tempPath.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND)
+		{
+			const DWORD errorCode = GetLastError();
+			error = FormatWindowsError("Could not remove old temporary download file.", errorCode);
+			if (LooksLikeSecuritySoftwareBlock(errorCode))
+				AppendSecuritySoftwareHint(error);
+			return false;
+		}
+		if (!DeleteFileW(finalPath.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND)
+		{
+			const DWORD errorCode = GetLastError();
+			error = FormatWindowsError("Could not remove old downloaded package.", errorCode);
+			if (LooksLikeSecuritySoftwareBlock(errorCode))
+				AppendSecuritySoftwareHint(error);
+			return false;
+		}
 
 		HINTERNET internet = InternetOpenW(Utf8ToWide(userAgent).c_str(), INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
 		if (!internet)
 		{
-			error = "InternetOpen failed.";
+			error = FormatWindowsError("Could not initialize internet connection.", GetLastError());
 			return false;
 		}
 
@@ -139,8 +203,9 @@ namespace Updater
 
 		if (!request)
 		{
+			const DWORD errorCode = GetLastError();
 			InternetCloseHandle(internet);
-			error = "InternetOpenUrl failed.";
+			error = FormatWindowsError("Could not open update download URL.", errorCode);
 			return false;
 		}
 
@@ -151,25 +216,45 @@ namespace Updater
 		HANDLE file = CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (file == INVALID_HANDLE_VALUE)
 		{
+			const DWORD errorCode = GetLastError();
 			InternetCloseHandle(request);
 			InternetCloseHandle(internet);
-			error = "Could not create download file.";
+			error = FormatWindowsError("Could not create update download file.", errorCode);
+			if (LooksLikeSecuritySoftwareBlock(errorCode))
+				AppendSecuritySoftwareHint(error);
 			return false;
 		}
 
 		char buffer[32768];
 		DWORD bytesRead = 0;
 		unsigned long long totalRead = 0;
-		while (InternetReadFile(request, buffer, sizeof(buffer), &bytesRead) && bytesRead)
+		while (true)
 		{
-			DWORD bytesWritten = 0;
-			if (!WriteFile(file, buffer, bytesRead, &bytesWritten, nullptr) || bytesWritten != bytesRead)
+			if (!InternetReadFile(request, buffer, sizeof(buffer), &bytesRead))
 			{
+				const DWORD errorCode = GetLastError();
 				CloseHandle(file);
 				InternetCloseHandle(request);
 				InternetCloseHandle(internet);
 				DeleteFileW(tempPath.c_str());
-				error = "Could not write download file.";
+				error = FormatWindowsError("Update download was interrupted before it completed.", errorCode);
+				AppendSecuritySoftwareHint(error);
+				return false;
+			}
+			if (!bytesRead)
+				break;
+
+			DWORD bytesWritten = 0;
+			if (!WriteFile(file, buffer, bytesRead, &bytesWritten, nullptr) || bytesWritten != bytesRead)
+			{
+				const DWORD errorCode = GetLastError();
+				CloseHandle(file);
+				InternetCloseHandle(request);
+				InternetCloseHandle(internet);
+				DeleteFileW(tempPath.c_str());
+				error = FormatWindowsError("Could not write update download file.", errorCode);
+				if (LooksLikeSecuritySoftwareBlock(errorCode))
+					AppendSecuritySoftwareHint(error);
 				return false;
 			}
 
@@ -182,10 +267,20 @@ namespace Updater
 		InternetCloseHandle(request);
 		InternetCloseHandle(internet);
 
-		if (!MoveFileExW(tempPath.c_str(), finalPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		if (contentLength > 0 && totalRead != contentLength)
 		{
 			DeleteFileW(tempPath.c_str());
-			error = "Could not finalize download file.";
+			error = "Update download did not complete. Antivirus, firewall, or proxy software may have blocked it. Add your BlazBlue Centralfiction installation folder as an antivirus exclusion, then retry.";
+			return false;
+		}
+
+		if (!MoveFileExW(tempPath.c_str(), finalPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		{
+			const DWORD errorCode = GetLastError();
+			DeleteFileW(tempPath.c_str());
+			error = FormatWindowsError("Could not finalize update download file.", errorCode);
+			if (LooksLikeSecuritySoftwareBlock(errorCode))
+				AppendSecuritySoftwareHint(error);
 			return false;
 		}
 
@@ -202,7 +297,10 @@ namespace Updater
 		HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (file == INVALID_HANDLE_VALUE)
 		{
-			error = "Could not open file for SHA-256.";
+			const DWORD errorCode = GetLastError();
+			error = FormatWindowsError("Could not open downloaded package for SHA-256 verification.", errorCode);
+			if (LooksLikeSecuritySoftwareBlock(errorCode))
+				AppendSecuritySoftwareHint(error);
 			return false;
 		}
 
@@ -224,10 +322,13 @@ namespace Updater
 		{
 			if (!CryptHashData(hash, buffer, bytesRead, 0))
 			{
+				const DWORD errorCode = GetLastError();
 				CryptDestroyHash(hash);
 				CryptReleaseContext(provider, 0);
 				CloseHandle(file);
-				error = "Could not hash file.";
+				error = FormatWindowsError("Could not hash downloaded package.", errorCode);
+				if (LooksLikeSecuritySoftwareBlock(errorCode))
+					AppendSecuritySoftwareHint(error);
 				return false;
 			}
 		}

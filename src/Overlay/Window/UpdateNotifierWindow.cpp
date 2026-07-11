@@ -355,7 +355,9 @@ void UpdateNotifierWindow::Draw()
 	if (!update.errorText.empty())
 	{
 		ImGui::Spacing();
-		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", update.errorText.c_str());
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.35f, 0.35f, 1.0f));
+		ImGui::TextWrapped("%s", update.errorText.c_str());
+		ImGui::PopStyleColor();
 	}
 	if (!update.autoApplySupported && !update.autoApplyDisabledReason.empty())
 	{

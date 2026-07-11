@@ -219,7 +219,10 @@ namespace Updater
 		if (result.status != UpdateCheckStatus_UpdateAvailable)
 		{
 			if (result.status != UpdateCheckStatus_NoUpdate)
+			{
 				state.lastFailureUtc = state.lastCheckUtc;
+				LOG(1, "[UPDATER] Update check failed. status=%d message=%s\n", result.status, result.message.c_str());
+			}
 			store.Save(state);
 			return;
 		}
@@ -279,7 +282,7 @@ namespace Updater
 		}
 		if (_stricmp(sha256.c_str(), update.manifest.sha256.c_str()) != 0)
 		{
-			SetErrorLocked("Downloaded package SHA-256 did not match update manifest.");
+			SetErrorLocked("Downloaded package SHA-256 did not match the update manifest. The download may be corrupted or blocked. Add your BlazBlue Centralfiction installation folder as an antivirus exclusion, then retry.");
 			return;
 		}
 
@@ -431,6 +434,7 @@ namespace Updater
 
 	void UpdateCoordinator::SetErrorLocked(const std::string& error)
 	{
+		LOG(1, "[UPDATER] Update failed: %s\n", error.c_str());
 		EnterCriticalSection(&m_lock);
 		m_snapshot.state = UpdateUiState_Error;
 		m_snapshot.errorText = error;

@@ -6,6 +6,7 @@
 #include <wininet.h>
 #include <algorithm>
 #include <cwchar>
+#include <cstdio>
 
 #pragma comment(lib, "wininet.lib")
 
@@ -22,6 +23,34 @@ namespace Updater
 		{
 			std::string version = MOD_VERSION;
 			return ToWideAscii("BBCFIM/" + version);
+		}
+
+		std::string FormatWindowsError(const char* prefix, DWORD errorCode)
+		{
+			char message[512] = {};
+			FormatMessageA(
+				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+				nullptr,
+				errorCode,
+				0,
+				message,
+				sizeof(message),
+				nullptr);
+
+			char code[32] = {};
+			std::snprintf(code, sizeof(code), "%lu", errorCode);
+			std::string result = prefix;
+			result += " Windows error ";
+			result += code;
+			if (message[0])
+			{
+				result += ": ";
+				result += message;
+				while (!result.empty() && (result[result.size() - 1] == '\r' || result[result.size() - 1] == '\n' || result[result.size() - 1] == '.'))
+					result.erase(result.size() - 1);
+			}
+			result += ".";
+			return result;
 		}
 	}
 
@@ -149,7 +178,7 @@ namespace Updater
 		HINTERNET internet = InternetOpenW(userAgent.c_str(), INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
 		if (!internet)
 		{
-			error = "InternetOpen failed.";
+			error = FormatWindowsError("Could not initialize internet connection.", GetLastError());
 			return false;
 		}
 
@@ -166,15 +195,27 @@ namespace Updater
 
 		if (!request)
 		{
+			const DWORD errorCode = GetLastError();
 			InternetCloseHandle(internet);
-			error = "InternetOpenUrl failed.";
+			error = FormatWindowsError("Could not open GitHub update URL.", errorCode);
 			return false;
 		}
 
 		char buffer[4096];
 		DWORD bytesRead = 0;
-		while (InternetReadFile(request, buffer, sizeof(buffer), &bytesRead) && bytesRead)
+		while (true)
 		{
+			if (!InternetReadFile(request, buffer, sizeof(buffer), &bytesRead))
+			{
+				const DWORD errorCode = GetLastError();
+				InternetCloseHandle(request);
+				InternetCloseHandle(internet);
+				error = FormatWindowsError("GitHub update request was interrupted.", errorCode);
+				return false;
+			}
+			if (!bytesRead)
+				break;
+
 			outText.append(buffer, bytesRead);
 		}
 
