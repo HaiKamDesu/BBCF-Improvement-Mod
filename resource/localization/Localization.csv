@@ -356,6 +356,20 @@ Hidden players,Hidden players,Jugadores ocultos
 Show hidden players window,Show hidden players window,Mostrar ventana de jugadores ocultos
 "Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Abre automáticamente una ventana con los jugadores ocultos por el filtro de conexión mientras la lista clasificatoria está abierta. Cerrar esa ventana equivale a desmarcar esta opción."
 No players are currently hidden.,No players are currently hidden.,No hay jugadores ocultos actualmente.
+Ranked List Config,Ranked List Config,Configuración de lista clasificatoria
+Show ranked list config window,Show ranked list config window,Mostrar ventana de configuración de lista clasificatoria
+"Automatically opens a window while the ranked search list is on screen, holding the connection filter toggle, list sorting, and the list of hidden players. Closing that window is the same as unchecking this.","Automatically opens a window while the ranked search list is on screen, holding the connection filter toggle, list sorting, and the list of hidden players. Closing that window is the same as unchecking this.","Abre automáticamente una ventana mientras la lista de búsqueda clasificatoria está en pantalla, con el interruptor del filtro de conexión, el orden de la lista y la lista de jugadores ocultos. Cerrar esa ventana equivale a desmarcar esta opción."
+Enable the filter to sort the list and review hidden players.,Enable the filter to sort the list and review hidden players.,Activa el filtro para ordenar la lista y revisar los jugadores ocultos.
+Sort ranked list,Sort ranked list,Ordenar lista clasificatoria
+"Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank.","Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank.","Reordena la propia lista de búsqueda clasificatoria. El orden por conexión usa el tiempo de sondeo de alcanzabilidad del filtro (una estimación, no el ping real); el orden por nivel usa el rango anunciado de cada jugador."
+Best to Worst Connection,Best to Worst Connection,Mejor a peor conexión
+Worst to Best Connection,Worst to Best Connection,Peor a mejor conexión
+Closest to Furthest from my Level,Closest to Furthest from my Level,Más cercano a más lejano de mi nivel
+Furthest to Closest from my Level,Furthest to Closest from my Level,Más lejano a más cercano de mi nivel
+Highest to Lowest Level,Highest to Lowest Level,Nivel más alto a más bajo
+Lowest to Highest Level,Lowest to Highest Level,Nivel más bajo a más alto
+Names in A-Z Order,Names in A-Z Order,Nombres en orden A-Z
+Names in Z-A Order,Names in Z-A Order,Nombres en orden Z-A
 Restore,Restore,Restaurar
 Restore all,Restore all,Restaurar todos
 blocked (repeated failures),blocked (repeated failures),bloqueado (fallos repetidos)

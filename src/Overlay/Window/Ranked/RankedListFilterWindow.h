@@ -2,14 +2,16 @@
 
 #include "Overlay/Window/IWindow.h"
 
-// Lists the players currently hidden from the ranked search list by
-// RankedListConnectionFilter, with per-player Restore buttons.
+// "Ranked List Config" window. Holds all ranked-list-filter controls: the
+// enable checkbox, the sort-order dropdown, and the live list of hidden
+// players with per-player Restore. These were moved here out of the F1
+// Network Matches section, which now only carries the toggle that shows this
+// window.
 //
-// Auto-visibility: opens by itself while the ranked search list is on screen
-// (and the filter plus the ShowRankedListFilterWindow setting are enabled),
-// and closes when the list goes away. The user closing the window with its X
-// is treated as unchecking ShowRankedListFilterWindow, persisted to
-// settings.ini - see UpdateAutoVisibility / AfterDraw.
+// Auto-visibility: opens by itself whenever the ranked search list is on
+// screen (and the ShowRankedListConfigWindow setting is enabled), and closes
+// promptly when the list goes away. The user closing the window with its X is
+// treated as unchecking ShowRankedListConfigWindow, persisted to settings.ini.
 class RankedListFilterWindow : public IWindow
 {
 public:
@@ -19,7 +21,7 @@ public:
 	}
 
 	// Called once per frame (MatchState::OnUpdate) to drive automatic
-	// open/close based on filter state and list visibility.
+	// open/close based on the setting and list visibility.
 	void UpdateAutoVisibility();
 
 protected:

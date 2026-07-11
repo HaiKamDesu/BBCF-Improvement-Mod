@@ -660,6 +660,48 @@ struct LocalizationKeysAccessor
         // No players are currently hidden.
         inline const char* No_players_are_currently_hidden() const { return Get("No players are currently hidden."); }
 
+        // Ranked List Config
+        inline const char* Ranked_List_Config() const { return Get("Ranked List Config"); }
+
+        // Show ranked list config window
+        inline const char* Show_ranked_list_config_window() const { return Get("Show ranked list config window"); }
+
+        // Automatically opens a window while the ranked search list is on screen, holding the connection filter toggle, list sorting, and the list of hidden players. Closing that window is the same as unchecking this.
+        inline const char* Automatically_opens_a_window_while_the_ranked_search_list_is_on_screen_holding_the_connection_filter_toggle_list_sorting_and_the_list_of_hidden_players_Closing_that_window_is_the_same_as_unchecking_this() const { return Get("Automatically opens a window while the ranked search list is on screen, holding the connection filter toggle, list sorting, and the list of hidden players. Closing that window is the same as unchecking this."); }
+
+        // Enable the filter to sort the list and review hidden players.
+        inline const char* Enable_the_filter_to_sort_the_list_and_review_hidden_players() const { return Get("Enable the filter to sort the list and review hidden players."); }
+
+        // Sort ranked list
+        inline const char* Sort_ranked_list() const { return Get("Sort ranked list"); }
+
+        // Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank.
+        inline const char* Reorders_the_ranked_search_list_itself_Connection_order_uses_the_filter_s_reachability_probe_timing_an_estimate_not_real_ping_level_order_uses_each_player_s_advertised_rank() const { return Get("Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank."); }
+
+        // Best to Worst Connection
+        inline const char* Best_to_Worst_Connection() const { return Get("Best to Worst Connection"); }
+
+        // Worst to Best Connection
+        inline const char* Worst_to_Best_Connection() const { return Get("Worst to Best Connection"); }
+
+        // Closest to Furthest from my Level
+        inline const char* Closest_to_Furthest_from_my_Level() const { return Get("Closest to Furthest from my Level"); }
+
+        // Furthest to Closest from my Level
+        inline const char* Furthest_to_Closest_from_my_Level() const { return Get("Furthest to Closest from my Level"); }
+
+        // Highest to Lowest Level
+        inline const char* Highest_to_Lowest_Level() const { return Get("Highest to Lowest Level"); }
+
+        // Lowest to Highest Level
+        inline const char* Lowest_to_Highest_Level() const { return Get("Lowest to Highest Level"); }
+
+        // Names in A-Z Order
+        inline const char* Names_in_A_Z_Order() const { return Get("Names in A-Z Order"); }
+
+        // Names in Z-A Order
+        inline const char* Names_in_Z_A_Order() const { return Get("Names in Z-A Order"); }
+
         // Restore
         inline const char* Restore() const { return Get("Restore"); }
 

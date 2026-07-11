@@ -41,6 +41,23 @@
 //   transient one-off failures don't earn permanent blocks.
 // - Two+ real connection failures in a session: blocked for the session.
 //
+// Sort order applied to the delivered (compacted) list - the game renders
+// rows in exactly the order we serve them, so this reorders the actual UI.
+// Values persist in settings.ini as RankedListSortMode.
+enum RankedListSortMode_
+{
+	RankedListSortMode_Default = 0,
+	RankedListSortMode_BestConnection,   // probe establishment time asc, relay penalized
+	RankedListSortMode_WorstConnection,
+	RankedListSortMode_ClosestLevel,     // |their level - my level| asc
+	RankedListSortMode_FurthestLevel,
+	RankedListSortMode_HighestLevel,
+	RankedListSortMode_LowestLevel,
+	RankedListSortMode_NameAZ,
+	RankedListSortMode_NameZA,
+	RankedListSortMode_COUNT,
+};
+
 // Gated behind Settings::settingsIni.enableRankedListConnectionFilter.
 class RankedListConnectionFilter
 {
@@ -113,10 +130,15 @@ public:
 	void RestoreAllPeers();
 	void GetLastListCounts(size_t* outShown, size_t* outHidden) const;
 
-	// True while the game appears to have the lobby search list on screen: it
-	// re-requests the list every few seconds while (and only while) the list is
-	// open, so "a request happened recently" is a reliable open-signal.
+	// True while the game appears to have the lobby search list on screen. The
+	// game calls GetLobbyByIndex continuously (every render frame) while the
+	// list is visible, so recent index access is a tight, prompt open-signal;
+	// recent RequestLobbyList is kept as a coarse fallback.
 	bool IsLobbyListLikelyOpen() const;
+
+	// Called from SteamMatchmakingWrapper::GetLobbyByIndex (filter on or off) to
+	// timestamp list-render activity for IsLobbyListLikelyOpen.
+	void NoteLobbyIndexAccessed();
 
 private:
 	RankedListConnectionFilter();
@@ -153,18 +175,27 @@ private:
 		int reactiveFailCount = 0;
 		bool sessionBlocked = false;
 		std::string lastKnownName; // best-effort, for the hidden-players UI
+		// Connection-quality estimate from the reachability probe: how long the
+		// P2P session took to establish, and whether it went through a relay.
+		// ~0 = never measured.
+		unsigned long long probeElapsedMs = ~0ull;
+		bool usedRelay = false;
 	};
 
 	struct LobbyCandidate
 	{
 		uint64_t lobbyId = 0;
 		uint64_t ownerSteamId = 0;
-		std::string ownerName; // from "ownerName" lobby metadata, for user-facing notifications
+		std::string ownerName;     // from "ownerName" lobby metadata, for user-facing notifications
+		int internalRankLevel = -1; // from "RANK_HOST_LEVEL" lobby metadata (visible level - 1); -1 = unknown
 	};
 
 	void OnLobbyListResultDelivered(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall);
 	void StartProbeIfNeeded(uint64_t steamId);
 	void PollProbes();
+	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
+	// Candidates whose sort key is unknown keep their relative order at the end.
+	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown) const;
 	// While a join attempt is pending, watches for the target appearing as a
 	// member of the game's own room struct (which happens on the confirmation
 	// screen). That proves the connection worked, so a subsequent LeaveLobby -
@@ -183,7 +214,8 @@ private:
 	STEAM_CALLBACK(RankedListConnectionFilter, OnLobbyEnter, LobbyEnter_t);
 
 	std::unordered_map<uint64_t, PeerVerdict> m_verdicts;
-	std::unordered_set<uint64_t> m_probesInFlight;
+	// steamId -> probe start tick, for measuring establishment time.
+	std::unordered_map<uint64_t, unsigned long long> m_probesInFlight;
 	std::unordered_set<uint64_t> m_announcedHidden;
 	std::vector<LobbyCandidate> m_candidates;
 	std::vector<uint64_t> m_reachableLobbies;
@@ -194,6 +226,7 @@ private:
 	size_t m_lastShownCount = 0;
 	size_t m_lastHiddenCount = 0;
 	unsigned long long m_lastListRequestTickMs = 0;
+	unsigned long long m_lastLobbyIndexAccessTickMs = 0;
 
 	LobbyListResultProxy m_lobbyListProxy;
 	CCallbackBase* m_gameLobbyListHandler = nullptr;

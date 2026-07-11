@@ -5,10 +5,14 @@
 #include "Core/logger.h"
 #include "Network/RoomManager.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
+#include "Overlay/Window/Ranked/RankedProgressWindow.h"
 #include "SteamApiWrapper/SteamMatchmakingWrapper.h"
 
 #include <Windows.h>
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -224,6 +228,16 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		candidate.ownerSteamId = g_interfaces.pSteamMatchmakingWrapper->ResolveLobbyOwnerSteamId(lobby);
 		const char* const ownerName = raw->GetLobbyData(lobby, "ownerName");
 		candidate.ownerName = (ownerName != nullptr) ? ownerName : "";
+		const char* const hostLevel = raw->GetLobbyData(lobby, "RANK_HOST_LEVEL");
+		if (hostLevel != nullptr && hostLevel[0] != '\0')
+		{
+			char* end = nullptr;
+			const long parsedLevel = std::strtol(hostLevel, &end, 10);
+			if (end != hostLevel && parsedLevel >= 0 && parsedLevel <= 63)
+			{
+				candidate.internalRankLevel = static_cast<int>(parsedLevel);
+			}
+		}
 		if (candidate.ownerSteamId != 0 && !candidate.ownerName.empty())
 		{
 			// Keep the freshest display name on record for the hidden-players UI.
@@ -290,7 +304,7 @@ void RankedListConnectionFilter::StartProbeIfNeeded(uint64_t steamId)
 		}
 	}
 
-	m_probesInFlight.insert(steamId);
+	m_probesInFlight[steamId] = now;
 
 	if (g_interfaces.pSteamNetworkingWrapper != nullptr)
 	{
@@ -310,7 +324,7 @@ void RankedListConnectionFilter::PollProbes()
 	const unsigned long long now = GetTickCount64();
 	for (auto it = m_probesInFlight.begin(); it != m_probesInFlight.end();)
 	{
-		const uint64_t steamId = *it;
+		const uint64_t steamId = it->first;
 		P2PSessionState_t state = {};
 		if (!g_interfaces.pSteamNetworkingWrapper->GetP2PSessionState(CSteamID(steamId), &state))
 		{
@@ -323,9 +337,12 @@ void RankedListConnectionFilter::PollProbes()
 			PeerVerdict& verdict = m_verdicts[steamId];
 			verdict.kind = PeerVerdict::Kind::Reachable;
 			verdict.verdictTickMs = now;
-			LOG(1, "[RankedListFilter] probe steamId=%llu reachable=1 relay=%u\n",
+			verdict.probeElapsedMs = now - it->second;
+			verdict.usedRelay = state.m_bUsingRelay != 0;
+			LOG(1, "[RankedListFilter] probe steamId=%llu reachable=1 relay=%u elapsedMs=%llu\n",
 				static_cast<unsigned long long>(steamId),
-				static_cast<unsigned int>(state.m_bUsingRelay));
+				static_cast<unsigned int>(state.m_bUsingRelay),
+				verdict.probeElapsedMs);
 			it = m_probesInFlight.erase(it);
 		}
 		else if (state.m_eP2PSessionError != k_EP2PSessionErrorNone)
@@ -407,11 +424,141 @@ bool RankedListConnectionFilter::IsPeerUnresolved(uint64_t steamId) const
 	return true;
 }
 
+void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCandidate*>* shown) const
+{
+	const int mode = Settings::settingsIni.rankedListSortMode;
+	if (shown == nullptr || shown->size() < 2 ||
+		mode <= RankedListSortMode_Default || mode >= RankedListSortMode_COUNT)
+	{
+		return;
+	}
+
+	// "My level" for the closest/furthest modes, from the ranked progress
+	// machinery. If it can't be captured (e.g. unranked), those modes keep the
+	// default order.
+	uint32_t myVisibleRank = 0;
+	bool haveMyRank = false;
+	if (mode == RankedListSortMode_ClosestLevel || mode == RankedListSortMode_FurthestLevel)
+	{
+		RankedProgressOverlaySnapshot snapshot;
+		if (CaptureRankedProgressOverlaySnapshot(&snapshot) && snapshot.active && !snapshot.isUnranked)
+		{
+			myVisibleRank = snapshot.currentRank;
+			haveMyRank = true;
+		}
+		if (!haveMyRank)
+		{
+			LOG(1, "[RankedListFilter] sort: own rank unavailable, keeping default order\n");
+			return;
+		}
+	}
+
+	struct SortEntry
+	{
+		const LobbyCandidate* candidate = nullptr;
+		bool keyKnown = false;
+		long long numericKey = 0;
+		std::string textKey;
+	};
+
+	std::vector<SortEntry> entries;
+	entries.reserve(shown->size());
+	for (const LobbyCandidate* const candidate : *shown)
+	{
+		SortEntry entry;
+		entry.candidate = candidate;
+
+		switch (mode)
+		{
+		case RankedListSortMode_BestConnection:
+		case RankedListSortMode_WorstConnection:
+		{
+			const auto it = m_verdicts.find(candidate->ownerSteamId);
+			if (it != m_verdicts.end() && it->second.probeElapsedMs != ~0ull)
+			{
+				// Relay routes are a worse sign than raw establishment time alone.
+				entry.numericKey = static_cast<long long>(it->second.probeElapsedMs) +
+					(it->second.usedRelay ? 2000 : 0);
+				entry.keyKnown = true;
+			}
+			break;
+		}
+		case RankedListSortMode_ClosestLevel:
+		case RankedListSortMode_FurthestLevel:
+			if (candidate->internalRankLevel >= 0)
+			{
+				const long long theirVisible = candidate->internalRankLevel + 1;
+				const long long diff = theirVisible - static_cast<long long>(myVisibleRank);
+				entry.numericKey = diff >= 0 ? diff : -diff;
+				entry.keyKnown = true;
+			}
+			break;
+		case RankedListSortMode_HighestLevel:
+		case RankedListSortMode_LowestLevel:
+			if (candidate->internalRankLevel >= 0)
+			{
+				entry.numericKey = candidate->internalRankLevel;
+				entry.keyKnown = true;
+			}
+			break;
+		case RankedListSortMode_NameAZ:
+		case RankedListSortMode_NameZA:
+			if (!candidate->ownerName.empty())
+			{
+				entry.textKey = candidate->ownerName;
+				std::transform(entry.textKey.begin(), entry.textKey.end(), entry.textKey.begin(),
+					[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+				entry.keyKnown = true;
+			}
+			break;
+		default:
+			break;
+		}
+
+		entries.push_back(entry);
+	}
+
+	const bool descending =
+		mode == RankedListSortMode_WorstConnection ||
+		mode == RankedListSortMode_FurthestLevel ||
+		mode == RankedListSortMode_HighestLevel ||
+		mode == RankedListSortMode_NameZA;
+	const bool textual = mode == RankedListSortMode_NameAZ || mode == RankedListSortMode_NameZA;
+
+	// Unknown-key entries always sink to the end in their original relative
+	// order, regardless of direction - "worst connection first" should not
+	// reward players we simply haven't measured yet.
+	std::stable_sort(entries.begin(), entries.end(),
+		[descending, textual](const SortEntry& a, const SortEntry& b)
+		{
+			if (a.keyKnown != b.keyKnown)
+			{
+				return a.keyKnown;
+			}
+			if (!a.keyKnown)
+			{
+				return false;
+			}
+			if (textual)
+			{
+				return descending ? (b.textKey < a.textKey) : (a.textKey < b.textKey);
+			}
+			return descending ? (b.numericKey < a.numericKey) : (a.numericKey < b.numericKey);
+		});
+
+	shown->clear();
+	for (const SortEntry& entry : entries)
+	{
+		shown->push_back(entry.candidate);
+	}
+}
+
 void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason)
 {
 	const unsigned long long now = GetTickCount64();
 
 	m_reachableLobbies.clear();
+	std::vector<const LobbyCandidate*> shownCandidates;
 	std::string hiddenNames;
 	size_t newlyHiddenCount = 0;
 	std::unordered_set<uint64_t> hiddenThisPass;
@@ -419,7 +566,7 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	{
 		if (!ShouldHidePeer(candidate.ownerSteamId, now))
 		{
-			m_reachableLobbies.push_back(candidate.lobbyId);
+			shownCandidates.push_back(&candidate);
 			continue;
 		}
 
@@ -462,10 +609,17 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 		}
 	}
 
+	SortShownCandidates(&shownCandidates);
+	for (const LobbyCandidate* const candidate : shownCandidates)
+	{
+		m_reachableLobbies.push_back(candidate->lobbyId);
+	}
+
 	m_lastShownCount = m_reachableLobbies.size();
 	m_lastHiddenCount = m_candidates.size() - m_reachableLobbies.size();
-	LOG(1, "[RankedListFilter] delivering (%s): %zu/%zu lobbies shown\n",
-		reason, m_reachableLobbies.size(), m_candidates.size());
+	LOG(1, "[RankedListFilter] delivering (%s): %zu/%zu lobbies shown, sortMode=%d\n",
+		reason, m_reachableLobbies.size(), m_candidates.size(),
+		Settings::settingsIni.rankedListSortMode);
 
 	if (newlyHiddenCount > 0 && g_notificationBar != nullptr)
 	{
@@ -599,6 +753,10 @@ void RankedListConnectionFilter::OnMatchStarted()
 		PeerVerdict& verdict = m_verdicts[m_pendingConnectionTarget];
 		verdict.kind = PeerVerdict::Kind::Reachable;
 		verdict.verdictTickMs = GetTickCount64();
+		if (verdict.probeElapsedMs == ~0ull)
+		{
+			verdict.probeElapsedMs = 0; // proven by a real match - best possible standing
+		}
 	}
 	m_pendingLobbyId = 0;
 	m_pendingConnectionTarget = 0;
@@ -712,11 +870,26 @@ void RankedListConnectionFilter::GetLastListCounts(size_t* outShown, size_t* out
 	}
 }
 
+void RankedListConnectionFilter::NoteLobbyIndexAccessed()
+{
+	m_lastLobbyIndexAccessTickMs = GetTickCount64();
+}
+
 bool RankedListConnectionFilter::IsLobbyListLikelyOpen() const
 {
-	// Longest observed gap between the game's automatic list re-requests while
-	// the search list stayed on screen was ~15s.
-	constexpr unsigned long long kListActivityWindowMs = 16000;
+	const unsigned long long now = GetTickCount64();
+	// Primary signal: the game reads lobby rows by index every frame the list is
+	// on screen, so a very recent access means it's visible right now and the
+	// window closes promptly once the player leaves.
+	constexpr unsigned long long kIndexAccessWindowMs = 2500;
+	if (m_lastLobbyIndexAccessTickMs != 0 &&
+		now - m_lastLobbyIndexAccessTickMs < kIndexAccessWindowMs)
+	{
+		return true;
+	}
+	// Fallback: covers any moment the list is up but not currently being
+	// index-walked (longest observed auto-refresh gap was ~15s).
+	constexpr unsigned long long kListRequestWindowMs = 16000;
 	return m_lastListRequestTickMs != 0 &&
-		GetTickCount64() - m_lastListRequestTickMs < kListActivityWindowMs;
+		now - m_lastListRequestTickMs < kListRequestWindowMs;
 }
