@@ -23,4 +23,5 @@ enum WindowType_
         WindowType_NetworkSquareColor,
         WindowType_UnlimitedReplayTakeover,
         WindowType_ReleaseChecker,
+        WindowType_RankedListFilter,
 };

@@ -101,7 +101,8 @@
       "Read(//tmp/**)",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /t:BBCF_IM /nologo)",
       "Read(//home/usuario/.claude/skills/**)",
-      "Read(//home/usuario/.claude/**)"
+      "Read(//home/usuario/.claude/**)",
+      "Bash(unzip -l bin/Debug/BBCF.IM.win-x86.v7.3.zip)"
     ]
   }
 }

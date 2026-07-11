@@ -1,0 +1,336 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== DECOMPILE TARGETS =====
+----- DECOMPILE 004a26a0 containing 004a26a0 -----
+Function: FUN_004a26a0
+
+undefined4 __thiscall FUN_004a26a0(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  char cVar1;
+  int iVar2;
+  
+  FUN_00407a60();
+  cVar1 = FUN_00407c90();
+  if (cVar1 != '\0') {
+    iVar2 = FUN_00407a60();
+    if (((*(uint *)(iVar2 + 4) & 0xf00000) != 0x800000) || ((*(uint *)(iVar2 + 4) & 0x40000) == 0))
+    {
+      iVar2 = FUN_004a25c0();
+      if (iVar2 != -100) {
+        if (iVar2 == 0) {
+          return 0;
+        }
+        FUN_004a0cf0();
+        FUN_00407970(param_2);
+        *(undefined4 *)(*(int *)(param_1 + 0x68a0) + 0xe8) = param_3;
+        *(undefined4 *)(*(int *)(param_1 + 0x68a0) + 0xcc) = 1;
+      }
+    }
+  }
+  return 0xffffff9c;
+}
+
+
+
+----- DECOMPILE 004a1930 containing 004a1930 -----
+Function: FUN_004a1930
+
+undefined4 __fastcall FUN_004a1930(int param_1)
+
+{
+  int iVar1;
+  char cVar2;
+  
+  iVar1 = *(int *)(*(int *)(param_1 + 0x68a0) + 0xcc);
+  if ((iVar1 == 3) || (iVar1 == 6)) {
+    cVar2 = FUN_004079b0(*(int *)(param_1 + 0x68a0));
+    if (cVar2 == '\0') {
+      FUN_004a0cf0();
+    }
+    else if (*(int *)(*(int *)(param_1 + 0x68a0) + 0xcc) != 6) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+
+----- DECOMPILE 004a0b80 containing 004a0b80 -----
+Function: FUN_004a0b80
+
+undefined4 __fastcall FUN_004a0b80(int param_1)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  iVar1 = *(int *)(*(int *)(param_1 + 0x68a0) + 0xcc);
+  if ((iVar1 != 4) && (iVar1 != 3)) {
+    uVar2 = 0xffffff9c;
+    if (iVar1 == 6) {
+      uVar2 = 100;
+    }
+    return uVar2;
+  }
+  return 0;
+}
+
+
+
+----- DECOMPILE 004a1ab0 containing 004a1ab0 -----
+Function: FUN_004a1ab0
+
+bool __fastcall FUN_004a1ab0(int param_1)
+
+{
+  int iVar1;
+  
+  iVar1 = *(int *)(*(int *)(param_1 + 0x68a0) + 0xcc);
+  return iVar1 != 0 && iVar1 != 3;
+}
+
+
+
+----- DECOMPILE 004a0fe0 containing 004a0fe0 -----
+Function: FUN_004a0fe0
+
+undefined * FUN_004a0fe0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082adee;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00cf7708 & 1) == 0) {
+    DAT_00cf7708 = DAT_00cf7708 | 1;
+    local_8 = 0;
+    FUN_004a06d0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit((_func_4879 *)&LAB_008488b0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00cad0c0;
+}
+
+
+
+----- DECOMPILE 004b4360 containing 004b4360 -----
+Function: FUN_004b4360
+
+undefined4 __thiscall FUN_004b4360(int *param_1,int param_2)
+
+{
+  int iVar1;
+  uint uVar2;
+  char cVar3;
+  
+  iVar1 = *param_1;
+  cVar3 = FUN_00407c90();
+  if ((cVar3 != '\0') &&
+     ((uVar2 = *(uint *)(iVar1 + param_2 * 0x18 + 4), (uVar2 & 0xf00000) != 0x800000 ||
+      ((uVar2 & 0x40000) == 0)))) {
+    return 1;
+  }
+  return 0;
+}
+
+
+
+----- DECOMPILE 00407c90 containing 00407c90 -----
+Function: FUN_00407c90
+
+uint __fastcall FUN_00407c90(int *param_1)
+
+{
+  uint uVar1;
+  uint in_EAX;
+  uint uVar2;
+  
+  uVar1 = param_1[1];
+  uVar2 = uVar1 >> 0x14 & 0xf;
+  if (((((((uVar2 != 0) && (uVar2 < 0xb)) && (in_EAX = (int)uVar1 >> 0x18, 0 < (int)in_EAX)) &&
+        ((int)in_EAX < 5)) &&
+       ((uVar2 != 1 || ((*param_1 != 0 && (in_EAX = uVar1 & 0xfffff, in_EAX < 5)))))) &&
+      ((uVar2 != 7 || ((*param_1 != 0 && ((uVar1 & 0xfffff) == 0)))))) &&
+     ((uVar2 != 3 || (*param_1 != 0)))) {
+    return CONCAT31((int3)(in_EAX >> 8),1);
+  }
+  return in_EAX & 0xffffff00;
+}
+
+
+
+===== CALLERS (references) =====
+--- callers of 004a26a0 (FUN_004a26a0) ---
+0049a2c4 type=UNCONDITIONAL_CALL caller_fn=FUN_0049a230
+0049d5a6 type=UNCONDITIONAL_CALL caller_fn=FUN_0049d560
+
+--- callers of 004a1930 (FUN_004a1930) ---
+0049d57f type=UNCONDITIONAL_CALL caller_fn=FUN_0049d560
+
+--- callers of 004a0b80 (FUN_004a0b80) ---
+0049d58a type=UNCONDITIONAL_CALL caller_fn=FUN_0049d560
+00499e6e type=UNCONDITIONAL_CALL caller_fn=FUN_00499e60
+0049a7fb type=UNCONDITIONAL_CALL caller_fn=FUN_0049a7f0
+00499dfe type=UNCONDITIONAL_CALL caller_fn=FUN_00499df0
+00499e20 type=UNCONDITIONAL_CALL caller_fn=FUN_00499df0
+0049a95b type=UNCONDITIONAL_CALL caller_fn=FUN_0049a940
+
+--- callers of 004a1ab0 (FUN_004a1ab0) ---
+0049d596 type=UNCONDITIONAL_CALL caller_fn=FUN_0049d560
+0049d453 type=UNCONDITIONAL_CALL caller_fn=FUN_0049d440
+
+--- callers of 004a0fe0 (FUN_004a0fe0) ---
+0046e495 type=UNCONDITIONAL_CALL caller_fn=FUN_0046e440
+0046e597 type=UNCONDITIONAL_CALL caller_fn=FUN_0046e540
+0046e679 type=UNCONDITIONAL_CALL caller_fn=FUN_0046e660
+0047001d type=UNCONDITIONAL_CALL caller_fn=FUN_0046fff0
+0046eb93 type=UNCONDITIONAL_CALL caller_fn=FUN_0046eb80
+0049f056 type=UNCONDITIONAL_CALL caller_fn=FUN_0049f050
+0046ecb7 type=UNCONDITIONAL_CALL caller_fn=FUN_0046ecb0
+0046eff3 type=UNCONDITIONAL_CALL caller_fn=FUN_0046efb0
+0049ef57 type=UNCONDITIONAL_CALL caller_fn=FUN_0049ef50
+0046f531 type=UNCONDITIONAL_CALL caller_fn=FUN_0046f520
+0046fbdd type=UNCONDITIONAL_CALL caller_fn=FUN_0046fb80
+0046ffe4 type=UNCONDITIONAL_CALL caller_fn=FUN_0046ffd0
+00470889 type=UNCONDITIONAL_CALL caller_fn=FUN_00470880
+0049a340 type=UNCONDITIONAL_CALL caller_fn=FUN_0049a340
+00471112 type=UNCONDITIONAL_CALL caller_fn=FUN_00470e30
+00471493 type=UNCONDITIONAL_CALL caller_fn=FUN_00471490
+00472602 type=UNCONDITIONAL_CALL caller_fn=FUN_004725b0
+0047c71e type=UNCONDITIONAL_CALL caller_fn=FUN_0047c690
+0049d5c0 type=UNCONDITIONAL_CALL caller_fn=FUN_0049d5c0
+00496e44 type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+00496e5d type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+00496e64 type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+00496e69 type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+00496eb5 type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+00496ed6 type=UNCONDITIONAL_CALL caller_fn=FUN_00496e40
+0049a7b4 type=UNCONDITIONAL_CALL caller_fn=FUN_0049a7b0
+0049a7bb type=UNCONDITIONAL_CALL caller_fn=FUN_0049a7b0
+0049a7c0 type=UNCONDITIONAL_CALL caller_fn=FUN_0049a7b0
+0049ece7 type=UNCONDITIONAL_CALL caller_fn=FUN_0049ece0
+0049ecee type=UNCONDITIONAL_CALL caller_fn=FUN_0049ece0
+0049ecf3 type=UNCONDITIONAL_CALL caller_fn=FUN_0049ece0
+00496f24 type=UNCONDITIONAL_CALL caller_fn=FUN_00496f20
+00496f2b type=UNCONDITIONAL_CALL caller_fn=FUN_00496f20
+00496f30 type=UNCONDITIONAL_CALL caller_fn=FUN_00496f20
+004a7f0c type=UNCONDITIONAL_CALL caller_fn=FUN_004a7f00
+00496ffa type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+00497277 type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+0049727e type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+00497283 type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+004972a7 type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+004972d5 type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+004972dc type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+004972e1 type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+004972ff type=UNCONDITIONAL_CALL caller_fn=FUN_00496ff0
+00497325 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+00497330 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+004973c2 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+004973c9 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+004973ce type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+004973f2 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+00497419 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+00497420 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+00497425 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+00497443 type=UNCONDITIONAL_CALL caller_fn=FUN_00497320
+004a575d type=UNCONDITIONAL_CALL caller_fn=FUN_004a5740
+00497474 type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+0049747b type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+00497480 type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+0049749e type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+004974a5 type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+004974aa type=UNCONDITIONAL_CALL caller_fn=FUN_00497470
+0049750c type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+00497517 type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+0049751c type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+0049753b type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+004977d1 type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+004977e6 type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+0049785a type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+0049787d type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+004978a5 type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+004978c8 type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+004978eb type=UNCONDITIONAL_CALL caller_fn=FUN_004974e0
+00497a06 type=UNCONDITIONAL_CALL caller_fn=FUN_004979e0
+00497d6f type=UNCONDITIONAL_CALL caller_fn=FUN_00497d40
+004984af type=UNCONDITIONAL_CALL caller_fn=FUN_00498480
+00498a14 type=UNCONDITIONAL_CALL caller_fn=FUN_004989e0
+00498a25 type=UNCONDITIONAL_CALL caller_fn=FUN_004989e0
+004995d6 type=UNCONDITIONAL_CALL caller_fn=FUN_004989e0
+00499741 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499762 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499769 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+0049976e type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+0049978c type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499793 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499798 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+004997ed type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+004997f4 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+004997f9 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499823 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+0049982a type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+0049982f type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499915 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+0049991c type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499921 type=UNCONDITIONAL_CALL caller_fn=FUN_00499720
+00499977 type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+0049997e type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+004999bd type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+004999c4 type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+004999c9 type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+00499a1d type=UNCONDITIONAL_CALL caller_fn=FUN_00499970
+(truncated)
+
+--- callers of 004b4360 (FUN_004b4360) ---
+006567fa type=UNCONDITIONAL_CALL caller_fn=FUN_00656490
+
+--- callers of 00407c90 (FUN_00407c90) ---
+00407d0f type=UNCONDITIONAL_CALL caller_fn=FUN_00407cf0
+0041cd2a type=UNCONDITIONAL_CALL caller_fn=FUN_0041ccf0
+0041cdba type=UNCONDITIONAL_CALL caller_fn=FUN_0041cd80
+0041edb9 type=UNCONDITIONAL_CALL caller_fn=FUN_0041ed30
+0041f4bb type=UNCONDITIONAL_CALL caller_fn=FUN_0041f380
+0041f5c7 type=UNCONDITIONAL_CALL caller_fn=FUN_0041f380
+0041f6f3 type=UNCONDITIONAL_CALL caller_fn=FUN_0041f380
+00421484 type=UNCONDITIONAL_CALL caller_fn=FUN_00421420
+0046d154 type=UNCONDITIONAL_CALL caller_fn=FUN_0046d0a0
+0046d17f type=UNCONDITIONAL_CALL caller_fn=FUN_0046d0a0
+0046d41b type=UNCONDITIONAL_CALL caller_fn=FUN_0046d370
+0046d446 type=UNCONDITIONAL_CALL caller_fn=FUN_0046d370
+0046e7b9 type=UNCONDITIONAL_CALL caller_fn=FUN_0046e790
+004a26b3 type=UNCONDITIONAL_CALL caller_fn=FUN_004a26a0
+004b4371 type=UNCONDITIONAL_CALL caller_fn=FUN_004b4360
+0070d2f4 type=UNCONDITIONAL_CALL caller_fn=FUN_0070d2b0
+
+===== CALLEES =====
+--- callees of 004a26a0 (FUN_004a26a0) ---
+  004a25c0 FUN_004a25c0
+  004a0cf0 FUN_004a0cf0
+  00407a60 FUN_00407a60
+  00407c90 FUN_00407c90
+  00407970 FUN_00407970
+
+--- callees of 004a1930 (FUN_004a1930) ---
+  004a0cf0 FUN_004a0cf0
+  004079b0 FUN_004079b0
+
+--- callees of 004a0b80 (FUN_004a0b80) ---
+
+--- callees of 004a1ab0 (FUN_004a1ab0) ---
+
+--- callees of 004a0fe0 (FUN_004a0fe0) ---
+  0079e1ff _atexit
+  004a06d0 FUN_004a06d0
+
+--- callees of 004b4360 (FUN_004b4360) ---
+  00407c90 FUN_00407c90
+
+--- callees of 00407c90 (FUN_00407c90) ---
+

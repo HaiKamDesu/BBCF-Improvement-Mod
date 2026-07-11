@@ -119,6 +119,9 @@
     <ClCompile Include="src\Overlay\Window\DebugWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\Ranked\RankedListFilterWindow.cpp">
+      <Filter>src\Overlay\Window\Ranked</Filter>
+    </ClCompile>
     <ClCompile Include="src\Overlay\Window\Ranked\RankedMainMenuSection.cpp">
       <Filter>src\Overlay\Window\Ranked</Filter>
     </ClCompile>
@@ -147,11 +150,13 @@
     <ClCompile Include="src\Game\Player.cpp" />
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\MatchState.cpp" />
+    <ClCompile Include="src\Game\NetworkStallDiagnostics.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Overlay\Logger\ImGuiLogger.cpp" />
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
+    <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Palette\CharPaletteHandle.cpp" />
     <ClCompile Include="src\Palette\PaletteManager.cpp" />
     <ClCompile Include="src\CustomGameMode\customGameMode.cpp" />
@@ -313,6 +318,9 @@
     <ClInclude Include="src\Overlay\Window\DebugWindow.h" />
     <ClInclude Include="src\Overlay\Window\LogWindow.h" />
     <ClInclude Include="src\Overlay\Window\MainWindow.h" />
+    <ClInclude Include="src\Overlay\Window\Ranked\RankedListFilterWindow.h">
+      <Filter>src\Overlay\Window\Ranked</Filter>
+    </ClInclude>
     <ClInclude Include="src\Overlay\Window\Ranked\RankedMainMenuSection.h">
       <Filter>src\Overlay\Window\Ranked</Filter>
     </ClInclude>
@@ -345,11 +353,13 @@
     <ClInclude Include="src\Overlay\Window\IWindow.h" />
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\MatchState.h" />
+    <ClInclude Include="src\Game\NetworkStallDiagnostics.h" />
     <ClInclude Include="src\Network\NetworkManager.h" />
     <ClInclude Include="src\Network\Packet.h" />
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Game\Room\Room.h" />
     <ClInclude Include="src\Network\RoomManager.h" />
+    <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Game\Room\RoomMemberEntry.h" />
     <ClInclude Include="src\Network\OnlinePaletteManager.h" />
     <ClInclude Include="src\Palette\CharPaletteHandle.h" />

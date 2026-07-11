@@ -18,6 +18,7 @@
 #include "Overlay/Window/WinePopupWindow.h"
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/Window/NetworkSquareColorWindow.h"
+#include "Overlay/Window/Ranked/RankedListFilterWindow.h"
 #include "Overlay/Window/ReleaseCheckerWindow.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
@@ -100,5 +101,9 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_ReleaseChecker,
                 new ReleaseCheckerWindow("Releases##checker", true, ImGuiWindowFlags_NoCollapse));
+
+        AddWindow(WindowType_RankedListFilter,
+                new RankedListFilterWindow((L("Hidden players") + "###RankedListFilter").c_str(), true,
+                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse));
 }
 

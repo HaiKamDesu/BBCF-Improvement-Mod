@@ -8,6 +8,7 @@
 #include "D3D9EXWrapper/ID3DXWrapper_Effect.h"
 #include "D3D9EXWrapper/ID3D9EXWrapper.h"
 #include "Hooks/hooks_bbcf.h"
+#include "Network/RankedListConnectionFilter.h"
 #include "SteamApiWrapper/steamApiWrappers.h"
 
 #include <detours.h>
@@ -20,6 +21,9 @@ typedef HRESULT(APIENTRY* D3DXCreateEffect_t)(LPDIRECT3DDEVICE9, LPCVOID, UINT, 
 typedef HRESULT(WINAPI* D3DXCreateSprite_t)(LPDIRECT3DDEVICE9 pDevice, LPD3DXSPRITE* ppSprite);
 typedef SteamAPICall_t(__fastcall* RequestLobbyList_t)(ISteamMatchmaking*);
 typedef bool (WINAPI* SteamAPI_Init_t)();
+typedef void (__cdecl* SteamAPI_RunCallbacks_t)();
+typedef void (__cdecl* SteamAPI_RegisterCallResult_t)(class CCallbackBase* pCallback, SteamAPICall_t hAPICall);
+typedef void (__cdecl* SteamAPI_UnregisterCallResult_t)(class CCallbackBase* pCallback, SteamAPICall_t hAPICall);
 typedef HWND(__stdcall* CreateWindowExW_t)(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName,
 	DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam);
 typedef void* (__cdecl* SteamInternal_CreateInterface_t)(const char* ver);
@@ -36,6 +40,9 @@ D3DXCreateEffect_t orig_D3DXCreateEffect;
 D3DXCreateSprite_t orig_D3DXCreateSprite;
 RequestLobbyList_t orig_RequestLobbyList;
 SteamAPI_Init_t orig_SteamAPI_Init;
+SteamAPI_RunCallbacks_t orig_SteamAPI_RunCallbacks;
+SteamAPI_RegisterCallResult_t orig_SteamAPI_RegisterCallResult;
+SteamAPI_UnregisterCallResult_t orig_SteamAPI_UnregisterCallResult;
 CreateWindowExW_t orig_CreateWindowExW;
 SteamInternal_CreateInterface_t orig_SteamInternal_CreateInterface;
 SteamClient_t orig_SteamClient;
@@ -400,6 +407,49 @@ bool WINAPI hook_SteamAPI_Init()
 	return ret;
 }
 
+void __cdecl hook_SteamAPI_RunCallbacks()
+{
+	if (!orig_SteamAPI_RunCallbacks)
+	{
+		return;
+	}
+
+	orig_SteamAPI_RunCallbacks();
+
+	// Post-pump tick: while the ranked-list filter holds a proxied lobby-list
+	// result (probing owners behind the game's native "Searching" popup), poll
+	// probe progress and deliver the count-patched result to the game's own
+	// handler once settled. Bounded internally by the probe timeout.
+	RankedListConnectionFilter::GetInstance().OnSteamCallbacksPump();
+}
+
+void __cdecl hook_SteamAPI_RegisterCallResult(CCallbackBase* pCallback, SteamAPICall_t hAPICall)
+{
+	if (!orig_SteamAPI_RegisterCallResult)
+	{
+		return;
+	}
+
+	// Substitute the ranked-list filter's proxy for the game's handler when this
+	// registration is for the lobby-list call the filter armed; everything else
+	// (including the mod's own CCallResults) passes through untouched.
+	CCallbackBase* const actual = RankedListConnectionFilter::GetInstance().SubstituteRegisterCallResult(
+		pCallback, static_cast<uint64_t>(hAPICall));
+	orig_SteamAPI_RegisterCallResult(actual, hAPICall);
+}
+
+void __cdecl hook_SteamAPI_UnregisterCallResult(CCallbackBase* pCallback, SteamAPICall_t hAPICall)
+{
+	if (!orig_SteamAPI_UnregisterCallResult)
+	{
+		return;
+	}
+
+	CCallbackBase* const actual = RankedListConnectionFilter::GetInstance().SubstituteUnregisterCallResult(
+		pCallback, static_cast<uint64_t>(hAPICall));
+	orig_SteamAPI_UnregisterCallResult(actual, hAPICall);
+}
+
 HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName,
 	DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam)
 {
@@ -437,6 +487,9 @@ bool placeHooks_detours()
 	PBYTE pD3DXCreateEffect = hM_d3dx9_43 ? (PBYTE)GetProcAddress(hM_d3dx9_43, "D3DXCreateEffect") : nullptr;
 	PBYTE pD3DXCreateSprite = hM_d3dx9_43 ? (PBYTE)GetProcAddress(hM_d3dx9_43, "D3DXCreateSprite") : nullptr;
 	PBYTE pSteamAPI_Init = hM_steam_api ? (PBYTE)GetProcAddress(hM_steam_api, "SteamAPI_Init") : nullptr;
+	PBYTE pSteamAPI_RunCallbacks = hM_steam_api ? (PBYTE)GetProcAddress(hM_steam_api, "SteamAPI_RunCallbacks") : nullptr;
+	PBYTE pSteamAPI_RegisterCallResult = hM_steam_api ? (PBYTE)GetProcAddress(hM_steam_api, "SteamAPI_RegisterCallResult") : nullptr;
+	PBYTE pSteamAPI_UnregisterCallResult = hM_steam_api ? (PBYTE)GetProcAddress(hM_steam_api, "SteamAPI_UnregisterCallResult") : nullptr;
 	// [DISABLED: Steam acquisition diagnostics - sections 58-65; all paths confirmed installed but zero calls observed; removing reduces injection surface]
 	// PBYTE pSteamInternal_CreateInterface = (PBYTE)GetProcAddress(hM_steam_api, "SteamInternal_CreateInterface");
 	// PBYTE pSteamClient = (PBYTE)GetProcAddress(hM_steam_api, "SteamClient");
@@ -452,6 +505,9 @@ bool placeHooks_detours()
 	HookOptionalDetour((PBYTE)pD3DXCreateEffect, "D3DXCreateEffect");
 	HookOptionalDetour((PBYTE)pD3DXCreateSprite, "D3DXCreateSprite");
 	HookOptionalDetour((PBYTE)pSteamAPI_Init, "SteamAPI_Init");
+	HookOptionalDetour((PBYTE)pSteamAPI_RunCallbacks, "SteamAPI_RunCallbacks");
+	HookOptionalDetour((PBYTE)pSteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult");
+	HookOptionalDetour((PBYTE)pSteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult");
 	// [DISABLED: acquisition diagnostic HookOptionalDetour calls - sections 58-65]
 	// if (!HookOptionalDetour((PBYTE)pSteamInternal_CreateInterface, "SteamInternal_CreateInterface")) return false;
 	// if (!HookOptionalDetour((PBYTE)pSteamClient, "SteamClient")) return false;
@@ -471,6 +527,12 @@ bool placeHooks_detours()
 		orig_D3DXCreateSprite = (D3DXCreateSprite_t)DetourFunction(pD3DXCreateSprite, (LPBYTE)hook_D3DXCreateSprite);
 	if (pSteamAPI_Init)
 		orig_SteamAPI_Init = (SteamAPI_Init_t)DetourFunction(pSteamAPI_Init, (LPBYTE)hook_SteamAPI_Init);
+	if (pSteamAPI_RunCallbacks)
+		orig_SteamAPI_RunCallbacks = (SteamAPI_RunCallbacks_t)DetourFunction(pSteamAPI_RunCallbacks, (LPBYTE)hook_SteamAPI_RunCallbacks);
+	if (pSteamAPI_RegisterCallResult)
+		orig_SteamAPI_RegisterCallResult = (SteamAPI_RegisterCallResult_t)DetourFunction(pSteamAPI_RegisterCallResult, (LPBYTE)hook_SteamAPI_RegisterCallResult);
+	if (pSteamAPI_UnregisterCallResult)
+		orig_SteamAPI_UnregisterCallResult = (SteamAPI_UnregisterCallResult_t)DetourFunction(pSteamAPI_UnregisterCallResult, (LPBYTE)hook_SteamAPI_UnregisterCallResult);
 	// [DISABLED: acquisition diagnostic DetourFunction installs - sections 58-65]
 	// if (pSteamInternal_CreateInterface) orig_SteamInternal_CreateInterface = ...
 	// if (pSteamClient) orig_SteamClient = ...

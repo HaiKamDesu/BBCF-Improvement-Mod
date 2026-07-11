@@ -7,6 +7,7 @@
 #include "Game/gamestates.h"
 #include "Hooks/hooks_bbcf.h"
 #include "Hooks/RankedAutomationHarness.h"
+#include "Network/RankedListConnectionFilter.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -131,6 +132,10 @@ SteamMatchmakingWrapper::SteamMatchmakingWrapper(ISteamMatchmaking** pSteamMatch
 	m_SteamMatchmaking = *pSteamMatchmaking;
 	void* thisAddress = this;
 	WriteToProtectedMemory((uintptr_t)pSteamMatchmaking, (char*)&thisAddress, 4); //basically *pSteamMatchmaking = this;
+
+	// Construct now (Steam is guaranteed initialized here) so its P2PSessionConnectFail_t
+	// callback is registered before any lobby list request can happen.
+	RankedListConnectionFilter::GetInstance();
 
 	LOG(2, "\t- after: *pSteamMatchmaking: 0x%p, m_SteamMatchmaking: 0x%p\n", *pSteamMatchmaking, m_SteamMatchmaking);
 }
@@ -264,10 +269,35 @@ bool SteamMatchmakingWrapper::RemoveFavoriteGame(AppId_t nAppID, uint32 nIP, uin
 	return m_SteamMatchmaking->RemoveFavoriteGame(nAppID, nIP, nConnPort, nQueryPort, unFlags);
 }
 
+uint64_t SteamMatchmakingWrapper::ResolveLobbyOwnerSteamId(CSteamID steamIDLobby)
+{
+	// GetLobbyOwner() is frequently unresolved for search-result lobbies before we've
+	// actually joined them (confirmed live: returns invalid). Fall back to the
+	// "ownerID" lobby metadata string, same key CacheRankedLobbyOwnerId already reads.
+	const CSteamID owner = m_SteamMatchmaking->GetLobbyOwner(steamIDLobby);
+	if (owner.IsValid())
+	{
+		return owner.ConvertToUint64();
+	}
+
+	const char* const ownerIdStr = m_SteamMatchmaking->GetLobbyData(steamIDLobby, "ownerID");
+	if (ownerIdStr && ownerIdStr[0] != '\0')
+	{
+		char* end = nullptr;
+		const unsigned long long parsed = std::strtoull(ownerIdStr, &end, 10);
+		if (end != ownerIdStr)
+		{
+			return static_cast<uint64_t>(parsed);
+		}
+	}
+	return 0;
+}
+
 SteamAPICall_t SteamMatchmakingWrapper::RequestLobbyList()
 {
 	const SteamAPICall_t call = m_SteamMatchmaking->RequestLobbyList();
 	LOG(7, "[Lobby] RequestLobbyList call=%llu\n", static_cast<unsigned long long>(call));
+	RankedListConnectionFilter::GetInstance().OnLobbyListRequestIssued(static_cast<uint64_t>(call));
 	if (Settings::settingsIni.enableInDevelopmentFeatures && Settings::settingsIni.rankedAutomationHarnessEnabled)
 	{
 		RankedAutomationHarness::NotifyLobbyListRequested();
@@ -323,7 +353,23 @@ void SteamMatchmakingWrapper::AddRequestLobbyListCompatibleMembersFilter(CSteamI
 CSteamID SteamMatchmakingWrapper::GetLobbyByIndex(int iLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper GetLobbyByIndex\n");
-	return m_SteamMatchmaking->GetLobbyByIndex(iLobby);
+
+	// Serve the probed, compacted list when one is active: unreachable entries
+	// are removed (not gapped), so the game builds rows for reachable lobbies
+	// only. Falls through to the raw API when the filter is off or no result
+	// set is available.
+	uint64_t remappedLobbyId = 0;
+	if (RankedListConnectionFilter::GetInstance().TryGetRemappedLobby(iLobby, &remappedLobbyId))
+	{
+		LOG(1, "[RankedListFilter] GetLobbyByIndex(%d) remapped -> %llu\n",
+			iLobby, static_cast<unsigned long long>(remappedLobbyId));
+		return remappedLobbyId != 0 ? CSteamID(remappedLobbyId) : k_steamIDNil;
+	}
+
+	const CSteamID rawLobby = m_SteamMatchmaking->GetLobbyByIndex(iLobby);
+	LOG(1, "[RankedListFilter] GetLobbyByIndex(%d) passthrough -> %llu\n",
+		iLobby, static_cast<unsigned long long>(rawLobby.ConvertToUint64()));
+	return rawLobby;
 }
 
 SteamAPICall_t SteamMatchmakingWrapper::CreateLobby(ELobbyType eLobbyType, int cMaxMembers)
@@ -336,12 +382,21 @@ SteamAPICall_t SteamMatchmakingWrapper::JoinLobby(CSteamID steamIDLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper JoinLobby\n");
 	LOG(7, "\t- steamIDLobby: %llu\n", steamIDLobby.ConvertToUint64());
+
+	const uint64_t ownerSteamId = ResolveLobbyOwnerSteamId(steamIDLobby);
+
+	LOG(1, "[RankedListFilter] JoinLobby lobby=%llu ownerSteamId=%llu\n",
+		static_cast<unsigned long long>(steamIDLobby.ConvertToUint64()),
+		static_cast<unsigned long long>(ownerSteamId));
+	RankedListConnectionFilter::GetInstance().OnJoinLobbyAttempt(steamIDLobby.ConvertToUint64(), ownerSteamId);
+
 	return m_SteamMatchmaking->JoinLobby(steamIDLobby);
 }
 
 void SteamMatchmakingWrapper::LeaveLobby(CSteamID steamIDLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper LeaveLobby\n");
+	RankedListConnectionFilter::GetInstance().OnLeaveLobby(steamIDLobby.ConvertToUint64());
 	return m_SteamMatchmaking->LeaveLobby(steamIDLobby);
 }
 

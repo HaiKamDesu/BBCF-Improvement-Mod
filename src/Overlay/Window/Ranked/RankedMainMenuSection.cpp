@@ -47,6 +47,29 @@ namespace RankedUi
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Shows win/loss ranked outcome predictions during ranked match confirmation and ranked rematch screens when opponent rank data is available.").c_str());
 
+		ImGui::HorizontalSpacing();
+		bool enableRankedListConnectionFilter = Settings::settingsIni.enableRankedListConnectionFilter;
+		if (ImGui::Checkbox(L("Hide unreachable players from ranked list").c_str(), &enableRankedListConnectionFilter))
+		{
+			Settings::settingsIni.enableRankedListConnectionFilter = enableRankedListConnectionFilter;
+			Settings::changeSetting("EnableRankedListConnectionFilter", enableRankedListConnectionFilter ? "1" : "0");
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below.").c_str());
+
+		if (enableRankedListConnectionFilter)
+		{
+			ImGui::HorizontalSpacing();
+			bool showRankedListFilterWindow = Settings::settingsIni.showRankedListFilterWindow;
+			if (ImGui::Checkbox(L("Show hidden players window").c_str(), &showRankedListFilterWindow))
+			{
+				Settings::settingsIni.showRankedListFilterWindow = showRankedListFilterWindow;
+				Settings::changeSetting("ShowRankedListFilterWindow", showRankedListFilterWindow ? "1" : "0");
+			}
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(L("Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.").c_str());
+		}
+
 		ImGui::VerticalSpacing(8);
 		ImGui::HorizontalSpacing();
 		if (ImGui::Button(L("Ranked ladder").c_str()))

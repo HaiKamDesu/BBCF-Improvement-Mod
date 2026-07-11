@@ -639,6 +639,42 @@ struct LocalizationKeysAccessor
         // Shows win/loss ranked outcome predictions during ranked match confirmation and ranked rematch screens when opponent rank data is available.
         inline const char* Shows_win_loss_ranked_outcome_predictions_during_ranked_match_confirmation_and_ranked_rematch_screens_when_opponent_rank_data_is_available() const { return Get("Shows win/loss ranked outcome predictions during ranked match confirmation and ranked rematch screens when opponent rank data is available."); }
 
+        // Hide unreachable players from ranked list
+        inline const char* Hide_unreachable_players_from_ranked_list() const { return Get("Hide unreachable players from ranked list"); }
+
+        // Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below.
+        inline const char* Checks_in_the_background_whether_listed_players_are_actually_reachable_and_hides_confirmed_unreachable_ones_from_the_ranked_search_list_One_off_connection_failures_only_hide_a_player_briefly_repeat_offenders_stay_hidden_for_the_session_Hidden_players_can_be_restored_below() const { return Get("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below."); }
+
+        // Last search: %d shown, %d hidden
+        inline const char* Last_search_d_shown_d_hidden() const { return Get("Last search: %d shown, %d hidden"); }
+
+        // Hidden players
+        inline const char* Hidden_players() const { return Get("Hidden players"); }
+
+        // Show hidden players window
+        inline const char* Show_hidden_players_window() const { return Get("Show hidden players window"); }
+
+        // Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.
+        inline const char* Automatically_opens_a_window_listing_players_hidden_by_the_connection_filter_while_the_ranked_list_is_open_Closing_that_window_is_the_same_as_unchecking_this() const { return Get("Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this."); }
+
+        // No players are currently hidden.
+        inline const char* No_players_are_currently_hidden() const { return Get("No players are currently hidden."); }
+
+        // Restore
+        inline const char* Restore() const { return Get("Restore"); }
+
+        // Restore all
+        inline const char* Restore_all() const { return Get("Restore all"); }
+
+        // blocked (repeated failures)
+        inline const char* blocked_repeated_failures() const { return Get("blocked (repeated failures)"); }
+
+        // connection failed
+        inline const char* connection_failed() const { return Get("connection failed"); }
+
+        // unreachable
+        inline const char* unreachable() const { return Get("unreachable"); }
+
         // Ranked ladder
         inline const char* Ranked_ladder() const { return Get("Ranked ladder"); }
 

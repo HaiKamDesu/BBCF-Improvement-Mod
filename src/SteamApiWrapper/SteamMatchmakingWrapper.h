@@ -1,5 +1,6 @@
 #pragma once
 #include <isteammatchmaking.h>
+#include <steam_api.h>
 
 #include <Windows.h>
 
@@ -71,4 +72,6 @@ public:
 	void CheckForPSNGameBootInvite(unsigned int iGameBootAttributes);
 #endif
 	CALL_BACK(LobbyChatUpdate_t)
+
+	uint64_t ResolveLobbyOwnerSteamId(CSteamID steamIDLobby);
 };

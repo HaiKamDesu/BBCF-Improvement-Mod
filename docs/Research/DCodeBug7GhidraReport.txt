@@ -1,0 +1,66 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== REFERENCES TO 00ea97c8 =====
+004b9fc8 type=READ fn=FUN_004b9f70
+
+===== DECOMPILE EACH REFERENCING FUNCTION =====
+----- DECOMPILE 004b9f70 -----
+Function: FUN_004b9f70
+
+undefined4 FUN_004b9f70(void)
+
+{
+  int iVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082b6ce;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00ebfe18 & 1) == 0) {
+    DAT_00ebfe18 = DAT_00ebfe18 | 1;
+    local_8 = 0;
+    FUN_004b9350(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_00848960);
+  }
+  local_8 = 0xffffffff;
+  if (DAT_00ea97c8 == 1) {
+    iVar1 = FUN_004b9770();
+    *(undefined4 *)(iVar1 + 0x1b1200) = 0;
+    iVar1 = FUN_004b9770();
+    *(undefined4 *)(iVar1 + 0x1b11f0) = 2;
+    ExceptionList = local_10;
+    return 0;
+  }
+  if (DAT_00ea97c8 == 2) {
+    iVar1 = FUN_004caca0();
+    if (iVar1 != 0) {
+      ExceptionList = local_10;
+      return 0;
+    }
+    iVar1 = FUN_004b9770();
+    if (*(int *)(iVar1 + 0x1b1200) != 0) {
+      iVar1 = FUN_004b9770();
+      *(undefined4 *)(iVar1 + 0x1b11f0) = 3;
+      ExceptionList = local_10;
+      return 0;
+    }
+  }
+  else if (DAT_00ea97c8 != 3) {
+    ExceptionList = local_10;
+    return 0;
+  }
+  iVar1 = FUN_004b9770();
+  *(undefined4 *)(iVar1 + 0x1b11f0) = 0;
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+===== CALLERS OF EACH REFERENCING FUNCTION =====
+--- callers of 004b9f70 (FUN_004b9f70) ---
+008aa400 type=DATA caller_fn=<none>
+

@@ -349,6 +349,18 @@ Show square color progress,Show square color progress,Mostrar progreso de color 
 Shows a movable network square color progress window while inside network mode.,Shows a movable network square color progress window while inside network mode.,Muestra una ventana movible de progreso de color de square dentro del modo network.
 Show ranked prediction,Show ranked prediction,Mostrar predicción de rango
 Shows win/loss ranked outcome predictions during ranked match confirmation and ranked rematch screens when opponent rank data is available.,Shows win/loss ranked outcome predictions during ranked match confirmation and ranked rematch screens when opponent rank data is available.,Muestra predicciones de victoria y derrota durante la confirmación y la revancha clasificatoria cuando el rango del rival está disponible.
+Hide unreachable players from ranked list,Hide unreachable players from ranked list,Ocultar jugadores inalcanzables de la lista clasificatoria
+"Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below.","Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below.","Comprueba en segundo plano si los jugadores de la lista son realmente alcanzables y oculta de la lista clasificatoria a los confirmados como inalcanzables. Los fallos de conexión puntuales solo ocultan a un jugador brevemente; los reincidentes quedan ocultos durante la sesión. Los jugadores ocultos se pueden restaurar abajo."
+"Last search: %d shown, %d hidden","Last search: %d shown, %d hidden","Última búsqueda: %d visibles, %d ocultos"
+Hidden players,Hidden players,Jugadores ocultos
+Show hidden players window,Show hidden players window,Mostrar ventana de jugadores ocultos
+"Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Abre automáticamente una ventana con los jugadores ocultos por el filtro de conexión mientras la lista clasificatoria está abierta. Cerrar esa ventana equivale a desmarcar esta opción."
+No players are currently hidden.,No players are currently hidden.,No hay jugadores ocultos actualmente.
+Restore,Restore,Restaurar
+Restore all,Restore all,Restaurar todos
+blocked (repeated failures),blocked (repeated failures),bloqueado (fallos repetidos)
+connection failed,connection failed,conexión fallida
+unreachable,unreachable,inalcanzable
 Ranked ladder,Ranked ladder,Escalera clasificatoria
 Ranked ladder###RankedLadder,Ranked ladder###RankedLadder,Escalera clasificatoria###RankedLadder
 "Opens the ranked ladder window, including known LP thresholds and population estimates.","Opens the ranked ladder window, including known LP thresholds and population estimates.",Abre la ventana de escalera clasificatoria con umbrales de LP conocidos y estimaciones de población.
