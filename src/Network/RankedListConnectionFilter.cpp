@@ -46,6 +46,30 @@ namespace
 	constexpr unsigned long long kReachableTtlMs = 5 * 60 * 1000;
 	constexpr unsigned long long kProbeUnreachableTtlMs = 10 * 60 * 1000;
 
+	// How long a cached real gameTier is trusted for sorting before it's
+	// treated as unknown again. Long enough to survive the gap between a
+	// brand-new search's delivery and its own row/entry objects resolving
+	// (the game only creates those at delivery time, so there's necessarily
+	// a lag), short enough that a truly stale reading from long ago (e.g. a
+	// player who left and came back much later) doesn't keep winning the
+	// sort. See "regressed to fallback-only" section in the progress doc for
+	// why an unconditional per-search wipe was tried and reverted instead.
+	constexpr unsigned long long kGameTierTtlMs = 45 * 1000;
+
+	// Exact reproduction of the game's own RTT -> Delay-digit bucketing
+	// (FUN_004a6620, used by the ranked list row renderer FUN_00661060 to draw
+	// the '0'+digit glyph): negative = unresolved (nothing drawn), <60ms = 4,
+	// <100ms = 3, <200ms = 2, <300ms = 1, otherwise 0. Higher = better.
+	int GameDelayDigitFromRtt(int rttMs)
+	{
+		if (rttMs < 0) return -1;
+		if (rttMs < 0x3C) return 4;
+		if (rttMs < 0x64) return 3;
+		if (rttMs < 0xC8) return 2;
+		if (rttMs < 0x12C) return 1;
+		return 0;
+	}
+
 	// One real connection failure hides the peer only briefly - live testing
 	// showed one-off transient failures happen to otherwise-fine players.
 	// Repeat offenders get blocked for the session.
@@ -268,6 +292,22 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		return;
 	}
 
+	// NOTE: an earlier version of this function unconditionally wiped every
+	// cached gameTier here on every new list. That fixed one real bug (a
+	// stale tier from an EARLIER search winning the sort for a player whose
+	// brand-new row hadn't resolved yet) but caused a WORSE regression:
+	// the game only creates its row/entry objects at the moment we actually
+	// deliver a list (that's what triggers its own GetLobbyByIndex calls),
+	// so during the hold period before delivery there is nothing fresh to
+	// poll for THIS new list yet - and since only the first delivery of a
+	// search ever reaches the screen (later in-place recomputations don't -
+	// see "MAJOR FINDING" section in the progress doc), wiping the cache
+	// here meant NO delivery ever had real tier data again. Live-confirmed:
+	// 0 of 3 real deliveries in one full session used real tier data after
+	// this wipe was added. Reverted - staleness is now bounded by
+	// PeerVerdict::gameTierTickMs + kGameTierTtlMs in SortShownCandidates
+	// instead of an unconditional wipe here.
+
 	m_heldIOFailure = bIOFailure;
 	m_heldApiCall = (hSteamAPICall != 0) ? hSteamAPICall : m_pendingApiCall;
 	if (pvParam != nullptr)
@@ -312,6 +352,15 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 				candidate.internalRankLevel = static_cast<int>(parsedLevel);
 			}
 		}
+		// NOTE (2026-07-12): an earlier version read the "HOST_NETCOLOR" lobby
+		// metadata key here and used it as the connection sort key. That key
+		// IS what fills the row entry's +0x74 byte (instruction-level verified
+		// against the FUN_0046fcc0 switch jump table) - but +0x74 only drives
+		// the row's small colored ICON, not the numeric 0-4 Delay column the
+		// user actually compares against. The Delay digit is rendered from
+		// entry+0x78 (viewer-measured average RTT, bucketed by FUN_004a6620) -
+		// see the progress doc's 2026-07-12 "Delay column source" section.
+		// PollGameTiers() now reads that RTT field; no metadata tier read here.
 		if (candidate.ownerSteamId != 0 && !candidate.ownerName.empty())
 		{
 			// Keep the freshest display name on record for the hidden-players UI.
@@ -496,12 +545,7 @@ void RankedListConnectionFilter::PollGameTiers()
 	}
 
 	const int32_t rowCount = *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(listStruct) + 0xae8);
-	// Only trust this read when the game's own row count exactly matches our
-	// last delivery - live testing showed a brief lag (a tick or two) right
-	// after each delivery where the game's count reads 0/stale before
-	// catching up. Skipping the mismatched window avoids pairing a row's
-	// tier with the wrong peer.
-	if (rowCount <= 0 || static_cast<size_t>(rowCount) != m_reachableLobbies.size())
+	if (rowCount <= 0)
 	{
 		return;
 	}
@@ -509,7 +553,6 @@ void RankedListConnectionFilter::PollGameTiers()
 	const uint8_t* const permutationArray = reinterpret_cast<const uint8_t*>(listStruct) + 0xaf4;
 	typedef void* (__thiscall * WalkRowListFn)(void*, int32_t);
 	const WalkRowListFn walkRowList = reinterpret_cast<WalkRowListFn>(moduleBase + kWalkRowListRva);
-	typedef uint8_t(__thiscall * GetTierFn)(void*);
 
 	for (int32_t row = 0; row < rowCount; ++row)
 	{
@@ -525,47 +568,71 @@ void RankedListConnectionFilter::PollGameTiers()
 		{
 			continue;
 		}
-		const void* const entryVtable = *reinterpret_cast<void* const*>(entry);
-		if (entryVtable == nullptr ||
-			IsBadReadPtr(reinterpret_cast<const uint8_t*>(entryVtable) + 0x1c, sizeof(void*)))
-		{
-			continue;
-		}
-		const GetTierFn getTier =
-			*reinterpret_cast<const GetTierFn*>(reinterpret_cast<uintptr_t>(entryVtable) + 0x1c);
-		if (getTier == nullptr)
-		{
-			continue;
-		}
-		const uint8_t tier = getTier(entry);
 
-		// Row order matches our own last-delivered order exactly (rowCount
-		// was just confirmed equal to m_reachableLobbies.size() above) - map
-		// position -> lobbyId -> ownerSteamId to know which peer this is.
-		const uint64_t lobbyId = m_reachableLobbies[static_cast<size_t>(row)];
-		for (const LobbyCandidate& candidate : m_candidates)
+		// Identity key (progress doc: "CONFIRMED: the identity field IS the
+		// real Steam64 ID, byte-for-byte") - a plain pointer chase, no
+		// virtual call. entry+0x114 is null until the game's own connection-
+		// quality resolver has run for this row at least once; skip rows
+		// that haven't resolved yet rather than guessing who they are. This
+		// REPLACES the old positional row->lobbyId->steamId lookup, which
+		// was proven unreliable (see "MAJOR NEW FINDING"/"RESOLVED
+		// (differently than expected)" sections) - correctness here no
+		// longer depends on row order matching delivery order at all.
+		const uint8_t* const idSubObjPtr = reinterpret_cast<const uint8_t*>(entry) + 0x114;
+		if (IsBadReadPtr(idSubObjPtr, sizeof(void*)))
 		{
-			if (candidate.lobbyId == lobbyId)
-			{
-				PeerVerdict& verdict = m_verdicts[candidate.ownerSteamId];
-				verdict.gameTier = tier;
-				// Cumulative average across every observation this session -
-				// smooths out any single noisy/mismapped reading rather than
-				// letting the sort key jump around on one bad sample.
-				if (verdict.gameTierSampleCount <= 0)
-				{
-					verdict.gameTierAverage = static_cast<double>(tier);
-				}
-				else
-				{
-					verdict.gameTierAverage =
-						(verdict.gameTierAverage * verdict.gameTierSampleCount + tier) /
-						(verdict.gameTierSampleCount + 1);
-				}
-				++verdict.gameTierSampleCount;
-				break;
-			}
+			continue;
 		}
+		const void* const idSubObj = *reinterpret_cast<void* const*>(idSubObjPtr);
+		if (idSubObj == nullptr ||
+			IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
+		{
+			continue;
+		}
+		const uint32_t idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+		const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+		const uint64_t steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
+		if (steamId == 0)
+		{
+			continue;
+		}
+
+		// The value behind the on-screen Delay column: entry+0x78 holds the
+		// viewer-measured average RTT to this host (best 4 of 5 samples,
+		// resolved asynchronously by the game's own FUN_0046db40 from its
+		// steamId-keyed RTT sample table; 0xFFFFFFFF/-1 until resolved). This
+		// is a plain dword field read - no virtual call at all, strictly safer
+		// than the old vtable slot-7 tier call this replaces. The old +0x74
+		// byte that call returned is the HOST_NETCOLOR icon index, NOT the
+		// Delay digit - see progress doc 2026-07-12 "Delay column source".
+		const uint8_t* const rttFieldPtr = reinterpret_cast<const uint8_t*>(entry) + 0x78;
+		if (IsBadReadPtr(rttFieldPtr, sizeof(int32_t)))
+		{
+			continue;
+		}
+		const int32_t rttMs = *reinterpret_cast<const int32_t*>(rttFieldPtr);
+		if (rttMs < 0)
+		{
+			continue; // sentinel - the game hasn't resolved this row's RTT yet
+		}
+
+		PeerVerdict& verdict = m_verdicts[steamId];
+		verdict.gameRttMs = rttMs;
+		verdict.gameTier = GameDelayDigitFromRtt(rttMs);
+		verdict.gameTierTickMs = now;
+		// Cumulative average across every observation this session - kept for
+		// diagnostics only (user chose latest-reading sorting).
+		if (verdict.gameTierSampleCount <= 0)
+		{
+			verdict.gameTierAverage = static_cast<double>(rttMs);
+		}
+		else
+		{
+			verdict.gameTierAverage =
+				(verdict.gameTierAverage * verdict.gameTierSampleCount + rttMs) /
+				(verdict.gameTierSampleCount + 1);
+		}
+		++verdict.gameTierSampleCount;
 	}
 }
 
@@ -648,6 +715,8 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 		return;
 	}
 
+	const unsigned long long now = GetTickCount64();
+
 	// "My level" for the closest/furthest modes, from the ranked progress
 	// machinery. If it can't be captured (e.g. unranked), those modes keep the
 	// default order.
@@ -674,6 +743,12 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 		bool keyKnown = false;
 		long long numericKey = 0;
 		std::string textKey;
+		// Connection modes only: the peer's current on-screen Delay digit
+		// (0-4) and raw RTT when the real reading was used; -1 otherwise.
+		// Logged so a screenshot's visible Delay column can be compared
+		// against the delivered order digit-for-digit.
+		int delayDigit = -1;
+		int rttMs = -1;
 	};
 
 	std::vector<SortEntry> entries;
@@ -688,24 +763,43 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 		case RankedListSortMode_BestConnection:
 		case RankedListSortMode_WorstConnection:
 		{
-			// Prefer the game's own real connection-quality tier
-			// (0-7, higher = better - see docs/Research/RankedListConnectionFilter_Progress.md
-			// for the full RE trace and live confirmation) whenever it's been
-			// observed at least once for this peer, read live by
-			// PollGameTiers(). Uses the cumulative average across every
-			// observation this session (gameTierAverage), not just the
-			// latest single reading, per the reasoning that a one-off noisy
-			// or mismapped sample shouldn't move a peer's sort position by
-			// itself. Fixed-point (x100) so the average survives as an
-			// integer sort key; negated so ascending numericKey still means
-			// "best first" for RankedListSortMode_BestConnection, matching
-			// the convention the probeElapsedMs fallback below already uses
-			// (smaller = better = sorts first ascending).
+			// Prefer the game's own measured per-viewer RTT (the exact value
+			// behind the on-screen 0-4 Delay digit - lower = better; see
+			// docs/Research/RankedListConnectionFilter_Progress.md 2026-07-12
+			// "Delay column source" section) whenever it's been observed
+			// recently for this peer, read live by PollGameTiers(). Sorting by
+			// the raw RTT rather than the bucketed digit gives a finer order
+			// that is still digit-monotonic, so the visible Delay column reads
+			// sorted. Uses the LATEST single reading, not the cumulative
+			// average - user explicitly chose "match the currently-displayed
+			// number" over a smoother but sometimes-stale ranking.
+			//
+			// Real RTT and the probeElapsedMs fallback are fundamentally
+			// different metrics and must never be compared directly. Live
+			// testing found exactly this bug class before: values on
+			// incompatible scales let a confirmed-worst peer beat every
+			// not-yet-measured one. Real-RTT keys therefore live in their own
+			// band (around kRealTierKeyBase, always far more negative than any
+			// plausible probeElapsedMs value) so ANY resolved real reading
+			// sorts as a block ahead of ANY fallback-only peer, in EITHER Best
+			// or Worst mode - direction is baked in directly here (via the
+			// `worst` bool) rather than via the shared `descending` flip
+			// below, because that flip alone would invert the
+			// real-vs-fallback bucket priority for Worst mode.
+			constexpr long long kRealTierKeyBase = -1000000000LL;
+			const bool worst = mode == RankedListSortMode_WorstConnection;
 			const auto it = m_verdicts.find(candidate->ownerSteamId);
-			if (it != m_verdicts.end() && it->second.gameTierSampleCount > 0)
+			if (it != m_verdicts.end() && it->second.gameRttMs >= 0 &&
+				it->second.gameTierSampleCount > 0 &&
+				now - it->second.gameTierTickMs < kGameTierTtlMs)
 			{
-				entry.numericKey = -static_cast<long long>(it->second.gameTierAverage * 100.0);
+				// rttMs is realistically < ~100000, so the key stays deep
+				// inside the negative band in both directions.
+				const long long rtt = static_cast<long long>(it->second.gameRttMs);
+				entry.numericKey = kRealTierKeyBase + (worst ? -rtt : rtt);
 				entry.keyKnown = true;
+				entry.delayDigit = it->second.gameTier;
+				entry.rttMs = it->second.gameRttMs;
 			}
 			// Fallback: the mod's own reachability-probe establishment time,
 			// only used until the real tier above has been observed - it's a
@@ -713,8 +807,9 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 			// column, and unlike the tier it never updates after first probe.
 			else if (it != m_verdicts.end() && it->second.probeElapsedMs != ~0ull)
 			{
-				entry.numericKey = static_cast<long long>(it->second.probeElapsedMs) +
+				const long long probeKey = static_cast<long long>(it->second.probeElapsedMs) +
 					(it->second.usedRelay ? 2000 : 0);
+				entry.numericKey = worst ? -probeKey : probeKey;
 				entry.keyKnown = true;
 			}
 			break;
@@ -754,8 +849,12 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 		entries.push_back(entry);
 	}
 
+	// RankedListSortMode_WorstConnection deliberately excluded here - its
+	// direction is baked directly into numericKey above (see the `worst`
+	// bool in the connection-mode case), because a simple ascending/
+	// descending flip alone would invert the real-tier-vs-fallback bucket
+	// priority (see the comment there for why).
 	const bool descending =
-		mode == RankedListSortMode_WorstConnection ||
 		mode == RankedListSortMode_FurthestLevel ||
 		mode == RankedListSortMode_HighestLevel ||
 		mode == RankedListSortMode_NameZA;
@@ -808,6 +907,16 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 			snprintf(part, sizeof(part), " #%zu owner=%llu name=\"%s\" known=%d text=\"%s\"", i,
 				static_cast<unsigned long long>(entries[i].candidate->ownerSteamId), name,
 				entries[i].keyKnown ? 1 : 0, entries[i].textKey.c_str());
+		}
+		else if (entries[i].delayDigit >= 0)
+		{
+			// Connection mode with a real game reading: include the on-screen
+			// Delay digit and raw RTT so screenshots can be cross-checked
+			// digit-for-digit against this delivered order.
+			snprintf(part, sizeof(part), " #%zu owner=%llu name=\"%s\" known=%d key=%lld delay=%d rtt=%d", i,
+				static_cast<unsigned long long>(entries[i].candidate->ownerSteamId), name,
+				entries[i].keyKnown ? 1 : 0, entries[i].numericKey,
+				entries[i].delayDigit, entries[i].rttMs);
 		}
 		else
 		{
@@ -973,16 +1082,13 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	// every few seconds and picks up the results).
 	PollProbes();
 	PollPendingConnectionConfirmation();
-	// TEMPORARILY DISABLED (2026-07-11) for an isolation test: name-tagged
-	// logs showed the row/entry association for this chain rotating on its
-	// own roughly once per second with zero real delivery in between - see
-	// docs/Research/RankedListConnectionFilter_Progress.md "MAJOR NEW
-	// FINDING". Not yet known whether this rotation is a game-internal
-	// behavior or caused/worsened by the mod's own repeated calls into this
-	// chain. Disabling this call (and the diagnostic below) for one test
-	// session to see whether the on-screen list stays visually stable with
-	// zero mod interference - re-enable once that's answered either way.
-	// PollGameTiers();
+	// Reads each game row's +0x78 measured RTT (the true source of the
+	// on-screen 0-4 Delay digit) keyed by the row's own embedded Steam64 ID.
+	// NOTE: an interim version instead read the "HOST_NETCOLOR" lobby
+	// metadata here-ish - that key feeds the row's colored ICON (+0x74), not
+	// the Delay digit, and was verified to be the wrong column (see progress
+	// doc 2026-07-12 "Delay column source" section).
+	PollGameTiers();
 
 	if (m_pipelineState == PipelineState::Idle)
 	{
@@ -1337,18 +1443,21 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 			{
 				rowCount = *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(listStruct) + 0xae8);
 
-				// TEMPORARILY DISABLED (2026-07-11), per-row loop only - kept
-				// the mgr/rowCount read above alive for basic liveness
-				// confirmation. Name-tagged logs showed the tier-to-name
-				// association from this exact per-row walk (FUN_004a5450 +
-				// entry vtable slot 7) rotating on its own roughly once per
-				// second with zero real delivery in between - see progress
-				// doc "MAJOR NEW FINDING". Disabling this specific loop
-				// (the only place besides PollGameTiers, also disabled, that
-				// calls into this chain) isolates whether the mod's own
-				// repeated calls are causing/worsening the rotation, or
-				// whether it's purely game-internal. Re-enable once
-				// answered either way.
+				// Per-row tier-vs-name correlation loop stays DISABLED (see
+				// "MAJOR NEW FINDING" in the progress doc - that correlation
+				// is proven unreliable). Re-enabled just enough rows here
+				// (kIdentityProbeRowCount) for a NARROWER, SAFER purpose:
+				// this exact walk (FUN_004a5450 + entry vtable slot 7) has
+				// been called from the mod's own code across many prior
+				// sessions with zero crashes - only a live CDB breakpoint on
+				// the underlying game function ever crashed the game (see
+				// progress doc "live CDB debugging attempts" - two crashes,
+				// both from setting an actual breakpoint, never from the
+				// mod's own calls). So it's safe to also peek the entry's own
+				// vtable pointer here (already read as entryVtable below,
+				// previously discarded after use) and log its RVA, to
+				// identify the entry's concrete class statically via Ghidra
+				// - entirely without a live debugger.
 				const uint8_t* const permutationArray =
 					reinterpret_cast<const uint8_t*>(listStruct) + 0xaf4;
 				typedef void* (__thiscall * WalkRowListFn)(void*, int32_t);
@@ -1356,7 +1465,8 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 					reinterpret_cast<WalkRowListFn>(moduleBase + kWalkRowListRva);
 				typedef uint8_t(__thiscall * GetTierFn)(void*);
 
-				const int rowsToRead = 0; // was: (rowCount <= 0) ? 0 : (rowCount < kMaxDiagnosticRows ? rowCount : kMaxDiagnosticRows);
+				constexpr int kIdentityProbeRowCount = 10;
+				const int rowsToRead = (rowCount <= 0) ? 0 : (rowCount < kIdentityProbeRowCount ? rowCount : kIdentityProbeRowCount);
 				for (int row = 0; row < rowsToRead; ++row)
 				{
 					const int32_t* const permutationSlot =
@@ -1411,8 +1521,70 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 						}
 					}
 
-					char part[64];
-					snprintf(part, sizeof(part), " [%d]=%u(%s)", row, static_cast<unsigned int>(tier), name);
+					// Entry vtable RVA (address - moduleBase), computed and
+					// logged entirely from within the mod's own already-safe
+					// call chain - no live debugger needed. This is what
+					// lets the entry's concrete class be identified
+					// statically in Ghidra (0x00400000 + this RVA), to
+					// check its fields/other vtable slots for an identity
+					// value (steamId or similar) instead of relying on the
+					// now-disproven positional row/name mapping.
+					const uintptr_t entryVtableRva =
+						reinterpret_cast<uintptr_t>(entryVtable) - moduleBase;
+
+					// Candidate identity key (progress doc: "ENTRY vtable
+					// resolved via static Ghidra analysis" section) - a
+					// plain pointer chase, no virtual call, no calling-
+					// convention risk. entry+0x114 is a sub-object pointer,
+					// null until the game's own connection-quality resolver
+					// (FUN_0046db40) runs for this row at least once; its
+					// +0xc/+0x10 dwords are the same 2-dword key shape the
+					// game itself uses elsewhere to correlate this row with
+					// an established P2P connection (leading hypothesis:
+					// the peer's Steam64 ID, not yet proven bit-for-bit).
+					// Logged for correlation only - not used for any real
+					// decision yet.
+					uint32_t idLow = 0;
+					uint32_t idHigh = 0;
+					bool idKnown = false;
+					const uint8_t* const idSubObjPtr = reinterpret_cast<const uint8_t*>(entry) + 0x114;
+					if (!IsBadReadPtr(idSubObjPtr, sizeof(void*)))
+					{
+						const void* const idSubObj = *reinterpret_cast<void* const*>(idSubObjPtr);
+						if (idSubObj != nullptr &&
+							!IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
+						{
+							idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+							idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+							idKnown = true;
+						}
+					}
+
+					// The +0x78 measured-RTT field that actually drives the
+					// on-screen 0-4 Delay digit (see progress doc 2026-07-12
+					// "Delay column source") - logged alongside the +0x74
+					// icon tier so future sessions can cross-check both.
+					int32_t rttMs = -1;
+					const uint8_t* const rttPtr = reinterpret_cast<const uint8_t*>(entry) + 0x78;
+					if (!IsBadReadPtr(rttPtr, sizeof(int32_t)))
+					{
+						rttMs = *reinterpret_cast<const int32_t*>(rttPtr);
+					}
+					const int delayDigit = GameDelayDigitFromRtt(rttMs);
+
+					char part[200];
+					if (idKnown)
+					{
+						snprintf(part, sizeof(part), " [%d]=icon:%u,delay:%d,rtt:%d(%s,vtableRva=0x%zx,id=%08x%08x)", row,
+							static_cast<unsigned int>(tier), delayDigit, rttMs, name,
+							static_cast<size_t>(entryVtableRva), idHigh, idLow);
+					}
+					else
+					{
+						snprintf(part, sizeof(part), " [%d]=icon:%u,delay:%d,rtt:%d(%s,vtableRva=0x%zx,id=unresolved)", row,
+							static_cast<unsigned int>(tier), delayDigit, rttMs, name,
+							static_cast<size_t>(entryVtableRva));
+					}
 					tierDump += part;
 				}
 			}

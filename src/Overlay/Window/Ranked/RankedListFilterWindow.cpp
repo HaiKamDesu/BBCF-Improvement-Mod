@@ -73,7 +73,7 @@ void RankedListFilterWindow::Draw()
 	}
 	ImGui::PopItemWidth();
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker(L("Reorders the ranked search list itself. Connection order uses the game's own connection-quality rating once observed for a player, updating live as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank.").c_str());
+	ImGui::ShowHelpMarker(L("Reorders the ranked search list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a player, updating as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank.").c_str());
 
 	ImGui::Separator();
 

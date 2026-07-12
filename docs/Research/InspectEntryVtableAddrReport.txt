@@ -1,0 +1,122 @@
+Address: 0049cc34
+Block: .text
+  start=00401000 end=008495ff perms r=True w=False x=True
+Function containing addr: FUN_0049cb90
+Instruction at addr: <none>
+Data at addr: <none>
+
+Raw bytes from 0049cc34-0x20 to +0x40:
+  0049cc14: 0x96
+  0049cc15: 0x00
+  0049cc16: 0xc2
+  0049cc17: 0x01
+  0049cc18: 0x00
+  0049cc19: 0x0f
+  0049cc1a: 0x87
+  0049cc1b: 0xab
+  0049cc1c: 0x00
+  0049cc1d: 0x00
+  0049cc1e: 0x00
+  0049cc1f: 0x33
+  0049cc20: 0xff
+  0049cc21: 0x80
+  0049cc22: 0x7b
+  0049cc23: 0x10
+  0049cc24: 0x00
+  0049cc25: 0x0f
+  0049cc26: 0x86
+  0049cc27: 0x8d
+  0049cc28: 0x00
+  0049cc29: 0x00
+  0049cc2a: 0x00
+  0049cc2b: 0x8d
+  0049cc2c: 0x43
+  0049cc2d: 0x14
+  0049cc2e: 0x89
+  0049cc2f: 0x45
+  0049cc30: 0x08
+  0049cc31: 0x0f
+  0049cc32: 0xb7
+  0049cc33: 0x53
+  0049cc34: 0x08 <-- TARGET
+  0049cc35: 0x03
+  0049cc36: 0xd7
+  0049cc37: 0x81
+  0049cc38: 0xfa
+  0049cc39: 0x40
+  0049cc3a: 0x38
+  0049cc3b: 0x00
+  0049cc3c: 0x00
+  0049cc3d: 0x7d
+  0049cc3e: 0x34
+  0049cc3f: 0x0f
+  0049cc40: 0xb6
+  0049cc41: 0x8e
+  0049cc42: 0x10
+  0049cc43: 0xc2
+  0049cc44: 0x01
+  0049cc45: 0x00
+  0049cc46: 0x0f
+  0049cc47: 0xb7
+  0049cc48: 0x40
+  0049cc49: 0xfe
+  0049cc4a: 0x69
+  0049cc4b: 0xc9
+  0049cc4c: 0x80
+  0049cc4d: 0x70
+  0049cc4e: 0x00
+  0049cc4f: 0x00
+  0049cc50: 0x03
+  0049cc51: 0xca
+  0049cc52: 0x66
+  0049cc53: 0x89
+  0049cc54: 0x04
+  0049cc55: 0x4e
+  0049cc56: 0x0f
+  0049cc57: 0xb6
+  0049cc58: 0x8e
+  0049cc59: 0x10
+  0049cc5a: 0xc2
+  0049cc5b: 0x01
+  0049cc5c: 0x00
+  0049cc5d: 0x8b
+  0049cc5e: 0x45
+  0049cc5f: 0x08
+  0049cc60: 0x69
+  0049cc61: 0xc9
+  0049cc62: 0x80
+  0049cc63: 0x70
+  0049cc64: 0x00
+  0049cc65: 0x00
+  0049cc66: 0x0f
+  0049cc67: 0xb7
+  0049cc68: 0x00
+  0049cc69: 0x03
+  0049cc6a: 0xca
+  0049cc6b: 0x66
+  0049cc6c: 0x89
+  0049cc6d: 0x84
+  0049cc6e: 0x4e
+  0049cc6f: 0x80
+  0049cc70: 0x70
+  0049cc71: 0x00
+  0049cc72: 0x00
+  0049cc73: 0x0f
+
+Dwords around target (+/- 0x20):
+  0049cc14: 0x01c20096
+  0049cc18: 0xab870f00
+  0049cc1c: 0x33000000
+  0049cc20: 0x107b80ff
+  0049cc24: 0x8d860f00
+  0049cc28: 0x8d000000
+  0049cc2c: 0x45891443
+  0049cc30: 0x53b70f08
+  0049cc34: 0x81d70308 <-- TARGET
+  0049cc38: 0x003840fa
+  0049cc3c: 0x0f347d00
+  0049cc40: 0xc2108eb6
+  0049cc44: 0xb70f0001
+  0049cc48: 0xc969fe40
+  0049cc4c: 0x00007080
+  0049cc50: 0x8966ca03

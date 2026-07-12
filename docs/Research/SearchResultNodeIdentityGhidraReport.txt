@@ -1,0 +1,317 @@
+
+----- 0046db40 FUN_0046db40 (contains queried addr 0046db74) -----
+
+undefined4 __fastcall FUN_0046db40(int param_1)
+
+{
+  undefined4 uVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  
+  uVar1 = FUN_004702e0();
+  iVar4 = 0;
+  if (0 < *(int *)(param_1 + 0xae8)) {
+    do {
+      iVar2 = FUN_004a5450(iVar4);
+      if ((*(int *)(iVar2 + 0x110) != 0) &&
+         (iVar3 = FUN_0046e9e0(*(undefined4 *)(*(int *)(iVar2 + 0x114) + 0xc),
+                               *(undefined4 *)(*(int *)(iVar2 + 0x114) + 0x10)), -1 < iVar3)) {
+        *(int *)(iVar2 + 0x78) = iVar3;
+        *(undefined4 *)(iVar2 + 0x110) = 0;
+      }
+      iVar4 = iVar4 + 1;
+    } while (iVar4 < *(int *)(param_1 + 0xae8));
+  }
+  return uVar1;
+}
+
+
+----- 0046dc00 FUN_0046dc00 (contains queried addr 0046dd18) -----
+
+void __fastcall FUN_0046dc00(int param_1)
+
+{
+  *(undefined4 *)(param_1 + 0xc) = 0;
+  *(undefined2 *)(param_1 + 0x10) = 0;
+  *(undefined1 *)(param_1 + 0x38) = 0;
+  *(undefined4 *)(param_1 + 0x78) = 0xffffffff;
+  *(undefined4 *)(param_1 + 100) = 0;
+  *(undefined4 *)(param_1 + 0x5c) = 0;
+  *(undefined2 *)(param_1 + 0x5a) = 0;
+  *(undefined2 *)(param_1 + 0x60) = 0;
+  *(undefined2 *)(param_1 + 0x73) = 0;
+  *(undefined4 *)(param_1 + 0x68) = 0;
+  *(undefined4 *)(param_1 + 0x6c) = 0;
+  *(undefined2 *)(param_1 + 0x70) = 0;
+  *(undefined1 *)(param_1 + 0x72) = 0;
+  *(undefined4 *)(param_1 + 0x7c) = 0;
+  *(undefined4 *)(param_1 + 0x80) = 0;
+  *(undefined4 *)(param_1 + 0x84) = 0;
+  *(undefined4 *)(param_1 + 0x88) = 0;
+  *(undefined4 *)(param_1 + 0x8c) = 0;
+  *(undefined4 *)(param_1 + 0x90) = 0;
+  *(undefined4 *)(param_1 + 0x94) = 0;
+  *(undefined4 *)(param_1 + 0x98) = 0;
+  *(undefined4 *)(param_1 + 0x9c) = 0;
+  *(undefined4 *)(param_1 + 0xa0) = 0;
+  *(undefined4 *)(param_1 + 0xa4) = 0;
+  *(undefined4 *)(param_1 + 0xa8) = 0;
+  *(undefined4 *)(param_1 + 0xac) = 0;
+  *(undefined4 *)(param_1 + 0xb0) = 0;
+  *(undefined4 *)(param_1 + 0xb4) = 0;
+  *(undefined4 *)(param_1 + 0xb8) = 0;
+  *(undefined4 *)(param_1 + 0xbc) = 0;
+  *(undefined4 *)(param_1 + 0xc0) = 0;
+  *(undefined4 *)(param_1 + 0xc4) = 0;
+  *(undefined4 *)(param_1 + 200) = 0;
+  *(undefined4 *)(param_1 + 0xcc) = 0;
+  *(undefined4 *)(param_1 + 0xd0) = 0;
+  *(undefined4 *)(param_1 + 0xd4) = 0;
+  *(undefined4 *)(param_1 + 0xd8) = 0;
+  *(undefined4 *)(param_1 + 0xdc) = 0;
+  *(undefined4 *)(param_1 + 0xe0) = 0;
+  *(undefined4 *)(param_1 + 0xe4) = 0;
+  *(undefined4 *)(param_1 + 0xe8) = 0;
+  *(undefined4 *)(param_1 + 0xec) = 0;
+  *(undefined4 *)(param_1 + 0xf0) = 0;
+  *(undefined4 *)(param_1 + 0xf4) = 0;
+  *(undefined4 *)(param_1 + 0xf8) = 0;
+  *(undefined4 *)(param_1 + 0xfc) = 0;
+  *(undefined4 *)(param_1 + 0x100) = 0;
+  *(undefined4 *)(param_1 + 0x104) = 0;
+  *(undefined4 *)(param_1 + 0x108) = 0;
+  *(undefined2 *)(param_1 + 0x10c) = 0;
+  *(undefined4 *)(param_1 + 0x110) = 0;
+  *(undefined4 *)(param_1 + 0x114) = 0;
+  return;
+}
+
+
+----- 0046dfa0 FUN_0046dfa0 (contains queried addr 0046dfe4) -----
+
+int __thiscall FUN_0046dfa0(int param_1,int param_2)
+
+{
+  undefined1 uVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  int iVar4;
+  undefined4 *puVar5;
+  
+  FUN_0041c900();
+  if ((*(int *)(param_1 + 0xc54) != 0) || (*(char *)(param_1 + 0x25e0) != '\0')) {
+    return 0x66;
+  }
+  piVar2 = (int *)FUN_004a5450(*(undefined1 *)(param_2 + 0x36d));
+  iVar4 = piVar2[0x45];
+  if (iVar4 == 0) {
+    iVar4 = 100;
+  }
+  else {
+    uVar3 = *(undefined4 *)(iVar4 + 4);
+    *(undefined4 *)(param_1 + 0xc74) = *(undefined4 *)(iVar4 + 8);
+    *(undefined4 *)(param_1 + 0xc70) = uVar3;
+    *(undefined4 *)(param_1 + 0xc80) = 0;
+    uVar1 = (**(code **)(*piVar2 + 0x3c))();
+    *(undefined1 *)(param_2 + 0x380) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x40))();
+    *(undefined1 *)(param_2 + 0x381) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x44))();
+    *(undefined1 *)(param_2 + 0x382) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x48))();
+    *(undefined1 *)(param_2 + 899) = uVar1;
+    iVar4 = 0;
+    puVar5 = (undefined4 *)(param_2 + 900);
+    do {
+      uVar3 = (**(code **)(*piVar2 + 0x4c))(iVar4);
+      iVar4 = iVar4 + 1;
+      *puVar5 = uVar3;
+      puVar5 = puVar5 + 1;
+    } while (iVar4 < 0x20);
+    iVar4 = FUN_0041c110(param_1 + 0xc50,1);
+    if (iVar4 == 0) {
+      *(undefined1 *)(param_1 + 0x25e0) = 1;
+      return 0;
+    }
+  }
+  return iVar4;
+}
+
+
+----- 0046e0a0 FUN_0046e0a0 (contains queried addr 0046e281) -----
+
+void __thiscall FUN_0046e0a0(int param_1,int param_2)
+
+{
+  uint uVar1;
+  undefined4 ****ppppuVar2;
+  int iVar3;
+  undefined4 *puVar4;
+  undefined *puVar5;
+  undefined4 uVar6;
+  undefined1 local_50 [4];
+  undefined4 local_4c;
+  undefined4 local_48;
+  void *local_44 [4];
+  undefined4 local_34;
+  uint local_30;
+  undefined4 ***local_2c [4];
+  undefined4 local_1c;
+  uint local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00828e20;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_48 = FUN_0041c900(local_14);
+  if (*(char *)(param_1 + 0x25dd) == '\0') {
+    FUN_0041c620();
+    *(uint *)(param_1 + 0xbd8) = (uint)*(byte *)(param_2 + 0xfc);
+    *(undefined4 *)(param_1 + 0xbd4) = *(undefined4 *)(param_2 + 0x108);
+    FUN_0041d390(PTR_s_NETWORK_VERSION_009d9610,*(undefined1 *)(param_2 + 0x110));
+    FUN_0041d390(PTR_s_HOST_NETCOLOR_009d9618,*(undefined4 *)(param_2 + 0x100));
+    uVar1 = *(uint *)(param_2 + 0x108) & 0xf;
+    if (uVar1 == 2) {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x154));
+      FUN_0041d390(PTR_s_RANK_RTT_FILTER_009d964c,*(undefined2 *)(param_2 + 0x136));
+      FUN_0041d390(PTR_s_PLAYER_MEMBER_MAX_009d9624,*(undefined1 *)(param_2 + 0xfc));
+      uVar6 = *(undefined4 *)(param_2 + 0x108);
+      puVar5 = PTR_s_PLAYER_SESSION_FLAG_009d9630;
+    }
+    else if (uVar1 == 0) {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x138));
+      FUN_0041d390(PTR_s_RANK_MYAREA_009d9638,*(undefined2 *)(param_2 + 0x132));
+      FUN_0041d390(PTR_s_RANK_AREA_FILTER_009d963c,*(undefined2 *)(param_2 + 0x134));
+      FUN_0041d390(PTR_s_RANK_HOST_LEVEL_009d9640,*(undefined2 *)(param_2 + 0x130));
+      FUN_0041d390(PTR_s_RANK_LEVEL_MIN_009d9644,*(undefined4 *)(param_2 + 0x144));
+      FUN_0041d390(PTR_s_RANK_LEVEL_MAX_009d9648,*(undefined4 *)(param_2 + 0x148));
+      FUN_0041d390(PTR_s_RANK_RTT_FILTER_009d964c,*(undefined2 *)(param_2 + 0x136));
+      FUN_0041d390(PTR_s_RANK_DISCONNECT_RATE_009d9650,*(undefined4 *)(param_2 + 0x150));
+      uVar6 = *(undefined4 *)(param_2 + 0x14c);
+      puVar5 = PTR_s_RANK_DISCONNECT_009d9654;
+    }
+    else {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x114));
+      FUN_00468610(param_2 + 8);
+      local_8 = 0;
+      FUN_00779430(local_2c,local_44);
+      local_8 = CONCAT31(local_8._1_3_,2);
+      if (7 < local_30) {
+        FID_conflict__free(local_44[0]);
+      }
+      local_44[0] = (void *)((uint)local_44[0] & 0xffff0000);
+      ppppuVar2 = local_2c;
+      if (0xf < local_18) {
+        ppppuVar2 = (undefined4 ****)local_2c[0];
+      }
+      local_30 = 7;
+      local_34 = 0;
+      FUN_0041d360(PTR_s_PLAYER_ROOM_NAME_009d961c,ppppuVar2);
+      local_8 = 0xffffffff;
+      if (0xf < local_18) {
+        FID_conflict__free(local_2c[0]);
+      }
+      local_18 = 0xf;
+      local_1c = 0;
+      local_2c[0] = (undefined4 ***)((uint)local_2c[0] & 0xffffff00);
+      FUN_0041d390(PTR_s_PLAYER_ROOM_TYPE_009d9620,*(undefined4 *)(param_2 + 0x118));
+      FUN_0041d390(PTR_s_PLAYER_MEMBER_MAX_009d9624,*(undefined1 *)(param_2 + 0xfc));
+      FUN_0041d390(PTR_s_PLAYER_PRIVATE_NUM_009d9628,*(undefined1 *)(param_2 + 0xfe));
+      FUN_0041d390(PTR_s_PLAYER_PRIVATE_MAX_009d962c,*(undefined1 *)(param_2 + 0xfd));
+      FUN_0041d390(PTR_s_PLAYER_SESSION_FLAG_009d9630,*(undefined4 *)(param_2 + 0x108));
+      uVar6 = *(undefined4 *)(param_2 + 0x10c);
+      puVar5 = PTR_s_PLAYER_SESSION_VALUE_009d9634;
+    }
+    FUN_0041d390(puVar5,uVar6);
+    iVar3 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+    puVar4 = (undefined4 *)(**(code **)(**(int **)(iVar3 + 4) + 8))(local_50);
+    uVar6 = *puVar4;
+    local_4c = puVar4[1];
+    iVar3 = FUN_004b9700();
+    iVar3 = *(int *)(iVar3 + 0x68);
+    *(undefined4 *)(param_2 + 0x1e0) = uVar6;
+    *(undefined4 *)(param_2 + 0x1e4) = local_4c;
+    *(uint *)(param_2 + 0x1e8) = (uint)(iVar3 == 0);
+    *(undefined4 *)(param_2 + 0x1ec) = 0;
+    iVar3 = FUN_0041bf90(param_1 + 0xbc0);
+    if (iVar3 == 0) {
+      *(undefined1 *)(param_1 + 0x25dd) = 1;
+    }
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+----- 0046e860 FUN_0046e860 (contains queried addr 0046e863) -----
+
+void __thiscall FUN_0046e860(int param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  
+  iVar1 = *(int *)(param_1 + 0x114);
+  *param_2 = *(undefined4 *)(iVar1 + 0xc);
+  param_2[1] = *(undefined4 *)(iVar1 + 0x10);
+  return;
+}
+
+
+(FUN_0046dc00 already decompiled above, containing function for 0046dc00)
+
+----- 0046e9e0 FUN_0046e9e0 (contains queried addr 0046e9e0) -----
+
+uint __thiscall FUN_0046e9e0(int param_1,int param_2,uint param_3)
+
+{
+  uint uVar1;
+  uint uVar2;
+  int *piVar3;
+  uint *puVar4;
+  int iVar5;
+  uint uVar6;
+  int iVar7;
+  bool bVar8;
+  uint local_8;
+  
+  piVar3 = (int *)(param_1 + 8);
+  iVar5 = 0;
+  while ((((piVar3[0x17] != 0 || (*piVar3 != param_2)) || (piVar3[1] != param_3)) ||
+         (piVar3[0x18] == 0))) {
+    iVar5 = iVar5 + 1;
+    piVar3 = piVar3 + 0x1a;
+    if (0x13 < iVar5) {
+      return 0xffffffff;
+    }
+  }
+  iVar7 = 0;
+  uVar6 = 0;
+  local_8 = 0;
+  param_3 = 0;
+  puVar4 = (uint *)(piVar3 + 0xc);
+  iVar5 = 5;
+  do {
+    uVar1 = *puVar4;
+    bVar8 = CARRY4(local_8,uVar1);
+    local_8 = local_8 + uVar1;
+    uVar2 = puVar4[1];
+    iVar7 = iVar7 + uVar2 + (uint)bVar8;
+    if ((param_3 <= uVar2) && ((param_3 < uVar2 || (uVar6 < uVar1)))) {
+      uVar6 = uVar1;
+      param_3 = uVar2;
+    }
+    puVar4 = puVar4 + 2;
+    iVar5 = iVar5 + -1;
+  } while (iVar5 != 0);
+  return local_8 - uVar6 >> 2 | ((iVar7 - param_3) - (uint)(local_8 < uVar6)) * 0x40000000;
+}
+
+
+(FUN_0046e860 already decompiled above, containing function for 0046e860)

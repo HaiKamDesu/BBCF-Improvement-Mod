@@ -178,19 +178,33 @@ private:
 		// gameTier below has been observed at least once for this peer.
 		unsigned long long probeElapsedMs = ~0ull;
 		bool usedRelay = false;
-		// The game's OWN internal connection-quality tier (0-7, 4=default per
-		// user report - see docs/Research/RankedListConnectionFilter_Progress.md
-		// for the full RE trace), read live from the ranked list's own render
-		// data via PollGameTiers(). -1 = never observed yet. Kept as the raw
-		// latest single reading, mainly for diagnostics - gameTierAverage
-		// below is what sorting actually uses.
+		// The game's OWN per-viewer measured average RTT to this host, in ms,
+		// read from the ranked-list row entry's +0x78 field via PollGameTiers()
+		// (see docs/Research/RankedListConnectionFilter_Progress.md, 2026-07-12
+		// "Delay column source" section: the on-screen Delay digit is exactly
+		// this value bucketed by FUN_004a6620's thresholds). -1 = never
+		// observed/unresolved. This is what connection sorting keys on.
+		int gameRttMs = -1;
+		// The 0-4 Delay digit the game renders for that RTT ('0'+digit glyph,
+		// FUN_004a6620: <60ms=4, <100=3, <200=2, <300=1, else 0). Derived from
+		// gameRttMs at read time; kept for diagnostics/screenshot cross-checks.
 		int gameTier = -1;
-		// Cumulative average of every gameTier observation for this peer
+		// Cumulative average of every gameRttMs observation for this peer
 		// across the whole session (not just the current list) - smooths out
-		// any single noisy/mismapped reading, per user request to store and
-		// average results rather than sort by only the latest one.
+		// any single noisy reading. Not used for sorting (user chose latest).
 		double gameTierAverage = -1.0;
 		int gameTierSampleCount = 0;
+		// GetTickCount64() at the last successful gameTier read. Used to
+		// bound how long a cached tier is trusted across a brand-new search
+		// (see kGameTierTtlMs) - the game recreates its row/entry objects
+		// from scratch on every new search, so a value from a much earlier
+		// point shouldn't be trusted indefinitely, but discarding it
+		// entirely on every new search left the sort with no real data at
+		// all for the one delivery that actually reaches the screen (see
+		// progress doc "regressed to fallback-only"). A bounded TTL is the
+		// middle ground: survives the gap before the new search's own
+		// entries resolve, without trusting truly stale data forever.
+		unsigned long long gameTierTickMs = 0;
 	};
 
 	struct LobbyCandidate
@@ -216,12 +230,12 @@ private:
 	void OnLobbyListResultDelivered(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall);
 	void StartProbeIfNeeded(uint64_t steamId);
 	void PollProbes();
-	// Reads the game's own live per-row connection-quality tier (see progress
-	// doc) for every currently-delivered row and stores it into the matching
-	// peer's PeerVerdict::gameTier, keyed by position in m_reachableLobbies -
-	// only when the game's own row count matches ours exactly (i.e. it has
-	// caught up to our last delivery), to avoid mismatched row/peer pairing.
-	// A no-op until a list has actually been delivered.
+	// Reads the game's own live per-row Delay data (the +0x78 measured-RTT
+	// field that drives the on-screen 0-4 Delay digit - see progress doc,
+	// 2026-07-12 "Delay column source" section) for every row the game
+	// currently has, attributing each reading to the correct peer via the
+	// row entry's own embedded Steam64 ID (entry+0x114 -> +0xc/+0x10) - no
+	// positional assumptions. A no-op until a list has actually been delivered.
 	void PollGameTiers();
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.

@@ -1,0 +1,101 @@
+===== Decompile of FUN_0046d890 (0046d890) =====
+
+int __thiscall FUN_0046d890(int param_1,int param_2)
+
+{
+  byte bVar1;
+  int iVar2;
+  uint uVar3;
+  int iVar4;
+  int *piVar5;
+  int local_10;
+  int local_8;
+  
+  FUN_0041c900();
+  if (*(char *)(param_1 + 0x25df) == '\x01') {
+    iVar2 = FUN_0041c5f0(param_1 + 0xcc0);
+    if (-1 < iVar2) {
+      if (99 < iVar2) {
+        *(undefined1 *)(param_1 + 0x25df) = 0;
+        return iVar2;
+      }
+      piVar5 = *(int **)(param_1 + 0xae0);
+      *(int *)(param_1 + 0xae8) = *(int *)(param_1 + 0xcf0);
+      local_10 = 0;
+      local_8 = 0;
+      iVar2 = 0;
+      if (0 < *(int *)(param_1 + 0xcf0)) {
+        iVar4 = param_1 + 0xcf4;
+        do {
+          FUN_0046fcc0(iVar4);
+          if (*(char *)(param_2 + 0xcc) == '\0') {
+LAB_0046da5c:
+            piVar5 = (int *)piVar5[1];
+            local_8 = local_8 + 1;
+          }
+          else {
+            uVar3 = (**(code **)(*piVar5 + 0x38))();
+            if (((uVar3 & 0xf000000) == 0) ||
+               (uVar3 = (**(code **)(*piVar5 + 0x1c))(), (uVar3 & 0xff) == *(uint *)(param_2 + 0xe8)
+               )) {
+              if (*(int *)(param_2 + 0xd4) != 0) {
+                iVar2 = 1;
+                uVar3 = (**(code **)(*piVar5 + 0x34))();
+                switch(uVar3 & 0xf0) {
+                case 0x20:
+                  iVar2 = 2;
+                  break;
+                case 0x30:
+                  iVar2 = 3;
+                  break;
+                case 0x40:
+                  iVar2 = 4;
+                  break;
+                case 0x50:
+                  iVar2 = 5;
+                }
+                if (*(int *)(param_2 + 0xd4) != iVar2) goto LAB_0046d9b7;
+              }
+              bVar1 = (**(code **)(*piVar5 + 0x20))();
+              iVar2 = *(int *)(param_2 + 0xdc);
+              if (iVar2 == 1) {
+                if (bVar1 < 3) goto LAB_0046da17;
+              }
+              else if (iVar2 == 2) {
+                if ((2 < bVar1) && (bVar1 < 6)) {
+LAB_0046da17:
+                  if (((*(int *)(param_2 + 0xe0) == 0) ||
+                      (uVar3 = (**(code **)(*piVar5 + 0x38))(),
+                      *(uint *)(param_2 + 0xe0) == (uVar3 & 0xf))) &&
+                     (iVar2 = *(int *)(param_2 + 0xd0), uVar3 = (**(code **)(*piVar5 + 0x34))(),
+                     (uint)(iVar2 != 0) == (uVar3 >> 0x1a & 1))) goto LAB_0046da5c;
+                }
+              }
+              else if ((iVar2 != 3) || (5 < bVar1)) goto LAB_0046da17;
+            }
+          }
+LAB_0046d9b7:
+          local_10 = local_10 + 1;
+          iVar4 = iVar4 + 0x14;
+          iVar2 = local_8;
+        } while (local_10 < *(int *)(param_1 + 0xae8));
+      }
+      *(int *)(param_1 + 0xae8) = iVar2;
+      *(undefined4 *)(param_1 + 0xaec) = 0;
+      *(undefined4 *)(param_1 + 0xaf0) = 0;
+      *(undefined1 *)(param_1 + 0x25df) = 0;
+      return 0;
+    }
+  }
+  else {
+    iVar2 = -1;
+  }
+  return iVar2;
+}
+
+
+
+===== Callers of FUN_0046d890 =====
+  called from (no function) at 0089cb90
+
+

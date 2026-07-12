@@ -1,0 +1,38 @@
+confirmed-live MGR vtable (stale, old ASLR-session value, may be garbage) @ 00cfc3a4
+  block=.data r=True w=True x=False
+  function containing=<none>
+  instruction at addr=<none>
+  data at addr=?? 00h
+  dword at addr=0x00000000
+
+candidate ENTRY vtable RVA 0x49cc34 @ 0049cc34
+  block=.text r=True w=False x=True
+  function containing=FUN_0049cb90
+  instruction at addr=<none>
+  data at addr=<none>
+  dword at addr=0x81d70308
+
+known-good CNetworkLobbyData::vftable @ 0089c7cc
+  block=.rdata r=True w=False x=False
+  function containing=<none>
+  instruction at addr=<none>
+  data at addr=addr[35] 
+  dword at addr=0x0046a1a0
+
+known-good GAMESTEAM_CNetworkServer::vftable @ 0089cb4c
+  block=.rdata r=True w=False x=False
+  function containing=<none>
+  instruction at addr=<none>
+  data at addr=addr[57] 
+  dword at addr=0x0046f620
+
+
+All memory blocks:
+  Headers              00400000 - 004003ff  r=True w=False x=False size=0x400
+  .text                00401000 - 008495ff  r=True w=False x=True size=0x448600
+  .rdata               0084a000 - 009d25ff  r=True w=False x=False size=0x188600
+  .data                009d3000 - 0186f1ff  r=True w=True x=False size=0xe9c200
+  .tls                 01870000 - 018701ff  r=True w=True x=False size=0x200
+  .rsrc                01871000 - 0189f1ff  r=True w=False x=False size=0x2e200
+  .reloc               018a0000 - 01a0b1ff  r=True w=False x=False size=0x16b200
+  tdb                  ffdff000 - ffdfffff  r=True w=True x=False size=0x1000

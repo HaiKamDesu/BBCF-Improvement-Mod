@@ -1,0 +1,175 @@
+===== Decompile of FUN_00655260 (00655260) =====
+
+void FUN_00655260(undefined4 param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,
+                 int param_5,undefined4 param_6)
+
+{
+  char *local_28 [4];
+  char *local_18;
+  char *local_14;
+  char *local_10;
+  char *local_c;
+  undefined4 local_8;
+  
+  local_28[0] = "net_col_def.hip";
+  local_28[1] = "net_col_A.hip";
+  local_28[2] = "net_col_B.hip";
+  local_28[3] = "net_col_C.hip";
+  local_18 = "net_col_D.hip";
+  local_14 = "net_col_E.hip";
+  local_10 = "net_col_F.hip";
+  local_c = "net_col_G.hip";
+  local_8 = 0;
+  FUN_00643b40();
+  FUN_00643ea0(local_28[param_5],&local_8,0,0,0);
+  FUN_006916b0(local_8,param_1,param_2,param_3,param_4,1,param_6,0,0x3f800000,0x3f800000,0,0,0,0);
+  return;
+}
+
+
+
+===== Full raw disassembly of FUN_00655260 =====
+00655260  PUSH EBP
+00655261  MOV EBP,ESP
+00655263  SUB ESP,0x24
+00655266  MOV dword ptr [EBP + -0x24],0x94d078
+0065526d  MOV dword ptr [EBP + -0x20],0x94d088
+00655274  MOV dword ptr [EBP + -0x1c],0x94d098
+0065527b  MOV dword ptr [EBP + -0x18],0x94d0a8
+00655282  MOV dword ptr [EBP + -0x14],0x94d0b8
+00655289  MOV dword ptr [EBP + -0x10],0x94d0c8
+00655290  MOV dword ptr [EBP + -0xc],0x94d0d8
+00655297  MOV dword ptr [EBP + -0x8],0x94d0e8
+0065529e  MOV dword ptr [EBP + -0x4],0x0
+006552a5  CALL 0x00643b40
+006552aa  PUSH 0x0
+006552ac  PUSH 0x0
+006552ae  PUSH 0x0
+006552b0  LEA ECX,[EBP + -0x4]
+006552b3  PUSH ECX
+006552b4  MOV ECX,dword ptr [EBP + 0x18]
+006552b7  PUSH dword ptr [EBP + ECX*0x4 + -0x24]
+006552bb  MOV ECX,EAX
+006552bd  CALL 0x00643ea0
+006552c2  FLD1
+006552c4  PUSH 0x0
+006552c6  PUSH 0x0
+006552c8  PUSH 0x0
+006552ca  PUSH 0x0
+006552cc  SUB ESP,0x8
+006552cf  FST float ptr [ESP + 0x4]
+006552d3  FSTP float ptr [ESP]
+006552d6  PUSH 0x0
+006552d8  PUSH dword ptr [EBP + 0x1c]
+006552db  FLD float ptr [EBP + 0x10]
+006552de  PUSH 0x1
+006552e0  PUSH dword ptr [EBP + 0x14]
+006552e3  SUB ESP,0xc
+006552e6  FSTP float ptr [ESP + 0x8]
+006552ea  FLD float ptr [EBP + 0xc]
+006552ed  FSTP float ptr [ESP + 0x4]
+006552f1  FLD float ptr [EBP + 0x8]
+006552f4  FSTP float ptr [ESP]
+006552f7  PUSH dword ptr [EBP + -0x4]
+006552fa  CALL 0x006916b0
+006552ff  ADD ESP,0x38
+00655302  MOV ESP,EBP
+00655304  POP EBP
+00655305  RET
+
+
+===== Decompile of FUN_00533d10 (00533d10) =====
+
+void FUN_00533d10(int param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,
+                 undefined4 param_5,undefined4 param_6)
+
+{
+  char *pcVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  undefined4 uVar5;
+  char *local_28 [4];
+  char *local_18;
+  char *local_14;
+  char *local_10;
+  char *local_c;
+  int local_8;
+  
+  uVar5 = 0;
+  uVar4 = 0;
+  uVar3 = 0;
+  piVar2 = &local_8;
+  local_28[0] = "net_col_def.hip";
+  local_28[1] = "net_col_A.hip";
+  local_28[2] = "net_col_B.hip";
+  local_28[3] = "net_col_C.hip";
+  local_18 = "net_col_D.hip";
+  local_14 = "net_col_E.hip";
+  local_10 = "net_col_F.hip";
+  local_c = "net_col_G.hip";
+  pcVar1 = local_28[param_1];
+  local_8 = -1;
+  FUN_00643b40(pcVar1,piVar2,0,0,0);
+  FUN_00643ea0(pcVar1,piVar2,uVar3,uVar4,uVar5);
+  if (local_8 != -1) {
+    FUN_006916b0(local_8,param_2,param_3,param_4,param_6,1,param_5,1,0x3f800000,0x3f800000,0,0,0,0);
+  }
+  return;
+}
+
+
+
+===== Full raw disassembly of FUN_00533d10 =====
+00533d10  PUSH EBP
+00533d11  MOV EBP,ESP
+00533d13  SUB ESP,0x24
+00533d16  PUSH 0x0
+00533d18  PUSH 0x0
+00533d1a  PUSH 0x0
+00533d1c  LEA EAX,[EBP + -0x4]
+00533d1f  PUSH EAX
+00533d20  MOV EAX,dword ptr [EBP + 0x8]
+00533d23  MOV dword ptr [EBP + -0x24],0x94d078
+00533d2a  MOV dword ptr [EBP + -0x20],0x94d088
+00533d31  MOV dword ptr [EBP + -0x1c],0x94d098
+00533d38  MOV dword ptr [EBP + -0x18],0x94d0a8
+00533d3f  MOV dword ptr [EBP + -0x14],0x94d0b8
+00533d46  MOV dword ptr [EBP + -0x10],0x94d0c8
+00533d4d  MOV dword ptr [EBP + -0xc],0x94d0d8
+00533d54  MOV dword ptr [EBP + -0x8],0x94d0e8
+00533d5b  PUSH dword ptr [EBP + EAX*0x4 + -0x24]
+00533d5f  MOV dword ptr [EBP + -0x4],0xffffffff
+00533d66  CALL 0x00643b40
+00533d6b  MOV ECX,EAX
+00533d6d  CALL 0x00643ea0
+00533d72  MOV EAX,dword ptr [EBP + -0x4]
+00533d75  CMP EAX,-0x1
+00533d78  JZ 0x00533db8
+00533d7a  FLD1
+00533d7c  PUSH 0x0
+00533d7e  PUSH 0x0
+00533d80  PUSH 0x0
+00533d82  PUSH 0x0
+00533d84  SUB ESP,0x8
+00533d87  FST float ptr [ESP + 0x4]
+00533d8b  FSTP float ptr [ESP]
+00533d8e  PUSH 0x1
+00533d90  PUSH dword ptr [EBP + 0x18]
+00533d93  FLD float ptr [EBP + 0x14]
+00533d96  PUSH 0x1
+00533d98  PUSH dword ptr [EBP + 0x1c]
+00533d9b  SUB ESP,0xc
+00533d9e  FSTP float ptr [ESP + 0x8]
+00533da2  FLD float ptr [EBP + 0x10]
+00533da5  FSTP float ptr [ESP + 0x4]
+00533da9  FLD float ptr [EBP + 0xc]
+00533dac  FSTP float ptr [ESP]
+00533daf  PUSH EAX
+00533db0  CALL 0x006916b0
+00533db5  ADD ESP,0x38
+00533db8  MOV ESP,EBP
+00533dba  POP EBP
+00533dbb  RET
+
+

@@ -1,0 +1,179 @@
+===== Key-name string table at 0x009d9610 (18 entries) =====
+  [0] 0x0089c690 -> u'NETWORK_VERSION'
+  [1] 0x0089c6a0 -> u'MATCHING_FILTER'
+  [2] 0x0089c6b0 -> u'HOST_NETCOLOR'
+  [3] 0x0089c6c0 -> u'PLAYER_ROOM_NAME'
+  [4] 0x0089c974 -> u'PLAYER_ROOM_TYPE'
+  [5] 0x0089c6d4 -> u'PLAYER_MEMBER_MAX'
+  [6] 0x0089c6e8 -> u'PLAYER_PRIVATE_NUM'
+  [7] 0x0089c6fc -> u'PLAYER_PRIVATE_MAX'
+  [8] 0x0089c710 -> u'PLAYER_SESSION_FLAG'
+  [9] 0x0089c724 -> u'PLAYER_SESSION_VALUE'
+  [10] 0x0089c73c -> u'RANK_MYAREA'
+  [11] 0x0089c748 -> u'RANK_AREA_FILTER'
+  [12] 0x0089c75c -> u'RANK_HOST_LEVEL'
+  [13] 0x0089c76c -> u'RANK_LEVEL_MIN'
+  [14] 0x0089c77c -> u'RANK_LEVEL_MAX'
+  [15] 0x0089c78c -> u'RANK_RTT_FILTER'
+  [16] 0x0089c79c -> u'RANK_DISCONNECT_RATE'
+  [17] 0x0089c7b4 -> u'RANK_DISCONNECT'
+
+
+===== Decompile of FUN_0041c8f0 (per-value parser) =====
+
+void __fastcall FUN_0041c8f0(int param_1)
+
+{
+  FUN_0079fa3c(param_1 + 4);
+  return;
+}
+
+
+
+===== Full decompile of FUN_0046fcc0 (confirmed +0x74 tier-byte writer) for reference =====
+
+void __thiscall FUN_0046fcc0(int param_1,int param_2)
+
+{
+  char *_Str1;
+  undefined1 uVar1;
+  char cVar2;
+  undefined2 uVar3;
+  int iVar4;
+  char *pcVar5;
+  int iVar6;
+  wchar_t ****_Src;
+  undefined4 uVar7;
+  int local_cc;
+  undefined1 local_c4 [64];
+  void *local_84 [4];
+  undefined4 local_74;
+  uint local_70;
+  wchar_t ***local_6c [4];
+  undefined4 local_5c;
+  uint local_58;
+  char local_54 [64];
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00828ed0;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  FUN_0046dc00(local_14);
+  *(int *)(param_1 + 0x114) = param_2;
+  iVar4 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+  uVar1 = (**(code **)(**(int **)(iVar4 + 0x10) + 0x44))
+                    (*(undefined4 *)(param_2 + 4),*(undefined4 *)(param_2 + 8));
+  *(undefined1 *)(param_1 + 0x6d) = uVar1;
+  local_cc = 0;
+  iVar4 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+  iVar4 = (**(code **)(**(int **)(iVar4 + 0x10) + 0x54))
+                    (*(undefined4 *)(param_2 + 4),*(undefined4 *)(param_2 + 8));
+  if (0 < iVar4) {
+    do {
+      iVar4 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+      cVar2 = (**(code **)(**(int **)(iVar4 + 0x10) + 0x58))
+                        (*(undefined4 *)(param_2 + 4),*(undefined4 *)(param_2 + 8),local_cc,local_54
+                         ,0x40,local_c4,0x40);
+      if (cVar2 != '\0') {
+        iVar4 = 0;
+        do {
+          _Str1 = (&PTR_s_NETWORK_VERSION_009d9610)[iVar4];
+          pcVar5 = _Str1;
+          do {
+            cVar2 = *pcVar5;
+            pcVar5 = pcVar5 + 1;
+          } while (cVar2 != '\0');
+          iVar6 = _strncmp(_Str1,local_54,(int)pcVar5 - (int)(_Str1 + 1));
+          if (iVar6 == 0) {
+            switch(iVar4) {
+            case 2:
+              uVar1 = FUN_0041c8f0();
+              *(undefined1 *)(param_1 + 0x74) = uVar1;
+              break;
+            case 3:
+              uVar7 = FUN_00530540();
+              FUN_00404ea0(uVar7);
+              local_8 = 0;
+              FUN_007795c0(local_6c,local_84);
+              local_8 = CONCAT31(local_8._1_3_,2);
+              if (0xf < local_70) {
+                FID_conflict__free(local_84[0]);
+              }
+              _Src = local_6c;
+              if (7 < local_58) {
+                _Src = (wchar_t ****)local_6c[0];
+              }
+              local_70 = 0xf;
+              local_74 = 0;
+              local_84[0] = (void *)((uint)local_84[0] & 0xffffff00);
+              _wcscpy_s((wchar_t *)(param_1 + 0x10),0x14,(wchar_t *)_Src);
+              local_8 = 0xffffffff;
+              if (7 < local_58) {
+                FID_conflict__free(local_6c[0]);
+              }
+              local_58 = 7;
+              local_5c = 0;
+              local_6c[0] = (wchar_t ***)((uint)local_6c[0] & 0xffff0000);
+              break;
+            case 5:
+              uVar1 = FUN_0041c8f0();
+              *(undefined1 *)(param_1 + 0x6c) = uVar1;
+              break;
+            case 6:
+              uVar1 = FUN_0041c8f0();
+              *(undefined1 *)(param_1 + 0x6f) = uVar1;
+              break;
+            case 7:
+              uVar1 = FUN_0041c8f0();
+              *(undefined1 *)(param_1 + 0x6e) = uVar1;
+              break;
+            case 8:
+              uVar7 = FUN_0041c8f0();
+              *(undefined4 *)(param_1 + 100) = uVar7;
+              break;
+            case 9:
+              uVar7 = FUN_0041c8f0();
+              *(undefined4 *)(param_1 + 0x68) = uVar7;
+              break;
+            case 10:
+              uVar3 = FUN_0041c8f0();
+              *(undefined2 *)(param_1 + 0x5c) = uVar3;
+              break;
+            case 0xb:
+              uVar3 = FUN_0041c8f0();
+              *(undefined2 *)(param_1 + 0x5e) = uVar3;
+              break;
+            case 0xc:
+              uVar3 = FUN_0041c8f0();
+              *(undefined2 *)(param_1 + 0x5a) = uVar3;
+              break;
+            case 0xf:
+              uVar3 = FUN_0041c8f0();
+              *(undefined2 *)(param_1 + 0x10a) = uVar3;
+            }
+            break;
+          }
+          iVar4 = iVar4 + 1;
+        } while (iVar4 < 0x12);
+      }
+      local_cc = local_cc + 1;
+      iVar4 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+      iVar4 = (**(code **)(**(int **)(iVar4 + 0x10) + 0x54))
+                        (*(undefined4 *)(param_2 + 4),*(undefined4 *)(param_2 + 8));
+    } while (local_cc < iVar4);
+  }
+  *(undefined4 *)(param_1 + 0xc) = 1;
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+===== Callers of FUN_0046fcc0 (to learn when/how often a row's metadata gets (re)populated) =====
+  called from FUN_0046d890 at 0046d913

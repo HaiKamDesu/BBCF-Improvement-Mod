@@ -1,0 +1,353 @@
+===== ENTRY vtable resolution at 0089cc34 (RVA 0x49cc34) =====
+  symbol at vtable addr: GAMESTEAM_SearchResultNode::vftable  type=Label
+
+  Checking for RTTI Complete Object Locator ptr 4 bytes before vtable:
+    [vtable-4] = 0x009abfb8
+      symbol at COL: GAMESTEAM_SearchResultNode::RTTI_Complete_Object_Locator
+      COL.signature=0x0 COL.pTypeDescriptor_field=0x9d9a44
+      symbol at TypeDescriptor: GAMESTEAM_SearchResultNode::RTTI_Type_Descriptor
+
+  Namespace-aware fully-qualified scan for symbols within +/- 0x40 of vtable addr:
+    diff=-4  0089cc30  Label      GAMESTEAM_SearchResultNode::vftable_meta_ptr
+    diff=+0  0089cc34  Label      GAMESTEAM_SearchResultNode::vftable
+
+===== ENTRY vtable slot dump =====
+
+--- Vtable dump at 0089cc34 ---
+  slot  0 (off 0x00) @ 0089cc34 -> 0x0046cf80  FUN_0046cf80
+  slot  1 (off 0x04) @ 0089cc38 -> 0x0070e400  FUN_0070e400
+  slot  2 (off 0x08) @ 0089cc3c -> 0x0046ea70  FUN_0046ea70
+  slot  3 (off 0x0c) @ 0089cc40 -> 0x007587d0  FUN_007587d0
+  slot  4 (off 0x10) @ 0089cc44 -> 0x0046e860  FUN_0046e860
+  slot  5 (off 0x14) @ 0089cc48 -> 0x0046e9b0  FUN_0046e9b0
+  slot  6 (off 0x18) @ 0089cc4c -> 0x00668180  FUN_00668180
+  slot  7 (off 0x1c) @ 0089cc50 -> 0x0046e880  FUN_0046e880
+  slot  8 (off 0x20) @ 0089cc54 -> 0x0046e930  FUN_0046e930
+  slot  9 (off 0x24) @ 0089cc58 -> 0x0046e940  FUN_0046e940
+  slot 10 (off 0x28) @ 0089cc5c -> 0x0046e9c0  FUN_0046e9c0
+  slot 11 (off 0x2c) @ 0089cc60 -> 0x0046e9d0  FUN_0046e9d0
+  slot 12 (off 0x30) @ 0089cc64 -> 0x0046e890  FUN_0046e890
+  slot 13 (off 0x34) @ 0089cc68 -> 0x00439970  FUN_00439970
+  slot 14 (off 0x38) @ 0089cc6c -> 0x00439980  FUN_00439980
+  slot 15 (off 0x3c) @ 0089cc70 -> 0x0046e9a0  FUN_0046e9a0
+  slot 16 (off 0x40) @ 0089cc74 -> 0x0046e970  FUN_0046e970
+  slot 17 (off 0x44) @ 0089cc78 -> 0x0046e960  FUN_0046e960
+  slot 18 (off 0x48) @ 0089cc7c -> 0x0046e950  FUN_0046e950
+  slot 19 (off 0x4c) @ 0089cc80 -> 0x0046e980  FUN_0046e980
+  slot 20 (off 0x50) @ 0089cc84 -> 0x0046e8b0  FUN_0046e8b0
+  slot 21 (off 0x54) @ 0089cc88 -> 0x0046e840  FUN_0046e840
+  slot 22 (off 0x58) @ 0089cc8c -> 0x0046e850  FUN_0046e850
+  slot 23 (off 0x5c) @ 0089cc90 -> 0x0046e8a0  FUN_0046e8a0
+  slot 24 @ 0089cc94: value 0x61657473 not a function entry - stopping (probable vtable end)
+
+Total slots read: 24 ; purecall stubs: 0 ; real implementations: 24
+
+===== Decompiling every non-__purecall ENTRY vtable slot =====
+
+----- slot 0 (offset 0x00) FUN_0046cf80 @ 0046cf80 -----
+
+undefined4 * __thiscall FUN_0046cf80(undefined4 *param_1,byte param_2)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082a500;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAMESTEAM_SearchResultNode::vftable;
+  local_8 = 0xffffffff;
+  FUN_004059c0(uVar1);
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+----- slot 1 (offset 0x04) FUN_0070e400 @ 0070e400 -----
+
+undefined4 __fastcall FUN_0070e400(int param_1)
+
+{
+  return *(undefined4 *)(param_1 + 0xc);
+}
+
+
+----- slot 2 (offset 0x08) FUN_0046ea70 @ 0046ea70 -----
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+undefined8 FUN_0046ea70(void)
+
+{
+  return CONCAT44(_DAT_00000004,_DAT_00000000);
+}
+
+
+----- slot 3 (offset 0x0c) FUN_007587d0 @ 007587d0 -----
+
+int __fastcall FUN_007587d0(int param_1)
+
+{
+  return param_1 + 0x10;
+}
+
+
+----- slot 4 (offset 0x10) FUN_0046e860 @ 0046e860 -----
+
+void __thiscall FUN_0046e860(int param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  
+  iVar1 = *(int *)(param_1 + 0x114);
+  *param_2 = *(undefined4 *)(iVar1 + 0xc);
+  param_2[1] = *(undefined4 *)(iVar1 + 0x10);
+  return;
+}
+
+
+----- slot 5 (offset 0x14) FUN_0046e9b0 @ 0046e9b0 -----
+
+undefined1 __fastcall FUN_0046e9b0(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x60);
+}
+
+
+----- slot 6 (offset 0x18) FUN_00668180 @ 00668180 -----
+
+undefined1 FUN_00668180(void)
+
+{
+  return 0;
+}
+
+
+----- slot 7 (offset 0x1c) FUN_0046e880 @ 0046e880 <-- SLOT 7 (offset 0x1c), CONFIRMED tier getter (0-7 byte, zero args, thiscall) -----
+
+undefined1 __fastcall FUN_0046e880(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x74);
+}
+
+
+----- slot 8 (offset 0x20) FUN_0046e930 @ 0046e930 -----
+
+undefined1 __fastcall FUN_0046e930(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x6c);
+}
+
+
+----- slot 9 (offset 0x24) FUN_0046e940 @ 0046e940 -----
+
+undefined1 __fastcall FUN_0046e940(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x6d);
+}
+
+
+----- slot 10 (offset 0x28) FUN_0046e9c0 @ 0046e9c0 -----
+
+undefined1 __fastcall FUN_0046e9c0(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x6e);
+}
+
+
+----- slot 11 (offset 0x2c) FUN_0046e9d0 @ 0046e9d0 -----
+
+undefined1 __fastcall FUN_0046e9d0(int param_1)
+
+{
+  return *(undefined1 *)(param_1 + 0x6f);
+}
+
+
+----- slot 12 (offset 0x30) FUN_0046e890 @ 0046e890 -----
+
+undefined4 __fastcall FUN_0046e890(int param_1)
+
+{
+  return *(undefined4 *)(param_1 + 0x78);
+}
+
+
+----- slot 13 (offset 0x34) FUN_00439970 @ 00439970 -----
+
+undefined4 __fastcall FUN_00439970(int param_1)
+
+{
+  return *(undefined4 *)(param_1 + 100);
+}
+
+
+----- slot 14 (offset 0x38) FUN_00439980 @ 00439980 -----
+
+undefined4 __fastcall FUN_00439980(int param_1)
+
+{
+  return *(undefined4 *)(param_1 + 0x68);
+}
+
+
+----- slot 15 (offset 0x3c) FUN_0046e9a0 @ 0046e9a0 -----
+
+undefined2 __fastcall FUN_0046e9a0(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x7c);
+}
+
+
+----- slot 16 (offset 0x40) FUN_0046e970 @ 0046e970 -----
+
+undefined2 __fastcall FUN_0046e970(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x7e);
+}
+
+
+----- slot 17 (offset 0x44) FUN_0046e960 @ 0046e960 -----
+
+undefined2 __fastcall FUN_0046e960(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x80);
+}
+
+
+----- slot 18 (offset 0x48) FUN_0046e950 @ 0046e950 -----
+
+undefined2 __fastcall FUN_0046e950(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x82);
+}
+
+
+----- slot 19 (offset 0x4c) FUN_0046e980 @ 0046e980 -----
+
+undefined4 __thiscall FUN_0046e980(int param_1,int param_2)
+
+{
+  return *(undefined4 *)(param_1 + 0x84 + param_2 * 4);
+}
+
+
+----- slot 20 (offset 0x50) FUN_0046e8b0 @ 0046e8b0 -----
+
+undefined2 __fastcall FUN_0046e8b0(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x5a);
+}
+
+
+----- slot 21 (offset 0x54) FUN_0046e840 @ 0046e840 -----
+
+undefined2 __fastcall FUN_0046e840(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x5c);
+}
+
+
+----- slot 22 (offset 0x58) FUN_0046e850 @ 0046e850 -----
+
+undefined2 __fastcall FUN_0046e850(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x5e);
+}
+
+
+----- slot 23 (offset 0x5c) FUN_0046e8a0 @ 0046e8a0 -----
+
+undefined2 __fastcall FUN_0046e8a0(int param_1)
+
+{
+  return *(undefined2 *)(param_1 + 0x10a);
+}
+
+
+===== Steam-API-keyword hits across ENTRY vtable slots =====
+  slot 0 (off 0x00) FUN_0046cf80 : keyword 'Steam'
+
+===== Identity-shaped keyword hits across ENTRY vtable slots =====
+  <none found>
+
+===== Data cross-references TO the vtable address itself (constructor candidates) =====
+  xref from 0046f6d8 (DATA) in function FUN_0046f680
+  xref from 0046cfa9 (DATA) in function FUN_0046cf80
+
+===== Decompiling constructor candidate(s) =====
+
+----- constructor candidate FUN_0046f680 @ 0046f680 -----
+
+undefined4 * FUN_0046f680(void)
+
+{
+  uint uVar1;
+  undefined4 *puVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082987b;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  puVar2 = (undefined4 *)operator_new(0x118);
+  local_8 = 0;
+  if (puVar2 != (undefined4 *)0x0) {
+    FUN_00405960(uVar1);
+    *puVar2 = GAME_SearchResultNode::vftable;
+    local_8 = CONCAT31((int3)((uint)local_8 >> 8),2);
+    *puVar2 = GAMESTEAM_SearchResultNode::vftable;
+    FUN_0046dc00();
+    ExceptionList = local_10;
+    return puVar2;
+  }
+  ExceptionList = local_10;
+  return (undefined4 *)0x0;
+}
+
+
+----- constructor candidate FUN_0046cf80 @ 0046cf80 -----
+
+undefined4 * __thiscall FUN_0046cf80(undefined4 *param_1,byte param_2)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082a500;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAMESTEAM_SearchResultNode::vftable;
+  local_8 = 0xffffffff;
+  FUN_004059c0(uVar1);
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+

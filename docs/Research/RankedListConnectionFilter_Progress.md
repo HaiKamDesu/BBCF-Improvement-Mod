@@ -1709,6 +1709,958 @@ that mutation was not located.
    already-working `probeElapsedMs`-only sort - this remains a reasonable, honest place to stop
    if identity correlation turns out to be unsolvable via static+live RE effort actually spent.
 
+## Live CDB debugging attempted, twice crashed the game - DO NOT set a breakpoint on this function again (2026-07-12)
+
+Per user request, attempted live CDB attach to find an identity field on the ENTRY object (see
+previous section's next-step #1), since static RE alone couldn't resolve it. Full writeup for
+future agents:
+
+**Setup that worked fine, repeatedly, with zero issues:**
+- `cdb.exe` (x86, from Windows Kits 10 Debugging Tools) requires elevation (SeDebugPrivilege) to
+  attach to another process - the user's shell runs under UAC split-token (admin group present
+  but deny-only), so plain attach fails with Win32 error 5 (access denied). Fix: launch cdb via
+  `Start-Process -Verb RunAs` from PowerShell, which silently elevated without an interactive UAC
+  prompt in this environment (`ConsentPromptBehaviorAdmin=5`, i.e. simple consent, and it went
+  through without visibly blocking - possibly cached/pre-approved for this binary this session).
+- `-pv` (noninvasive attach) CANNOT resume execution (`g` fails with "No runnable debuggees") -
+  it's read-only-ish snapshot access, not a real controllable session. Use plain `-p <pid>` for
+  anything requiring `g`/breakpoints - this DOES suspend all threads at attach until `g` runs.
+- **Critical safety flag: always pass `-pd`** (auto-detach instead of kill on debugger exit). The
+  FIRST crash below happened specifically because `-pd` was omitted - killing cdb via `taskkill`
+  without it caused Windows to tear down the debuggee along with the dying debugger (default
+  "kill on close" behavior of the underlying debug object). With `-pd` set, an isolation smoke
+  test (attach, `lm m BBCF`, `qd`) completed cleanly and the game was confirmed unaffected -
+  proving the attach/detach round-trip itself, with NO breakpoint involved, is safe.
+- Module-relative addressing gotcha: `bp BBCF+0xA5450` is WRONG - cdb's MASM evaluator reads
+  "BBCF" as the hex literal `0xBBCF`, not the module name, giving a garbage address. Always
+  compute the explicit numeric base first via `lm m BBCF` (confirmed `00860000` in this session -
+  matches the ASLR finding from the previous RE pass) and use `00860000+0xA5450` instead.
+- With that fixed, `u 00860000+0xA5450` and `u 00860000+0x261060` disassembled EXACTLY matching
+  the known decompiled signatures of `FUN_004a5450` and `FUN_00661060` respectively - strong
+  independent confirmation the RE work's addressing has been correct all along.
+
+**What went wrong, twice, both times ONLY when an actual breakpoint was set and hit (never
+during plain attach/read/detach):**
+1. First attempt: script got the process attached but appeared to stall long before reaching the
+   scripted commands (large ModLoad enumeration for ~150 DLLs takes noticeably longer under full
+   invasive attach than it did during the `-pv` smoke test). An impatient external Bash-level
+   `timeout` killed the wrapper process, orphaning the elevated `cdb.exe` (Start-Process -Verb
+   RunAs launches a detached process tree the timeout couldn't reach) - still holding the game
+   suspended. Force-killing that orphaned `cdb.exe` via `taskkill` (without `-pd` set at the time)
+   caused the game to terminate - the exact "kill on debugger exit" default described above.
+2. Second attempt (this session): fixed both issues above (`-pd` set, and used a `Monitor`-based
+   wait instead of an external timeout, patiently waiting ~8+ minutes without touching anything).
+   The attach itself proceeded fine and the one-shot breakpoint (`bp /1 00860000+0xA5450 "..."`)
+   WAS successfully hit (`g` resumed execution, the breakpoint fired) - but shortly after, the
+   game's own crash log shows `Critical error detected c0000374` (`STATUS_HEAP_CORRUPTION`)
+   followed shortly by `verifier.dll` loading and then an actual access violation
+   (`c0000005`) inside `ntdll!RtlpAllocateHeap`. The debugger itself detached cleanly via `qd`
+   this time (confirmed in the log) - but the game had already fatally corrupted its own heap by
+   that point and was gone from the process list moments later.
+
+**Conclusion: setting a software breakpoint (INT3 write) on `FUN_004a5450` and letting it actually
+fire reliably crashes this game via heap corruption**, independent of the debugger's own
+cleanup/detach behavior (which worked correctly the second time). This looks like the game (or
+Steam's anti-tamper/crash-handling layer - `steamclient.dll`'s `crashhandler.dll` and
+`Breakpad_SteamWriteMiniDumpUsingExceptionInfoWithBuildId` appeared in nearby stack context) reacts
+badly to code-section modification or to a live INT3 hit in this specific function, triggering
+its own heap-corruption detection. **Do not set a breakpoint on this function (or likely any
+function in this call chain) again** - the risk is confirmed, not hypothetical, 1-for-1 across the
+only real attempt that got far enough to actually hit the breakpoint. Live CDB debugging of this
+specific chain is now considered CLOSED, not just paused - any future identity-field
+investigation must be done statically or via the mod's own existing safe call chain (see next
+section), not via an attached breakpoint.
+
+## Safer alternative found: get the ENTRY's vtable RVA from the mod's own already-safe call chain (2026-07-12)
+
+Key realization: the mod's OWN code has been calling this exact walk (`FUN_004a5450` + the
+entry's vtable slot 7 tier getter) across many prior test sessions with ZERO crashes - only the
+external CDB breakpoint ever destabilized the game. This means the entry's own vtable pointer
+(already read as `entryVtable` inside `DiagnosticLogRankedListMgrSlot`'s per-row loop, previously
+computed only to validate the `+0x1c` slot and then discarded) can be safely logged, giving a
+live vtable address with **zero live-debugger risk** - the RVA (`entryVtable - moduleBase`) can
+then be looked up directly in the static Ghidra project to identify ENTRY's concrete class and
+examine its other fields/vtable slots for an identity value (steamId or similar), entirely via
+the user's preferred static-analysis-plus-DEBUG.txt workflow.
+
+**Implemented this session:** re-enabled the per-row loop in `DiagnosticLogRankedListMgrSlot` for
+a small, bounded row count (`kIdentityProbeRowCount = 3` - NOT the full `kMaxDiagnosticRows`, to
+keep this identity-focused probe minimal) and added `entryVtableRva` to the per-row log output:
+`[row]=tier(Name,vtableRva=0xXXXXXX)`. Build verified clean (Debug|Win32). The full name/gameTier
+correlation loop used by `PollGameTiers` for actual sorting remains disabled (per the "rotation is
+a mod-side mapping bug" finding) - this re-enabled loop is ONLY for identity investigation via the
+logged RVA, not for reviving the broken sort-by-tier feature.
+
+**Next step:** get a fresh `DEBUG.txt` from a session with a populated ranked list, grep for
+`rankedListMgrDiag`, and take the `vtableRva=0x...` value from any row. Feed that RVA into a
+Ghidra decompile pass (`0x00400000 + RVA` = Ghidra address) to identify the entry's concrete class
+and thoroughly examine ALL its fields/other vtable slots (not just slot 7) for anything
+identity-shaped (a steamId, lobbyId, or similar) - this is the same investigation the previous RE
+agent attempted but couldn't complete, because it never had a live vtable address to anchor the
+search (only a stale, ASLR-invalidated one from an old log). This directly answers whether the
+tag-based filter/sort feature is truly a dead end or has one more viable path.
+
+## ENTRY vtable resolved via static Ghidra analysis - class identified, and a genuinely promising identity-key field found (2026-07-12, new session)
+
+Per the standing next-step ("get the ENTRY's vtable RVA from the mod's own already-safe call
+chain" - the CDB-breakpoint path is CLOSED, see the two sections above, do not revisit), this
+session took the freshly-logged, stable `entryVtableRva=0x49cc34` value from `DiagnosticLogRankedListMgrSlot`'s
+per-row loop and resolved it statically. **Pure Ghidra static analysis this whole session - no
+live debugger, no CDB, zero crash risk.**
+
+### Arithmetic correction before anything else: the RVA-to-Ghidra-address math in the task
+hand-off was wrong
+
+The task briefing computed `0x00400000 + 0x49cc34 = 0x0049CC34` - **that arithmetic is simply
+incorrect** (adding a positive number to `0x00400000` cannot yield a result smaller than the
+larger addend's own leading digits unless there's a typo). The correct sum, confirmed via
+`python3 -c "print(hex(0x00400000 + 0x0049CC34))"`, is **`0x0089CC34`** (the `4+8=C` nibble
+carries). This was caught immediately by inspecting what actually lives at each address:
+`0x0049CC34` sits mid-function inside `.text` (`FUN_0049cb90`, real disassembled instructions,
+not a vtable), while `0x0089CC34` sits inside `.rdata` (`0x0084a000-0x009d2600`, the same section
+every other confirmed vtable in this doc lives in) and resolves cleanly via RTTI. **Whoever reads
+a future `vtableRva=0x...` value out of `DEBUG.txt` for this or any similar diagnostic: always
+recompute `0x00400000 + rva` with an actual calculator/Python one-liner before treating the sum as
+known-good - do not eyeball hex addition, this session almost repeated the exact mistake the task
+briefing made.**
+
+### ENTRY's concrete class: `GAMESTEAM_SearchResultNode` (RTTI-confirmed)
+
+At Ghidra address `0x0089CC34`:
+
+- Symbol: `GAMESTEAM_SearchResultNode::vftable`.
+- RTTI Complete Object Locator at `vtable-4` (`0x0089CC30`, standard MSVC layout) resolves to
+  `GAMESTEAM_SearchResultNode::RTTI_Complete_Object_Locator` /
+  `GAMESTEAM_SearchResultNode::RTTI_Type_Descriptor` - a real, non-guessed, demangler-recovered
+  name, not a keyword-search inference.
+- Constructor `FUN_0046f680`: `operator_new(0x118)` (**object size 0x118 = 280 bytes**), then
+  `*puVar2 = GAME_SearchResultNode::vftable;` followed immediately by
+  `*puVar2 = GAMESTEAM_SearchResultNode::vftable;` (the classic MSVC two-stage vtable assignment
+  for a class with a base - `GAME_SearchResultNode` is the abstract base, `GAMESTEAM_SearchResultNode`
+  the concrete override, same pattern already seen for `CNetworkLobbyData`/`CSTEAMNetworkLobbyData`
+  and `GAME_CNetworkServer`/`GAMESTEAM_CNetworkServer` in earlier sessions - this game's whole
+  network layer follows this `GAME_X` abstract / `GAMESTEAM_X` concrete naming convention).
+- Field-initializer `FUN_0046dc00` (called right after vtable assignment) zeroes every field from
+  `+0xc` through `+0x114` explicitly, one store per line - this **is** a full, high-confidence
+  memory-layout map of the object (reproduced in full below), not a guess from partial vtable
+  coverage.
+
+### Full vtable dump (24 slots, ALL real implementations - no `__purecall`, unlike the earlier
+`CNetworkLobbyData` abstract base)
+
+| slot | off | fn | body | field meaning (cross-checked against `FUN_00661060`'s known call sites) |
+|---|---|---|---|---|
+| 0 | 0x00 | `FUN_0046cf80` | scalar-deleting destructor | - |
+| 1 | 0x04 | `FUN_0070e400` | `return *(int*)(this+0xc);` | **validity/type flag** - confirmed, this is the exact call `FUN_00661060` uses as `iVar8 = (**(*piVar7+4))()` to decide "no room"/invalid slot |
+| 2 | 0x08 | `FUN_0046ea70` | `return CONCAT44(_DAT_00000004,_DAT_00000000);` | reads absolute addr 0/4 - degenerate/unimplemented-looking, not identity-shaped |
+| 3 | 0x0c | `FUN_007587d0` | `return this+0x10;` | returns the ADDRESS of `+0x10`, not a value - likely a sub-object/name-buffer accessor |
+| **4** | **0x10** | **`FUN_0046e860`** | **`iVar1=*(int*)(this+0x114); out[0]=*(int*)(iVar1+0xc); out[1]=*(int*)(iVar1+0x10);`** | **THE IDENTITY-KEY CANDIDATE - see below** |
+| 5 | 0x14 | `FUN_0046e9b0` | `return *(byte*)(this+0x60);` | small state byte |
+| 6 | 0x18 | `FUN_00668180` | `return 0;` | constant stub |
+| 7 | 0x1c | `FUN_0046e880` | `return *(byte*)(this+0x74);` | **CONFIRMED tier getter** (already live-verified across many prior sessions - this is the exact byte read by the game's own `net_col_def/A-G.hip` icon selection) |
+| 8 | 0x20 | `FUN_0046e930` | `return *(byte*)(this+0x6c);` | raw member count - matches `FUN_00661060`'s slot-8 call |
+| 9 | 0x24 | `FUN_0046e940` | `return *(byte*)(this+0x6d);` | member-count-format companion (max/capacity) - matches slot-9 call |
+| 10 | 0x28 | `FUN_0046e9c0` | `return *(byte*)(this+0x6e);` | byte, adjacent to member-count fields |
+| 11 | 0x2c | `FUN_0046e9d0` | `return *(byte*)(this+0x6f);` | byte, adjacent to member-count fields |
+| 12 | 0x30 | `FUN_0046e890` | `return *(int*)(this+0x78);` | **written by `FUN_0046db40`** (the identity-key resolver, see below) - an RTT/connection-table-slot index once resolved, `0xffffffff` sentinel until then (matches `FUN_0046dc00`'s `*(this+0x78)=0xffffffff` init) |
+| 13 | 0x34 | `FUN_00439970` | `return *(int*)(this+0x64);` | dword |
+| 14 | 0x38 | `FUN_00439980` | `return *(int*)(this+0x68);` | dword |
+| 15 | 0x3c | `FUN_0046e9a0` | `return *(short*)(this+0x7c);` | word |
+| 16 | 0x40 | `FUN_0046e970` | `return *(short*)(this+0x7e);` | word |
+| 17 | 0x44 | `FUN_0046e960` | `return *(short*)(this+0x80);` | word |
+| 18 | 0x48 | `FUN_0046e950` | `return *(short*)(this+0x82);` | word - `+0x7c/0x7e/0x80/0x82` is a word-quad, plausible per-team/per-slot level or ping values (candidate for the "closest/furthest level" sort mode's own field, not yet cross-checked) |
+| 19 | 0x4c | `FUN_0046e980` | `return *(int*)(this+0x84+idx*4);` | **array accessor**, base `+0x84` |
+| 20 | 0x50 | `FUN_0046e8b0` | `return *(short*)(this+0x5a);` | word |
+| 21 | 0x54 | `FUN_0046e840` | `return *(short*)(this+0x5c);` | word |
+| 22 | 0x58 | `FUN_0046e850` | `return *(short*)(this+0x5e);` | word - `+0x5a/0x5c/0x5e` word-triplet |
+| 23 | 0x5c | `FUN_0046e8a0` | `return *(short*)(this+0x10a);` | word, near the very end of the 0x118-byte object |
+
+### The identity-key candidate: slot 4 (`FUN_0046e860`, offset 0x10) and its corroboration
+
+```c
+// slot 4 - offset 0x10 in GAMESTEAM_SearchResultNode::vftable
+void __thiscall FUN_0046e860(int param_1, undefined4 *param_2)
+{
+  int iVar1;
+  iVar1 = *(int *)(param_1 + 0x114);      // follow ENTRY+0x114 (a pointer, null until resolved)
+  *param_2 = *(undefined4 *)(iVar1 + 0xc);      // out[0] = sub-object+0xc
+  param_2[1] = *(undefined4 *)(iVar1 + 0x10);   // out[1] = sub-object+0x10
+}
+```
+
+`ENTRY+0x114` is a **pointer field**, explicitly zero-initialized by the field-initializer
+(`FUN_0046dc00`: `*(int*)(param_1+0x114) = 0;` is its very last store) - so it is **null until
+some other event populates it**, not always safe to read.
+
+**This exact 2-dword shape is independently corroborated from two other, already-decompiled
+functions in this investigation (one from this session, one re-confirming an earlier session's
+find):**
+
+1. **`FUN_0046db40`** (this session's re-decompile; this is the SAME function an earlier session
+   found as `GAMESTEAM_CNetworkServer`'s own vtable slot 44, `off 0xb0` - it turns out to ALSO be
+   the resolver that walks the ranked-list's own row list):
+   ```c
+   undefined4 __fastcall FUN_0046db40(int param_1)
+   {
+     ...
+     for (iVar4 = 0; iVar4 < *(int *)(param_1 + 0xae8); iVar4++) {   // same +0xae8 row COUNT
+       iVar2 = FUN_004a5450(iVar4);                                   // same list walker -> ENTRY ptr
+       if (*(int *)(iVar2 + 0x110) != 0) {                            // "needs resolution" flag
+         iVar3 = FUN_0046e9e0(*(undefined4 *)(*(int *)(iVar2 + 0x114) + 0xc),
+                               *(undefined4 *)(*(int *)(iVar2 + 0x114) + 0x10));
+         if (-1 < iVar3) {
+           *(int *)(iVar2 + 0x78) = iVar3;         // <-- writes slot 12's field (confirmed above)
+           *(undefined4 *)(iVar2 + 0x110) = 0;     // clear "needs resolution"
+         }
+       }
+     }
+   }
+   ```
+   This runs over the exact same row list (`+0xae8` count, `FUN_004a5450` walker) our ranked-list
+   tier chain already uses - i.e. it is the **connection-quality resolver for this exact row
+   object**, not an unrelated class as an earlier session guessed. It reads ENTRY's `+0x114`
+   sub-object's `+0xc`/`+0x10` pair as a 2-dword key into `FUN_0046e9e0`, and on success stores
+   the resolved index into ENTRY`+0x78` (slot 12).
+
+2. **`FUN_0046e9e0`** (already found in an earlier session, re-confirmed unchanged this session):
+   linear-searches up to 20 rows (stride `0x1a` dwords = 104 bytes) of a per-peer sample table for
+   a row whose **first two dwords match the caller's 2-dword key exactly**, then averages 5
+   `(low,high)` dword-pairs from that row - a per-peer RTT/ping sample cache, keyed by this exact
+   2-dword identity.
+
+3. **`FUN_0046e790`** (a `GAMESTEAM_CNetworkServer` method - the *already-connected* P2P session
+   object, not the search-result row) calls the **same** `FUN_0046e9e0` with its **own** fields as
+   the key:
+   ```c
+   uVar1 = *(undefined4 *)(param_1 + 0xc7c);
+   uVar2 = *(undefined4 *)(param_1 + 0xc78);
+   ...
+   uVar5 = FUN_0046e9e0(uVar2, uVar1);
+   ```
+   i.e. `GAMESTEAM_CNetworkServer+0xc78`/`+0xc7c` hold the **identical 2-dword key shape**, read
+   directly off the connection object itself (no indirection through a `+0x114`-style pointer -
+   makes sense, since a `CNetworkServer` is a live, already-resolved connection to one specific
+   peer, unlike a not-yet-joined search-result row).
+
+4. **`FUN_0046f720`** (the writer of new rows into the same 20-slot table `FUN_0046e9e0` reads)
+   is called from **four** places, confirmed via `getReferencesTo`, and **every single call site
+   passes the same `(param_1+0xc78, param_1+0xc7c)` pair** off a `GAMESTEAM_CNetworkServer`-shaped
+   object as the new row's key (`FUN_0046d0a0`, `FUN_0046d370`, `FUN_0046e790`, `FUN_00470240` -
+   all four are P2P-connection state-machine functions, matched via the `param_1+0x25e0` state
+   byte already known from earlier sessions to be `GAMESTEAM_CNetworkServer`'s own phase field).
+
+**Conclusion: `+0xc78`/`+0xc7c` on the connection object and `(+0x114)->+0xc`/`+0x10` on the
+search-result row are the SAME identity key, used by the game itself to correlate "this
+not-yet-joined search-result row" with "this already-established P2P connection" for exactly the
+purpose of carrying RTT/connection-quality data between the two subsystems.** This is a real,
+game-authored cross-referencing mechanism - not a coincidental shape match. Given (a) this is a
+Steamworks-integrated title, (b) `GAMESTEAM_CNetworkServer` objects are explicitly per-remote-peer
+P2P sessions (their entire purpose is "my connection to one specific Steam user"), and (c) a
+64-bit value split as two adjacent dwords is exactly `CSteamID`'s native in-memory representation,
+**the leading hypothesis is that this 2-dword pair IS the peer's Steam64 ID** - though this
+specific pass did not trace back far enough to find the literal write site of
+`CNetworkServer+0xc78/+0xc7c` (i.e. did not catch it being set directly from a
+`P2PSessionRequest_t::m_steamIDRemote` or similar Steamworks callback param) to prove the bit
+layout beyond doubt.
+
+**Even if it turns out NOT to be litereally `CSteamID`'s bit pattern**, it is still, on the
+strength of the evidence above, a **stable, game-authored, per-peer identity key already used by
+the game's own code to correlate the search-result row across subsystems** - which is exactly
+what's needed to fix the "rotation" mapping bug (see the "RESOLVED (differently than expected)"
+section much earlier in this doc: the mod's positional row-index assumption was proven false, and
+this doc's own next-step #1 asked for exactly this kind of directly-readable identity field on
+the entry object). Reading this 2-dword value per row instead of relying on position would let
+the mod correctly attribute `gameTier` data to the right player regardless of whatever internal
+list-node reshuffling causes the positional "rotation."
+
+### Confidence and risk assessment for adding a live read
+
+**Confidence: medium-high that this field is a genuine, usable per-peer identity key; medium
+(not yet proven) that it is bit-for-bit the Steam64 ID.** Backed by: RTTI-confirmed concrete
+class, a full zero-init field map from the real constructor (not guesswork), and three
+independent decompiled call sites (one from this session, two corroborating from earlier
+sessions) all converging on the same 2-dword key shape being shared between the not-yet-joined
+row object and the already-connected P2P session object specifically for cross-subsystem
+identity correlation.
+
+**Risk of adding a live read: very low, LOWER than the already-shipped tier-byte read.** Two ways
+to do it, in order of preference:
+
+1. **Safest - direct pointer-chase, no virtual call at all:** `entry+0x114` is a plain pointer
+   field (not a vtable call), so reading it needs no calling-convention guessing whatsoever:
+   ```cpp
+   const void* const idSubObj = *reinterpret_cast<void* const*>(
+       reinterpret_cast<const uint8_t*>(entry) + 0x114);
+   if (idSubObj != nullptr && !IsBadReadPtr(idSubObj, 0x14)) {
+       const uint32_t idLow  = *reinterpret_cast<const uint32_t*>(
+           reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+       const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(
+           reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+   }
+   ```
+   Must handle `idSubObj == nullptr` gracefully (skip that row this poll cycle) - it is null until
+   `FUN_0046db40`'s resolution runs at least once for that row, same "benefit of the doubt while
+   unresolved" pattern the filter's reputation model already uses elsewhere.
+2. **Alternative, if the direct read above ever looks suspicious:** call vtable slot 4 the proper
+   way (`this=entry`, one explicit output-buffer argument of 8 bytes, thiscall) - this is a real
+   virtual call with an explicit argument (unlike slot 7's zero-arg case already solved), so if
+   this route is taken it deserves the same raw-disassembly double-check slot 7's `uVar10`
+   mystery-argument got before trusting it (see the "RESOLVED: `uVar10`..." section above) - but
+   given option 1 needs no virtual call and no argument-count guessing at all, it should be tried
+   first.
+
+### Concrete next steps, in order
+
+1. **Add the direct pointer-chase read (option 1 above) to `DiagnosticLogRankedListMgrSlot`'s
+   per-row loop**, logging the two dwords alongside the already-logged tier/name/vtableRva, e.g.
+   `[row]=tier(Name,vtableRva=0x..,idLow=0x..,idHigh=0x..)`. Build, deploy, get a fresh
+   `DEBUG.txt` from a populated ranked-list session.
+2. **Cross-check `idHigh`** against the individual-account Steam64 ID pattern (`0x0110xxxx`-shaped
+   high dword) for at least one row - if it matches for players whose Steam friend/lobby-member ID
+   is independently known (e.g. a friend already on the list, or cross-referenced against the
+   already-logged `owner=<steamId>` from `SortShownCandidates`'s diagnostic for a peer that
+   happens to already be a resolved/reachable candidate), that would be a strong direct
+   confirmation this literally is the Steam64 ID, not just an opaque game-internal key.
+3. **Whether or not step 2 proves the literal Steam64-ID hypothesis**, if the `(idLow, idHigh)`
+   pair is confirmed **stable per on-screen player and distinct between different players** (the
+   minimum bar for "usable as an identity key," regardless of its exact semantic meaning), wire it
+   into `PollGameTiers()` as the correlation key instead of positional row index - this directly
+   fixes the "rotation" mapping bug from the "RESOLVED (differently than expected)" section, and
+   would finally make the real `gameTier` data safely attributable to the correct player.
+4. **If `idSubObj` is null for most/all rows** even on a populated, fully-loaded list (i.e. the
+   resolution event that populates `+0x114` rarely or never fires for a not-yet-probed row), this
+   candidate is weaker than hoped - it would only become useful for rows the mod has ALSO already
+   established (or is establishing) its own P2P probe connection to, which is a smaller subset than
+   "every visible row." Still worth checking - even partial coverage (only entries our own prober
+   is already talking to) may be enough to validate the tier-averaging data for the subset that
+   matters most (the ones the sort is trying hardest to rank).
+5. New Ghidra scripts from this session (kept for reuse), all under
+   `docs/Research/ghidra_scripts/`, matching `run_ghidra_*.cmd` / `*GhidraReport.txt` in
+   `docs/Research/`: `DecompileRankedListEntryVtable.py` (namespace-aware vtable resolver +
+   full-slot decompiler + constructor-xref finder - reusable template for any future "resolve a
+   live-logged vtable RVA to a real class" investigation), `InspectEntryVtableAddr.py` /
+   `CheckVtableSections.py` (quick section/byte inspectors, useful for sanity-checking an address
+   actually looks like a vtable before trusting a decompile of it - would have caught this
+   session's arithmetic slip immediately if run first), `DecompileSearchResultNodeIdentity.py`,
+   `DecompileNetworkServerIdWriters.py`.
+
+## Identity-key candidate wired into the diagnostic (2026-07-12, same day)
+
+Implemented next-step #1 from the section above. `DiagnosticLogRankedListMgrSlot`'s per-row loop
+now also does the direct pointer-chase read (`entry+0x114` -> dereference -> `+0xc`/`+0x10` dwords)
+exactly as specified - no virtual call, guarded with `IsBadReadPtr` at each step, gracefully
+skipping (logging `id=unresolved`) when the sub-object pointer is still null. Also bumped
+`kIdentityProbeRowCount` from 3 to 10 to get better cross-player signal in one read (still a small
+bounded subset, not the full list - this is an identity-investigation probe, not the production
+path). Log format: `[row]=tier(Name,vtableRva=0x..,id=<16 hex digits, idHigh then idLow>)` or
+`[row]=tier(Name,vtableRva=0x..,id=unresolved)`. Build verified clean (Debug|Win32).
+
+**Next step for whoever picks this up:** get a fresh `DEBUG.txt` from a populated ranked-list
+session and check, across multiple rows/refreshes: (a) does `id=` ever show as resolved (non-
+"unresolved") at all, (b) is the same on-screen player's `id=` value stable across repeated reads
+and different from other players' (the minimum bar for a usable identity key, regardless of
+whether it's literally the Steam64 ID), (c) does the high dword ever match the `0x0110xxxx`-shaped
+individual-account pattern for a player whose real steamId is independently known from the
+`sort order` log's `owner=` field (cross-reference by name). If (b) holds, this is ready to wire
+into `PollGameTiers()` as the real correlation key, finally fixing the rotation/mismapping bug.
+
+## CONFIRMED: the identity field IS the real Steam64 ID, byte-for-byte (2026-07-12, same day)
+
+Fresh `DEBUG.txt` (md5sum-verified) from a populated ranked-list session, refreshed multiple
+times, gave 15 distinct resolved `id=` values. **Every single one shares the exact high dword
+`01100001`** - precisely the standard Steam64 encoding (universe=public, account type=individual)
+- already a strong signal on its own. Went further and cross-referenced two decoded values
+directly against the already-logged `sort order`/`owner=` steamIds by name:
+
+- `id=011000014f146cf4` -> decimal `76561199287004404` -> **exact match** for
+  `owner=76561199287004404 name="BrotherHoodBR12"` in the same session's `sort order` log.
+- `id=011000010b1d4745` -> decimal `76561198146733893` -> **exact match** for
+  `owner=76561198146733893 name="ItJustWorksButDoesn't"`.
+
+**This is conclusive: the field at `entry+0x114 -> +0xc/+0x10` is the peer's literal, real Steam64
+ID.** Not a game-internal opaque key merely shaped like one - an exact, verified match against
+already-independently-known steamIds.
+
+**Bonus finding that further validates this, and separately reconfirms an old bug:** the SAME
+diagnostic line's *name* field (still using the old, already-known-broken positional
+`m_reachableLobbies[row] -> candidate.ownerName` lookup) showed `id=011000010f3b0d09` mislabeled
+as "ItJustWorksButDoesn't" at one point in the session. Decoded, that ID is `76561198215793929`,
+which the `sort order` log shows actually belongs to **"FlaqJak"**, a different player entirely.
+This is exactly consistent with everything already established: the position-based name
+correlation is unreliable (as proven earlier), while **the new ID field - read directly from the
+entry object itself, with no positional assumption at all - is accurate every time.** This mismatch
+is further proof the fix works, not evidence against it: it shows precisely why position-based
+correlation must be replaced, and that the ID field is immune to the exact failure mode that broke
+everything until now.
+
+**This closes out the investigation cleanly:** the tag-based sort/filter feature is confirmed
+FEASIBLE. The only remaining work is wiring the ID as the real correlation key in place of
+position, in `PollGameTiers()` and `BuildCompactedListAndDeliver`'s tier-attribution logic (see
+next-steps #3 in the section above, now unblocked) - implemented in the very next commit after
+this one, see below.
+
+## Real fix implemented: PollGameTiers now keys tier data by the real Steam64 ID instead of row position (2026-07-12, same day)
+
+Rewired the whole gameTier collection path to use the confirmed-accurate identity field instead of
+positional correlation:
+
+- `PollGameTiers()` no longer assumes `m_reachableLobbies[row]` tells us who's at that row. Instead,
+  for each row it does the SAME `entry+0x114 -> +0xc/+0x10` pointer-chase already validated above,
+  builds a `uint64_t steamId = (uint64_t)idHigh << 32 | idLow`, and only proceeds if the sub-object
+  was resolved (non-null) - skipping unresolved rows entirely rather than guessing.
+- Removed the old `rowCount == m_reachableLobbies.size()` gate that was papering over the
+  positional mismatch - it's no longer needed since correctness no longer depends on row order
+  matching delivery order at all. This also means gameTier collection now works even during the
+  brief post-delivery lag window where the count temporarily mismatched (previously skipped
+  entirely).
+- The tier value is stored the same way as before (`m_verdicts[steamId].gameTier` +
+  `gameTierAverage` cumulative averaging) - only the *lookup* changed, not the storage/averaging
+  logic, which was never the broken part.
+- `DiagnosticLogRankedListMgrSlot`'s per-row loop is UNCHANGED (still logs the old, known-unreliable
+  name alongside the new reliable id, specifically so future sessions can keep using the mismatch
+  as a live sanity check that the id field remains trustworthy where the name field is not).
+
+Build verified clean (Debug|Win32). **Not yet live-tested** - next step is a fresh `DEBUG.txt` +
+visual confirmation that `BestConnection`/`WorstConnection` sort now actually reflects the game's
+real tier consistently, since the correlation bug that blocked this for the entire investigation
+should now be fixed.
+
+## Trivial but total bug found: PollGameTiers() was never actually being called (2026-07-12, same day)
+
+User tested the identity-key fix and reported `BestConnection` still not ordering correctly -
+players known to be tier 4 still showing in random middle positions. Fresh `DEBUG.txt`
+(md5sum-verified) showed the real bug immediately: **every single `sort order` line all session
+(37 of 37) had a positive `key=` value - the `probeElapsedMs` fallback - never once the negative,
+`gameTierAverage`-based key.** Cross-checked that the identity chain itself WAS working fine in
+parallel (`DiagnosticLogRankedListMgrSlot`'s `id=` values decoded and matched real, currently-
+visible players by name, e.g. `76561198102157404` = "gigantic father", `76561198256402225` =
+"Vermi" - both present in the same session's `sort order` log) - so the fix from earlier this
+session was structurally correct, but its effect was never reaching the sort at all.
+
+**Root cause: `PollGameTiers()`'s call site in `OnSteamCallbacksPump()` was still commented out**
+from the much-earlier isolation test (see "MAJOR NEW FINDING"/isolation-test sections). That test
+disabled the call to check whether the mod's own polling was causing the "rotation" bug: the
+verdict came back "no, it's a mod-side positional-mapping bug" (see "RESOLVED (differently than
+expected)"), and `PollGameTiers()` was subsequently rewritten to use the confirmed-correct
+identity-key lookup instead of position - but the call site itself was never uncommented
+afterward. So for this whole session (and the identity-verification session before it),
+`PollGameTiers()` was dead code - it never ran, `gameTier`/`gameTierAverage` never got populated
+for anyone, and `SortShownCandidates` correctly (per its own designed fallback logic) always fell
+back to `probeElapsedMs`, which is exactly what looked like "still broken."
+
+**Fixed:** re-enabled the `PollGameTiers();` call in `OnSteamCallbacksPump()`. Build verified
+clean (Debug|Win32). This is a simple oversight, not a new design problem - the identity-key logic
+underneath was never actually exercised until now. **Still not live-tested** - this is the real
+first live test of the complete fix (identity-key correlation + the call site actually running).
+
+## CONFIRMED via exact screenshot-to-log match: delivery/identity pipeline is fully correct; remaining gap was average-vs-instantaneous (2026-07-12, same day)
+
+User provided 3 screenshots (one per real search) plus a matching `DEBUG.txt` (md5sum-verified).
+Did a direct, unambiguous, name-by-name comparison between each screenshot's visible row order
+and the exact `sort order` log line for that same real delivery (matched via the
+`GetLobbyByIndex`-burst method):
+
+- **Search 1**: exact position-for-position match, all 11 visible rows (Eroscode, Vermi, gigantic
+  father, Kirtle, ragataga, Currsligga, BradyBackRibs, Rinix, snowwolf125, Diozyne, Momo) - this
+  search correctly had no real tier data yet (first search of the session, `probeElapsedMs`
+  fallback throughout), so an unsorted-by-tag appearance here is expected/correct, not a bug.
+- **Search 2**: 10 of 11 visible rows matched exactly in order; the one difference (last visible
+  row) is most likely explained by a small timing gap between the log capture and the screenshot
+  moment (the list can gain/lose members between the two).
+- **Search 3**: **exact match, all 11 visible rows**, in the precise order shown on screen
+  (Currsligga, Dungeon Crawler Mac, KkkK, Eroscode, gigantic father, kusanagyu, Kirtle, Haphazard,
+  snowwolf125, じ, slayraptor64).
+
+**This conclusively proves the delivery mechanism and the identity-key correlation fix from
+earlier today are both working correctly - what the mod computes and delivers is genuinely what
+reaches the screen.** The user's continued "still not right" report is explained by something
+different and much simpler: **the sort was ranking by `gameTierAverage` (a running average across
+every observation this session), while the number displayed in the game's own delay-dot column is
+the CURRENT, single instantaneous reading.** Connection quality can genuinely fluctuate tick to
+tick (this was the whole reason averaging was requested in the first place) - so a player whose
+averaged rank puts them near the top can still show a lower number at any given instant, and this
+is a real, expected disagreement between "smoothed rank" and "momentary displayed value," not a
+mapping/delivery bug. Confirmed directly in the screenshots: e.g. search 2 shows visible tags
+`2,0,4,2,1,3,2,1,1,2,1` in delivered order - NOT visually monotonic - because the delivered ORDER
+was correctly ranked by average while each row's DISPLAYED number is the raw instantaneous value.
+
+**User's explicit choice when asked "average vs. latest-only" (2026-07-12): use only the latest
+reading.** Implemented: `SortShownCandidates`'s `BestConnection`/`WorstConnection` cases now key
+off `gameTier` (the single latest observation) instead of `gameTierAverage`. `gameTierAverage`/
+`gameTierSampleCount` are left in place (still computed by `PollGameTiers`, just no longer used for
+the sort key) in case a future session wants to revisit the trade-off. Build verified clean
+(Debug|Win32). **Not yet live-tested** - this should make the delivered order track the visibly
+displayed number much more closely, at the cost of the order being able to shuffle more often as
+connections fluctuate (an expected, accepted trade-off per the user's explicit choice).
+
+## Real, confirmed bug found and fixed: stale cached gameTier survived across brand-new searches (2026-07-12, same day)
+
+User reported a specific, concrete anomaly: a player showing delay tag "0" on screen was sorted at
+the very TOP of a `BestConnection` list - impossible if 0 were genuinely their best-ever value.
+Fresh screenshot + `DEBUG.txt` (md5sum-verified) traced this precisely, using the player's REAL
+steamId (from `sort order`'s `owner=` field, not the diagnostic's still-cosmetically-unreliable
+name field - confirmed again this session: the diagnostic mislabeled a DIFFERENT player,
+`76561198366918608`, as "KkkK" at one point, while the REAL "KkkK" is `76561199486366201` per the
+correctly-attributed `sort order` log - a reminder that the diagnostic's `name=` field is decorative
+only, never trust it over `owner=`):
+
+- Search 1 (fresh list, first time this player appeared): `known=0` - correctly unresolved.
+- Search 2 (later, same session): `known=1 key=-5` - `PollGameTiers` successfully resolved their
+  identity and read tier 5.
+- **Search 3 (a brand-new, later search): STILL `known=1 key=-5`** - the exact same cached value,
+  reused verbatim, sorted to the TOP - while the game's own on-screen tag for their fresh row in
+  THIS new search showed the honest default "0", because that new row's own connection-quality
+  resolver hadn't run yet for this fresh instance.
+
+**Root cause: `PeerVerdict::gameTier`/`gameTierAverage`/`gameTierSampleCount` are keyed by steamId
+and persisted for the entire session, but the underlying GAME-SIDE entry object is recreated from
+scratch on every genuinely new `LobbyMatchList_t` delivery - its real tier byte starts back at a
+default/unresolved state each time until the game's own resolver (`FUN_0046db40`) catches up for
+THAT fresh instance.** Using an old cached value to sort a brand-new list's not-yet-resolved row
+produces exactly this: a stale high value winning the sort while the live, currently-displayed tag
+is still whatever a fresh/default read into the ENTRY chain honestly returns.
+
+**Fixed:** `OnLobbyListResultDelivered` (fires exactly once per genuinely new list, confirmed via
+the `GetLobbyByIndex`-burst method used throughout this investigation) now resets
+`gameTier`/`gameTierAverage`/`gameTierSampleCount` to their unresolved defaults for every entry in
+`m_verdicts` before processing the new list. `probeElapsedMs`/reputation data are deliberately
+NOT touched - those track reachability across searches by design and remain valid session-wide.
+This means `BestConnection`/`WorstConnection` will correctly show `probeElapsedMs` fallback (or
+"unknown") for everyone immediately after each new search, until `PollGameTiers` re-resolves real
+tiers fresh for that specific instance - a brief, honest gap, not a bug.
+
+Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+## Second real bug found and fixed: real tier and fallback estimate were on incompatible numeric scales (2026-07-12, same day)
+
+User reported another screenshot where the ordering was still visibly wrong - explicitly noted
+this wasn't just connection instability, since the same players kept showing tier 0 across
+repeated refreshes. Fresh `DEBUG.txt` (md5sum-verified) traced it directly in the `sort order` log
+for the exact real delivery matching the screenshot:
+
+```
+#0 owner=76561198090996621 name="UMA | Akane" known=1 key=0
+#1 owner=76561198136424162 name="faygofiend" known=1 key=1656
+#2 ... key=1688
+```
+
+**`key=0` for a `known=1` entry with real tier data means `gameTier=0`** (the worst possible real
+value - `-static_cast<long long>(0)` = `0`). Every other visible entry that round was still on the
+`probeElapsedMs` fallback (positive millisecond values, e.g. `1656`). **Since `0 < 1656`, a
+CONFIRMED worst-possible real tier mathematically beat every peer whose real tier simply hadn't
+been measured yet** - putting a tier-0 player at the very top of "Best Connection." This is a
+distinct bug from the earlier staleness fix (which addressed *stale* cached data winning) - this
+one is about *correctly-fresh* worst-tier data winning against unrelated-scale fallback data, a
+pure key-scale defect in `SortShownCandidates`, unrelated to identity/delivery/staleness.
+
+**Fixed:** real-tier keys now live in their own dedicated numeric band
+(`kRealTierKeyBase = -1000000000LL` and below) that no plausible `probeElapsedMs` value (typically
+hundreds to tens of thousands) could ever reach - so ANY resolved real tier, however bad, always
+sorts as a block strictly ahead of ANY fallback-only peer. Direction (best-first vs. worst-first)
+is now baked directly into the key computation via a local `worst` bool, rather than relying on
+the shared `descending` flip used by other sort modes - a flip alone would have inverted the
+real-tier-vs-fallback bucket priority specifically for `WorstConnection` mode (fallback's small
+positive numbers would otherwise outrank the real-tier bucket's large negative numbers under a
+naive reversal). `RankedListSortMode_WorstConnection` was removed from the shared `descending` set
+accordingly - it's now fully self-contained within the connection-mode case.
+
+Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+## Third real bug found and fixed: the staleness fix itself regressed real tier data to never reaching the screen at all (2026-07-12, same day)
+
+User provided two screenshots (consecutive refreshes) and a fresh `DEBUG.txt` (md5sum-verified),
+reporting a player ("Brullar") who visibly should have been top-ranked (tier 4, no one else
+visibly higher) but stayed stuck in the middle on the next refresh - and separately raised a sharp,
+independent question: they report only ever having visually seen delay-column values 0 through 4,
+never anything they'd recognize as higher, despite this doc logging real reads up to 6/7 - meaning
+either the mod is reading the wrong value, or values 5-7 are visually indistinguishable from 4 in
+the game's own rendering. A background RE pass was dispatched to check that question specifically
+(asset/icon-selection analysis, not yet reported back as of this writing).
+
+**Separately, and more urgently, direct log analysis for this exact session found a serious
+regression from the PREVIOUS session's staleness fix:** checked all 3 real deliveries this session
+(via the `GetLobbyByIndex`-burst method) for ANY entry using a real-tier-based key
+(`kRealTierKeyBase` range) - **zero of 3 deliveries had ANY real tier data at all.** Every single
+visible sort this entire session was 100% `probeElapsedMs` fallback, despite `PollGameTiers`
+correctly resolving real tier data via the identity chain in the background (confirmed separately
+via the diagnostic).
+
+**Root cause:** the previous session's fix (clearing `gameTier`/`gameTierAverage`/
+`gameTierSampleCount` for every peer at the start of `OnLobbyListResultDelivered`, to stop stale
+data from an earlier search winning the sort) collided with an already-known architectural fact:
+**the game only creates its row/entry objects at the exact moment a list is actually delivered to
+it** (that's what triggers its own `GetLobbyByIndex` calls) - so during the hold period BEFORE
+delivery, there are no fresh entries for the new search to poll yet, and wiping the cache at that
+exact moment left nothing at all for the sort to use. Combined with the older, already-documented
+fact that only the FIRST delivery of a search ever reaches the screen (later in-place
+recomputations are no-ops - see "MAJOR FINDING" section), this meant real tier data could
+never inform what the user actually sees, ever, after that fix - a complete (if well-intentioned)
+regression of the tier-based sort back to pure fallback-estimate behavior.
+
+**Fixed with a bounded-TTL middle ground instead of an unconditional wipe:** added
+`PeerVerdict::gameTierTickMs` (timestamp of the last successful real-tier read) and
+`kGameTierTtlMs = 45000` (45s). `SortShownCandidates` now only trusts `gameTier` if it was
+refreshed within that window - long enough to survive the gap between a new search's delivery and
+its own entries resolving (typically a few seconds, based on prior observations), short enough
+that a truly old reading (e.g. a player who left and reappeared minutes later) eventually falls
+back to being treated as unknown again. The unconditional wipe in `OnLobbyListResultDelivered` was
+removed entirely. Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+**Still open, pending the RE agent's report:** whether the raw 0-7 tier value the mod reads is
+genuinely the same thing the game's delay column visually distinguishes, or whether it needs a
+transformation (clamp, bucket, or a different meaning for the upper bits) that the mod isn't
+currently applying - see the dispatched background investigation referenced above.
+
+## RE agent report: icon-selection code path fully resolved - NO clamp exists, and the tier byte's real source is `HOST_NETCOLOR` Steam lobby metadata, not a live per-viewer ping (2026-07-12, new session)
+
+This is the background RE pass referenced in the section above. Investigated whether the
+icon-selection code clamps/buckets the raw 0-7 byte before picking a sprite, and what actually
+writes the byte in the first place. Pure static Ghidra analysis this session - **no live CDB,
+no process interaction, per the standing CLOSED status on live debugging of this call chain.**
+New Ghidra scripts, all under `docs/Research/ghidra_scripts/`, matching
+`run_ghidra_netcol_select_fn.cmd` / `run_ghidra_searchresultnode_tier_writer.cmd` /
+`run_ghidra_lobby_metadata_key_table.cmd` / `run_ghidra_searchresultnode_populate_caller.cmd`
+in `docs/Research/`: `DecompileNetColSelectFn.py`, `DecompileSearchResultNodeTierWriter.py`,
+`DecompileLobbyMetadataKeyTable.py`, `DecompileSearchResultNodePopulateCaller.py`. Matching
+report files: `NetColSelectFnGhidraReport.txt`, `SearchResultNodeTierWriterGhidraReport.txt`,
+`LobbyMetadataKeyTableGhidraReport.txt`, `SearchResultNodePopulateCallerGhidraReport.txt`.
+
+### Part 1: the icon-select helpers use the RAW byte as a direct array index - no clamp, no modulo, no bucketing anywhere
+
+Full decompile + manual raw-disassembly cross-check of both tiered icon-draw helpers
+(`FUN_00655260`, used by the confirmed ranked-list row renderer `FUN_00661060`; and its
+sibling `FUN_00533d10`, used by the post-match/rival-card screens) - both are trivially
+simple, and both index the 8-string array with the tier value completely unmodified:
+
+```c
+// FUN_00655260 (ranked list) - full decompile, nothing elided:
+void FUN_00655260(undefined4 param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,
+                 int param_5,undefined4 param_6)
+{
+  char *local_28[4]; char *local_18,*local_14,*local_10,*local_c; undefined4 local_8;
+  local_28[0]="net_col_def.hip"; local_28[1]="net_col_A.hip"; local_28[2]="net_col_B.hip";
+  local_28[3]="net_col_C.hip"; local_18="net_col_D.hip"; local_14="net_col_E.hip";
+  local_10="net_col_F.hip"; local_c="net_col_G.hip"; local_8=0;
+  FUN_00643b40();
+  FUN_00643ea0(local_28[param_5],&local_8,0,0,0);   // <-- direct index, param_5 = raw tier byte
+  FUN_006916b0(local_8,param_1,param_2,param_3,param_4,1,param_6,0,0x3f800000,0x3f800000,0,0,0,0);
+}
+```
+
+Raw disassembly confirms `param_5` (`[EBP+0x18]`, zero-extended straight from the entry's
+tier-getter `AL` return per the earlier "RESOLVED: `uVar10`..." section) is used verbatim:
+`MOV ECX,dword ptr [EBP+0x18]` then `PUSH dword ptr [EBP+ECX*0x4+-0x24]` - a plain
+`array[index]` load, no `AND`, no `CMP`/`JAE`-style bounds clamp, no lookup/remap table, no
+`MOD`. **`FUN_00533d10` (the other, post-match-screen caller) does the exact same thing**
+(`local_28[param_1]`, same raw-disasm shape). **Conclusively answers whether a clamp exists:
+there is no clamp/bucketing transform anywhere in the render path.** Indices 4/5/6/7
+(`net_col_D/E/F/G.hip`) are four fully distinct string literals, loaded and drawn via four
+fully independent `FUN_00643ea0`/`FUN_006916b0` calls - the code treats all 8 assets as
+completely separate, unaliased sprites. (What was NOT verified this pass: whether the actual
+`.hip` texture *pixel content* of D/E/F/G is visually distinguishable at the small on-screen
+icon size - the game's `net_col_*.hip` files live packed inside one of the proprietary
+`data/ETC/*.pac` archives, and no unpacker for this game's `.pac`/`.hip` format was available
+in this session/repo. This remains the one untested part of the "is it a code clamp or an
+asset-content issue" question - see next steps below.)
+
+### Part 2: the tier byte is `HOST_NETCOLOR`, a one-shot Steam lobby-metadata string set by the HOST, not a locally-measured live ping
+
+Ran a fast whole-binary instruction scan (1,266,930 instructions) for real object-field stores
+to offset `+0x74` (filtering out ~140 `[EBP + -0x74]` stack-local false positives), then
+decompiled the register-relative survivors. Found the actual writer:
+
+**`FUN_0046fcc0(ENTRY* param_1, void* param_2)`** - called from exactly **one** place in the
+whole binary (a single xref from data at `0089cb90`, i.e. invoked via vtable-style dispatch).
+Decompiles to: set `ENTRY+0x114 = param_2` (the identity-key sub-object pointer this doc
+already proved, in an earlier session, decodes to the peer's real Steam64 ID), then loop up to
+18 times over the lobby's Steam metadata key/value pairs (`GetLobbyData`-by-index-shaped
+vtable calls through `SteamInternal_ContextInit`), `strncmp`-matching each key name against a
+fixed 18-string table at RVA `0x9D9610`. Dumped that table in full:
+
+```
+[0]  NETWORK_VERSION
+[1]  MATCHING_FILTER
+[2]  HOST_NETCOLOR        <-- writes ENTRY+0x74, our confirmed tier byte, UNMODIFIED
+[3]  PLAYER_ROOM_NAME
+[4]  PLAYER_ROOM_TYPE
+[5]  PLAYER_MEMBER_MAX    -> ENTRY+0x6c
+[6]  PLAYER_PRIVATE_NUM   -> ENTRY+0x6f
+[7]  PLAYER_PRIVATE_MAX   -> ENTRY+0x6e
+[8]  PLAYER_SESSION_FLAG  -> ENTRY+0x64
+[9]  PLAYER_SESSION_VALUE -> ENTRY+0x68
+[10] RANK_MYAREA
+[11] RANK_AREA_FILTER
+[12] RANK_HOST_LEVEL     -> ENTRY+0x5c
+[13] RANK_LEVEL_MIN      -> ENTRY+0x5e
+[14] RANK_LEVEL_MAX      -> ENTRY+0x5a
+[15] RANK_RTT_FILTER
+[16] RANK_DISCONNECT_RATE
+[17] RANK_DISCONNECT     -> ENTRY+0x10a
+```
+
+Key `[2]`, `"HOST_NETCOLOR"`, is the **exact** literal string this doc already found (and set
+aside as a loose end) in the "User's explicit new direction" section much earlier:
+`RANK_RTT_FILTER`/`net_col_A..G.hip`/`HOST_NETCOLOR` strings - it is now conclusively the
+confirmed source, not a coincidental keyword hit. Its value is parsed via `FUN_0041c8f0` (a
+one-line wrapper around `FUN_0079fa3c` - almost certainly `atoi`/`strtol` given a raw metadata
+string goes in and a single byte comes out) and stored **completely unmodified** into
+`ENTRY+0x74` - matching the getter (`FUN_0046e880`: `return *(byte*)(this+0x74);`) exactly, so
+there is no double-transform hiding anywhere between metadata parse and icon-index use either.
+
+**This means the ranked list's delay-dot tier is not a measurement the viewing client makes of
+its own connection to that lobby's host at all - it is the HOST's own self-reported netcolor
+value, published once as Steam lobby metadata, read by every client browsing the list.** This
+is exactly the same `netcolor` mechanism this doc already fully reverse-engineered in the "RE
+follow-up on the `netcolor` lead" section (`NetworkUserData+0x194`, gated by a 30-sample
+warm-up counter at `+0x196` via `FUN_004a1110`: returns a hardcoded `0` unless the host's own
+sample count has reached 30, otherwise returns the true stored tier byte) - that section had
+flagged this exact mechanism as "probably the wrong subsystem" for the search list because it
+only writes a *local* `RoomMemberEntry.netcolor` once already in a room. **That conclusion was
+right about the write path investigated at the time, but incomplete: the same underlying
+per-host tier value also gets independently published as `HOST_NETCOLOR` lobby metadata by
+Steamworks' own lobby-data-set mechanism (the literal host-side `SetLobbyData` call was not
+traced this pass - it's a different process's code path, not observable from static analysis
+of one binary snapshot)**, which is exactly what every *other* client's row-populate function
+(`FUN_0046fcc0`, called from `FUN_0046d890`, the list-rebuild/filter function bound to the row
+list's `+0xae0/+0xae8/+0xaec/+0xaf0` fields already confirmed as the MGR's own list-struct
+layout - decompiled in full this pass, and it also applies the `RANK_*`-filter server-side
+matchmaking checks in the same loop) reads back.
+
+**This resolves several previously-mysterious observations already logged earlier in this doc,
+retroactively:**
+- **"Names/rows are static, only the delay ICON progressively fills in over time"** (the
+  isolation-test finding from the "RESOLVED (differently than expected)" section): `FUN_0046d890`
+  creates every row's identity/name fields synchronously from the lobby-list enumeration
+  itself, but `HOST_NETCOLOR` (like all Steam lobby metadata) is fetched via a separate,
+  independently-replicating `GetLobbyData` cache that can lag behind the list enumeration by a
+  visible amount - so the icon can legitimately arrive later than the row it belongs to, with
+  zero reordering of anything, exactly matching the user's description.
+- **The "stale cached `gameTier` survived across brand-new searches" bug** (an earlier section
+  today): makes complete sense now - each new search creates entirely new `ENTRY` objects,
+  each with its own fresh one-shot `HOST_NETCOLOR` fetch; there was never a "live" value to go
+  stale in the first place, only a fresh snapshot per list. This also means the newly-added
+  `kGameTierTtlMs=45000` fix (section immediately above) is a reasonable practical compromise,
+  but is masking, not measuring, a real refresh cadence - the true refresh moment is "a new
+  `ENTRY` was created for this search," not any fixed wall-clock duration.
+- **Why the earlier `AASTEAM_CNetworker`/`DAT_00a5d270` candidates read flat zero while this
+  one is genuinely live:** those were both trying to find a per-viewer *measured* connection
+  quality; the real mechanism is a host-authored, Steam-replicated *lobby metadata string*, a
+  completely different kind of data source neither candidate was.
+
+### Answer to the user's "only 5 visually distinct values ever seen" report
+
+Since (a) the render path definitely does not clamp (Part 1) and (b) real diagnostic sessions
+earlier in this doc already logged genuine live sightings of tier `5`, `6`, and `7` for real
+players (e.g. the `18:47:30` log block: `wokewaifu95)=7`, multiple `=6` and `=5` entries), tiers
+above 4 clearly DO occur in the wild and DO reach the same unclamped render call as tiers 0-4.
+**This is not a code-side clamp/bucket, full stop.** The most likely remaining explanations for
+why the user personally hasn't recognized a 6th/7th/8th distinct icon, roughly in order of
+likelihood, **none confirmed this session (would need the `.hip` assets extracted, see next
+steps):**
+1. The `net_col_D/E/F/G.hip` sprite assets themselves may be visually very similar to
+   `net_col_C.hip` or to each other at the small on-screen icon size (e.g. a palette/color-ramp
+   design where tiers 4-7 are subtle shade variations on the same base icon) - an asset/content
+   design choice, not a code bug.
+2. Tiers 5-7 may require the host to have a substantially long-lived/stable connection (30+
+   samples per the warm-up gate) reported at a level most real hosts practically don't sustain
+   before the searching client stops watching that specific lobby - i.e. tiers 5-7 might be
+   rare in practice even though structurally possible and already logged in this doc's own
+   diagnostics. This is a claim about the real-world distribution of the value, not the code.
+3. `net_col_def.hip` (index 0) is very likely the "no data yet"/gated-default sprite (matches
+   the `FUN_004a1110` 30-sample gate returning a hardcoded `0`) rather than "worst connection" -
+   worth remembering when interpreting any future value distribution: index 0 conflates
+   "genuinely tier 0" and "not enough data yet," both from the same host-side gate.
+
+### Concrete next steps, in order
+
+1. **Find or write a `.pac`/`.hip` unpacker** to actually extract and eyeball-compare
+   `net_col_def.hip` through `net_col_G.hip` - the only way to conclusively settle whether
+   D-G are visually distinct assets. The archive almost certainly lives under `data/ETC/*.pac`
+   (many candidate lobby/network-icon-named pacs exist there) - narrowing down which specific
+   `.pac` contains these 8 filenames was not attempted this session.
+2. **Cross-reference a live `HOST_NETCOLOR`-sourced tier reading against that same host's own
+   in-room `netcolor`** (via the already-shipped `NetworkSquareColorWindow.cpp` mechanism) the
+   next time the mod's user actually connects to and plays a match against a specific opponent
+   whose search-list tier was logged beforehand - a match would be the final confirmation these
+   really are the same underlying value, published early via lobby metadata.
+3. **If this insight is ever wired back into the mod:** since `HOST_NETCOLOR` is fetched exactly
+   once per `ENTRY` at row-creation time (single caller of `FUN_0046fcc0`, from the list-rebuild
+   function `FUN_0046d890`) and never re-polled afterward, the existing per-row diagnostic
+   loop's repeated `entry+0x1c` vtable calls (throttled to 2/sec via `PollGameTiers`) are
+   unnecessary overhead for tracking *changes* to this specific field - it cannot change without
+   an entirely new lobby-list delivery creating new `ENTRY` objects. Not attempted/changed this
+   session - purely research, no source edited per this task's scope.
+4. **Not attempted this session, lower priority:** trace `FUN_0079fa3c` (the real parser
+   `FUN_0041c8f0` wraps) fully to confirm it's a plain string-to-int conversion with no extra
+   transform of its own (very likely, given the getter's own byte-for-byte pass-through
+   already confirmed, but not independently decompiled this pass).
+
+## MAJOR SIMPLIFICATION: switched to reading `HOST_NETCOLOR` directly as Steam lobby metadata, replacing the entire vtable/entry-walk chain (2026-07-12, same day)
+
+Acting on the RE agent's finding immediately above (the tier is `HOST_NETCOLOR`, a plain Steam
+lobby-metadata string, not something requiring the mgr/vtable/`FUN_004a5450`/entry-walk chain at
+all): rewired the mod to read it the same simple way `ownerName` and `RANK_HOST_LEVEL` are already
+read, directly in `OnLobbyListResultDelivered`'s per-lobby loop
+(`raw->GetLobbyData(lobby, "HOST_NETCOLOR")`, parsed via `strtol`, range-checked to 0-7, stored
+straight into `m_verdicts[candidate.ownerSteamId]` with a fresh `gameTierTickMs`).
+
+**This eliminates every structural problem the vtable-walk approach had, in one step:**
+- **No identity-correlation problem** - the value is read tied to the exact `ownerSteamId` already
+  being resolved for that lobby, never via row position at all.
+- **No "entries don't exist until delivery" chicken-and-egg** - lobby metadata is available
+  synchronously while building `m_candidates`, BEFORE `BuildCompactedListAndDeliver` even runs -
+  meaning the very FIRST (and only-ever-screen-reaching) delivery of a brand-new search now has
+  real tier data available immediately, with no hold/wait needed at all.
+- **No staleness ambiguity** - a fresh value is fetched on every single new delivery; the
+  `kGameTierTtlMs` bound from the previous fix is now just a sane backstop, not something papering
+  over a real gap.
+- **No vtable calls, no crash-risk surface whatsoever** - it's the exact same `ISteamMatchmaking`
+  API call pattern already used safely for other metadata in this same function.
+
+`PollGameTiers()`'s call site in `OnSteamCallbacksPump()` is now disabled (function and the
+mgr/vtable-walk chain left in place, not deleted, in case a future session wants to cross-check
+the two sources against each other - they should read the same underlying value per the RE trace).
+The per-row identity/tier diagnostic (`DiagnosticLogRankedListMgrSlot`) is left running unchanged,
+also for cross-check purposes.
+
+Build verified clean (Debug|Win32). **Not yet live-tested** - this is a genuinely new, much
+simpler code path (direct metadata read, never exercised before), not just a variant of what was
+already tested. The user's original "Brullar not sorting correctly" and "only see tags 0-4"
+reports should both get a fresh, clean test against this implementation - the second question
+(whether 5-7 are visually distinct) remains open per the RE agent's report and is unrelated to
+this code change; this change only affects HOW the mod obtains the tier value, not what the game
+itself renders for values 5-7.
+
+## RE-VERIFICATION of the HOST_NETCOLOR attribution, per user challenge — the +0x74 mapping is correct, BUT +0x74 is the wrong FIELD: the Delay column is actually entry+0x78 (2026-07-12, new session)
+
+User firmly rejected the previous session's claim that `HOST_NETCOLOR` lobby metadata is the
+source of the ranked list's Delay column, suspecting a key-table-index-to-field-offset mixup or
+a conflation of two systems. Re-derived everything from scratch, instruction-level, without
+trusting the previous session's mapping. **Both the user and the previous session turn out to be
+partially right: the previous session's store-level attribution was accurate, but it answered
+the wrong question — `+0x74` drives the row's colored ICON, not the numeric Delay column the
+user actually reads.** Full chain below, all verified this session. No live debugger used
+anywhere (CDB remains permanently CLOSED for this game).
+
+### Part 1 — independent re-verification of FUN_0046fcc0's key-to-offset mapping
+
+Method: extracted the raw switch dispatch from `tools/bbcf_disasm_ascii.txt` and read the actual
+jump table + key-string table **directly from `BBCF.exe`'s bytes** (PE section mapping via a
+Python one-liner — not from any Ghidra report):
+
+- Dispatch at `0x0046FDC6`: `add esi,-2; cmp esi,0xD; ja skip; jmp [esi*4+0x0046FF8C]` — a
+  14-entry jump table indexed by (matched key-table index − 2). `esi` is the loop index over the
+  18-entry string table at `0x009D9610` (strncmp per key, verified in the same disasm).
+- Jump table contents (read from exe bytes at VA `0x0046FF8C`) and the store each target performs:
+
+  | keyIdx | key | handler | store |
+  |---|---|---|---|
+  | 2 | `HOST_NETCOLOR` | `0x0046FDD9` | `call 0041C8F0; mov byte ptr [ebx+74h],al` — **+0x74, confirmed** |
+  | 3 | `PLAYER_ROOM_NAME` | `0x0046FDEC` | wcscpy into `+0x10` |
+  | 4 | `PLAYER_ROOM_TYPE` | `0x0046FF21` | no-op |
+  | 5 | `PLAYER_MEMBER_MAX` | `0x0046FE89` | byte `+0x6c` |
+  | 6 | `PLAYER_PRIVATE_NUM` | `0x0046FE9C` | byte `+0x6f` |
+  | 7 | `PLAYER_PRIVATE_MAX` | `0x0046FEAC` | byte `+0x6e` |
+  | 8 | `PLAYER_SESSION_FLAG` | `0x0046FEBC` | dword `+0x64` |
+  | 9 | `PLAYER_SESSION_VALUE` | `0x0046FECC` | dword `+0x68` |
+  | 10 | `RANK_MYAREA` | `0x0046FEDC` | word `+0x5c` |
+  | 11 | `RANK_AREA_FILTER` | `0x0046FEED` | word `+0x5e` |
+  | 12 | `RANK_HOST_LEVEL` | `0x0046FEFE` | word `+0x5a` |
+  | 13/14 | `RANK_LEVEL_MIN`/`MAX` | `0x0046FF21` | no-op |
+  | 15 | `RANK_RTT_FILTER` | `0x0046FF0F` | word `+0x10a` |
+
+- **The previous session's summary table in this doc WAS wrong in four rows** (it attributed
+  `+0x5c/+0x5e/+0x5a/+0x10a` to `RANK_HOST_LEVEL`/`RANK_LEVEL_MIN`/`RANK_LEVEL_MAX`/
+  `RANK_DISCONNECT` — actually `RANK_MYAREA`/`RANK_AREA_FILTER`/`RANK_HOST_LEVEL`/
+  `RANK_RTT_FILTER` per the jump table above) — the user's suspicion of sloppy mapping was
+  justified. But the one row that mattered, `HOST_NETCOLOR -> +0x74`, is instruction-level
+  correct, and the whole-binary store scan (`SearchResultNodeTierWriterGhidraReport.txt`, 165
+  raw `[reg+0x74]` MOV hits, exactly ONE byte-sized store to a real object `+0x74`:
+  `0046fde4 MOV byte ptr [EBX+0x74],AL` inside `FUN_0046fcc0`) confirms nothing else ever
+  writes it. Confidence: as high as static analysis gets.
+
+### Part 2 — THE ACTUAL FINDING: the Delay column digit is entry+0x78 (viewer-measured RTT), not +0x74
+
+Re-reading the full `FUN_00661060` decompile (`NetColIconCallersGhidraReport.txt` lines
+1150-1240) past the icon call, the row renderer's LAST draw block is:
+
+```c
+uVar6 = (**(code **)(*piVar7 + 0x30))();       // ENTRY vtable slot 12 -> *(int*)(entry+0x78)
+FUN_004a77e0(uVar6);                            // (lazy-init singleton getter, decompiler
+                                                //  artifact arg - irrelevant)
+iVar5 = FUN_004a6620(uVar6);                    // RTT -> digit bucketing, see below
+if (iVar5 != -1) {
+  FUN_0068fcb0(&DAT_01463ec8, iVar5 + 0x30, ...); // 0x30 = ASCII '0': draws the DIGIT GLYPH
+}
+```
+
+`FUN_004a6620` (raw disasm, trivially small): `rtt<0 -> -1` (draw nothing), `<0x3C(60) -> 4`,
+`<0x64(100) -> 3`, `<0xC8(200) -> 2`, `<0x12C(300) -> 1`, else `0`. **Range 0-4, higher =
+better, exactly matching the user's "only ever seen 0-4" report.** The `-1 -> draw nothing`
+path is exactly the "Delay value fills in progressively per row" behavior the user described.
+
+Where `+0x78` comes from (all previously decompiled, now correctly connected):
+- `FUN_0046dc00` (field init) sets `+0x78 = 0xFFFFFFFF` (sentinel).
+- `FUN_0046db40` (runs continuously) walks the same row list and, per row with the
+  "needs resolution" flag (`+0x110`) set, calls `FUN_0046e9e0(steamIdLow, steamIdHigh)` using
+  the row's own embedded Steam64 ID (`+0x114 -> +0xc/+0x10`, the identity key this doc already
+  proved byte-for-byte) and stores the result into `+0x78`.
+- `FUN_0046e9e0` looks up the 20-row RTT sample table by that Steam64 key and returns the
+  **average of the best 4 of 5 RTT samples** (sum minus max, >>2) — a per-VIEWER measured
+  quantity, resolved asynchronously as the game's own QoS pings accumulate samples.
+
+**So the row shows TWO separate connection indicators: the `net_col_*` colored icon (slot 7,
+`+0x74`, host-self-reported `HOST_NETCOLOR` metadata — what the mod has been sorting by), and
+the numeric Delay digit (slot 12, `+0x78`, viewer-measured RTT — what the user actually
+compares against).** The user's rejection was correct in the way that matters: sorting by
+`HOST_NETCOLOR` can never match the Delay column, because they are different measurements of
+different things (host's own historical quality vs. my live RTT to that host). This also
+retroactively explains, cleanly, every "sorted on paper, wrong on screen" session in this doc:
+the paper order was sorted by the icon value while the eyes compared against the digit.
+
+Corroborating log evidence (last session's `DEBUG.txt`, 22:14-22:19): the mod's slot-7 reads
+showed tiers up to 7 with a spread the user never saw in the Delay column; the user's
+screenshot digits were 0-4; the digit is drawn from a different field with different
+range/thresholds. All three observations line up only under this Part-2 model.
+
+### Fix implemented this session
+
+- `PollGameTiers()` re-enabled (its call site had also been left commented out — again) and
+  rewritten to read `*(int32_t*)(entry + 0x78)` **directly** — a plain field read, NO virtual
+  call at all (strictly safer than the old slot-7 call it replaces), still keyed by the proven
+  `entry+0x114 -> +0xc/+0x10` Steam64 identity, skipping unresolved (`< 0`) rows.
+- `PeerVerdict` gained `gameRttMs` (latest resolved RTT, -1 = never); `gameTier` now stores the
+  0-4 Delay digit derived via `GameDelayDigitFromRtt()` (an exact reproduction of
+  `FUN_004a6620`'s thresholds, new helper in `RankedListConnectionFilter.cpp`), kept for
+  diagnostics/screenshot cross-checks. `gameTierAverage` now averages RTT (diagnostics only).
+- `SortShownCandidates()` connection modes key on **raw RTT** inside the existing negative
+  real-data band (`kRealTierKeyBase ± rtt`) — finer than the digit but digit-monotonic, so the
+  visible Delay column reads sorted; probe-timing fallback and the band separation (both
+  previously-fixed bugs) are preserved unchanged. The sort log now emits `delay=D rtt=R` per
+  entry with a real reading, so screenshots can be cross-checked digit-for-digit.
+- The `HOST_NETCOLOR` metadata read in `OnLobbyListResultDelivered` is REMOVED (with a comment
+  explaining why it was wrong); the per-row diagnostic now logs `[row]=icon:T,delay:D,rtt:R`
+  so both values stay observable side by side.
+- Help text (`RankedListFilterWindow.cpp` + `Localization.csv`, key/en/es) now says the sort
+  matches "the list's own Delay rating (0-4)".
+- Build verified clean (Debug|Win32).
+
+### Expectations and test protocol for the next live session
+
+- **First search after boot will still look unsorted** — the game itself has no digits yet
+  (all `+0x78` sentinels, nothing drawn); the mod falls back to probe timing. This is inherent:
+  the metric literally does not exist yet, for the game or for us.
+- From the second refresh onward (the game auto-refreshes every ~8-16s), the order should
+  match the visible Delay digits monotonically (best first for mode 1), modulo digits that
+  resolve after the delivery instant (they'll be picked up next refresh via the 45s TTL cache).
+- Cross-reference using the `sort order` lines' `owner=`/`name=`/`delay=` fields against a
+  screenshot taken right after a refresh. As always, never trust the `rankedListMgrDiag` line's
+  name field (cosmetic, proven unreliable); its `id=` field is the trustworthy one.
+- If the digits STILL don't read sorted: check whether the logged `delay=` values match the
+  screenshot's digits for the same names. If they match but the order is wrong, the delivery
+  path regressed (was proven exact twice); if they don't match, the `+0x78` read or identity
+  keying needs re-examination — those are the only two links left in the chain.
+
 ## Testing protocol reminder
 
 User builds/deploys manually via Visual Studio ("Release Deploy" config) — Claude never

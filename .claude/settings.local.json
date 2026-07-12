@@ -120,7 +120,11 @@
       "Bash(taskkill.exe /F /PID 51900)",
       "Bash(cmd.exe /C \"start steam://rungameid/486860\")",
       "Bash(cmd.exe /C \"start \\\\\"\\\\\" \\\\\"steam://rungameid/486860\\\\\"\")",
-      "Bash(cmd.exe /C \"cd /d \\\\\"D:\\\\SteamLibrary\\\\steamapps\\\\common\\\\BlazBlue Centralfiction\\\\\" && start BBCF.exe\")"
+      "Bash(cmd.exe /C \"cd /d \\\\\"D:\\\\SteamLibrary\\\\steamapps\\\\common\\\\BlazBlue Centralfiction\\\\\" && start BBCF.exe\")",
+      "Bash(cmd.exe /c \"run_ghidra_netcol_select_fn.cmd\")",
+      "Bash(cmd.exe /c \"run_ghidra_lobby_metadata_key_table.cmd\")",
+      "Bash(cmd.exe /c \"run_ghidra_searchresultnode_populate_caller.cmd\")",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /v:m)"
     ]
   }
 }
