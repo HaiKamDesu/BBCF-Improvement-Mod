@@ -1,0 +1,66 @@
+===== Callers of 0046a820 (CNetworkLobbyData_GetSingleton) =====
+  (1 references)
+  004a29f0  UNCONDITIONAL_JUMP caller=thunk_FUN_0046a820
+
+  ---- Decompiling 1 unique caller functions ----
+
+  ----- caller 004a29f0 thunk_FUN_0046a820 -----
+
+undefined * thunk_FUN_0046a820(void)
+
+{
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  puStack_c = &LAB_00828b1e;
+  pvStack_10 = ExceptionList;
+  ExceptionList = &pvStack_10;
+  if ((DAT_00a624e0 & 1) == 0) {
+    DAT_00a624e0 = DAT_00a624e0 | 1;
+    uStack_8 = 0;
+    FUN_00469e20(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_00848550);
+  }
+  ExceptionList = pvStack_10;
+  return &DAT_00a5d270;
+}
+
+
+
+===== Callers of 0046a9a0 (CNetworkLobbyData_slot6_Const32) =====
+  (4 references)
+  0085003c  DATA         caller=<no function>
+  008993cc  DATA         caller=<no function>
+  0089c7e4  DATA         caller=<no function>
+  0089c8a4  DATA         caller=<no function>
+
+  ---- Decompiling 0 unique caller functions ----
+
+
+===== Callers of 004a2a00 (CNetworkLobbyData_slot7_Const10) =====
+  (4 references)
+  0089c34c  DATA         caller=<no function>
+  0089c358  DATA         caller=<no function>
+  0089c7e8  DATA         caller=<no function>
+  0089c8a8  DATA         caller=<no function>
+
+  ---- Decompiling 0 unique caller functions ----
+
+
+===== Callers of 004a2a50 (CNetworkLobbyData_slot1_Aggregate) =====
+  (2 references)
+  0089c7d0  DATA         caller=<no function>
+  0089c890  DATA         caller=<no function>
+
+  ---- Decompiling 0 unique caller functions ----
+
+
+===== Callers of 004a2970 (CNetworkLobbyData_slot2_RowAccessor) =====
+  (2 references)
+  0089c7d4  DATA         caller=<no function>
+  0089c894  DATA         caller=<no function>
+
+  ---- Decompiling 0 unique caller functions ----
+
+

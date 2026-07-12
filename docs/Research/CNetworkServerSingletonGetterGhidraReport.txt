@@ -1,0 +1,21 @@
+----- 008485a5: no function (checking instruction) -----
+  instr: JMP 0x0046cdd0
+
+----- 0046cf20 FUN_0046cf20 -----
+
+void * __thiscall FUN_0046cf20(void *param_1,byte param_2)
+
+{
+  FUN_0046cdd0();
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  return param_1;
+}
+
+
+
+  callers of FUN_0046cf20:
+    0089cbd4  from ?
+
+

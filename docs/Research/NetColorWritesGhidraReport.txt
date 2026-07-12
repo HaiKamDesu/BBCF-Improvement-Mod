@@ -1,0 +1,39 @@
+===== References to NetworkUserData struct base (00cad0c0) =====
+  004a1038  DATA              FUN_004a0fe0
+  004a101a  DATA              FUN_004a0fe0
+  008488b0  DATA              <no function>
+===== References to netcolor byte (+0x194) (00cad254) =====
+  (no references found)
+===== References to netcolor counter byte (+0x195) (00cad255) =====
+  (no references found)
+===== References to OLD NetworkUserData struct base (008ad0c0) =====
+  (no references found)
+===== References to OLD netcolor byte (+0x194) (008ad254) =====
+  (no references found)
+===== References to OLD netcolor counter byte (+0x195) (008ad255) =====
+  (no references found)
+
+===== Decompiled callers (1 unique functions) =====
+----- FUN_004a0fe0 (004a0fe0) -----
+
+undefined * FUN_004a0fe0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082adee;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00cf7708 & 1) == 0) {
+    DAT_00cf7708 = DAT_00cf7708 | 1;
+    local_8 = 0;
+    FUN_004a06d0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit((_func_4879 *)&LAB_008488b0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00cad0c0;
+}
+
+

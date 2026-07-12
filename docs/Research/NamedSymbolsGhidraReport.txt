@@ -1,0 +1,161 @@
+===== keyword: Lobby =====
+  (0 matches)
+
+===== keyword: Delay =====
+  (0 matches)
+
+===== keyword: Ping =====
+  007968ba  Function   grouping
+  (1 matches)
+
+===== keyword: Latency =====
+  (0 matches)
+
+===== keyword: Connection =====
+  (0 matches)
+
+===== keyword: Room =====
+  (0 matches)
+
+===== keyword: List =====
+  007a68b6  Label      ?AddTail@?$List@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007a68e5  Label      ?Remove@?$List@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007a7319  Label      ?IsInExceptionSpec@@YAEPAUEHExceptionRecord@@PBU_s_ESTypeList@@@Z
+  007bb6bb  Label      ?Add@?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@QAEHPAVWorkQueue@23@@Z
+  007bb844  Label      ?AddTail@?$SafeRWList@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@V_ReaderWriterLock@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007bb9d1  Label      ?CheckForDeletion@?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@AAEXXZ
+  007bbb38  Label      ?DeleteElements@?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007bbec7  Function   NextList
+  007bbec7  Label      ?NextList@?$Hash@PAV_TaskCollection@details@Concurrency@@PAV123@@details@Concurrency@@AAEPAUListNode@123@PAH@Z
+  007bc072  Label      ?Remove@?$Hash@PAV_TaskCollection@details@Concurrency@@PAV123@@details@Concurrency@@AAEPAUListNode@123@ABQAV_TaskCollection@23@H@Z
+  007bc0ba  Label      ?Remove@?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@QAE_NPAVWorkQueue@23@H_N@Z
+  007bc1b0  Label      ?Remove@?$SafeRWList@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@V_ReaderWriterLock@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007bc518  Function   SafeRWList<>
+  007bc959  Function   ~ListArray<class_Concurrency::details::ExternalStatistics>
+  007bc959  Label      ??1?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@QAE@XZ
+  007bc9cb  Function   ~ListArray<class_Concurrency::details::ScheduleGroupBase>
+  007bc9cb  Label      ??1?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@QAE@XZ
+  007bcb35  Label      ??A?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@QBEPAVVirtualProcessor@12@H@Z
+  007bcc8f  Label      ?Add@?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@QAEHPAVScheduleGroupBase@23@@Z
+  007bce15  Label      ?AddHead@?$List@UBoostedObject@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUBoostedObject@23@@Z
+  007bce4e  Label      ?AddTail@?$List@VWaitNode@SchedulerBase@details@Concurrency@@VNoCount@CollectionTypes@34@@details@Concurrency@@QAEXPAVWaitNode@SchedulerBase@23@@Z
+  007bce7b  Label      ?AddTail@?$SafeRWList@VWaitNode@SchedulerBase@details@Concurrency@@VNoCount@CollectionTypes@34@V_ReaderWriterLock@34@@details@Concurrency@@QAEXPAVWaitNode@SchedulerBase@23@@Z
+  007bd0eb  Label      ?CheckForDeletion@?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@AAEXXZ
+  007bd119  Label      ?CheckForDeletion@?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@AAEXXZ
+  007bd4b3  Label      ?DeleteElements@?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007bd4d1  Label      ?DeleteElements@?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007bd6f4  Label      ?Find@?$Hash@II@details@Concurrency@@QAEPAUListNode@123@ABIPAI@Z
+  007bd7b9  Label      ?FindScheduleGroupSegment@SchedulingRing@details@Concurrency@@AAEPAVScheduleGroupSegmentBase@23@HHPAHPAV?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@23@@Z
+  007bdd12  Label      ?GetNextScheduleGroupSegment@SchedulingRing@details@Concurrency@@AAEPAVScheduleGroupSegmentBase@23@PAHHPAV?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@23@@Z
+  007bedd6  Label      ?Remove@?$List@UBoostedObject@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUBoostedObject@23@@Z
+  007bee08  Label      ?Remove@?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@QAE_NPAVExternalStatistics@23@H_N@Z
+  007bef06  Label      ?Remove@?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@QAE_NPAVScheduleGroupBase@23@H_N@Z
+  007bf004  Label      ?RemoveHead@?$List@UBoostedObject@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEPAUBoostedObject@23@XZ
+  007bf02c  Label      ?RemoveHead@?$List@VWaitNode@SchedulerBase@details@Concurrency@@VNoCount@CollectionTypes@34@@details@Concurrency@@QAEPAVWaitNode@SchedulerBase@23@XZ
+  007bf050  Label      ?RemoveHead@?$SafeRWList@VWaitNode@SchedulerBase@details@Concurrency@@VNoCount@CollectionTypes@34@V_ReaderWriterLock@34@@details@Concurrency@@QAEPAVWaitNode@SchedulerBase@23@XZ
+  007bfcef  Label      ?AddTail@?$List@VSchedulerProxy@details@Concurrency@@VCount@CollectionTypes@23@@details@Concurrency@@QAEXPAVSchedulerProxy@23@@Z
+  007c2e36  Label      ?Remove@?$List@VSchedulerProxy@details@Concurrency@@VCount@CollectionTypes@23@@details@Concurrency@@QAEXPAVSchedulerProxy@23@@Z
+  007cb3f3  Label      ?Insert@?$Hash@II@details@Concurrency@@QAEPAUListNode@123@ABI0@Z
+  007cb457  Label      ?Lookup@?$Hash@II@details@Concurrency@@AAEPAUListNode@123@ABIH@Z
+  007cc6c2  Function   ~ListArray<class_Concurrency::details::WorkQueue>
+  007cc6c2  Label      ??1?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@QAE@XZ
+  007cc811  Label      ?Add@?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@QAEHPAVExternalStatistics@23@@Z
+  007cc969  Label      ?Add@?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@details@Concurrency@@QAEHPAVScheduleGroupSegmentBase@23@@Z
+  007ccb82  Label      ?CheckForDeletion@?$ListArray@U?$ListArrayInlineLink@VWorkQueue@details@Concurrency@@@details@Concurrency@@@details@Concurrency@@AAEXXZ
+  007cd229  Label      ?Remove@?$ListArray@U?$ListArrayInlineLink@VWorkQueue@details@Concurrency@@@details@Concurrency@@@details@Concurrency@@QAE_NPAU?$ListArrayInlineLink@VWorkQueue@details@Concurrency@@@23@H_N@Z
+  007cdd64  Label      ?DeleteElements@?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007ce154  Label      ?Remove@?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@QAE_NPAVVirtualProcessor@23@H_N@Z
+  007ce699  Function   ~ListArray<class_Concurrency::details::VirtualProcessor>
+  007ce699  Label      ??1?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@QAE@XZ
+  007ce74f  Label      ?Add@?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@QAEHPAVVirtualProcessor@23@@Z
+  007d0076  Function   ListArray<>
+  007d01ed  Function   ~ListArray<class_Concurrency::details::ScheduleGroupSegmentBase>
+  007d01ed  Label      ??1?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@details@Concurrency@@QAE@XZ
+  007d02d4  Label      ?DeleteElements@?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007d02f8  Label      ?Remove@?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@details@Concurrency@@QAE_NPAVScheduleGroupSegmentBase@23@H_N@Z
+  007d195b  Label      ?AddTail@?$List@VExecutionResource@details@Concurrency@@VCount@CollectionTypes@23@@details@Concurrency@@QAEXPAVExecutionResource@23@@Z
+  007d23ce  Label      ?Remove@?$List@VExecutionResource@details@Concurrency@@VCount@CollectionTypes@23@@details@Concurrency@@QAEXPAVExecutionResource@23@@Z
+  007d669a  Function   CheckPriorityList
+  007d669a  Label      ?CheckPriorityList@WorkSearchContext@details@Concurrency@@AAE_NK@Z
+  007d8b84  Function   ImmGetCandidateListA
+  EXTERNAL:00000053  Function   InitializeSListHead
+  EXTERNAL:00000058  Function   QueryDepthSList
+  EXTERNAL:00000059  Function   InterlockedFlushSList
+  EXTERNAL:0000005a  Function   InterlockedPushEntrySList
+  EXTERNAL:0000005b  Function   InterlockedPopEntrySList
+  EXTERNAL:00000141  Function   ImmGetCandidateListW
+  EXTERNAL:00000142  Function   ImmGetCandidateListA
+  EXTERNAL:00000165  Function   listen
+  ffdff000  Label      ExceptionList
+  (69 matches)
+
+===== keyword: Matchmak =====
+  (0 matches)
+
+===== keyword: Search =====
+  007ce991  Function   DeferToAffineSearchers
+  007ce991  Label      ?DeferToAffineSearchers@Slot@?$Mailbox@V_UnrealizedChore@details@Concurrency@@@details@Concurrency@@QBE_NXZ
+  007d669a  Label      ?CheckPriorityList@WorkSearchContext@details@Concurrency@@AAE_NK@Z
+  007d66b8  Label      ?GetLocalRunnable@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVVirtualProcessor@23@_N@Z
+  007d6815  Label      ?GetRealizedChore@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_N@Z
+  007d6865  Label      ?GetRealizedChoreWithinGroup@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NW4SearchAffinity@123@2@Z
+  007d68e6  Label      ?GetRunnableContext@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@@Z
+  007d6917  Label      ?GetRunnableContextWithinGroup@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@W4SearchAffinity@123@_N@Z
+  007d6992  Label      ?GetUnrealizedChore@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_N2@Z
+  007d69e5  Label      ?GetUnrealizedChoreWithinGroup@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NW4SearchAffinity@123@2@Z
+  007d6ac7  Function   PreSearch
+  007d6ac7  Label      ?PreSearch@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@@Z
+  007d6af7  Function   QuickSearch
+  007d6af7  Label      ?QuickSearch@WorkSearchContext@details@Concurrency@@AAE_NPAVScheduleGroupSegmentBase@23@PAVWorkItem@23@_NK@Z
+  007d6b64  Function   QuickSearchYield
+  007d6b64  Label      ?QuickSearchYield@WorkSearchContext@details@Concurrency@@AAE_NPAVScheduleGroupSegmentBase@23@PAVWorkItem@23@_NK@Z
+  007d6bd2  Label      ?Reset@WorkSearchContext@details@Concurrency@@QAEXPAVVirtualProcessor@23@W4Algorithm@123@@Z
+  007d6ca4  Function   SearchCacheLocal
+  007d6ca4  Label      ?SearchCacheLocal@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NK@Z
+  007d6f62  Function   SearchCacheLocalYield
+  007d6f62  Label      ?SearchCacheLocalYield@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NK@Z
+  007d71e1  Function   SearchCacheLocal_Realized
+  007d71e1  Label      ?SearchCacheLocal_Realized@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@PAVScheduleGroupSegmentBase@23@_NW4SearchAffinity@123@K3@Z
+  007d72da  Function   SearchCacheLocal_Runnables
+  007d72da  Label      ?SearchCacheLocal_Runnables@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@PAVScheduleGroupSegmentBase@23@_NW4SearchAffinity@123@K3@Z
+  007d73e0  Function   SearchCacheLocal_Unrealized
+  007d73e0  Label      ?SearchCacheLocal_Unrealized@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@PAVScheduleGroupSegmentBase@23@_NW4SearchAffinity@123@K3@Z
+  007d74dc  Function   SearchFair
+  007d74dc  Label      ?SearchFair@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NK@Z
+  007d75ef  Function   SearchFairYield
+  007d75ef  Label      ?SearchFairYield@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVScheduleGroupSegmentBase@23@_NK@Z
+  007d76fd  Function   SearchFair_Realized
+  007d76fd  Label      ?SearchFair_Realized@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@_N@Z
+  007d7791  Function   SearchFair_Runnables
+  007d7791  Label      ?SearchFair_Runnables@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@@Z
+  007d77ff  Function   SearchFair_Unrealized
+  007d77ff  Label      ?SearchFair_Unrealized@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingRing@23@_N@Z
+  007d78d1  Function   SkipSegmentSearch
+  007d78d1  Label      ?SkipSegmentSearch@WorkSearchContext@details@Concurrency@@AAE_NPAVScheduleGroupSegmentBase@23@0W4SearchAffinity@123@_N@Z
+  007d7959  Label      ?StealForeignLocalRunnable@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingNode@23@@Z
+  007d799b  Label      ?StealLocalRunnable@WorkSearchContext@details@Concurrency@@AAE_NPAVWorkItem@23@PAVSchedulingNode@23@PAVVirtualProcessor@23@@Z
+  EXTERNAL:00000180  Function   ldap_search_sW
+  (42 matches)
+
+===== keyword: Menu =====
+  (0 matches)
+
+===== keyword: Scene =====
+  (0 matches)
+
+===== keyword: Screen =====
+  (0 matches)
+
+===== keyword: Panel =====
+  (0 matches)
+
+===== keyword: P2P =====
+  (0 matches)
+
+===== keyword: NetworkLobby =====
+  (0 matches)
+
+===== keyword: CNetwork =====
+  (0 matches)
+
+TOTAL matches across all keywords (with overlap): 112

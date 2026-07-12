@@ -130,15 +130,12 @@ public:
 	void RestoreAllPeers();
 	void GetLastListCounts(size_t* outShown, size_t* outHidden) const;
 
-	// True while the game appears to have the lobby search list on screen. The
-	// game calls GetLobbyByIndex continuously (every render frame) while the
-	// list is visible, so recent index access is a tight, prompt open-signal;
-	// recent RequestLobbyList is kept as a coarse fallback.
-	bool IsLobbyListLikelyOpen() const;
-
-	// Called from SteamMatchmakingWrapper::GetLobbyByIndex (filter on or off) to
-	// timestamp list-render activity for IsLobbyListLikelyOpen.
-	void NoteLobbyIndexAccessed();
+	// True while the ranked search list screen is on screen. Detected directly
+	// from the game's own row array (populated only while that screen exists),
+	// which is reliable regardless of the game's irregular Steam re-request
+	// cadence. A short grace period debounces the brief moment the game rebuilds
+	// the array between refreshes.
+	bool IsLobbyListLikelyOpen();
 
 private:
 	RankedListConnectionFilter();
@@ -177,9 +174,23 @@ private:
 		std::string lastKnownName; // best-effort, for the hidden-players UI
 		// Connection-quality estimate from the reachability probe: how long the
 		// P2P session took to establish, and whether it went through a relay.
-		// ~0 = never measured.
+		// ~0 = never measured. Used as a fallback sort key only until
+		// gameTier below has been observed at least once for this peer.
 		unsigned long long probeElapsedMs = ~0ull;
 		bool usedRelay = false;
+		// The game's OWN internal connection-quality tier (0-7, 4=default per
+		// user report - see docs/Research/RankedListConnectionFilter_Progress.md
+		// for the full RE trace), read live from the ranked list's own render
+		// data via PollGameTiers(). -1 = never observed yet. Kept as the raw
+		// latest single reading, mainly for diagnostics - gameTierAverage
+		// below is what sorting actually uses.
+		int gameTier = -1;
+		// Cumulative average of every gameTier observation for this peer
+		// across the whole session (not just the current list) - smooths out
+		// any single noisy/mismapped reading, per user request to store and
+		// average results rather than sort by only the latest one.
+		double gameTierAverage = -1.0;
+		int gameTierSampleCount = 0;
 	};
 
 	struct LobbyCandidate
@@ -190,9 +201,28 @@ private:
 		int internalRankLevel = -1; // from "RANK_HOST_LEVEL" lobby metadata (visible level - 1); -1 = unknown
 	};
 
+	// The delivery pipeline (proxy + reorder/compaction) runs when EITHER the
+	// hide-unreachable filter or a non-default sort order is active - the two
+	// features are independent.
+	bool IsPipelineActive() const;
+	// Counts currently-populated rows in the game's ranked search row array.
+	int CountPopulatedGameRows() const;
+	// DIAGNOSTIC ONLY: logs the raw pointer value at the candidate ranked-list
+	// manager singleton slot found by tracing the delay-dot render call
+	// backward (see docs/Research/RankedListConnectionFilter_Progress.md).
+	// Does not feed any real decision yet - purely for live correlation.
+	void DiagnosticLogRankedListMgrSlot() const;
+
 	void OnLobbyListResultDelivered(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall);
 	void StartProbeIfNeeded(uint64_t steamId);
 	void PollProbes();
+	// Reads the game's own live per-row connection-quality tier (see progress
+	// doc) for every currently-delivered row and stores it into the matching
+	// peer's PeerVerdict::gameTier, keyed by position in m_reachableLobbies -
+	// only when the game's own row count matches ours exactly (i.e. it has
+	// caught up to our last delivery), to avoid mismatched row/peer pairing.
+	// A no-op until a list has actually been delivered.
+	void PollGameTiers();
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.
 	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown) const;
@@ -206,7 +236,16 @@ private:
 	bool ShouldHidePeer(uint64_t steamId, unsigned long long nowMs) const;
 	// True when this peer has no valid verdict and a probe is still in flight.
 	bool IsPeerUnresolved(uint64_t steamId) const;
-	void BuildCompactedListAndDeliver(const char* reason);
+	// forceDeliver=false (live-resort calls) skips re-invoking the game's
+	// handler when the recomputed order is identical to what's already been
+	// delivered, so probe polling doesn't churn the game's list UI for no
+	// reason. The original real-Steam-delivery call sites always force.
+	void BuildCompactedListAndDeliver(const char* reason, bool forceDeliver = true);
+	// Called every pump once a list is already on screen: recomputes shown/
+	// hidden/order from current verdicts and re-delivers only if it actually
+	// changed, so the visible list reorders itself live as probes resolve
+	// instead of waiting for the game's own next auto-refresh.
+	void TryLiveResort();
 
 	STEAM_CALLBACK(RankedListConnectionFilter, OnP2PSessionConnectFail, P2PSessionConnectFail_t);
 	// Direct result of JoinLobby(): fires even when the join itself is rejected
@@ -226,13 +265,18 @@ private:
 	size_t m_lastShownCount = 0;
 	size_t m_lastHiddenCount = 0;
 	unsigned long long m_lastListRequestTickMs = 0;
-	unsigned long long m_lastLobbyIndexAccessTickMs = 0;
+	unsigned long long m_lastRowsPopulatedTickMs = 0;
 
 	LobbyListResultProxy m_lobbyListProxy;
 	CCallbackBase* m_gameLobbyListHandler = nullptr;
+	// Kept alive after m_gameLobbyListHandler is cleared post-delivery, purely
+	// so TryLiveResort() can re-invoke the same handler with an updated order
+	// without waiting for the game to re-register a new call.
+	CCallbackBase* m_lastGameLobbyListHandler = nullptr;
 	LobbyMatchList_t m_heldResult = {};
 	bool m_heldIOFailure = false;
 	SteamAPICall_t m_heldApiCall = 0;
+	unsigned long long m_lastLiveResortTickMs = 0;
 
 	uint64_t m_pendingConnectionTarget = 0;
 	uint64_t m_pendingLobbyId = 0;

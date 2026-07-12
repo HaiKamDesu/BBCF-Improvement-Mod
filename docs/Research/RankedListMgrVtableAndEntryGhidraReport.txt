@@ -1,0 +1,83 @@
+===== Symbol/RTTI lookup at live MGR vtable addr 00cfc3a4 =====
+  <no symbol defined at this exact address>
+
+  Checking for RTTI Complete Object Locator ptr 4 bytes before vtable:
+    [vtable-4] = 0x00000000
+    <not a valid in-image pointer, skipping COL parse - probably no RTTI here>
+
+===== MGR vtable slot dump (00cfc3a4) =====
+
+--- Vtable dump at 00cfc3a4 ---
+  slot  0 (off 0x00) @ 00cfc3a4 -> 0x00000000  <none>
+  slot 1 @ 00cfc3a8: value 0x00000000 not a function entry - stopping
+
+===== Decompiling all resolved MGR vtable slot functions =====
+
+===== Re-decompiling FUN_004a7b40 (row-entry accessor) and FUN_004a5450 (list walker) =====
+
+----- 004a7b40 FUN_004a7b40 row-entry-by-index accessor -----
+
+undefined4 FUN_004a7b40(uint param_1)
+
+{
+  undefined4 *puVar1;
+  int iVar2;
+  undefined4 uVar3;
+  
+  puVar1 = (undefined4 *)FUN_00486070();
+  iVar2 = (**(code **)(*(int *)*puVar1 + 0x1c))();
+  if (*(uint *)(iVar2 + 0xae8) <= param_1) {
+    return 0;
+  }
+  puVar1 = (undefined4 *)FUN_00486070();
+  iVar2 = (**(code **)(*(int *)*puVar1 + 0x1c))();
+  uVar3 = FUN_004a5450(*(undefined4 *)(iVar2 + 0xaf4 + param_1 * 4));
+  return uVar3;
+}
+
+
+----- 004a5450 FUN_004a5450 list walker -----
+
+int __thiscall FUN_004a5450(int param_1,int param_2)
+
+{
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar2 = *(int *)(param_1 + 0xaec);
+  if ((iVar2 == 0) || (iVar1 = *(int *)(param_1 + 0xaf0), param_2 <= iVar1 / 2)) {
+    iVar2 = *(int *)(param_1 + 0xae0);
+    iVar1 = 0;
+    iVar3 = param_2;
+    if (0 < param_2) {
+      do {
+        iVar2 = *(int *)(iVar2 + 4);
+        iVar3 = iVar3 + -1;
+        iVar1 = param_2;
+      } while (iVar3 != 0);
+    }
+  }
+  else if (param_2 < iVar1) {
+    param_2 = iVar1 - param_2;
+    iVar1 = iVar1 - param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 8);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  else if (iVar1 < param_2) {
+    param_2 = param_2 - iVar1;
+    iVar1 = iVar1 + param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 4);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  *(int *)(param_1 + 0xaec) = iVar2;
+  *(int *)(param_1 + 0xaf0) = iVar1;
+  return iVar2;
+}
+
+
+===== Searching all functions for 'operator new' followed by a vtable-store pattern (constructor candidates) =====

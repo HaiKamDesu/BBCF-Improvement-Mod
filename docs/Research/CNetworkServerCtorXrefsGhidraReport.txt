@@ -1,0 +1,173 @@
+
+===== xrefs to GAME_CNetworkServer::vftable (0089c9f4) =====
+  004a53d7  (DATA)  in FUN_004a53b0
+  0046c8ac  (DATA)  in FUN_0046c880
+
+  ---- Decompiling 2 unique constructor candidate(s) ----
+
+  ----- 004a53b0 FUN_004a53b0 -----
+
+void __fastcall FUN_004a53b0(undefined4 *param_1)
+
+{
+  uint uVar1;
+  undefined4 *puVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082ae4e;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAME_CNetworkServer::vftable;
+  local_8 = 0;
+  puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  while (puVar2 != (undefined4 *)0x0) {
+    (**(code **)*puVar2)(1);
+    puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  }
+  local_8 = 0xffffffff;
+  FUN_004059d0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+    callers of FUN_004a53b0:
+      00828da3  from Unwind@00828da0
+      0046ce5e  from FUN_0046cdd0
+      0046cfe6  from FUN_0046cfe0
+
+  ----- 0046c880 FUN_0046c880 -----
+
+undefined4 * __fastcall FUN_0046c880(undefined4 *param_1)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082ae4e;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAME_CNetworkServer::vftable;
+  FUN_00407940(uVar1);
+  FUN_00407940();
+  FUN_00407940();
+  FUN_0046c9b0();
+  FUN_00407940();
+  param_1[0x2b0] = param_1[0x2b0] & 0xff0fffff;
+  param_1[0x2b2] = param_1[0x2b2] & 0xff0fffff;
+  param_1[0x2b4] = param_1[0x2b4] & 0xff0fffff;
+  param_1[0x2b6] = param_1[0x2b6] & 0xff0fffff;
+  *(undefined1 *)((int)param_1 + 0xac3) = 0;
+  param_1[0x2b0] = param_1[0x2b0] & 0xfff00000;
+  *(undefined1 *)((int)param_1 + 0xacb) = 0;
+  param_1[0x2b2] = param_1[0x2b2] & 0xfff00000;
+  *(undefined1 *)((int)param_1 + 0xad3) = 0;
+  param_1[0x2b4] = param_1[0x2b4] & 0xfff00000;
+  *(undefined1 *)((int)param_1 + 0xadb) = 0;
+  param_1[0x2b6] = param_1[0x2b6] & 0xfff00000;
+  param_1[0x2af] = 0;
+  param_1[0x2b1] = 0;
+  param_1[0x2b3] = 0;
+  param_1[0x2b5] = 0;
+  FUN_00405980();
+  local_8 = 0;
+  FUN_0046dde0();
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+    callers of FUN_0046c880:
+      0046c709  from FUN_0046c6e0
+
+===== xrefs to GAMESTEAM_CNetworkServer::vftable (0089cb4c) =====
+  0046cdf9  (DATA)  in FUN_0046cdd0
+  0046c71b  (DATA)  in FUN_0046c6e0
+
+  ---- Decompiling 2 unique constructor candidate(s) ----
+
+  ----- 0046cdd0 FUN_0046cdd0 -----
+
+void __fastcall FUN_0046cdd0(undefined4 *param_1)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  int local_8;
+  
+  puStack_c = &LAB_00828dee;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAMESTEAM_CNetworkServer::vftable;
+  local_8 = 5;
+  FUN_0046f890(uVar1);
+  local_8._1_3_ = (uint3)((uint)local_8 >> 8);
+  param_1[0x45e] = GAMESTEAM_QoSListner::vftable;
+  local_8._0_1_ = 3;
+  FUN_0046a050();
+  local_8._0_1_ = 2;
+  FUN_0046cca0();
+  local_8._0_1_ = 1;
+  FUN_0046a050();
+  local_8 = (uint)local_8._1_3_ << 8;
+  FUN_0046cbc0();
+  local_8 = 0xffffffff;
+  FUN_004a53b0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+    callers of FUN_0046cdd0:
+      0046cf26  from FUN_0046cf20
+      008485a5  from ?
+
+  ----- 0046c6e0 FUN_0046c6e0 -----
+
+undefined4 * __fastcall FUN_0046c6e0(undefined4 *param_1)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00828dee;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  FUN_0046c880(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  local_8 = 0;
+  *param_1 = GAMESTEAM_CNetworkServer::vftable;
+  FUN_0046c340();
+  local_8._0_1_ = 1;
+  FUN_00469c50();
+  local_8._0_1_ = 2;
+  FUN_0046c460();
+  local_8._0_1_ = 3;
+  FUN_00469c50();
+  local_8._0_1_ = 4;
+  param_1[0x45c] = 0;
+  param_1[0x45e] = GAMESTEAM_QoSListner::vftable;
+  FUN_0046dbb0();
+  local_8 = CONCAT31(local_8._1_3_,5);
+  param_1[0x975] = param_1[0x975] & 0xff0fffff;
+  *(undefined1 *)((int)param_1 + 0x25d7) = 0;
+  param_1[0x975] = param_1[0x975] & 0xfff00000;
+  param_1[0x974] = 0;
+  FUN_0046dd20();
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+    callers of FUN_0046c6e0:
+      0046e8ff  from FUN_0046e8c0

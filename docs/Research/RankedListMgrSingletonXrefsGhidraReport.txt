@@ -1,0 +1,81 @@
+===== Data xrefs to 00c97e3c (DAT_00c97e3c (master netlist singleton storage)) =====
+  (4 references)
+  004860af  WRITE            caller=FUN_00486070
+  004860c8  DATA             caller=FUN_00486070
+  008486d0  READ             caller=<no function>
+  008486e2  WRITE            caller=<no function>
+
+  ---- Decompiling 1 unique referencing functions ----
+
+  ----- 00486070 FUN_00486070 -----
+
+undefined4 * FUN_00486070(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082a69e;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00c97e40 & 1) == 0) {
+    DAT_00c97e40 = DAT_00c97e40 | 1;
+    local_8 = 0;
+    DAT_00c97e3c = 0;
+    _atexit((_func_4879 *)&LAB_008486d0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00c97e3c;
+}
+
+
+
+
+===== Data xrefs to 00c97e40 (DAT_00c97e40 (lazy-init guard byte)) =====
+  (4 references)
+  0082a690  READ             caller=Unwind@0082a690
+  0082a698  WRITE            caller=Unwind@0082a690
+  00486092  READ             caller=FUN_00486070
+  0048609e  WRITE            caller=FUN_00486070
+
+  ---- Decompiling 2 unique referencing functions ----
+
+  ----- 00486070 FUN_00486070 -----
+
+undefined4 * FUN_00486070(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082a69e;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00c97e40 & 1) == 0) {
+    DAT_00c97e40 = DAT_00c97e40 | 1;
+    local_8 = 0;
+    DAT_00c97e3c = 0;
+    _atexit((_func_4879 *)&LAB_008486d0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00c97e3c;
+}
+
+
+
+  ----- 0082a690 Unwind@0082a690 -----
+
+void Unwind_0082a690(void)
+
+{
+  DAT_00c97e40 = DAT_00c97e40 & 0xfffffffe;
+  return;
+}
+
+
+
+
+===== Teardown function at 008486d0 =====
+  containing function: <none>

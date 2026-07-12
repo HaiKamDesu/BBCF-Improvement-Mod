@@ -353,7 +353,6 @@ void SteamMatchmakingWrapper::AddRequestLobbyListCompatibleMembersFilter(CSteamI
 CSteamID SteamMatchmakingWrapper::GetLobbyByIndex(int iLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper GetLobbyByIndex\n");
-	RankedListConnectionFilter::GetInstance().NoteLobbyIndexAccessed();
 
 	// Serve the probed, compacted list when one is active: unreachable entries
 	// are removed (not gapped), so the game builds rows for reachable lobbies

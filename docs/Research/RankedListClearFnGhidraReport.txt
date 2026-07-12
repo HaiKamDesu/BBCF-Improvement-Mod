@@ -1,0 +1,127 @@
+----- 004a5430 FUN_004a5430 -----
+
+void __fastcall FUN_004a5430(int param_1)
+
+{
+  int iVar1;
+  int *piVar2;
+  
+  iVar1 = 0;
+  piVar2 = (int *)(param_1 + 0xaf4);
+  do {
+    *piVar2 = iVar1;
+    iVar1 = iVar1 + 1;
+    piVar2 = piVar2 + 1;
+  } while (iVar1 < 0x32);
+  return;
+}
+
+
+
+----- 004a53b0 FUN_004a53b0 -----
+
+void __fastcall FUN_004a53b0(undefined4 *param_1)
+
+{
+  uint uVar1;
+  undefined4 *puVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082ae4e;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAME_CNetworkServer::vftable;
+  local_8 = 0;
+  puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  while (puVar2 != (undefined4 *)0x0) {
+    (**(code **)*puVar2)(1);
+    puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  }
+  local_8 = 0xffffffff;
+  FUN_004059d0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+----- 004a5450 FUN_004a5450 -----
+
+int __thiscall FUN_004a5450(int param_1,int param_2)
+
+{
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar2 = *(int *)(param_1 + 0xaec);
+  if ((iVar2 == 0) || (iVar1 = *(int *)(param_1 + 0xaf0), param_2 <= iVar1 / 2)) {
+    iVar2 = *(int *)(param_1 + 0xae0);
+    iVar1 = 0;
+    iVar3 = param_2;
+    if (0 < param_2) {
+      do {
+        iVar2 = *(int *)(iVar2 + 4);
+        iVar3 = iVar3 + -1;
+        iVar1 = param_2;
+      } while (iVar3 != 0);
+    }
+  }
+  else if (param_2 < iVar1) {
+    param_2 = iVar1 - param_2;
+    iVar1 = iVar1 - param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 8);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  else if (iVar1 < param_2) {
+    param_2 = param_2 - iVar1;
+    iVar1 = iVar1 + param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 4);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  *(int *)(param_1 + 0xaec) = iVar2;
+  *(int *)(param_1 + 0xaf0) = iVar1;
+  return iVar2;
+}
+
+
+
+----- 004a5390: no function -----
+
+----- 004a53b0 FUN_004a53b0 -----
+
+void __fastcall FUN_004a53b0(undefined4 *param_1)
+
+{
+  uint uVar1;
+  undefined4 *puVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082ae4e;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAME_CNetworkServer::vftable;
+  local_8 = 0;
+  puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  while (puVar2 != (undefined4 *)0x0) {
+    (**(code **)*puVar2)(1);
+    puVar2 = (undefined4 *)FUN_00405cc0(uVar1);
+  }
+  local_8 = 0xffffffff;
+  FUN_004059d0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+

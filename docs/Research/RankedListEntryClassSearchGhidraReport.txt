@@ -1,0 +1,152 @@
+Total symbols: 50058
+
+----- keyword: RankMatch -----
+  0094db3c  Label      CNetworkUIRankMatchTopMenu::vftable_meta_ptr
+  0094db40  Label      CNetworkUIRankMatchTopMenu::vftable
+  0094dcc8  Label      CNetworkUIRankMatchCharSele::vftable_meta_ptr
+  0094dccc  Label      CNetworkUIRankMatchCharSele::vftable
+  009b1bb0  Label      CNetworkUIRankMatchTopMenu::RTTI_Complete_Object_Locator
+  009b1bc4  Label      CNetworkUIRankMatchTopMenu::RTTI_Class_Hierarchy_Descriptor
+  009b1bd4  Label      CNetworkUIRankMatchTopMenu::RTTI_Base_Class_Array
+  009b1be4  Label      CNetworkUIRankMatchTopMenu::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009b1c50  Label      CNetworkUIRankMatchCharSele::RTTI_Complete_Object_Locator
+  009b1c64  Label      CNetworkUIRankMatchCharSele::RTTI_Class_Hierarchy_Descriptor
+  009b1c74  Label      CNetworkUIRankMatchCharSele::RTTI_Base_Class_Array
+  009b1c84  Label      CNetworkUIRankMatchCharSele::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009f4288  Label      CNetworkUIRankMatchTopMenu::RTTI_Type_Descriptor
+  009f4500  Label      CNetworkUIRankMatchCharSele::RTTI_Type_Descriptor
+  (14 matches)
+
+----- keyword: SearchResult -----
+  0089c988  Label      GAME_SearchResultNode::vftable_meta_ptr
+  0089c98c  Label      GAME_SearchResultNode::vftable
+  0089cad8  Label      AASTEAM_SearchResult::vftable_meta_ptr
+  0089cadc  Label      AASTEAM_SearchResult::vftable
+  0089cc30  Label      GAMESTEAM_SearchResultNode::vftable_meta_ptr
+  0089cc34  Label      GAMESTEAM_SearchResultNode::vftable
+  009abc28  Label      GAME_SearchResultNode::RTTI_Complete_Object_Locator
+  009abc3c  Label      GAME_SearchResultNode::RTTI_Class_Hierarchy_Descriptor
+  009abc4c  Label      GAME_SearchResultNode::RTTI_Base_Class_Array
+  009abc58  Label      GAME_SearchResultNode::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009abcbc  Label      AASTEAM_SearchResult::RTTI_Complete_Object_Locator
+  009abcd0  Label      AASTEAM_SearchResult::RTTI_Class_Hierarchy_Descriptor
+  009abce0  Label      AASTEAM_SearchResult::RTTI_Base_Class_Array
+  009abce8  Label      AASTEAM_SearchResult::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009abfb8  Label      GAMESTEAM_SearchResultNode::RTTI_Complete_Object_Locator
+  009abfcc  Label      GAMESTEAM_SearchResultNode::RTTI_Class_Hierarchy_Descriptor
+  009abfdc  Label      GAMESTEAM_SearchResultNode::RTTI_Base_Class_Array
+  009abfec  Label      GAMESTEAM_SearchResultNode::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009d979c  Label      GAME_SearchResultNode::RTTI_Type_Descriptor
+  009d97e4  Label      AASTEAM_SearchResult::RTTI_Type_Descriptor
+  009d9a44  Label      GAMESTEAM_SearchResultNode::RTTI_Type_Descriptor
+  (21 matches)
+
+----- keyword: RoomEntry -----
+  (0 matches)
+
+----- keyword: NetworkRoom -----
+  (0 matches)
+
+----- keyword: RMSR -----
+  (0 matches)
+
+----- keyword: Entry -----
+  0079eadb  Label      ?_GetRangeOfTrysToCheck@@YAPBU_s_TryBlockMapEntry@@PBU_s_FuncInfo@@HHPAI1@Z
+  007a557a  Function   entry
+  007a68b6  Function   Concurrency::details::List<struct_Concurrency::details::ListEntry,class_Concurrency::details::CollectionTypes::NoCount>::AddTail
+  007a68b6  Label      ?AddTail@?$List@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007a68e5  Function   Concurrency::details::List<struct_Concurrency::details::ListEntry,class_Concurrency::details::CollectionTypes::NoCount>::Remove
+  007a68e5  Label      ?Remove@?$List@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007a6d9c  Label      ?CatchIt@@YAXPAUEHExceptionRecord@@PAUEHRegistrationNode@@PAU_CONTEXT@@PAXPBU_s_FuncInfo@@PBU_s_HandlerType@@PBU_s_CatchableType@@PBU_s_TryBlockMapEntry@@H1E@Z
+  007bb844  Function   Concurrency::details::SafeRWList<struct_Concurrency::details::ListEntry,class_Concurrency::details::CollectionTypes::NoCount,class_Concurrency::details::_ReaderWriterLock>::AddTail
+  007bb844  Label      ?AddTail@?$SafeRWList@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@V_ReaderWriterLock@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007bbb38  Label      ?DeleteElements@?$ListArray@VWorkQueue@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007bc1b0  Function   Concurrency::details::SafeRWList<struct_Concurrency::details::ListEntry,class_Concurrency::details::CollectionTypes::NoCount,class_Concurrency::details::_ReaderWriterLock>::Remove
+  007bc1b0  Label      ?Remove@?$SafeRWList@UListEntry@details@Concurrency@@VNoCount@CollectionTypes@23@V_ReaderWriterLock@23@@details@Concurrency@@QAEXPAUListEntry@23@@Z
+  007bd4b3  Label      ?DeleteElements@?$ListArray@VExternalStatistics@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007bd4d1  Label      ?DeleteElements@?$ListArray@VScheduleGroupBase@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007cdd64  Label      ?DeleteElements@?$ListArray@VVirtualProcessor@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  007ceb8d  Label      ?Alloc@AllocatorBucket@details@Concurrency@@QAEPATAllocationEntry@23@XZ
+  007cebf6  Label      ?Free@AllocatorBucket@details@Concurrency@@QAE_NPATAllocationEntry@23@@Z
+  007d02d4  Label      ?DeleteElements@?$ListArray@VScheduleGroupSegmentBase@details@Concurrency@@@details@Concurrency@@AAEXPAU_SINGLE_LIST_ENTRY@@@Z
+  EXTERNAL:0000005a  Function   KERNEL32.DLL::InterlockedPushEntrySList
+  EXTERNAL:0000005b  Function   KERNEL32.DLL::InterlockedPopEntrySList
+  EXTERNAL:00000183  Function   WLDAP32.DLL::ldap_first_entry
+  EXTERNAL:00000184  Function   WLDAP32.DLL::ldap_next_entry
+  (22 matches)
+
+----- keyword: RoomList -----
+  (0 matches)
+
+----- keyword: SearchEntry -----
+  (0 matches)
+
+----- keyword: MatchEntry -----
+  (0 matches)
+
+----- keyword: RoomInfo -----
+  (0 matches)
+
+----- keyword: RoomData -----
+  (0 matches)
+
+===== Structural scan: every 'vftable' symbol, slot count (looking for 40+ slot classes) =====
+Found 997 vftable symbols total
+  0084f474  slots=42  AA_CModel::vftable
+  00850e2c  slots=49  CTextureRenderer::vftable
+  008994f4  slots=42  AA_CModel_MUA::vftable
+  00899c74  slots=53  BG_CMain_Daylight::vftable
+  00899d4c  slots=53  BG_CMain_Night::vftable
+  00899e24  slots=53  BG_CTown::vftable
+  00899efc  slots=53  BG_CChurch::vftable
+  00899fd4  slots=53  BG_CVillage::vftable
+  0089a0ac  slots=53  BG_CChinatown::vftable
+  0089a184  slots=53  BG_CBridge::vftable
+  0089a25c  slots=53  BG_CGate_1::vftable
+  0089a334  slots=53  BG_CGate_2::vftable
+  0089a40c  slots=53  BG_CGate_Open::vftable
+  0089a4e4  slots=53  BG_CCircus::vftable
+  0089a5bc  slots=53  BG_CGarden::vftable
+  0089a694  slots=53  BG_CMonolis::vftable
+  0089a76c  slots=53  BG_CMain_Rain::vftable
+  0089a844  slots=53  BG_CChinatown_Night::vftable
+  0089a91c  slots=53  BG_CBridge_Night::vftable
+  0089a9f4  slots=53  BG_CGate_3::vftable
+  0089aacc  slots=53  BG_CPipe_2::vftable
+  0089aba4  slots=53  BG_CBascule::vftable
+  0089c9f4  slots=57  GAME_CNetworkServer::vftable
+  0089cb4c  slots=57  GAMESTEAM_CNetworkServer::vftable
+  0094b034  slots=53  BG_CETCBase::vftable
+  0094fca4  slots=53  BG_CUltimate::vftable
+  0094fd7c  slots=53  BG_CUltimateFinish::vftable
+  0094fe54  slots=53  BG_CAstralFinish::vftable
+  0094ff2c  slots=53  BG_CAstral::vftable
+  009509e4  slots=80  OBJ_CBase::vftable
+  009565f4  slots=80  OBJ_CCharBase::vftable
+  00958dbc  slots=53  BG_CBase::vftable
+  00959454  slots=53  BG_CHalloween::vftable
+  0095955c  slots=53  BG_CHalloween_2::vftable
+  009596fc  slots=53  BG_CPipe::vftable
+  0095f85c  slots=80  GAME_CETCObjectBase::vftable
+  0095fc7c  slots=80  ETCObjectStatic_CBase::vftable
+  0096011c  slots=80  Cockpit_CBase::vftable
+  009606a4  slots=80  TitleLoop_CBase::vftable
+  00960af4  slots=80  Profile_CBase::vftable
+  00960f7c  slots=80  CharSelect_CBase::vftable
+  00961524  slots=80  VSInfo_CBase::vftable
+  009619ac  slots=80  Winner_CBase::vftable
+  00961f1c  slots=80  StageInfo_CBase::vftable
+  009623e4  slots=80  Ending_CBase::vftable
+  0096285c  slots=80  Ranking_CBase::vftable
+  00962d8c  slots=80  ModeSelect_CBase::vftable
+  0096329c  slots=80  StaffRoll_CBase::vftable
+  009636f4  slots=80  Result_CBase::vftable
+  00963b54  slots=80  MainMenu_CBase::vftable
+  009640cc  slots=80  StorySelect_CBase::vftable
+  009645d4  slots=80  Lobby_CBase::vftable
+  00964a64  slots=80  MyRoomTest_CBase::vftable
+  00964ea4  slots=80  DCC_CBase::vftable
+  0097e044  slots=43  GAME_CTutorialScript::vftable
+  0097e47c  slots=53  GAME_CBGObjScript::vftable
+  009a0104  slots=45  CBaseRenderer::vftable
+  009a0214  slots=49  CBaseVideoRenderer::vftable

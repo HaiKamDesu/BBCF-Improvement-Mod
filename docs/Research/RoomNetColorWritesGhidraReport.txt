@@ -1,0 +1,22 @@
+===== References to Room base (00ccfdd0) =====
+  (no references found)
+===== References to member1 base (00ccfe18) =====
+  (no references found)
+===== References to member1 netcolor (+0x5A) (00ccfe72) =====
+  (no references found)
+===== References to member2 netcolor (+0x5A) (00ccff0a) =====
+  (no references found)
+===== References to member3 netcolor (+0x5A) (00ccffa2) =====
+  (no references found)
+===== References to member4 netcolor (+0x5A) (00cd003a) =====
+  (no references found)
+===== References to member5 netcolor (+0x5A) (00cd00d2) =====
+  (no references found)
+===== References to member6 netcolor (+0x5A) (00cd016a) =====
+  (no references found)
+===== References to member7 netcolor (+0x5A) (00cd0202) =====
+  (no references found)
+===== References to member8 netcolor (+0x5A) (00cd029a) =====
+  (no references found)
+
+===== Decompiled callers (0 unique functions) =====

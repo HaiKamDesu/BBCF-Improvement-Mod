@@ -1,0 +1,562 @@
+===== Callers of 004a29f0 (thunk_GetSingleton) =====
+  (99 references)
+  0046d68d  UNCONDITIONAL_CALL caller=FUN_0046d640
+  004a71d8  UNCONDITIONAL_CALL caller=FUN_004a6f70
+  004a7229  UNCONDITIONAL_CALL caller=FUN_004a6f70
+  004a7295  UNCONDITIONAL_CALL caller=FUN_004a6f70
+  004a7303  UNCONDITIONAL_CALL caller=FUN_004a6f70
+  004aa97c  UNCONDITIONAL_CALL caller=FUN_004aa890
+  004aa98e  UNCONDITIONAL_CALL caller=FUN_004aa890
+  004aa9a1  UNCONDITIONAL_CALL caller=FUN_004aa890
+  004aaa78  UNCONDITIONAL_CALL caller=FUN_004aa890
+  004aaa84  UNCONDITIONAL_CALL caller=FUN_004aa890
+  004aab39  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aaba3  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aac0f  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab5b4  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab5ed  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab6ea  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab726  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  0073c430  UNCONDITIONAL_CALL caller=FUN_0073c3b0
+  0052e2e5  UNCONDITIONAL_CALL caller=FUN_0052e2e0
+  0052e324  UNCONDITIONAL_CALL caller=FUN_0052e320
+  0052e4fa  UNCONDITIONAL_CALL caller=FUN_0052e410
+  0052fd0f  UNCONDITIONAL_CALL caller=FUN_0052fc30
+  00530748  UNCONDITIONAL_CALL caller=FUN_00530720
+  005307c5  UNCONDITIONAL_CALL caller=FUN_005307c0
+  00530884  UNCONDITIONAL_CALL caller=FUN_00530880
+  00530905  UNCONDITIONAL_CALL caller=FUN_00530900
+  005309b4  UNCONDITIONAL_CALL caller=FUN_005309b0
+  00530bbd  UNCONDITIONAL_CALL caller=FUN_00530af0
+  0066605e  UNCONDITIONAL_CALL caller=FUN_00665b00
+  00666099  UNCONDITIONAL_CALL caller=FUN_00665b00
+  0072329f  UNCONDITIONAL_CALL caller=FUN_007230e0
+  007232ca  UNCONDITIONAL_CALL caller=FUN_007230e0
+  00726ffb  UNCONDITIONAL_CALL caller=FUN_00726d90
+  0073d592  UNCONDITIONAL_CALL caller=FUN_0073cf70
+  0073d5e0  UNCONDITIONAL_CALL caller=FUN_0073cf70
+  0073d78f  UNCONDITIONAL_CALL caller=FUN_0073cf70
+  0073dde2  UNCONDITIONAL_CALL caller=FUN_0073da40
+  0073edd4  UNCONDITIONAL_CALL caller=FUN_0073ea90
+  0073efe8  UNCONDITIONAL_CALL caller=FUN_0073ea90
+  0073f060  UNCONDITIONAL_CALL caller=FUN_0073ea90
+  0073f35b  UNCONDITIONAL_CALL caller=FUN_0073f350
+  0073f3a5  UNCONDITIONAL_CALL caller=FUN_0073f350
+  0073f3d0  UNCONDITIONAL_CALL caller=FUN_0073f350
+  0073f7aa  UNCONDITIONAL_CALL caller=FUN_0073f520
+  0073bf80  UNCONDITIONAL_CALL caller=FUN_0073bf20
+  0073c6c7  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073c6f8  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073c728  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073c758  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073c788  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073ce40  UNCONDITIONAL_CALL caller=FUN_0073c550
+  0073ce58  UNCONDITIONAL_CALL caller=FUN_0073c550
+  007436ca  UNCONDITIONAL_CALL caller=FUN_007436b0
+  007438c1  UNCONDITIONAL_CALL caller=FUN_007438a0
+  00743cb0  UNCONDITIONAL_CALL caller=FUN_00743c80
+  007445af  UNCONDITIONAL_CALL caller=FUN_00743c80
+  00744886  UNCONDITIONAL_CALL caller=FUN_00744870
+  007448af  UNCONDITIONAL_CALL caller=FUN_00744870
+  0074494d  UNCONDITIONAL_CALL caller=FUN_00744930
+  00745095  UNCONDITIONAL_CALL caller=FUN_00745080
+  007450bc  UNCONDITIONAL_CALL caller=FUN_00745080
+  00745412  UNCONDITIONAL_CALL caller=FUN_007453b0
+  0074596f  UNCONDITIONAL_CALL caller=FUN_00745960
+  007459c9  UNCONDITIONAL_CALL caller=FUN_007459b0
+  00745e5d  UNCONDITIONAL_CALL caller=FUN_00745e40
+  00745ef6  UNCONDITIONAL_CALL caller=FUN_00745ec0
+  00748746  UNCONDITIONAL_CALL caller=FUN_007486e0
+  0049b1aa  UNCONDITIONAL_CALL caller=FUN_0049aea0
+  0049b1c2  UNCONDITIONAL_CALL caller=FUN_0049aea0
+  0049b1da  UNCONDITIONAL_CALL caller=FUN_0049aea0
+  0049b1f2  UNCONDITIONAL_CALL caller=FUN_0049aea0
+  004a6970  UNCONDITIONAL_CALL caller=FUN_004a6670
+  004a698c  UNCONDITIONAL_CALL caller=FUN_004a6670
+  004a699a  UNCONDITIONAL_CALL caller=FUN_004a6670
+  004abec1  UNCONDITIONAL_CALL caller=FUN_004aba50
+  004aacd0  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aad25  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aad40  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aadbd  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004aadce  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab055  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab1d6  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab29d  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab7b6  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab7d9  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab7f5  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab811  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004ab829  UNCONDITIONAL_CALL caller=FUN_004aaad0
+  004afdc7  UNCONDITIONAL_CALL caller=FUN_004afc90
+  004aff8e  UNCONDITIONAL_CALL caller=FUN_004afc90
+  004abf81  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004abfcb  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac160  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac232  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac385  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac3af  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac3ee  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac47e  UNCONDITIONAL_CALL caller=FUN_004abf50
+  004ac4c5  UNCONDITIONAL_CALL caller=FUN_004abf50
+
+  ---- Decompiling 42 unique caller functions ----
+
+  ----- caller 004aa890 FUN_004aa890 -----
+
+void __fastcall FUN_004aa890(int *param_1)
+
+{
+  bool bVar1;
+  undefined4 *puVar2;
+  int *piVar3;
+  int iVar4;
+  undefined4 uVar5;
+  undefined4 uVar6;
+  
+  puVar2 = (undefined4 *)FUN_00486070();
+  piVar3 = (int *)(**(code **)(*(int *)*puVar2 + 0x18))();
+  puVar2 = (undefined4 *)FUN_00486070();
+  (**(code **)(*(int *)*puVar2 + 0x1c))();
+  FUN_0049a400();
+  FUN_004a0fe0();
+  iVar4 = param_1[1];
+  if (iVar4 == 0) {
+    FUN_0049df90();
+    FUN_004a40a0();
+    FUN_004a45d0();
+    param_1[0x37] = 0;
+    param_1[0x38] = 0;
+    param_1[0x39] = 0;
+    FUN_00695830(1);
+    FUN_00695510();
+    iVar4 = FUN_0047e860();
+    (**(code **)(*piVar3 + 0x58))(*(undefined4 *)(iVar4 + 0x25f0));
+    param_1[0x38] = 0;
+    iVar4 = FUN_0047e860();
+    if (*(int *)(iVar4 + 0x2558) == 0xc) {
+      iVar4 = FUN_0047e860();
+      *(undefined4 *)(iVar4 + 0x2558) = 0;
+    }
+    if (*param_1 == 0xd) {
+      FUN_00647cc0();
+      uVar6 = 0;
+      uVar5 = 0;
+      param_1[0x9d] = 1;
+      FUN_0047ea90(0,0);
+      FUN_00464510(uVar5,uVar6);
+      FUN_00413280();
+      param_1[0x36] = 0xe;
+      piVar3 = (int *)thunk_FUN_0046a820();
+      (**(code **)(*piVar3 + 0x20))();
+      piVar3 = (int *)thunk_FUN_0046a820();
+      (**(code **)(*piVar3 + 0x30))();
+      param_1[1] = 0x8b;
+      goto LAB_004aaab6;
+    }
+    if (param_1[0x104] != 0) {
+      FUN_006983e0("NTER_Signout");
+    }
+  }
+  else {
+    if (iVar4 != 0x8b) {
+      if (iVar4 != 0x8c) {
+        return;
+      }
+      if (param_1[2] != 0) {
+        param_1[0x9c] = 0;
+        param_1[0x9d] = 0;
+        if (*param_1 == 0xd) {
+          param_1[0x2e] = 0x2f;
+          param_1[0x2f] = 1;
+          param_1[0x30] = 0;
+          param_1[0x31] = 0;
+          param_1[0x32] = 0;
+        }
+        FUN_004a5640();
+      }
+      iVar4 = FUN_004a5520();
+      if (iVar4 < 0) {
+        return;
+      }
+      if (param_1[0x2b] != 0) {
+        return;
+      }
+      if (param_1[0x2e] != 0) {
+        return;
+      }
+      if (*param_1 == 0xd) {
+        param_1[0x36] = 0;
+        FUN_004aa800();
+      }
+      param_1[4] = *param_1;
+      *param_1 = 0;
+      param_1[1] = 0;
+      goto LAB_004aaab6;
+    }
+    bVar1 = false;
+    piVar3 = (int *)thunk_FUN_0046a820();
+    iVar4 = (**(code **)(*piVar3 + 0x34))();
+    if (-1 < iVar4) {
+      if (iVar4 == 0) {
+        piVar3 = (int *)thunk_FUN_0046a820();
+        (**(code **)(*piVar3 + 0x20))();
+        bVar1 = true;
+      }
+      else {
+        piVar3 = (int *)thunk_FUN_0046a820();
+        (**(code **)(*piVar3 + 0x30))();
+      }
+    }
+    iVar4 = FUN_00550560();
+    if (iVar4 != 0) {
+      return;
+    }
+    if (!bVar1) {
+      return;
+    }
+  }
+  param_1[1] = 0x8c;
+LAB_004aaab6:
+  param_1[3] = 1;
+  FUN_004a9d20();
+  return;
+}
+
+
+  ----- caller 004aaad0 FUN_004aaad0 -----
+
+void __fastcall FUN_004aaad0(int param_1)
+
+{
+  undefined4 *puVar1;
+  int *piVar2;
+  int iVar3;
+  uint uVar4;
+  int *piVar5;
+  undefined4 uVar6;
+  int iVar7;
+  undefined2 *puVar8;
+  uint uVar9;
+  undefined2 *puVar10;
+  bool bVar11;
+  bool bVar12;
+  uint local_5c;
+  undefined4 local_58;
+  uint local_54;
+  undefined4 local_50;
+  int local_44;
+  uint local_40;
+  int local_3c;
+  uint *local_38;
+  undefined4 *local_34;
+  byte local_2d;
+  int local_2c;
+  undefined4 local_28;
+  undefined4 local_24;
+  undefined4 local_20;
+  undefined4 local_1c;
+  undefined4 local_18;
+  undefined4 local_14;
+  undefined4 local_10;
+  undefined4 local_c;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  puVar1 = (undefined4 *)FUN_00486070();
+  local_34 = (undefined4 *)(**(code **)(*(int *)*puVar1 + 0x18))();
+  puVar1 = (undefined4 *)FUN_00486070();
+  piVar2 = (int *)(**(code **)(*(int *)*puVar1 + 0x1c))();
+  local_38 = (uint *)FUN_0049a400();
+  FUN_004a0fe0();
+  FUN_004a0fe0();
+  bVar12 = false;
+  uVar9 = 0;
+  local_40 = 0;
+  local_54 = 0;
+  local_2c = 0;
+  local_5c = 0;
+  local_44 = 0;
+  bVar11 = false;
+  local_58 = 0;
+  local_50 = 0;
+  local_2d = 0;
+  iVar3 = thunk_FUN_0046a820();
+  uVar4 = 0;
+  piVar5 = (int *)(iVar3 + 0x1518);
+  do {
+    if (*piVar5 != 0) {
+      local_3c = iVar3 + 0x1510 + uVar4 * 0x68;
+      if (local_3c == 0) break;
+      uVar4 = *(uint *)(local_3c + 0x30);
+      local_44 = *(int *)(local_3c + 0x50);
+      local_54 = uVar4 >> 0xb & 1;
+      local_40 = uVar4 >> 8 & 1;
+      uVar9 = uVar4 >> 10 & 1;
+      if (local_40 != 0) {
+        iVar3 = thunk_FUN_0046a820();
+        iVar3 = *(int *)(iVar3 + ((*(int *)(local_3c + 0x4c) + 0x3ec) * 3 + (uint)(local_44 == 0)) *
+                                 4);
+        if (iVar3 != 0) {
+          local_58 = *(undefined4 *)(iVar3 + 0x28);
+          local_50 = *(undefined4 *)(iVar3 + 0x2c);
+          bVar11 = (*(uint *)(iVar3 + 0x30) & 0x10000) != 0;
+          local_2d = *(byte *)(iVar3 + 0x60);
+          local_5c = *(uint *)(iVar3 + 0x30) >> 10 & 1;
+          local_2c = 1;
+          if (*(int *)(iVar3 + 0x58) != 3) {
+            bVar12 = local_5c == 0;
+            break;
+          }
+        }
+      }
+      bVar12 = true;
+      break;
+    }
+    uVar4 = uVar4 + 1;
+    piVar5 = piVar5 + 0x1a;
+  } while (uVar4 < 0x40);
+  piVar5 = (int *)thunk_FUN_0046a820();
+  local_3c = (**(code **)(*piVar5 + 0x60))();
+  iVar3 = *(int *)(param_1 + 4);
+  if (local_3c == 0) {
+    bVar12 = true;
+  }
+  switch(iVar3) {
+  case 0:
+    FUN_00414520();
+    *(undefined4 *)(param_1 + 4) = 0x6f;
+    *(undefined4 *)(param_1 + 0xc) = 1;
+    FUN_004a9d20();
+    *(undefined4 *)(param_1 + 0x370) = 0;
+    break;
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 7:
+  case 8:
+  case 9:
+  case 10:
+  case 0xb:
+  case 0xc:
+  case 0xd:
+  case 0xe:
+  case 0xf:
+  case 0x10:
+  case 0x11:
+  case 0x12:
+  case 0x13:
+  case 0x14:
+  case 0x15:
+  case 0x16:
+  case 0x17:
+  case 0x18:
+  case 0x19:
+  case 0x1a:
+  case 0x1b:
+  case 0x1c:
+  case 0x1d:
+  case 0x1e:
+  case 0x1f:
+  case 0x20:
+  case 0x21:
+  case 0x22:
+  case 0x23:
+  case 0x24:
+  case 0x25:
+  case 0x26:
+  case 0x27:
+  case 0x28:
+  case 0x29:
+  case 0x2a:
+  case 0x2b:
+  case 0x2c:
+  case 0x2d:
+  case 0x2e:
+  case 0x2f:
+  case 0x30:
+  case 0x31:
+  case 0x32:
+  case 0x33:
+  case 0x34:
+  case 0x35:
+  case 0x36:
+  case 0x37:
+  case 0x38:
+  case 0x39:
+  case 0x3a:
+  case 0x3b:
+  case 0x3c:
+  case 0x3d:
+  case 0x3e:
+  case 0x3f:
+  case 0x40:
+  case 0x41:
+  case 0x42:
+  case 0x43:
+  case 0x44:
+  case 0x45:
+  case 0x46:
+  case 0x47:
+  case 0x48:
+  case 0x49:
+  case 0x4a:
+  case 0x4b:
+  case 0x4c:
+  case 0x4d:
+  case 0x4e:
+  case 0x4f:
+  case 0x50:
+  case 0x51:
+  case 0x52:
+  case 0x53:
+  case 0x54:
+  case 0x55:
+  case 0x56:
+  case 0x57:
+  case 0x58:
+  case 0x59:
+  case 0x5a:
+  case 0x5b:
+  case 0x5c:
+  case 0x5d:
+  case 0x5e:
+  case 0x5f:
+  case 0x60:
+  case 0x61:
+  case 0x62:
+  case 99:
+  case 100:
+  case 0x65:
+  case 0x66:
+  case 0x67:
+  case 0x68:
+  case 0x69:
+  case 0x6a:
+  case 0x6b:
+  case 0x6c:
+  case 0x6d:
+  case 0x6e:
+  case 0x75:
+  case 0x76:
+  case 0x77:
+  case 0x78:
+  case 0x79:
+  case 0x7a:
+  case 0x7b:
+  case 0x7c:
+  case 0x82:
+  default:
+    if (*(int *)(param_1 + 8) != 0) {
+      if ((iVar3 != 0x75) && (iVar3 != 0x76)) {
+        if (iVar3 == 0x7a) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x29;
+          *(undefined4 *)(param_1 + 0xbc) = 1;
+          *(undefined4 *)(param_1 + 0xc0) = 0;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        else if (iVar3 == 0x7b) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x2a;
+          *(undefined4 *)(param_1 + 0xbc) = 1;
+          *(undefined4 *)(param_1 + 0xc0) = 0;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        else if (iVar3 == 0x78) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x3d;
+          *(undefined4 *)(param_1 + 0xbc) = 2;
+          *(undefined4 *)(param_1 + 0xc0) = 1;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        else if (iVar3 == 0x77) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x3e;
+          *(undefined4 *)(param_1 + 0xbc) = 2;
+          *(undefined4 *)(param_1 + 0xc0) = 1;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        else if (iVar3 == 0x7c) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x3f;
+          *(undefined4 *)(param_1 + 0xbc) = 2;
+          *(undefined4 *)(param_1 + 0xc0) = 1;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        else if (iVar3 == 0x8d) {
+          *(undefined4 *)(param_1 + 0xb8) = 0x51;
+          *(undefined4 *)(param_1 + 0xbc) = 7;
+          *(undefined4 *)(param_1 + 0xc0) = 6;
+          *(undefined4 *)(param_1 + 0xc4) = 0;
+          *(undefined4 *)(param_1 + 200) = 0;
+        }
+        break;
+      }
+      goto LAB_004ab81d;
+    }
+    if (local_3c == 0) {
+      *(undefined4 *)(param_1 + 4) = 0x73;
+      goto LAB_004ab8ee;
+    }
+    if ((uVar9 != 0) && (local_54 == 0)) {
+      *(undefined4 *)(param_1 + 4) = 0x7d;
+      goto LAB_004ab8ee;
+    }
+    if (iVar3 == 0x7c) {
+      iVar3 = FUN_004a7f90();
+      iVar7 = local_2c;
+      if (iVar3 == 0) {
+        *(undefined4 *)(param_1 + 0xc) = 1;
+        if (*(int *)(param_1 + 0xb0) == 1) {
+          *(undefined4 *)(param_1 + 4) = 0x71;
+          goto LAB_004ab761;
+        }
+LAB_004ab75a:
+        *(undefined4 *)(param_1 + 4) = 0x75;
+        goto LAB_004ab761;
+      }
+    }
+    else if (iVar3 == 0x77) {
+      iVar3 = FUN_004a7f90();
+      iVar7 = local_2c;
+      if (iVar3 == 0) {
+        if (*(int *)(param_1 + 0xb0) == 1) {
+          FUN_00643b40();
+          iVar3 = FUN_0073c3b0(&local_40,&local_34);
+          if (iVar3 != 0) {
+            *(uint *)(param_1 + 0x2d8) = (int)local_34 + local_40 * 2;
+            piVar5 = (int *)thunk_FUN_0046a820();
+            iVar3 = (**(code **)(*piVar5 + 0x3c))(*(undefined4 *)(param_1 + 0x2d8));
+            *(undefined4 *)(param_1 + 0xc) = 1;
+            if (99 < iVar3) goto LAB_004ab75a;
+            *(undefined4 *)(param_1 + 4) = 0x79;
+            goto LAB_004ab761;
+          }
+        }
+LAB_004ab751:
+        *(undefined4 *)(param_1 + 0xc) = 1;
+        goto LAB_004ab75a;
+      }
+    }
+    else if (iVar3 == 0x79) {
+      piVar5 = (int *)thunk_FUN_0046a820();
+      iVar3 = (**(code **)(*piVar5 + 0x40))();
+      iVar7 = local_2c;
+      if (-1 < iVar3) {
+        if (iVar3 < 100) {
+          if (local_40 != 0) {
+            *(int *)(param_1 + 0x370) = local_2c;
+            *(undefined4 *)(param_1 + 4) = 0x76;
+            *(undefined4 *)(param_1 + 0xc) = 1;
+            FUN_004a9d20();
+            *(undefined4 *)(param_1 + 0xb4) = 0x4e;
+            goto LAB_004ab769;
+          }
+        }
+        else {
+          if (iVar3 == 0x6d) {
+            FUN_006983e0("NTE

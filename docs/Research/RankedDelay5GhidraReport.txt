@@ -1,0 +1,56 @@
+===== REFERENCES TO DAT_00a5d270 =====
+00848572 WRITE in FUN_00848550
+00848583 WRITE in FUN_00848550
+0046a878 DATA in FUN_0046a820
+0046a85a DATA in FUN_0046a820
+00828ae0 DATA in Unwind@00828ae0
+
+===== DECOMPILED =====
+----- 00848550 FUN_00848550 -----
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+void FUN_00848550(void)
+
+{
+  _DAT_00a5d270 = CNetworkLobbyData::vftable;
+  return;
+}
+
+
+
+----- 0046a820 FUN_0046a820 -----
+
+undefined * FUN_0046a820(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00828b1e;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a624e0 & 1) == 0) {
+    DAT_00a624e0 = DAT_00a624e0 | 1;
+    local_8 = 0;
+    FUN_00469e20(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_00848550);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a5d270;
+}
+
+
+
+----- 00828ae0 Unwind@00828ae0 -----
+
+void Unwind_00828ae0(void)
+
+{
+  FUN_0046a130();
+  return;
+}
+
+
+

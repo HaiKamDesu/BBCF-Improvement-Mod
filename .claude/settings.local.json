@@ -102,7 +102,25 @@
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /t:BBCF_IM /nologo)",
       "Read(//home/usuario/.claude/skills/**)",
       "Read(//home/usuario/.claude/**)",
-      "Bash(unzip -l bin/Debug/BBCF.IM.win-x86.v7.3.zip)"
+      "Bash(unzip -l bin/Debug/BBCF.IM.win-x86.v7.3.zip)",
+      "Bash('/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe' BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /nologo /v:minimal)",
+      "Bash(sort -t: -k2)",
+      "Bash(uniq -c -f1)",
+      "Bash(grep -v \"^--$\")",
+      "Bash(grep -i \"\\\\.cmd$\")",
+      "Bash(tasklist.exe)",
+      "Bash(\"/mnt/c/Program Files \\(x86\\)/Windows Kits/10/Debuggers/x86/cdb.exe\" -?)",
+      "Bash(tasklist.exe *)",
+      "Bash(mkdir -p /mnt/c/Users/Usuario/AppData/Local/Temp/bbcf_cdb)",
+      "Bash(cp /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/44d0f1d8-ac6e-4500-b350-5fb84bce2884/scratchpad/cdb_check.txt /mnt/c/Users/Usuario/AppData/Local/Temp/bbcf_cdb/cdb_check.txt)",
+      "Bash(\"/mnt/c/Program Files \\(x86\\)/Windows Kits/10/Debuggers/x86/cdb.exe\" -pv -p 17508 -cf \"C:\\\\Users\\\\Usuario\\\\AppData\\\\Local\\\\Temp\\\\bbcf_cdb\\\\cdb_check.txt\")",
+      "Bash(whoami.exe)",
+      "Bash(net.exe session *)",
+      "Bash(whoami.exe /groups)",
+      "Bash(taskkill.exe /F /PID 51900)",
+      "Bash(cmd.exe /C \"start steam://rungameid/486860\")",
+      "Bash(cmd.exe /C \"start \\\\\"\\\\\" \\\\\"steam://rungameid/486860\\\\\"\")",
+      "Bash(cmd.exe /C \"cd /d \\\\\"D:\\\\SteamLibrary\\\\steamapps\\\\common\\\\BlazBlue Centralfiction\\\\\" && start BBCF.exe\")"
     ]
   }
 }

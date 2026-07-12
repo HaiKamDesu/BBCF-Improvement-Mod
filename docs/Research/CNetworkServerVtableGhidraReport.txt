@@ -1,0 +1,737 @@
+
+===== GAME_CNetworkServer vftable at 0089c9f4 =====
+  slot  0 (off 0x00) -> 0079e05c __purecall
+  slot  1 (off 0x04) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot  2 (off 0x08) -> 0079e05c __purecall
+  slot  3 (off 0x0c) -> 0079e05c __purecall
+  slot  4 (off 0x10) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot  5 (off 0x14) -> 0079e05c __purecall
+  slot  6 (off 0x18) -> 0079e05c __purecall
+  slot  7 (off 0x1c) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot  8 (off 0x20) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot  9 (off 0x24) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 10 (off 0x28) -> 0079e05c __purecall
+  slot 11 (off 0x2c) -> 0079e05c __purecall
+  slot 12 (off 0x30) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 13 (off 0x34) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 14 (off 0x38) -> 0079e05c __purecall
+  slot 15 (off 0x3c) -> 0079e05c __purecall
+  slot 16 (off 0x40) -> 0079e05c __purecall
+  slot 17 (off 0x44) -> 0079e05c __purecall
+  slot 18 (off 0x48) -> 0079e05c __purecall
+  slot 19 (off 0x4c) -> 0079e05c __purecall
+  slot 20 (off 0x50) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 21 (off 0x54) -> 0079e05c __purecall
+  slot 22 (off 0x58) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 23 (off 0x5c) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 24 (off 0x60) -> 0079e05c __purecall
+  slot 25 (off 0x64) -> 0079e05c __purecall
+  slot 26 (off 0x68) -> 0079e05c __purecall
+  slot 27 (off 0x6c) -> 0079e05c __purecall
+  slot 28 (off 0x70) -> 0079e05c __purecall
+  slot 29 (off 0x74) -> 0079e05c __purecall
+  slot 30 (off 0x78) -> 0079e05c __purecall
+  slot 31 (off 0x7c) -> 0079e05c __purecall
+  slot 32 (off 0x80) -> 006a9da0 FUN_006a9da0
+  slot 33 (off 0x84) -> 006a9da0 FUN_006a9da0
+  slot 34 (off 0x88) -> 0046cfe0 FUN_0046cfe0
+  slot 35 (off 0x8c) -> 00751460 FUN_00751460
+  slot 36 (off 0x90) -> 0079e05c __purecall
+  slot 37 (off 0x94) -> 0079e05c __purecall
+  slot 38 (off 0x98) -> 00506ab0 FUN_00506ab0
+  slot 39 (off 0x9c) -> 004ba8f0 FUN_004ba8f0
+  slot 40 (off 0xa0) -> 0079e05c __purecall
+  slot 41 (off 0xa4) -> 004701d0 FUN_004701d0
+  slot 42 (off 0xa8) -> 0079e05c __purecall
+  slot 43 (off 0xac) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 44 (off 0xb0) -> 0079e05c __purecall <-- ENTRY uses this offset
+  slot 45 (off 0xb4) -> 004701d0 FUN_004701d0
+  slot 46 (off 0xb8) -> 00516a20 FUN_00516a20
+  slot 47 (off 0xbc) -> 00516a20 FUN_00516a20
+  slot 48 (off 0xc0) -> 00516a20 FUN_00516a20
+  slot 49 (off 0xc4) -> 0079e05c __purecall
+  slot 50 (off 0xc8) -> 0079e05c __purecall
+  slot 51 (off 0xcc) -> 0079e05c __purecall
+  slot 52 (off 0xd0) -> 006a9db0 FUN_006a9db0
+  slot 53 (off 0xd4) -> 00516a20 FUN_00516a20
+  slot 54 (off 0xd8) -> 006a9da0 FUN_006a9da0
+  slot 55 (off 0xdc) -> 0046ea80 FUN_0046ea80
+  slot 56 (off 0xe0) -> 00516a20 FUN_00516a20
+
+  ---- Decompiling slots at ENTRY's known-used offsets for GAME_CNetworkServer ----
+
+----- 0079e05c GAME_CNetworkServer slot 1 (off 0x04): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 4 (off 0x10): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 7 (off 0x1c): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 8 (off 0x20): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 9 (off 0x24): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 12 (off 0x30): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 13 (off 0x34): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 20 (off 0x50): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 22 (off 0x58): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 23 (off 0x5c): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 43 (off 0xac): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+----- 0079e05c GAME_CNetworkServer slot 44 (off 0xb0): __purecall -----
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+===== GAMESTEAM_CNetworkServer vftable at 0089cb4c =====
+  slot  0 (off 0x00) -> 0046f620 FUN_0046f620
+  slot  1 (off 0x04) -> 0046e0a0 FUN_0046e0a0 <-- ENTRY uses this offset
+  slot  2 (off 0x08) -> 0046e440 FUN_0046e440
+  slot  3 (off 0x0c) -> 0046f940 FUN_0046f940
+  slot  4 (off 0x10) -> 0046dfa0 FUN_0046dfa0 <-- ENTRY uses this offset
+  slot  5 (off 0x14) -> 0046df20 FUN_0046df20
+  slot  6 (off 0x18) -> 0046de70 FUN_0046de70
+  slot  7 (off 0x1c) -> 0046e540 FUN_0046e540 <-- ENTRY uses this offset
+  slot  8 (off 0x20) -> 004701e0 FUN_004701e0 <-- ENTRY uses this offset
+  slot  9 (off 0x24) -> 00516a20 FUN_00516a20 <-- ENTRY uses this offset
+  slot 10 (off 0x28) -> 0046e620 FUN_0046e620
+  slot 11 (off 0x2c) -> 004702d0 FUN_004702d0
+  slot 12 (off 0x30) -> 00516a20 FUN_00516a20 <-- ENTRY uses this offset
+  slot 13 (off 0x34) -> 0046eb80 FUN_0046eb80 <-- ENTRY uses this offset
+  slot 14 (off 0x38) -> 0046d7c0 FUN_0046d7c0
+  slot 15 (off 0x3c) -> 0046d640 FUN_0046d640
+  slot 16 (off 0x40) -> 0046d6c0 FUN_0046d6c0
+  slot 17 (off 0x44) -> 0046d890 FUN_0046d890
+  slot 18 (off 0x48) -> 0046d370 FUN_0046d370
+  slot 19 (off 0x4c) -> 0046d0a0 FUN_0046d0a0
+  slot 20 (off 0x50) -> 0046d710 FUN_0046d710 <-- ENTRY uses this offset
+  slot 21 (off 0x54) -> 0046dae0 FUN_0046dae0
+  slot 22 (off 0x58) -> 00516a20 FUN_00516a20 <-- ENTRY uses this offset
+  slot 23 (off 0x5c) -> 0046d730 FUN_0046d730 <-- ENTRY uses this offset
+  slot 24 (off 0x60) -> 0046db20 FUN_0046db20
+  slot 25 (off 0x64) -> 004ba8f0 FUN_004ba8f0
+  slot 26 (off 0x68) -> 0046d760 FUN_0046d760
+  slot 27 (off 0x6c) -> 0046d790 FUN_0046d790
+  slot 28 (off 0x70) -> 0046f680 FUN_0046f680
+  slot 29 (off 0x74) -> 0046dd20 FUN_0046dd20
+  slot 30 (off 0x78) -> 0046d010 FUN_0046d010
+  slot 31 (off 0x7c) -> 0046d070 FUN_0046d070
+  slot 32 (off 0x80) -> 006a9da0 FUN_006a9da0
+  slot 33 (off 0x84) -> 006a9da0 FUN_006a9da0
+  slot 34 (off 0x88) -> 0046cf20 FUN_0046cf20
+  slot 35 (off 0x8c) -> 0046ffd0 FUN_0046ffd0
+  slot 36 (off 0x90) -> 0046ec00 FUN_0046ec00
+  slot 37 (off 0x94) -> 0046e660 FUN_0046e660
+  slot 38 (off 0x98) -> 00506ab0 FUN_00506ab0
+  slot 39 (off 0x9c) -> 0046e790 FUN_0046e790
+  slot 40 (off 0xa0) -> 00683280 FUN_00683280
+  slot 41 (off 0xa4) -> 0046ecb0 FUN_0046ecb0
+  slot 42 (off 0xa8) -> 00470240 FUN_00470240
+  slot 43 (off 0xac) -> 004701f0 FUN_004701f0 <-- ENTRY uses this offset
+  slot 44 (off 0xb0) -> 0046db40 FUN_0046db40 <-- ENTRY uses this offset
+  slot 45 (off 0xb4) -> 004701a0 FUN_004701a0
+  slot 46 (off 0xb8) -> 00470180 FUN_00470180
+  slot 47 (off 0xbc) -> 00516a20 FUN_00516a20
+  slot 48 (off 0xc0) -> 00516a20 FUN_00516a20
+  slot 49 (off 0xc4) -> 0046fb80 FUN_0046fb80
+  slot 50 (off 0xc8) -> 0046ea90 FUN_0046ea90
+  slot 51 (off 0xcc) -> 0041db90 FUN_0041db90
+  slot 52 (off 0xd0) -> 006a9db0 FUN_006a9db0
+  slot 53 (off 0xd4) -> 00516a20 FUN_00516a20
+  slot 54 (off 0xd8) -> 006a9da0 FUN_006a9da0
+  slot 55 (off 0xdc) -> 0046ea80 FUN_0046ea80
+  slot 56 (off 0xe0) -> 00516a20 FUN_00516a20
+
+  ---- Decompiling slots at ENTRY's known-used offsets for GAMESTEAM_CNetworkServer ----
+
+----- 0046e0a0 GAMESTEAM_CNetworkServer slot 1 (off 0x04): FUN_0046e0a0 -----
+
+void __thiscall FUN_0046e0a0(int param_1,int param_2)
+
+{
+  uint uVar1;
+  undefined4 ****ppppuVar2;
+  int iVar3;
+  undefined4 *puVar4;
+  undefined *puVar5;
+  undefined4 uVar6;
+  undefined1 local_50 [4];
+  undefined4 local_4c;
+  undefined4 local_48;
+  void *local_44 [4];
+  undefined4 local_34;
+  uint local_30;
+  undefined4 ***local_2c [4];
+  undefined4 local_1c;
+  uint local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00828e20;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_48 = FUN_0041c900(local_14);
+  if (*(char *)(param_1 + 0x25dd) == '\0') {
+    FUN_0041c620();
+    *(uint *)(param_1 + 0xbd8) = (uint)*(byte *)(param_2 + 0xfc);
+    *(undefined4 *)(param_1 + 0xbd4) = *(undefined4 *)(param_2 + 0x108);
+    FUN_0041d390(PTR_s_NETWORK_VERSION_009d9610,*(undefined1 *)(param_2 + 0x110));
+    FUN_0041d390(PTR_s_HOST_NETCOLOR_009d9618,*(undefined4 *)(param_2 + 0x100));
+    uVar1 = *(uint *)(param_2 + 0x108) & 0xf;
+    if (uVar1 == 2) {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x154));
+      FUN_0041d390(PTR_s_RANK_RTT_FILTER_009d964c,*(undefined2 *)(param_2 + 0x136));
+      FUN_0041d390(PTR_s_PLAYER_MEMBER_MAX_009d9624,*(undefined1 *)(param_2 + 0xfc));
+      uVar6 = *(undefined4 *)(param_2 + 0x108);
+      puVar5 = PTR_s_PLAYER_SESSION_FLAG_009d9630;
+    }
+    else if (uVar1 == 0) {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x138));
+      FUN_0041d390(PTR_s_RANK_MYAREA_009d9638,*(undefined2 *)(param_2 + 0x132));
+      FUN_0041d390(PTR_s_RANK_AREA_FILTER_009d963c,*(undefined2 *)(param_2 + 0x134));
+      FUN_0041d390(PTR_s_RANK_HOST_LEVEL_009d9640,*(undefined2 *)(param_2 + 0x130));
+      FUN_0041d390(PTR_s_RANK_LEVEL_MIN_009d9644,*(undefined4 *)(param_2 + 0x144));
+      FUN_0041d390(PTR_s_RANK_LEVEL_MAX_009d9648,*(undefined4 *)(param_2 + 0x148));
+      FUN_0041d390(PTR_s_RANK_RTT_FILTER_009d964c,*(undefined2 *)(param_2 + 0x136));
+      FUN_0041d390(PTR_s_RANK_DISCONNECT_RATE_009d9650,*(undefined4 *)(param_2 + 0x150));
+      uVar6 = *(undefined4 *)(param_2 + 0x14c);
+      puVar5 = PTR_s_RANK_DISCONNECT_009d9654;
+    }
+    else {
+      FUN_0041d390(PTR_s_MATCHING_FILTER_009d9614,*(undefined4 *)(param_2 + 0x114));
+      FUN_00468610(param_2 + 8);
+      local_8 = 0;
+      FUN_00779430(local_2c,local_44);
+      local_8 = CONCAT31(local_8._1_3_,2);
+      if (7 < local_30) {
+        FID_conflict__free(local_44[0]);
+      }
+      local_44[0] = (void *)((uint)local_44[0] & 0xffff0000);
+      ppppuVar2 = local_2c;
+      if (0xf < local_18) {
+        ppppuVar2 = (undefined4 ****)local_2c[0];
+      }
+      local_30 = 7;
+      local_34 = 0;
+      FUN_0041d360(PTR_s_PLAYER_ROOM_NAME_009d961c,ppppuVar2);
+      local_8 = 0xffffffff;
+      if (0xf < local_18) {
+        FID_conflict__free(local_2c[0]);
+      }
+      local_18 = 0xf;
+      local_1c = 0;
+      local_2c[0] = (undefined4 ***)((uint)local_2c[0] & 0xffffff00);
+      FUN_0041d390(PTR_s_PLAYER_ROOM_TYPE_009d9620,*(undefined4 *)(param_2 + 0x118));
+      FUN_0041d390(PTR_s_PLAYER_MEMBER_MAX_009d9624,*(undefined1 *)(param_2 + 0xfc));
+      FUN_0041d390(PTR_s_PLAYER_PRIVATE_NUM_009d9628,*(undefined1 *)(param_2 + 0xfe));
+      FUN_0041d390(PTR_s_PLAYER_PRIVATE_MAX_009d962c,*(undefined1 *)(param_2 + 0xfd));
+      FUN_0041d390(PTR_s_PLAYER_SESSION_FLAG_009d9630,*(undefined4 *)(param_2 + 0x108));
+      uVar6 = *(undefined4 *)(param_2 + 0x10c);
+      puVar5 = PTR_s_PLAYER_SESSION_VALUE_009d9634;
+    }
+    FUN_0041d390(puVar5,uVar6);
+    iVar3 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+    puVar4 = (undefined4 *)(**(code **)(**(int **)(iVar3 + 4) + 8))(local_50);
+    uVar6 = *puVar4;
+    local_4c = puVar4[1];
+    iVar3 = FUN_004b9700();
+    iVar3 = *(int *)(iVar3 + 0x68);
+    *(undefined4 *)(param_2 + 0x1e0) = uVar6;
+    *(undefined4 *)(param_2 + 0x1e4) = local_4c;
+    *(uint *)(param_2 + 0x1e8) = (uint)(iVar3 == 0);
+    *(undefined4 *)(param_2 + 0x1ec) = 0;
+    iVar3 = FUN_0041bf90(param_1 + 0xbc0);
+    if (iVar3 == 0) {
+      *(undefined1 *)(param_1 + 0x25dd) = 1;
+    }
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+----- 0046dfa0 GAMESTEAM_CNetworkServer slot 4 (off 0x10): FUN_0046dfa0 -----
+
+int __thiscall FUN_0046dfa0(int param_1,int param_2)
+
+{
+  undefined1 uVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  int iVar4;
+  undefined4 *puVar5;
+  
+  FUN_0041c900();
+  if ((*(int *)(param_1 + 0xc54) != 0) || (*(char *)(param_1 + 0x25e0) != '\0')) {
+    return 0x66;
+  }
+  piVar2 = (int *)FUN_004a5450(*(undefined1 *)(param_2 + 0x36d));
+  iVar4 = piVar2[0x45];
+  if (iVar4 == 0) {
+    iVar4 = 100;
+  }
+  else {
+    uVar3 = *(undefined4 *)(iVar4 + 4);
+    *(undefined4 *)(param_1 + 0xc74) = *(undefined4 *)(iVar4 + 8);
+    *(undefined4 *)(param_1 + 0xc70) = uVar3;
+    *(undefined4 *)(param_1 + 0xc80) = 0;
+    uVar1 = (**(code **)(*piVar2 + 0x3c))();
+    *(undefined1 *)(param_2 + 0x380) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x40))();
+    *(undefined1 *)(param_2 + 0x381) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x44))();
+    *(undefined1 *)(param_2 + 0x382) = uVar1;
+    uVar1 = (**(code **)(*piVar2 + 0x48))();
+    *(undefined1 *)(param_2 + 899) = uVar1;
+    iVar4 = 0;
+    puVar5 = (undefined4 *)(param_2 + 900);
+    do {
+      uVar3 = (**(code **)(*piVar2 + 0x4c))(iVar4);
+      iVar4 = iVar4 + 1;
+      *puVar5 = uVar3;
+      puVar5 = puVar5 + 1;
+    } while (iVar4 < 0x20);
+    iVar4 = FUN_0041c110(param_1 + 0xc50,1);
+    if (iVar4 == 0) {
+      *(undefined1 *)(param_1 + 0x25e0) = 1;
+      return 0;
+    }
+  }
+  return iVar4;
+}
+
+
+----- 0046e540 GAMESTEAM_CNetworkServer slot 7 (off 0x1c): FUN_0046e540 -----
+
+void __fastcall FUN_0046e540(int param_1)
+
+{
+  int iVar1;
+  undefined4 local_1c;
+  undefined4 local_18;
+  undefined4 local_14;
+  undefined4 local_10;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  FUN_0041c900();
+  if ((*(int *)(param_1 + 0xc54) == 0) && (*(char *)(param_1 + 0x25e0) == '\a')) {
+    iVar1 = FUN_0041c1e0(param_1 + 0xc50,1);
+    if (iVar1 == 0) {
+      *(undefined1 *)(param_1 + 0x25e0) = 8;
+      FUN_0040a3c0();
+      iVar1 = FUN_004a0fe0();
+      local_1c = 0x360004;
+      local_18 = *(undefined4 *)(*(int *)(iVar1 + 0x2321c) + 0x78);
+      local_14 = *(undefined4 *)(*(int *)(iVar1 + 0x2321c) + 0x7c);
+      local_10 = 1000;
+      FUN_0040a7e0(&local_1c,&local_18);
+      FUN_0040a7e0(&local_1c,&local_18);
+      FUN_0040a7e0(&local_1c,&local_18);
+    }
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+----- 004701e0 GAMESTEAM_CNetworkServer slot 8 (off 0x20): FUN_004701e0 -----
+
+undefined4 __fastcall FUN_004701e0(int param_1)
+
+{
+  *(undefined1 *)(param_1 + 0x25de) = 1;
+  return 0;
+}
+
+
+----- 00516a20 GAMESTEAM_CNetworkServer slot 9 (off 0x24): FUN_00516a20 -----
+
+undefined4 FUN_00516a20(void)
+
+{
+  return 0;
+}
+
+
+----- 00516a20 GAMESTEAM_CNetworkServer slot 12 (off 0x30): FUN_00516a20 -----
+
+undefined4 FUN_00516a20(void)
+
+{
+  return 0;
+}
+
+
+----- 0046eb80 GAMESTEAM_CNetworkServer slot 13 (off 0x34): FUN_0046eb80 -----
+
+undefined4 __thiscall FUN_0046eb80(int param_1,int param_2)
+
+{
+  int iVar1;
+  
+  FUN_0041c900();
+  iVar1 = FUN_004a0fe0();
+  FUN_0049a400();
+  if ((param_2 * 0x98 + iVar1 + 0x22d58 != *(int *)(iVar1 + 0x23218)) ||
+     (iVar1 = FUN_0041c1e0(param_1 + 0xc50,1), iVar1 == 0)) {
+    FUN_0049f050(param_2);
+    *(undefined1 *)(param_2 + 0x25e3 + param_1) = 3;
+  }
+  return 0;
+}
+
+
+----- 0046d710 GAMESTEAM_CNetworkServer slot 20 (off 0x50): FUN_0046d710 -----
+
+undefined4 __fastcall FUN_0046d710(int param_1)
+
+{
+  if (*(char *)(param_1 + 0x25e0) == '\b') {
+    *(undefined1 *)(param_1 + 0x25e0) = 0;
+    return 0;
+  }
+  return 0xffffffff;
+}
+
+
+----- 00516a20 GAMESTEAM_CNetworkServer slot 22 (off 0x58): FUN_00516a20 -----
+
+undefined4 FUN_00516a20(void)
+
+{
+  return 0;
+}
+
+
+----- 0046d730 GAMESTEAM_CNetworkServer slot 23 (off 0x5c): FUN_0046d730 -----
+
+int __fastcall FUN_0046d730(int param_1)
+
+{
+  char cVar1;
+  
+  cVar1 = *(char *)(param_1 + 0x25de);
+  if (cVar1 == '\x04') {
+    *(undefined1 *)(param_1 + 0x25de) = 5;
+    return 0;
+  }
+  if (cVar1 == '\x06') {
+    return 100;
+  }
+  return (cVar1 == '\x05') - 1;
+}
+
+
+----- 004701f0 GAMESTEAM_CNetworkServer slot 43 (off 0xac): FUN_004701f0 -----
+
+void __fastcall FUN_004701f0(int *param_1)
+
+{
+  uint uVar1;
+  uint uVar2;
+  uint local_d0 [50];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  uVar1 = param_1[0x2ba];
+  uVar2 = 0;
+  if (uVar1 != 0) {
+    do {
+      local_d0[uVar2] = uVar2;
+      uVar2 = uVar2 + 1;
+    } while (uVar2 < uVar1);
+  }
+  (**(code **)(*param_1 + 0xa8))(uVar1,local_d0);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+----- 0046db40 GAMESTEAM_CNetworkServer slot 44 (off 0xb0): FUN_0046db40 -----
+
+undefined4 __fastcall FUN_0046db40(int param_1)
+
+{
+  undefined4 uVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  
+  uVar1 = FUN_004702e0();
+  iVar4 = 0;
+  if (0 < *(int *)(param_1 + 0xae8)) {
+    do {
+      iVar2 = FUN_004a5450(iVar4);
+      if ((*(int *)(iVar2 + 0x110) != 0) &&
+         (iVar3 = FUN_0046e9e0(*(undefined4 *)(*(int *)(iVar2 + 0x114) + 0xc),
+                               *(undefined4 *)(*(int *)(iVar2 + 0x114) + 0x10)), -1 < iVar3)) {
+        *(int *)(iVar2 + 0x78) = iVar3;
+        *(undefined4 *)(iVar2 + 0x110) = 0;
+      }
+      iVar4 = iVar4 + 1;
+    } while (iVar4 < *(int *)(param_1 + 0xae8));
+  }
+  return uVar1;
+}
+

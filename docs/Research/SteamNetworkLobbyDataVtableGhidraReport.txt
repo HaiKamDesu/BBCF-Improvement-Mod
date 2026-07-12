@@ -1,0 +1,739 @@
+--- Vtable at 0089c88c (CSTEAMNetworkLobbyData) ---
+  slot 0 @ 0089c88c -> 0x0046a1d0  FUN_0046a1d0
+  slot 1 @ 0089c890 -> 0x004a2a50  FUN_004a2a50
+  slot 2 @ 0089c894 -> 0x004a2970  FUN_004a2970
+  slot 3 @ 0089c898 -> 0x0046a6d0  FUN_0046a6d0
+  slot 4 @ 0089c89c -> 0x0046bf30  FUN_0046bf30
+  slot 5 @ 0089c8a0 -> 0x0046a3f0  FUN_0046a3f0
+  slot 6 @ 0089c8a4 -> 0x0046a9a0  FUN_0046a9a0
+  slot 7 @ 0089c8a8 -> 0x004a2a00  FUN_004a2a00
+  slot 8 @ 0089c8ac -> 0x0046be60  FUN_0046be60
+  slot 9 @ 0089c8b0 -> 0x0046be90  FUN_0046be90
+  slot 10 @ 0089c8b4 -> 0x0046be80  FUN_0046be80
+  slot 11 @ 0089c8b8 -> 0x0046a310  FUN_0046a310
+  slot 12 @ 0089c8bc -> 0x0046bee0  FUN_0046bee0
+  slot 13 @ 0089c8c0 -> 0x0046a350  FUN_0046a350
+  slot 14 @ 0089c8c4 -> 0x0046a240  FUN_0046a240
+  slot 15 @ 0089c8c8 -> 0x0046be00  FUN_0046be00
+  slot 16 @ 0089c8cc -> 0x0046a260  FUN_0046a260
+  slot 17 @ 0089c8d0 -> 0x0046bde0  FUN_0046bde0
+  slot 18 @ 0089c8d4 -> 0x0046be30  FUN_0046be30
+  slot 19 @ 0089c8d8 -> 0x0046bdc0  FUN_0046bdc0
+  slot 20 @ 0089c8dc -> 0x0046c070  FUN_0046c070
+  slot 21 @ 0089c8e0 -> 0x006a9da0  FUN_006a9da0
+  slot 22 @ 0089c8e4 -> 0x0046c0d0  FUN_0046c0d0
+  slot 23 @ 0089c8e8 -> 0x0046c0b0  FUN_0046c0b0
+  slot 24 @ 0089c8ec -> 0x0046a380  FUN_0046a380
+  slot 25 @ 0089c8f0 -> 0x0046a230  FUN_0046a230
+  slot 26 @ 0089c8f4 -> 0x0046a890  FUN_0046a890
+  slot 27 @ 0089c8f8 -> 0x0046c040  FUN_0046c040
+  slot 28 @ 0089c8fc -> 0x0046c100  FUN_0046c100
+  slot 29 @ 0089c900 -> 0x0046c140  FUN_0046c140
+  slot 30 @ 0089c904 -> 0x0046a700  FUN_0046a700
+  slot 31 @ 0089c908 -> 0x0046b940  FUN_0046b940
+  slot 32 @ 0089c90c -> 0x0046b9c0  FUN_0046b9c0
+  slot 33 @ 0089c910 -> 0x0046b840  FUN_0046b840
+  slot 34 @ 0089c914 -> 0x0046b920  FUN_0046b920
+  slot 35 @ 0089c918: value 0x6f4a794d is not a function entry - stopping (probable vtable end)
+
+  ---- Decompiling 35 vtable slot functions ----
+
+  ----- slot 0: 0046a1d0 FUN_0046a1d0 -----
+
+undefined4 * __thiscall FUN_0046a1d0(undefined4 *param_1,byte param_2)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00828ab8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  *param_1 = CSTEAMNetworkLobbyData::vftable;
+  local_8 = 0xffffffff;
+  *param_1 = CNetworkLobbyData::vftable;
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+  ----- slot 1: 004a2a50 FUN_004a2a50 -----
+
+int __thiscall FUN_004a2a50(int *param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  int iVar1;
+  int iVar2;
+  uint uVar3;
+  
+  iVar2 = 0;
+  uVar3 = 0;
+  do {
+    iVar1 = (**(code **)(*param_1 + 8))(param_2,param_3,uVar3);
+    if (iVar1 < 0) {
+      return -1;
+    }
+    iVar1 = (**(code **)(*param_1 + 8))(param_2,param_3,uVar3);
+    uVar3 = uVar3 + 1;
+    iVar2 = iVar2 + iVar1;
+  } while (uVar3 < 10);
+  return iVar2;
+}
+
+
+  ----- slot 2: 004a2970 FUN_004a2970 -----
+
+undefined4 __thiscall FUN_004a2970(int param_1,int param_2,int param_3,int param_4)
+
+{
+  int iVar1;
+  int iVar2;
+  
+  if (param_2 < 9) {
+    iVar1 = param_3;
+    iVar2 = param_2;
+    if (param_2 != -1) goto LAB_004a2984;
+  }
+  else {
+    iVar2 = 0;
+LAB_004a2984:
+    iVar1 = param_3;
+    if (3 < param_3) {
+      iVar1 = 0;
+    }
+    iVar1 = iVar1 + iVar2 * 4;
+  }
+  if (*(int *)(iVar1 * 0xa8 + 8 + param_1) == 0) {
+    return 0xffffffff;
+  }
+  if (param_2 < 9) {
+    if (param_2 == -1) goto LAB_004a29cb;
+  }
+  else {
+    param_2 = 0;
+  }
+  if (3 < param_3) {
+    param_3 = 0;
+  }
+  param_3 = param_3 + param_2 * 4;
+LAB_004a29cb:
+  return *(undefined4 *)(param_3 * 0xa8 + param_1 + 0x18 + param_4 * 0x10);
+}
+
+
+  ----- slot 3: 0046a6d0 FUN_0046a6d0 -----
+
+undefined4 __fastcall FUN_0046a6d0(int param_1)
+
+{
+  undefined4 *puVar1;
+  int iVar2;
+  
+  puVar1 = (undefined4 *)(param_1 + 8);
+  iVar2 = 0x20;
+  do {
+    *puVar1 = 0;
+    puVar1[2] = 0;
+    puVar1[3] = 0;
+    puVar1[4] = 0;
+    puVar1[5] = 0;
+    puVar1 = puVar1 + 0x2a;
+    iVar2 = iVar2 + -1;
+  } while (iVar2 != 0);
+  return 0;
+}
+
+
+  ----- slot 4: 0046bf30 FUN_0046bf30 -----
+
+undefined4 __thiscall FUN_0046bf30(int param_1,undefined4 *param_2)
+
+{
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    *(undefined4 *)(param_1 + 0x5240) = *param_2;
+    *(undefined4 *)(param_1 + 0x5244) = param_2[1];
+    *(undefined4 *)(param_1 + 0x3090) = 1;
+    *(undefined4 *)(param_1 + 0x3094) = 0;
+    return 0;
+  }
+  return 200;
+}
+
+
+  ----- slot 5: 0046a3f0 FUN_0046a3f0 -----
+
+undefined4 __fastcall FUN_0046a3f0(int param_1)
+
+{
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    return 0;
+  }
+  return 0xffffff9c;
+}
+
+
+  ----- slot 6: 0046a9a0 FUN_0046a9a0 -----
+
+undefined4 FUN_0046a9a0(void)
+
+{
+  return 0x20;
+}
+
+
+  ----- slot 7: 004a2a00 FUN_004a2a00 -----
+
+undefined4 FUN_004a2a00(void)
+
+{
+  return 10;
+}
+
+
+  ----- slot 8: 0046be60 FUN_0046be60 -----
+
+undefined4 FUN_0046be60(void)
+
+{
+  FUN_0046a4d0();
+  return 0;
+}
+
+
+  ----- slot 9: 0046be90 FUN_0046be90 -----
+
+undefined4 __thiscall FUN_0046be90(int param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    puVar2 = (undefined4 *)(param_1 + 0x5248);
+    for (iVar1 = 9; iVar1 != 0; iVar1 = iVar1 + -1) {
+      *puVar2 = *param_2;
+      param_2 = param_2 + 1;
+      puVar2 = puVar2 + 1;
+    }
+    *(undefined4 *)(param_1 + 0x3090) = 2;
+    *(undefined4 *)(param_1 + 0x3094) = 0;
+    return 0;
+  }
+  return 200;
+}
+
+
+  ----- slot 10: 0046be80 FUN_0046be80 -----
+
+undefined4 FUN_0046be80(void)
+
+{
+  return 100;
+}
+
+
+  ----- slot 11: 0046a310 FUN_0046a310 -----
+
+int __fastcall FUN_0046a310(int param_1)
+
+{
+  int iVar1;
+  
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    iVar1 = 0;
+    if (*(int *)(param_1 + 0x30a0) != 4) {
+      return (uint)(*(int *)(param_1 + 0x30a0) == 3) * 8 + 100;
+    }
+  }
+  else {
+    iVar1 = -100;
+  }
+  return iVar1;
+}
+
+
+  ----- slot 12: 0046bee0 FUN_0046bee0 -----
+
+undefined4 __fastcall FUN_0046bee0(int param_1)
+
+{
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    *(undefined4 *)(param_1 + 0x3090) = 3;
+    *(undefined4 *)(param_1 + 0x3094) = 0;
+    return 0;
+  }
+  return 200;
+}
+
+
+  ----- slot 13: 0046a350 FUN_0046a350 -----
+
+undefined4 __fastcall FUN_0046a350(int param_1)
+
+{
+  undefined4 uVar1;
+  
+  if ((*(int *)(param_1 + 0x3098) == 0) && (*(int *)(param_1 + 0x3090) == 0)) {
+    uVar1 = 0;
+    if (*(int *)(param_1 + 0x30a0) == 4) {
+      uVar1 = 100;
+    }
+    return uVar1;
+  }
+  return 0xffffff9c;
+}
+
+
+  ----- slot 14: 0046a240 FUN_0046a240 -----
+
+undefined4 __fastcall FUN_0046a240(int param_1)
+
+{
+  undefined4 uVar1;
+  
+  uVar1 = 0;
+  if (*(char *)(param_1 + 0x3112) != '\0') {
+    uVar1 = 100;
+  }
+  return uVar1;
+}
+
+
+  ----- slot 15: 0046be00 FUN_0046be00 -----
+
+undefined4 __thiscall FUN_0046be00(int param_1,undefined4 param_2)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\0') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 1;
+  *(undefined4 *)(param_1 + 0x30b4) = param_2;
+  return 0;
+}
+
+
+  ----- slot 16: 0046a260 FUN_0046a260 -----
+
+undefined4 __fastcall FUN_0046a260(int param_1)
+
+{
+  undefined4 uVar1;
+  
+  if (((*(byte *)(param_1 + 0x30b0) & 1) == 0) && (*(char *)(param_1 + 0x3112) != '\x01')) {
+    uVar1 = 0;
+    if (*(char *)(param_1 + 0x3112) != '\x02') {
+      uVar1 = 100;
+    }
+    return uVar1;
+  }
+  return 0xffffff9c;
+}
+
+
+  ----- slot 17: 0046bde0 FUN_0046bde0 -----
+
+undefined4 __fastcall FUN_0046bde0(int param_1)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\x02') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 2;
+  return 0;
+}
+
+
+  ----- slot 18: 0046be30 FUN_0046be30 -----
+
+undefined4 __fastcall FUN_0046be30(int param_1)
+
+{
+  if ((*(char *)(param_1 + 0x3112) == '\x02') && ((*(byte *)(param_1 + 0x30b0) & 2) == 0)) {
+    *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 4;
+    return 0;
+  }
+  return 100;
+}
+
+
+  ----- slot 19: 0046bdc0 FUN_0046bdc0 -----
+
+undefined4 __fastcall FUN_0046bdc0(int param_1)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\x03') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 8;
+  return 0;
+}
+
+
+  ----- slot 20: 0046c070 FUN_0046c070 -----
+
+undefined4 __thiscall FUN_0046c070(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\x05') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 0x10;
+  *(undefined4 *)(param_1 + 0x30c0) = param_2;
+  *(undefined4 *)(param_1 + 0x30c4) = param_3;
+  return 0;
+}
+
+
+  ----- slot 21: 006a9da0 FUN_006a9da0 -----
+
+undefined4 FUN_006a9da0(void)
+
+{
+  return 0;
+}
+
+
+  ----- slot 22: 0046c0d0 FUN_0046c0d0 -----
+
+undefined4 __thiscall FUN_0046c0d0(int param_1,undefined4 param_2)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\x05') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 0x20;
+  *(undefined4 *)(param_1 + 0x30b8) = param_2;
+  return 0;
+}
+
+
+  ----- slot 23: 0046c0b0 FUN_0046c0b0 -----
+
+undefined4 __fastcall FUN_0046c0b0(int param_1)
+
+{
+  if (*(char *)(param_1 + 0x3112) != '\x06') {
+    return 100;
+  }
+  *(uint *)(param_1 + 0x30b0) = *(uint *)(param_1 + 0x30b0) | 0x40;
+  return 0;
+}
+
+
+  ----- slot 24: 0046a380 FUN_0046a380 -----
+
+bool __fastcall FUN_0046a380(int param_1)
+
+{
+  return *(int *)(param_1 + 0x30a0) == 4;
+}
+
+
+  ----- slot 25: 0046a230 FUN_0046a230 -----
+
+bool __fastcall FUN_0046a230(int param_1)
+
+{
+  return *(char *)(param_1 + 0x3112) == '\0';
+}
+
+
+  ----- slot 26: 0046a890 FUN_0046a890 -----
+
+undefined8 __fastcall FUN_0046a890(int param_1)
+
+{
+  uint uVar1;
+  int *piVar2;
+  int iVar3;
+  
+  uVar1 = 0;
+  piVar2 = (int *)(param_1 + 0x3130);
+  do {
+    if (*piVar2 != 0) {
+      iVar3 = param_1 + 0x3128 + uVar1 * 0x70;
+      if (iVar3 == 0) {
+        return 0;
+      }
+      return *(undefined8 *)(iVar3 + 0x18);
+    }
+    uVar1 = uVar1 + 1;
+    piVar2 = piVar2 + 0x1c;
+  } while (uVar1 < 0x40);
+  return 0;
+}
+
+
+  ----- slot 27: 0046c040 FUN_0046c040 -----
+
+undefined4 __thiscall FUN_0046c040(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  if (*(int *)(param_1 + 0x30a0) != 4) {
+    return 100;
+  }
+  FUN_0041c900();
+  FUN_0041d230(param_2,param_3);
+  return 0;
+}
+
+
+  ----- slot 28: 0046c100 FUN_0046c100 -----
+
+void __thiscall FUN_0046c100(int param_1,undefined4 *param_2)
+
+{
+  if (*(int *)(param_1 + 0x30a0) == 4) {
+    *(undefined4 *)(param_1 + 0x30e0) = param_2[1];
+    *(undefined4 *)(param_1 + 0x30e4) = param_2[2];
+    *(undefined4 *)(param_1 + 0x30e8) = *param_2;
+    *(undefined1 *)(param_1 + 0x3114) = *(undefined1 *)(param_2 + 3);
+    *(undefined4 *)(param_1 + 0x30ec) = param_2[4];
+  }
+  return;
+}
+
+
+  ----- slot 29: 0046c140 FUN_0046c140 -----
+
+undefined4 __fastcall FUN_0046c140(int *param_1)
+
+{
+  int iVar1;
+  
+  iVar1 = FUN_0041c900();
+  if ((*(int *)(iVar1 + 0x1220) == 8) && (param_1[0xc28] == 4)) {
+    (**(code **)(*param_1 + 0x30))();
+  }
+  FUN_0046b560();
+  FUN_0046b2f0();
+  FUN_0046a9c0();
+  FUN_0046ae00();
+  iVar1 = param_1[0xc24];
+  if (iVar1 == 1) {
+    FUN_0046ba90();
+  }
+  else if (iVar1 == 2) {
+    FUN_0046bb00();
+  }
+  else if (iVar1 == 3) {
+    FUN_0046bcc0();
+  }
+  if ((param_1[0xc26] != 0) && (param_1[0xc24] == 0)) {
+    param_1[0xc24] = 4;
+    param_1[0xc25] = 0;
+    param_1[0xc26] = 0;
+  }
+  return 1;
+}
+
+
+  ----- slot 30: 0046a700 FUN_0046a700 -----
+
+void __fastcall FUN_0046a700(int *param_1)
+
+{
+  int iVar1;
+  undefined8 uVar2;
+  
+  iVar1 = FUN_004d1f30(5);
+  if (iVar1 != 0) {
+    iVar1 = FUN_0041c900();
+    uVar2 = (**(code **)(*param_1 + 0x68))();
+    FUN_006a9db0(0xac,0x24,0xffffffff,"MyJoinDate = %llu",uVar2);
+    FUN_006a9db0(0xac,0x25,0xffffffff,"LobbyID = %llu",*(undefined4 *)(iVar1 + 0x1228));
+    FUN_006a9db0(0xac,0x26,0xffffffff,"AreaID = %u",*(undefined4 *)(iVar1 + 0x2c40));
+    FUN_006a9db0(0xac,0x27,0xffffffff,"RegionID = %u",*(undefined4 *)(iVar1 + 0x2c3c));
+    FUN_006a9db0(0xac,0x28,0xffffffff,"Slot = %2d/%2d",*(undefined2 *)(iVar1 + 0x2c3a),
+                 *(undefined2 *)(iVar1 + 0x2c38));
+  }
+  return;
+}
+
+
+  ----- slot 31: 0046b940 FUN_0046b940 -----
+
+void __thiscall FUN_0046b940(int param_1,int param_2,undefined4 *param_3)
+
+{
+  undefined4 *puVar1;
+  undefined4 *puVar2;
+  undefined4 local_28;
+  undefined4 local_24;
+  undefined4 local_20;
+  undefined4 local_1c;
+  undefined4 local_18;
+  undefined4 local_14;
+  undefined4 local_10;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  if (*(int *)(param_1 + 0x30a0) == 4) {
+    FUN_0041c900();
+    local_20 = *(undefined4 *)(param_2 + 8);
+    local_1c = *(undefined4 *)(param_2 + 0xc);
+    local_24 = *(undefined4 *)(param_2 + 4);
+    local_18 = *param_3;
+    local_14 = param_3[1];
+    local_10 = param_3[2];
+    puVar2 = &local_18;
+    puVar1 = &local_28;
+    local_28 = 0x2c0010;
+    FUN_0040a3c0(puVar1,puVar2);
+    FUN_0040a7e0(puVar1,puVar2);
+  }
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+  ----- slot 32: 0046b9c0 FUN_0046b9c0 -----
+
+void __thiscall FUN_0046b9c0(int param_1,int param_2,undefined4 *param_3)
+
+{
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  undefined8 uVar4;
+  undefined4 *puVar5;
+  undefined4 *puVar6;
+  undefined4 local_28;
+  undefined4 local_24;
+  undefined8 local_20;
+  undefined4 local_18;
+  undefined4 local_14;
+  undefined4 local_10;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  if (*(int *)(param_1 + 0x30a0) == 4) {
+    uVar4 = __Xtime_get_ticks();
+    uVar4 = __allmul((uint)uVar4 - *(uint *)(param_2 + 8),
+                     ((int)((ulonglong)uVar4 >> 0x20) - *(int *)(param_2 + 0xc)) -
+                     (uint)((uint)uVar4 < *(uint *)(param_2 + 8)),100,0);
+    uVar4 = __alldiv(uVar4,1000000,0);
+    local_20._4_4_ = (undefined4)((ulonglong)uVar4 >> 0x20);
+    iVar2 = FUN_0041c900();
+    iVar3 = *(int *)(param_2 + 4) * 0x68;
+    iVar1 = *(int *)(iVar3 + 0x129c + iVar2);
+    *(int *)(iVar3 + 0x129c + iVar2) = (int)uVar4;
+    if (iVar1 == -1) {
+      local_28 = 0x2b0010;
+      local_20._0_4_ = 0;
+      local_20._4_4_ = 0;
+      local_20 = __Xtime_get_ticks();
+      local_24 = *(undefined4 *)(param_2 + 4);
+      local_18 = *param_3;
+      local_14 = param_3[1];
+      local_10 = param_3[2];
+      puVar6 = &local_18;
+      puVar5 = &local_28;
+      FUN_0040a3c0(puVar5,puVar6);
+      FUN_0040a7e0(puVar5,puVar6);
+    }
+  }
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+  ----- slot 33: 0046b840 FUN_0046b840 -----
+
+void FUN_0046b840(undefined4 param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  char *_Src;
+  undefined4 *puVar3;
+  rsize_t _MaxCount;
+  undefined1 local_50 [8];
+  undefined4 local_48;
+  undefined4 local_44;
+  undefined4 local_40;
+  undefined4 local_38;
+  undefined4 local_34;
+  undefined4 local_30;
+  char local_2c [36];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  local_30 = 0;
+  local_38 = 0x2e002e;
+  local_34 = 0;
+  iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+  puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_50);
+  local_34 = *puVar2;
+  local_30 = puVar2[1];
+  local_2c[0] = '\0';
+  local_2c[1] = '\0';
+  local_2c[2] = '\0';
+  local_2c[3] = '\0';
+  local_2c[4] = '\0';
+  local_2c[5] = '\0';
+  local_2c[6] = '\0';
+  local_2c[7] = '\0';
+  local_2c[8] = '\0';
+  local_2c[9] = '\0';
+  local_2c[10] = '\0';
+  local_2c[0xb] = '\0';
+  local_2c[0xc] = '\0';
+  local_2c[0xd] = '\0';
+  local_2c[0xe] = '\0';
+  local_2c[0xf] = '\0';
+  local_2c[0x10] = '\0';
+  local_2c[0x11] = '\0';
+  local_2c[0x12] = '\0';
+  local_2c[0x13] = '\0';
+  local_2c[0x14] = '\0';
+  local_2c[0x15] = '\0';
+  local_2c[0x16] = '\0';
+  local_2c[0x17] = '\0';
+  local_2c[0x18] = '\0';
+  local_2c[0x19] = '\0';
+  local_2c[0x1a] = '\0';
+  local_2c[0x1b] = '\0';
+  local_2c[0x1c] = '\0';
+  local_2c[0x1d] = '\0';
+  local_2c[0x1e] = '\0';
+  local_2c[0x1f] = '\0';
+  local_2c[0x20] = 0;
+  iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+  _MaxCount = 0x21;
+  _Src = (char *)(**(code **)**(undefined4 **)(iVar1 + 8))();
+  _strncpy_s(local_2c,0x20,_Src,_MaxCount);
+  local_48 = *param_2;
+  local_44 = param_2[1];
+  local_40 = param_2[2];
+  puVar2 = &local_48;
+  puVar3 = &local_38;
+  FUN_0040a3c0(puVar3,puVar2);
+  FUN_0040a7e0(puVar3,puVar2);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+  ----- slot 34: 0046b920 FUN_0046b920 -----
+
+void FUN_0046b920(int param_1)
+
+{
+  undefined4 uVar1;
+  undefined4 uVar2;
+  int iVar3;
+  
+  iVar3 = param_1 + 0xc;
+  uVar2 = *(undefined4 *)(param_1 + 8);
+  uVar1 = *(undefined4 *)(param_1 + 4);
+  FUN_0041c970(uVar1,uVar2,iVar3);
+  FUN_0041be40(uVar1,uVar2,iVar3);
+  return;
+}
+

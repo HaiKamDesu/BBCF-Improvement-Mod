@@ -675,8 +675,8 @@ struct LocalizationKeysAccessor
         // Sort ranked list
         inline const char* Sort_ranked_list() const { return Get("Sort ranked list"); }
 
-        // Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank.
-        inline const char* Reorders_the_ranked_search_list_itself_Connection_order_uses_the_filter_s_reachability_probe_timing_an_estimate_not_real_ping_level_order_uses_each_player_s_advertised_rank() const { return Get("Reorders the ranked search list itself. Connection order uses the filter's reachability probe timing (an estimate, not real ping); level order uses each player's advertised rank."); }
+        // Reorders the ranked search list itself. Connection order uses the game's own connection-quality rating once observed for a player, updating live as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank.
+        inline const char* Reorders_the_ranked_search_list_itself_Connection_order_uses_the_game_s_own_connection_quality_rating_once_observed_for_a_player_updating_live_as_it_changes_falls_back_to_the_mod_s_own_reachability_check_timing_as_a_rough_estimate_until_then_Level_order_uses_each_player_s_advertised_rank() const { return Get("Reorders the ranked search list itself. Connection order uses the game's own connection-quality rating once observed for a player, updating live as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank."); }
 
         // Best to Worst Connection
         inline const char* Best_to_Worst_Connection() const { return Get("Best to Worst Connection"); }

@@ -1,0 +1,90 @@
+----- 004a8ab0 FUN_004a8ab0 -----
+
+void FUN_004a8ab0(undefined4 param_1,undefined4 param_2)
+
+{
+  undefined1 uVar1;
+  undefined4 *puVar2;
+  int iVar3;
+  undefined4 uVar4;
+  int iVar5;
+  
+  puVar2 = (undefined4 *)FUN_00486070();
+  iVar3 = (**(code **)(*(int *)*puVar2 + 0x1c))();
+  puVar2 = (undefined4 *)FUN_00486070();
+  (**(code **)(*(int *)*puVar2 + 0x18))();
+  FUN_00406d90(iVar3 + 0x3d8,0x408);
+  uVar4 = FUN_004a0fe0();
+  *(undefined1 *)(iVar3 + 0x746) = 0;
+  FUN_00407970(uVar4);
+  *(undefined2 *)(iVar3 + 0x742) = 0;
+  *(undefined1 *)(iVar3 + 0x745) = 0;
+  iVar5 = FUN_0047e860();
+  *(undefined1 *)(iVar3 + 0x744) = *(undefined1 *)(iVar5 + 0x25f0);
+  FUN_0047bc50();
+  iVar5 = FUN_0047c1e0();
+  if (iVar5 == 0) {
+    uVar1 = 0x18;
+  }
+  else {
+    FUN_0047bc50();
+    uVar1 = FUN_0047c1e0();
+  }
+  *(undefined1 *)(iVar3 + 0x747) = uVar1;
+  FUN_0047bc50();
+  uVar1 = FUN_0047c210();
+  *(undefined1 *)(iVar3 + 0x748) = uVar1;
+  *(undefined4 *)(iVar3 + 0x750) = param_1;
+  *(undefined4 *)(iVar3 + 0x754) = param_2;
+  *(undefined4 *)(iVar3 + 0x74c) = 2;
+  FUN_004a5680();
+  return;
+}
+
+
+
+----- 004a5450 FUN_004a5450 -----
+
+int __thiscall FUN_004a5450(int param_1,int param_2)
+
+{
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar2 = *(int *)(param_1 + 0xaec);
+  if ((iVar2 == 0) || (iVar1 = *(int *)(param_1 + 0xaf0), param_2 <= iVar1 / 2)) {
+    iVar2 = *(int *)(param_1 + 0xae0);
+    iVar1 = 0;
+    iVar3 = param_2;
+    if (0 < param_2) {
+      do {
+        iVar2 = *(int *)(iVar2 + 4);
+        iVar3 = iVar3 + -1;
+        iVar1 = param_2;
+      } while (iVar3 != 0);
+    }
+  }
+  else if (param_2 < iVar1) {
+    param_2 = iVar1 - param_2;
+    iVar1 = iVar1 - param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 8);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  else if (iVar1 < param_2) {
+    param_2 = param_2 - iVar1;
+    iVar1 = iVar1 + param_2;
+    do {
+      iVar2 = *(int *)(iVar2 + 4);
+      param_2 = param_2 + -1;
+    } while (param_2 != 0);
+  }
+  *(int *)(param_1 + 0xaec) = iVar2;
+  *(int *)(param_1 + 0xaf0) = iVar1;
+  return iVar2;
+}
+
+
+

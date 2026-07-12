@@ -1,0 +1,88 @@
+SYMBOL thunk_FUN_0046a820 at 004a29f0 (isFunction=true)
+
+Looked up 004a29f0 -> function entry 004a29f0 name=thunk_FUN_0046a820 isThunk=true
+  thunkedFunction -> 0046a820 FUN_0046a820
+----- RAW DISASM 004a29f0 thunk_FUN_0046a820 -----
+004a29f0: JMP 0x0046a820
+
+----- DECOMPILE 004a29f0 thunk_FUN_0046a820 -----
+
+undefined * thunk_FUN_0046a820(void)
+
+{
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  puStack_c = &LAB_00828b1e;
+  pvStack_10 = ExceptionList;
+  ExceptionList = &pvStack_10;
+  if ((DAT_00a624e0 & 1) == 0) {
+    DAT_00a624e0 = DAT_00a624e0 | 1;
+    uStack_8 = 0;
+    FUN_00469e20(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_00848550);
+  }
+  ExceptionList = pvStack_10;
+  return &DAT_00a5d270;
+}
+
+
+
+Looked up 0046a820 -> function entry 0046a820 name=FUN_0046a820 isThunk=false
+----- RAW DISASM 0046a820 FUN_0046a820 -----
+0046a820: PUSH EBP
+0046a821: MOV EBP,ESP
+0046a823: PUSH -0x1
+0046a825: PUSH 0x828b1e
+0046a82a: MOV EAX,FS:[0x0]
+0046a830: PUSH EAX
+0046a831: MOV EAX,[0x00a0e0b8]
+0046a836: XOR EAX,EBP
+0046a838: PUSH EAX
+0046a839: LEA EAX,[EBP + -0xc]
+0046a83c: MOV FS:[0x0],EAX
+0046a842: MOV EAX,[0x00a624e0]
+0046a847: TEST AL,0x1
+0046a849: JNZ 0x0046a878
+0046a84b: OR EAX,0x1
+0046a84e: MOV [0x00a624e0],EAX
+0046a853: MOV dword ptr [EBP + -0x4],0x0
+0046a85a: MOV ECX,0xa5d270
+0046a85f: CALL 0x00469e20
+0046a864: PUSH 0x848550
+0046a869: CALL 0x0079e1ff
+0046a86e: ADD ESP,0x4
+0046a871: MOV dword ptr [EBP + -0x4],0xffffffff
+0046a878: MOV EAX,0xa5d270
+0046a87d: MOV ECX,dword ptr [EBP + -0xc]
+0046a880: MOV dword ptr FS:[0x0],ECX
+0046a887: POP ECX
+0046a888: MOV ESP,EBP
+0046a88a: POP EBP
+0046a88b: RET
+
+----- DECOMPILE 0046a820 FUN_0046a820 -----
+
+undefined * FUN_0046a820(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00828b1e;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a624e0 & 1) == 0) {
+    DAT_00a624e0 = DAT_00a624e0 | 1;
+    local_8 = 0;
+    FUN_00469e20(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_00848550);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a5d270;
+}
+
+
+

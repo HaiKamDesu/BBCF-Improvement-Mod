@@ -1,0 +1,122 @@
+===== All references to DAT_00a25788 =====
+  (9 references)
+  0041cb64  READ         caller=FUN_0041cac0
+  008480d4  WRITE        caller=FUN_008480b0
+  00848139  WRITE        caller=FUN_008480b0
+  0041c958  DATA         caller=FUN_0041c900
+  0041c93a  DATA         caller=FUN_0041c900
+  0041cb04  DATA         caller=FUN_0041cac0
+  0041cb46  DATA         caller=FUN_0041cac0
+  0041cb6d  DATA         caller=FUN_0041cac0
+  00823110  DATA         caller=Unwind@00823110
+
+  ---- Decompiling 4 unique referencing functions ----
+
+----- 008480b0 FUN_008480b0 -----
+
+void FUN_008480b0(void)
+
+{
+  byte *pbVar1;
+  undefined4 *_Memory;
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_0082312a;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  DAT_00a25788 = AASTEAM_CNetworker::vftable;
+  local_8 = 0;
+  FUN_00427cd0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  FUN_00427c40();
+  _Memory = DAT_00a291c8;
+  if (DAT_00a291c8 != (undefined4 *)0x0) {
+    local_8 = local_8 & 0xffffff00;
+    pbVar1 = (byte *)(DAT_00a291c8 + 1);
+    *DAT_00a291c8 = CCallbackImpl<16>::vftable;
+    if ((*pbVar1 & 1) != 0) {
+      SteamAPI_UnregisterCallback(_Memory);
+    }
+    FID_conflict__free(_Memory);
+    DAT_00a291c8 = (undefined4 *)0x0;
+  }
+  DAT_00a25788 = AA_CNetworker::vftable;
+  ExceptionList = local_10;
+  return;
+}
+
+
+----- 00823110 Unwind@00823110 -----
+
+void Unwind_00823110(void)
+
+{
+  FUN_004144d0();
+  return;
+}
+
+
+----- 0041cac0 FUN_0041cac0 -----
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+void FUN_0041cac0(undefined4 *param_1)
+
+{
+  undefined4 uVar1;
+  undefined4 uVar2;
+  uint uVar3;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082326c;
+  local_10 = ExceptionList;
+  uVar3 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  uVar1 = *param_1;
+  uVar2 = param_1[1];
+  if ((DAT_00a291d8 & 1) == 0) {
+    DAT_00a291d8 = DAT_00a291d8 | 1;
+    local_8 = 0;
+    FUN_0041b1a0(uVar3);
+    _atexit(FUN_008480b0);
+  }
+  _DAT_00a291cc = uVar1;
+  _DAT_00a291d0 = uVar2;
+  if ((DAT_00a291d8 & 1) == 0) {
+    DAT_00a291d8 = DAT_00a291d8 | 1;
+    local_8 = 1;
+    FUN_0041b1a0(uVar3);
+    _atexit(FUN_008480b0);
+  }
+  local_8 = 0xffffffff;
+  (**(code **)(DAT_00a25788 + 0x54))(0,3);
+  ExceptionList = local_10;
+  return;
+}
+
+
+----- 0041c900 FUN_0041c900 -----
+
+undefined4 * FUN_0041c900(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_008231ce;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a291d8 & 1) == 0) {
+    DAT_00a291d8 = DAT_00a291d8 | 1;
+    local_8 = 0;
+    FUN_0041b1a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_008480b0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a25788;
+}
+

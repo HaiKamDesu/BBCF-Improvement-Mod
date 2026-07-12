@@ -1,0 +1,31 @@
+===== FUN_0041c900 (container getter used by slot32 write path) =====
+
+----- 0041c900 FUN_0041c900 -----
+
+undefined4 * FUN_0041c900(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_008231ce;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a291d8 & 1) == 0) {
+    DAT_00a291d8 = DAT_00a291d8 | 1;
+    local_8 = 0;
+    FUN_0041b1a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit(FUN_008480b0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a25788;
+}
+
+
+
+===== Callers of FUN_0046b9c0 (slot32 ping/delay write) =====
+  (1 references)
+  0089c90c  DATA         caller=<no function>
+
+  ---- Decompiling 0 unique caller functions ----
