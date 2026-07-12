@@ -26,19 +26,11 @@ namespace
 	// real protocol packet.
 	constexpr int kProbeChannel = 200;
 
-	// How long a held lobby list waits for still-unknown peers before being
-	// delivered with unknowns shown (benefit of the doubt). Cache-warm
-	// refreshes deliver instantly - this only delays the first search after
-	// boot or after verdicts expire.
-	constexpr unsigned long long kHoldDeadlineMs = 2000;
-
-	// Connection-based sort needs actual probeElapsedMs measurements to mean
-	// anything. Live testing showed most probes take 4-8s to establish, far
-	// longer than kHoldDeadlineMs - delivering at 2s left 15/16 candidates
-	// with no measurement yet, so "Best/Worst Connection" was sorting almost
-	// nothing. Give connection-sort deliveries a longer hold so most probes
-	// have a chance to land before the order is locked in.
-	constexpr unsigned long long kConnectionSortHoldDeadlineMs = 6000;
+	// NOTE: earlier versions held the payload before delivering (2s, then 6s
+	// for connection sort) to let probes mature. Removed entirely (2026-07-12,
+	// per explicit user request for responsiveness): lists now deliver the
+	// instant they arrive, and ordering corrections happen live afterward via
+	// PollGameListAndApplyOrder()'s in-place permutation rewrites.
 
 	// Reputation lifetimes. A reachable verdict keeps refreshes instant for a
 	// while; a probe-confirmed unreachable verdict eventually expires so peers
@@ -55,6 +47,11 @@ namespace
 	// sort. See "regressed to fallback-only" section in the progress doc for
 	// why an unconditional per-search wipe was tried and reverted instead.
 	constexpr unsigned long long kGameTierTtlMs = 45 * 1000;
+
+	// Size of the game's ranked-list row permutation array at listStruct+0xaf4
+	// (0x32 entries - both the game's own identity reset FUN_004a5430 and the
+	// row renderer FUN_00661060 use exactly 50).
+	constexpr int32_t kGamePermSlots = 50;
 
 	// Exact reproduction of the game's own RTT -> Delay-digit bucketing
 	// (FUN_004a6620, used by the ranked list row renderer FUN_00661060 to draw
@@ -237,6 +234,9 @@ void RankedListConnectionFilter::OnLobbyListRequestIssued(uint64_t apiCallHandle
 	m_candidates.clear();
 	m_gameLobbyListHandler = nullptr;
 	m_heldApiCall = 0;
+	// The game resets its own permutation array (identity) as part of search
+	// start, so whatever custom order we wrote is gone with it.
+	m_gamePermCustomized = false;
 
 	if (!IsPipelineActive() || apiCallHandle == 0)
 	{
@@ -261,7 +261,6 @@ CCallbackBase* RankedListConnectionFilter::SubstituteRegisterCallResult(CCallbac
 	}
 
 	m_gameLobbyListHandler = pCallback;
-	m_lastGameLobbyListHandler = pCallback;
 	LOG(2, "[RankedListFilter] proxied lobby-list call result (game handler 0x%p, call %llu)\n",
 		static_cast<void*>(pCallback), static_cast<unsigned long long>(apiCallHandle));
 	return &m_lobbyListProxy;
@@ -319,8 +318,6 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		m_heldResult.m_nLobbiesMatching = 0;
 	}
 
-	m_pipelineState = PipelineState::Holding;
-
 	if (bIOFailure || pvParam == nullptr || m_heldResult.m_nLobbiesMatching == 0 ||
 		g_interfaces.pSteamMatchmakingWrapper == nullptr)
 	{
@@ -360,7 +357,7 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		// user actually compares against. The Delay digit is rendered from
 		// entry+0x78 (viewer-measured average RTT, bucketed by FUN_004a6620) -
 		// see the progress doc's 2026-07-12 "Delay column source" section.
-		// PollGameTiers() now reads that RTT field; no metadata tier read here.
+		// PollGameListAndApplyOrder() now reads that RTT field; no metadata tier read here.
 		if (candidate.ownerSteamId != 0 && !candidate.ownerName.empty())
 		{
 			// Keep the freshest display name on record for the hidden-players UI.
@@ -374,33 +371,15 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		StartProbeIfNeeded(candidate.ownerSteamId);
 	}
 
-	// Deliver immediately when every listed peer already has a valid verdict;
-	// otherwise hold briefly to give fresh probes a chance to resolve.
-	bool anyUnresolved = false;
-	for (const LobbyCandidate& candidate : m_candidates)
-	{
-		if (IsPeerUnresolved(candidate.ownerSteamId))
-		{
-			anyUnresolved = true;
-			break;
-		}
-	}
-
-	LOG(1, "[RankedListFilter] lobby list held: %u lobbies, unresolved=%d\n",
-		static_cast<unsigned int>(m_heldResult.m_nLobbiesMatching), anyUnresolved ? 1 : 0);
-
-	if (!anyUnresolved)
-	{
-		BuildCompactedListAndDeliver("verdicts cached");
-	}
-	else
-	{
-		const int sortMode = Settings::settingsIni.rankedListSortMode;
-		const bool connectionSort = sortMode == RankedListSortMode_BestConnection ||
-			sortMode == RankedListSortMode_WorstConnection;
-		m_holdDeadlineTickMs = GetTickCount64() +
-			(connectionSort ? kConnectionSortHoldDeadlineMs : kHoldDeadlineMs);
-	}
+	// Deliver immediately, always - no hold. Hiding uses whatever the
+	// reputation cache already knows; anything that resolves in the next few
+	// seconds (probes, the game's own Delay measurements) reaches the screen
+	// through PollGameListAndApplyOrder()'s live permutation rewrites instead
+	// of a pre-delivery wait. This removes the 2s/6s search delay entirely,
+	// per explicit user request (2026-07-12).
+	LOG(1, "[RankedListFilter] lobby list received: %u lobbies, delivering immediately\n",
+		static_cast<unsigned int>(m_heldResult.m_nLobbiesMatching));
+	BuildCompactedListAndDeliver("immediate");
 }
 
 void RankedListConnectionFilter::StartProbeIfNeeded(uint64_t steamId)
@@ -490,44 +469,29 @@ void RankedListConnectionFilter::PollProbes()
 	}
 }
 
-void RankedListConnectionFilter::PollGameTiers()
+uint8_t* RankedListConnectionFilter::ResolveGameRowListStruct() const
 {
-	if (m_reachableLobbies.empty())
-	{
-		return; // nothing delivered yet this session
-	}
-
-	// Throttled like the diagnostic this reuses the chain from - reading is
-	// cheap, but no need to do it more than a few times/sec.
-	static unsigned long long s_lastPollTickMs = 0;
-	const unsigned long long now = GetTickCount64();
-	if (now - s_lastPollTickMs < 500)
-	{
-		return;
-	}
-	s_lastPollTickMs = now;
-
 	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
 	if (moduleBase == 0)
 	{
-		return;
+		return nullptr;
 	}
 
 	const void* const* const slot =
 		reinterpret_cast<const void* const*>(moduleBase + kRankedListMgrSlotRva);
 	if (IsBadReadPtr(slot, sizeof(void*)))
 	{
-		return;
+		return nullptr;
 	}
 	const void* const mgr = *slot;
 	if (mgr == nullptr || IsBadReadPtr(mgr, sizeof(void*)))
 	{
-		return;
+		return nullptr;
 	}
 	const void* const vtable = *reinterpret_cast<const void* const*>(mgr);
 	if (vtable == nullptr || IsBadReadPtr(reinterpret_cast<const uint8_t*>(vtable) + 0x1c, sizeof(void*)))
 	{
-		return;
+		return nullptr;
 	}
 
 	typedef void*(__thiscall * GetListStructFn)(void*);
@@ -535,105 +499,292 @@ void RankedListConnectionFilter::PollGameTiers()
 		*reinterpret_cast<const GetListStructFn*>(reinterpret_cast<uintptr_t>(vtable) + 0x1c);
 	if (getListStruct == nullptr)
 	{
-		return;
+		return nullptr;
 	}
 	void* const listStruct = getListStruct(const_cast<void*>(mgr));
 	if (listStruct == nullptr ||
 		IsBadReadPtr(reinterpret_cast<const uint8_t*>(listStruct) + 0xae8, sizeof(int32_t)))
 	{
+		return nullptr;
+	}
+	return reinterpret_cast<uint8_t*>(listStruct);
+}
+
+void RankedListConnectionFilter::WriteIdentityGamePermutation()
+{
+	uint8_t* const listStruct = ResolveGameRowListStruct();
+	if (listStruct == nullptr)
+	{
+		return;
+	}
+	int32_t* const perm = reinterpret_cast<int32_t*>(listStruct + 0xaf4);
+	if (IsBadWritePtr(perm, sizeof(int32_t) * kGamePermSlots))
+	{
+		return;
+	}
+	// Same write the game's own search-start reset (FUN_004a5430) performs:
+	// perm[i] = i for all 50 slots.
+	for (int32_t i = 0; i < kGamePermSlots; ++i)
+	{
+		perm[i] = i;
+	}
+	m_gamePermCustomized = false;
+}
+
+void RankedListConnectionFilter::PollGameListAndApplyOrder()
+{
+	if (!m_hasRemapResult || m_candidates.empty() || !IsPipelineActive())
+	{
+		// Features were turned off (or nothing delivered): if we left a custom
+		// order in the game's permutation array, put it back the way the game
+		// expects it, once.
+		if (m_gamePermCustomized)
+		{
+			WriteIdentityGamePermutation();
+		}
 		return;
 	}
 
-	const int32_t rowCount = *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(listStruct) + 0xae8);
-	if (rowCount <= 0)
+	const unsigned long long now = GetTickCount64();
+	if (now - m_lastLiveOrderTickMs < 400)
+	{
+		return;
+	}
+	m_lastLiveOrderTickMs = now;
+
+	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+	uint8_t* const listStruct = ResolveGameRowListStruct();
+	if (moduleBase == 0 || listStruct == nullptr)
+	{
+		return;
+	}
+	const int32_t rowCount = *reinterpret_cast<const int32_t*>(listStruct + 0xae8);
+	const int32_t cap = (rowCount < kGamePermSlots) ? rowCount : kGamePermSlots;
+	if (cap <= 0)
+	{
+		return;
+	}
+	int32_t* const perm = reinterpret_cast<int32_t*>(listStruct + 0xaf4);
+	if (IsBadWritePtr(perm, sizeof(int32_t) * kGamePermSlots))
 	{
 		return;
 	}
 
-	const uint8_t* const permutationArray = reinterpret_cast<const uint8_t*>(listStruct) + 0xaf4;
 	typedef void* (__thiscall * WalkRowListFn)(void*, int32_t);
 	const WalkRowListFn walkRowList = reinterpret_cast<WalkRowListFn>(moduleBase + kWalkRowListRva);
 
-	for (int32_t row = 0; row < rowCount; ++row)
+	// Pass 1: walk the game's rows by LOGICAL list position (0..count-1, the
+	// index space the permutation array maps into) and harvest each row's
+	// identity + measured RTT. The identity sub-object pointer (entry+0x114)
+	// is set synchronously when the game populates the row (FUN_0046fcc0's
+	// first store), so it is available immediately after a delivery; the RTT
+	// (entry+0x78, the value behind the on-screen 0-4 Delay digit) resolves
+	// asynchronously and reads -1 until then. Both are plain field reads -
+	// no virtual calls.
+	struct LiveRow
 	{
-		const int32_t* const permutationSlot = reinterpret_cast<const int32_t*>(permutationArray + row * 4);
-		if (IsBadReadPtr(permutationSlot, sizeof(int32_t)))
-		{
-			break;
-		}
-		const int32_t underlyingIndex = *permutationSlot;
+		int32_t logical = 0;
+		uint64_t steamId = 0;
+	};
+	std::vector<LiveRow> rows;
+	rows.reserve(static_cast<size_t>(cap));
+	for (int32_t logical = 0; logical < cap; ++logical)
+	{
+		LiveRow row;
+		row.logical = logical;
 
-		void* const entry = walkRowList(listStruct, underlyingIndex);
-		if (entry == nullptr || IsBadReadPtr(entry, sizeof(void*)))
+		void* const entry = walkRowList(listStruct, logical);
+		if (entry != nullptr && !IsBadReadPtr(entry, sizeof(void*)))
 		{
-			continue;
-		}
+			const uint8_t* const idSubObjPtr = reinterpret_cast<const uint8_t*>(entry) + 0x114;
+			if (!IsBadReadPtr(idSubObjPtr, sizeof(void*)))
+			{
+				const void* const idSubObj = *reinterpret_cast<void* const*>(idSubObjPtr);
+				if (idSubObj != nullptr &&
+					!IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
+				{
+					const uint32_t idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+					const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+					row.steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
+				}
+			}
 
-		// Identity key (progress doc: "CONFIRMED: the identity field IS the
-		// real Steam64 ID, byte-for-byte") - a plain pointer chase, no
-		// virtual call. entry+0x114 is null until the game's own connection-
-		// quality resolver has run for this row at least once; skip rows
-		// that haven't resolved yet rather than guessing who they are. This
-		// REPLACES the old positional row->lobbyId->steamId lookup, which
-		// was proven unreliable (see "MAJOR NEW FINDING"/"RESOLVED
-		// (differently than expected)" sections) - correctness here no
-		// longer depends on row order matching delivery order at all.
-		const uint8_t* const idSubObjPtr = reinterpret_cast<const uint8_t*>(entry) + 0x114;
-		if (IsBadReadPtr(idSubObjPtr, sizeof(void*)))
-		{
-			continue;
+			const uint8_t* const rttFieldPtr = reinterpret_cast<const uint8_t*>(entry) + 0x78;
+			if (row.steamId != 0 && !IsBadReadPtr(rttFieldPtr, sizeof(int32_t)))
+			{
+				const int32_t rttMs = *reinterpret_cast<const int32_t*>(rttFieldPtr);
+				if (rttMs >= 0)
+				{
+					PeerVerdict& verdict = m_verdicts[row.steamId];
+					verdict.gameRttMs = rttMs;
+					verdict.gameTier = GameDelayDigitFromRtt(rttMs);
+					verdict.gameTierTickMs = now;
+					// Cumulative average kept for diagnostics only (user chose
+					// latest-reading sorting).
+					if (verdict.gameTierSampleCount <= 0)
+					{
+						verdict.gameTierAverage = static_cast<double>(rttMs);
+					}
+					else
+					{
+						verdict.gameTierAverage =
+							(verdict.gameTierAverage * verdict.gameTierSampleCount + rttMs) /
+							(verdict.gameTierSampleCount + 1);
+					}
+					++verdict.gameTierSampleCount;
+				}
+			}
 		}
-		const void* const idSubObj = *reinterpret_cast<void* const*>(idSubObjPtr);
-		if (idSubObj == nullptr ||
-			IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
-		{
-			continue;
-		}
-		const uint32_t idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
-		const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
-		const uint64_t steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
-		if (steamId == 0)
-		{
-			continue;
-		}
+		rows.push_back(row);
+	}
 
-		// The value behind the on-screen Delay column: entry+0x78 holds the
-		// viewer-measured average RTT to this host (best 4 of 5 samples,
-		// resolved asynchronously by the game's own FUN_0046db40 from its
-		// steamId-keyed RTT sample table; 0xFFFFFFFF/-1 until resolved). This
-		// is a plain dword field read - no virtual call at all, strictly safer
-		// than the old vtable slot-7 tier call this replaces. The old +0x74
-		// byte that call returned is the HOST_NETCOLOR icon index, NOT the
-		// Delay digit - see progress doc 2026-07-12 "Delay column source".
-		const uint8_t* const rttFieldPtr = reinterpret_cast<const uint8_t*>(entry) + 0x78;
-		if (IsBadReadPtr(rttFieldPtr, sizeof(int32_t)))
+	// Pass 2: current visible order as the stability baseline, from the
+	// permutation array as it stands. Invalid/stale/duplicate perm values
+	// (possible for one pass right after the game rebuilt the list) fall back
+	// to appending the missed logical indices in ascending order.
+	std::vector<int32_t> visibleSeq;
+	visibleSeq.reserve(static_cast<size_t>(cap));
+	std::vector<bool> logicalUsed(static_cast<size_t>(cap), false);
+	for (int32_t slot = 0; slot < cap; ++slot)
+	{
+		const int32_t logical = perm[slot];
+		if (logical >= 0 && logical < cap && !logicalUsed[static_cast<size_t>(logical)])
 		{
+			logicalUsed[static_cast<size_t>(logical)] = true;
+			visibleSeq.push_back(logical);
+		}
+	}
+	for (int32_t logical = 0; logical < cap; ++logical)
+	{
+		if (!logicalUsed[static_cast<size_t>(logical)])
+		{
+			visibleSeq.push_back(logical);
+		}
+	}
+
+	// Pass 3: desired visible order. Split the current sequence into
+	// [sortable rows] / [rows with no matching candidate] / [hidden-pending
+	// rows], sort the first group with the exact same comparator the
+	// delivery path uses, and reassemble. Hidden-pending peers (confirmed
+	// bad AFTER this list was delivered) sink to the tail instantly - their
+	// full removal still happens on the next real delivery.
+	const bool filterEnabled = Settings::settingsIni.enableRankedListConnectionFilter;
+	std::vector<int32_t> sortableLogicals;
+	std::vector<const LobbyCandidate*> sortableCandidates;
+	std::vector<int32_t> unmatchedLogicals;
+	std::vector<int32_t> hiddenLogicals;
+	std::vector<bool> candidateConsumed(m_candidates.size(), false);
+	for (const int32_t logical : visibleSeq)
+	{
+		const uint64_t steamId = rows[static_cast<size_t>(logical)].steamId;
+		if (filterEnabled && steamId != 0 && ShouldHidePeer(steamId, now))
+		{
+			hiddenLogicals.push_back(logical);
 			continue;
 		}
-		const int32_t rttMs = *reinterpret_cast<const int32_t*>(rttFieldPtr);
-		if (rttMs < 0)
+		// Match this row to one of our delivered candidates by owner steamId,
+		// consuming each candidate at most once (two lobbies can share an
+		// owner in weird cases; consumption keeps the mapping one-to-one).
+		const LobbyCandidate* matched = nullptr;
+		if (steamId != 0)
 		{
-			continue; // sentinel - the game hasn't resolved this row's RTT yet
+			for (size_t i = 0; i < m_candidates.size(); ++i)
+			{
+				if (!candidateConsumed[i] && m_candidates[i].ownerSteamId == steamId)
+				{
+					candidateConsumed[i] = true;
+					matched = &m_candidates[i];
+					break;
+				}
+			}
 		}
-
-		PeerVerdict& verdict = m_verdicts[steamId];
-		verdict.gameRttMs = rttMs;
-		verdict.gameTier = GameDelayDigitFromRtt(rttMs);
-		verdict.gameTierTickMs = now;
-		// Cumulative average across every observation this session - kept for
-		// diagnostics only (user chose latest-reading sorting).
-		if (verdict.gameTierSampleCount <= 0)
+		if (matched != nullptr)
 		{
-			verdict.gameTierAverage = static_cast<double>(rttMs);
+			sortableLogicals.push_back(logical);
+			sortableCandidates.push_back(matched);
 		}
 		else
 		{
-			verdict.gameTierAverage =
-				(verdict.gameTierAverage * verdict.gameTierSampleCount + rttMs) /
-				(verdict.gameTierSampleCount + 1);
+			unmatchedLogicals.push_back(logical);
 		}
-		++verdict.gameTierSampleCount;
 	}
+
+	// Sort the matched rows with the shared comparator (quietly - this runs
+	// ~2x/sec; we log only when the on-screen order actually changes).
+	std::vector<const LobbyCandidate*> sortedCandidates = sortableCandidates;
+	SortShownCandidates(&sortedCandidates, false);
+	// Map the sorted candidate sequence back to logical indices.
+	std::vector<int32_t> desired;
+	desired.reserve(static_cast<size_t>(cap));
+	{
+		std::vector<bool> rowTaken(sortableLogicals.size(), false);
+		for (const LobbyCandidate* const candidate : sortedCandidates)
+		{
+			for (size_t i = 0; i < sortableCandidates.size(); ++i)
+			{
+				if (!rowTaken[i] && sortableCandidates[i] == candidate)
+				{
+					rowTaken[i] = true;
+					desired.push_back(sortableLogicals[i]);
+					break;
+				}
+			}
+		}
+	}
+	desired.insert(desired.end(), unmatchedLogicals.begin(), unmatchedLogicals.end());
+	desired.insert(desired.end(), hiddenLogicals.begin(), hiddenLogicals.end());
+
+	// Pass 4: write the permutation only if it actually changed. Same thread
+	// as the renderer/selection logic (the Steam callback pump runs on the
+	// game's main thread), so this is frame-atomic - no torn reads possible.
+	bool changed = false;
+	for (int32_t slot = 0; slot < cap; ++slot)
+	{
+		if (perm[slot] != desired[static_cast<size_t>(slot)])
+		{
+			changed = true;
+			break;
+		}
+	}
+	if (!changed)
+	{
+		return;
+	}
+	for (int32_t slot = 0; slot < cap; ++slot)
+	{
+		perm[slot] = desired[static_cast<size_t>(slot)];
+	}
+	for (int32_t slot = cap; slot < kGamePermSlots; ++slot)
+	{
+		perm[slot] = slot;
+	}
+	m_gamePermCustomized = true;
+
+	std::string orderDump;
+	for (int32_t slot = 0; slot < cap; ++slot)
+	{
+		const uint64_t steamId = rows[static_cast<size_t>(desired[static_cast<size_t>(slot)])].steamId;
+		const char* name = "???";
+		int delay = -1;
+		for (const LobbyCandidate& candidate : m_candidates)
+		{
+			if (candidate.ownerSteamId == steamId && !candidate.ownerName.empty())
+			{
+				name = candidate.ownerName.c_str();
+				break;
+			}
+		}
+		const auto it = m_verdicts.find(steamId);
+		if (it != m_verdicts.end())
+		{
+			delay = it->second.gameTier;
+		}
+		char part[96];
+		snprintf(part, sizeof(part), " #%d %s(delay=%d)", slot, name, delay);
+		orderDump += part;
+	}
+	LOG(1, "[RankedListFilter] live order applied (%d rows, %zu hidden-pending):%s\n",
+		cap, hiddenLogicals.size(), orderDump.c_str());
 }
 
 bool RankedListConnectionFilter::ShouldHidePeer(uint64_t steamId, unsigned long long nowMs) const
@@ -667,36 +818,6 @@ bool RankedListConnectionFilter::ShouldHidePeer(uint64_t steamId, unsigned long 
 	return false;
 }
 
-bool RankedListConnectionFilter::IsPeerUnresolved(uint64_t steamId) const
-{
-	if (steamId == 0)
-	{
-		return false;
-	}
-	if (m_probesInFlight.find(steamId) == m_probesInFlight.end())
-	{
-		return false; // no probe running - whatever we know is what we get
-	}
-
-	const auto it = m_verdicts.find(steamId);
-	if (it == m_verdicts.end())
-	{
-		return true; // probing, no prior verdict at all
-	}
-
-	const unsigned long long now = GetTickCount64();
-	const PeerVerdict& verdict = it->second;
-	if (verdict.kind == PeerVerdict::Kind::Reachable)
-	{
-		return now - verdict.verdictTickMs >= kReachableTtlMs;
-	}
-	if (verdict.kind == PeerVerdict::Kind::ProbeUnreachable)
-	{
-		return now - verdict.verdictTickMs >= kProbeUnreachableTtlMs;
-	}
-	return true;
-}
-
 // NOTE: an earlier attempt read the game's own delay-column row array here
 // (container/row/session offsets that RE identified from FUN_004AAAD0). Live
 // testing disproved it: the container is confirmed constructed
@@ -706,7 +827,7 @@ bool RankedListConnectionFilter::IsPeerUnresolved(uint64_t steamId) const
 // timing instead (see SortShownCandidates); CountPopulatedGameRows below is
 // kept only as a diagnostic cross-check, not a real signal.
 
-void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCandidate*>* shown) const
+void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCandidate*>* shown, bool logOrder) const
 {
 	const int mode = Settings::settingsIni.rankedListSortMode;
 	if (shown == nullptr || shown->size() < 2 ||
@@ -767,7 +888,7 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 			// behind the on-screen 0-4 Delay digit - lower = better; see
 			// docs/Research/RankedListConnectionFilter_Progress.md 2026-07-12
 			// "Delay column source" section) whenever it's been observed
-			// recently for this peer, read live by PollGameTiers(). Sorting by
+			// recently for this peer, read live by PollGameListAndApplyOrder(). Sorting by
 			// the raw RTT rather than the bucketed digit gives a finer order
 			// that is still digit-monotonic, so the visible Delay column reads
 			// sorted. Uses the LATEST single reading, not the cumulative
@@ -892,6 +1013,12 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 	// underlying metric was noisy/unresolved for most entries" - user report
 	// (2026-07-11): "still not properly sorted" even after extending the
 	// initial hold. See docs/Research/RankedListConnectionFilter_Progress.md.
+	// Suppressed for the high-frequency live-permutation path (logOrder=false),
+	// which logs only when the on-screen order actually changes.
+	if (!logOrder)
+	{
+		return;
+	}
 	std::string orderDump;
 	for (size_t i = 0; i < entries.size(); ++i)
 	{
@@ -929,11 +1056,9 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 	LOG(1, "[RankedListFilter] sort order (mode=%d):%s\n", mode, orderDump.c_str());
 }
 
-void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason, bool forceDeliver)
+void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason)
 {
 	const unsigned long long now = GetTickCount64();
-
-	const std::vector<uint64_t> previouslyDelivered = m_reachableLobbies;
 
 	m_reachableLobbies.clear();
 	std::vector<const LobbyCandidate*> shownCandidates;
@@ -1000,18 +1125,11 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 		m_reachableLobbies.push_back(candidate->lobbyId);
 	}
 
-	// Live-resort calls (forceDeliver=false) only need to actually push a new
-	// delivery to the game when the order/membership genuinely changed -
-	// otherwise every probe-poll tick would needlessly re-invoke the game's
-	// list-rebuild handler.
-	const bool orderChanged = m_reachableLobbies != previouslyDelivered;
-
 	m_lastShownCount = m_reachableLobbies.size();
 	m_lastHiddenCount = m_candidates.size() - m_reachableLobbies.size();
-	LOG(1, "[RankedListFilter] delivering (%s): %zu/%zu lobbies shown, sortMode=%d%s\n",
+	LOG(1, "[RankedListFilter] delivering (%s): %zu/%zu lobbies shown, sortMode=%d\n",
 		reason, m_reachableLobbies.size(), m_candidates.size(),
-		Settings::settingsIni.rankedListSortMode,
-		(!forceDeliver && !orderChanged) ? " (unchanged, skipping re-delivery)" : "");
+		Settings::settingsIni.rankedListSortMode);
 
 	if (newlyHiddenCount > 0 && g_notificationBar != nullptr)
 	{
@@ -1023,12 +1141,7 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	m_pipelineState = PipelineState::Idle;
 	m_pendingApiCall = 0;
 
-	if (!forceDeliver && !orderChanged)
-	{
-		return;
-	}
-
-	CCallbackBase* const handler = (m_gameLobbyListHandler != nullptr) ? m_gameLobbyListHandler : m_lastGameLobbyListHandler;
+	CCallbackBase* const handler = m_gameLobbyListHandler;
 	m_gameLobbyListHandler = nullptr;
 	if (handler == nullptr)
 	{
@@ -1039,6 +1152,16 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	LobbyMatchList_t patched = m_heldResult;
 	patched.m_nLobbiesMatching = static_cast<uint32>(m_reachableLobbies.size());
 	handler->Run(&patched, m_heldIOFailure, m_heldApiCall);
+
+	// The game's own permutation array is reset only at SEARCH START (its
+	// FUN_004a5430 identity reset), never per delivery - so a custom order we
+	// wrote for the PREVIOUS list would still be in place when the game
+	// rebuilds its rows from this delivery, scrambling it. Restore identity
+	// right here, same call stack, before any render/selection code can run
+	// (everything is on the game's main thread), then let the live pass
+	// re-apply the proper order within ~400ms.
+	WriteIdentityGamePermutation();
+	m_lastLiveOrderTickMs = 0; // let the live pass run on the very next pump
 }
 
 void RankedListConnectionFilter::PollPendingConnectionConfirmation()
@@ -1082,83 +1205,21 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	// every few seconds and picks up the results).
 	PollProbes();
 	PollPendingConnectionConfirmation();
-	// Reads each game row's +0x78 measured RTT (the true source of the
-	// on-screen 0-4 Delay digit) keyed by the row's own embedded Steam64 ID.
-	// NOTE: an interim version instead read the "HOST_NETCOLOR" lobby
-	// metadata here-ish - that key feeds the row's colored ICON (+0x74), not
-	// the Delay digit, and was verified to be the wrong column (see progress
-	// doc 2026-07-12 "Delay column source" section).
-	PollGameTiers();
 
 	if (m_pipelineState == PipelineState::Idle)
 	{
 		// A list is already delivered and on screen (or nothing has ever been
-		// requested yet, in which case this is a cheap no-op) - see whether
-		// newly-resolved probes should reorder/re-hide it live.
-		TryLiveResort();
-		return;
+		// requested yet, in which case this is a cheap no-op). Harvest each
+		// row's Delay RTT and rewrite the game's own row permutation array in
+		// place if the desired order changed - this is what makes the visible
+		// list reorder itself live as measurements resolve, with no
+		// re-delivery. (An earlier mechanism re-invoked the game's CCallResult
+		// handler Run() here - proven to be a complete no-op, see progress doc
+		// "MAJOR FINDING": the game reads the list exactly once per genuine
+		// delivery. The permutation rewrite is the mechanism that actually
+		// reaches the screen.)
+		PollGameListAndApplyOrder();
 	}
-	if (m_pipelineState != PipelineState::Holding)
-	{
-		return;
-	}
-	if (!IsPipelineActive())
-	{
-		// Both features toggled off mid-hold - deliver everything as-is.
-		BuildCompactedListAndDeliver("pipeline disabled mid-hold");
-		return;
-	}
-
-	bool anyUnresolved = false;
-	for (const LobbyCandidate& candidate : m_candidates)
-	{
-		if (IsPeerUnresolved(candidate.ownerSteamId))
-		{
-			anyUnresolved = true;
-			break;
-		}
-	}
-
-	if (!anyUnresolved)
-	{
-		BuildCompactedListAndDeliver("all resolved");
-	}
-	else if (GetTickCount64() >= m_holdDeadlineTickMs)
-	{
-		BuildCompactedListAndDeliver("hold deadline, unknowns shown");
-	}
-}
-
-void RankedListConnectionFilter::TryLiveResort()
-{
-	// Nothing delivered yet this session, or both features are off - nothing
-	// to keep live.
-	if (!m_hasRemapResult || m_candidates.empty() || !IsPipelineActive())
-	{
-		return;
-	}
-
-	// Recomputing shown/hidden/order is cheap (list size is a few dozen at
-	// most), but re-invoking the game's own list-rebuild handler is not
-	// something to do every single pump - throttle it.
-	const unsigned long long now = GetTickCount64();
-	constexpr unsigned long long kLiveResortIntervalMs = 750;
-	if (now - m_lastLiveResortTickMs < kLiveResortIntervalMs)
-	{
-		return;
-	}
-	m_lastLiveResortTickMs = now;
-
-	if (m_lastGameLobbyListHandler == nullptr)
-	{
-		return; // nothing to re-deliver to yet
-	}
-
-	// forceDeliver=false: BuildCompactedListAndDeliver only actually pushes a
-	// new delivery when the recomputed shown/hidden/order genuinely changed
-	// since last time - this is what makes the list reorder itself live as
-	// probes resolve, without waiting for the game's own next auto-refresh.
-	BuildCompactedListAndDeliver("live resort", false);
 }
 
 bool RankedListConnectionFilter::TryGetRemappedLobby(int index, uint64_t* outLobbyId)

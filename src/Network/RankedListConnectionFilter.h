@@ -22,16 +22,18 @@
 //    the game's handler so Steam delivers the LobbyMatchList_t payload to US.
 //    (Reading the payload manually consumes it - the proxy is the only way to
 //    inspect-and-forward.)
-// 2. On delivery we hold the payload briefly (kHoldDeadlineMs, only while
-//    listed players have no cached verdict yet), then invoke the game's
-//    handler with a count-patched copy: confirmed-bad players are removed and
+// 2. On delivery we immediately invoke the game's handler with a
+//    count-patched copy: confirmed-bad players are removed and
 //    GetLobbyByIndex serves the compacted list. Unknown players are SHOWN
 //    (benefit of the doubt) - hiding is reserved for confirmed evidence.
-// 3. Probes keep running in the background after delivery. Verdicts land in a
-//    session-wide reputation cache; since the game auto-refreshes the list
-//    every few seconds, a player confirmed dead simply vanishes on the next
-//    refresh. Reachable verdicts are cached (kReachableTtlMs) so warm
-//    refreshes deliver instantly with no hold.
+//    There is deliberately NO hold/delay - responsiveness is prioritized,
+//    and ordering corrections happen live after delivery (see step 3).
+// 3. Probes keep running in the background after delivery, and
+//    PollGameListAndApplyOrder() rewrites the game's own row permutation
+//    array in place (~2x/sec) as verdicts/Delay values mature - the visible
+//    list reorders itself live, and hidden-pending peers sink to the tail,
+//    without waiting for the game's own next auto-refresh. Confirmed-dead
+//    players are fully removed on the next real refresh.
 //
 // Reputation rules:
 // - Probe confirmed unreachable (Steam P2P error): hidden for
@@ -155,7 +157,6 @@ private:
 	{
 		Idle,
 		Armed,   // RequestLobbyList issued; waiting for proxy delivery
-		Holding, // result held; waiting for unknowns to resolve (short deadline)
 	};
 
 	struct PeerVerdict
@@ -179,7 +180,7 @@ private:
 		unsigned long long probeElapsedMs = ~0ull;
 		bool usedRelay = false;
 		// The game's OWN per-viewer measured average RTT to this host, in ms,
-		// read from the ranked-list row entry's +0x78 field via PollGameTiers()
+		// read from the ranked-list row entry's +0x78 field via PollGameListAndApplyOrder()
 		// (see docs/Research/RankedListConnectionFilter_Progress.md, 2026-07-12
 		// "Delay column source" section: the on-screen Delay digit is exactly
 		// this value bucketed by FUN_004a6620's thresholds). -1 = never
@@ -230,16 +231,34 @@ private:
 	void OnLobbyListResultDelivered(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall);
 	void StartProbeIfNeeded(uint64_t steamId);
 	void PollProbes();
-	// Reads the game's own live per-row Delay data (the +0x78 measured-RTT
-	// field that drives the on-screen 0-4 Delay digit - see progress doc,
-	// 2026-07-12 "Delay column source" section) for every row the game
-	// currently has, attributing each reading to the correct peer via the
-	// row entry's own embedded Steam64 ID (entry+0x114 -> +0xc/+0x10) - no
-	// positional assumptions. A no-op until a list has actually been delivered.
-	void PollGameTiers();
+	// The live in-place list manipulator (see progress doc 2026-07-12 "Live
+	// permutation" section). Every ~400ms while a list is on screen: walks
+	// the game's own row list by logical index, harvests each row's Steam64
+	// ID (entry+0x114 -> +0xc/+0x10) and measured RTT (entry+0x78, the value
+	// behind the on-screen 0-4 Delay digit) into m_verdicts, computes the
+	// desired visible order (sort mode + hidden-peers-to-tail), and rewrites
+	// the game's own row permutation array (listStruct+0xaf4) in place. The
+	// renderer, row selection and the auto-connect state machines all resolve
+	// visible rows through that same array every frame, so this reorders the
+	// on-screen list instantly - no re-delivery, no refresh, no Run() replay
+	// (which was proven to be a no-op). Same-thread with the renderer (the
+	// Steam callback pump runs on the game's main thread), so writes are
+	// frame-atomic.
+	void PollGameListAndApplyOrder();
+	// Resets the game's row permutation array to the identity mapping (what
+	// the game itself writes at search start) - called right after every real
+	// delivery so a customized order from the PREVIOUS list can never scramble
+	// a freshly rebuilt one, and when the pipeline features get turned off.
+	void WriteIdentityGamePermutation();
+	// Resolves the game's live ranked row-list struct via the confirmed mgr
+	// singleton chain (base+0x897E3C -> mgr vtable slot 7). Returns nullptr
+	// when unavailable. All guards IsBadReadPtr-based, no allocation.
+	uint8_t* ResolveGameRowListStruct() const;
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.
-	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown) const;
+	// logOrder=false suppresses the per-call "sort order" log line (used by the
+	// high-frequency live path, which logs only when the order actually changes).
+	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown, bool logOrder = true) const;
 	// While a join attempt is pending, watches for the target appearing as a
 	// member of the game's own room struct (which happens on the confirmation
 	// screen). That proves the connection worked, so a subsequent LeaveLobby -
@@ -248,18 +267,7 @@ private:
 	void PollPendingConnectionConfirmation();
 	// True when this peer should be hidden based on current reputation.
 	bool ShouldHidePeer(uint64_t steamId, unsigned long long nowMs) const;
-	// True when this peer has no valid verdict and a probe is still in flight.
-	bool IsPeerUnresolved(uint64_t steamId) const;
-	// forceDeliver=false (live-resort calls) skips re-invoking the game's
-	// handler when the recomputed order is identical to what's already been
-	// delivered, so probe polling doesn't churn the game's list UI for no
-	// reason. The original real-Steam-delivery call sites always force.
-	void BuildCompactedListAndDeliver(const char* reason, bool forceDeliver = true);
-	// Called every pump once a list is already on screen: recomputes shown/
-	// hidden/order from current verdicts and re-delivers only if it actually
-	// changed, so the visible list reorders itself live as probes resolve
-	// instead of waiting for the game's own next auto-refresh.
-	void TryLiveResort();
+	void BuildCompactedListAndDeliver(const char* reason);
 
 	STEAM_CALLBACK(RankedListConnectionFilter, OnP2PSessionConnectFail, P2PSessionConnectFail_t);
 	// Direct result of JoinLobby(): fires even when the join itself is rejected
@@ -275,7 +283,6 @@ private:
 	bool m_hasRemapResult = false;
 	PipelineState m_pipelineState = PipelineState::Idle;
 	uint64_t m_pendingApiCall = 0;
-	unsigned long long m_holdDeadlineTickMs = 0;
 	size_t m_lastShownCount = 0;
 	size_t m_lastHiddenCount = 0;
 	unsigned long long m_lastListRequestTickMs = 0;
@@ -283,14 +290,15 @@ private:
 
 	LobbyListResultProxy m_lobbyListProxy;
 	CCallbackBase* m_gameLobbyListHandler = nullptr;
-	// Kept alive after m_gameLobbyListHandler is cleared post-delivery, purely
-	// so TryLiveResort() can re-invoke the same handler with an updated order
-	// without waiting for the game to re-register a new call.
-	CCallbackBase* m_lastGameLobbyListHandler = nullptr;
 	LobbyMatchList_t m_heldResult = {};
 	bool m_heldIOFailure = false;
 	SteamAPICall_t m_heldApiCall = 0;
-	unsigned long long m_lastLiveResortTickMs = 0;
+	// Throttle for PollGameListAndApplyOrder().
+	unsigned long long m_lastLiveOrderTickMs = 0;
+	// True while the game's permutation array holds a mod-written (non-
+	// identity) order - lets the pipeline restore identity exactly once when
+	// the features get turned off mid-session.
+	bool m_gamePermCustomized = false;
 
 	uint64_t m_pendingConnectionTarget = 0;
 	uint64_t m_pendingLobbyId = 0;

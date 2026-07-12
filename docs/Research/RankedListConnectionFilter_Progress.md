@@ -2661,6 +2661,119 @@ range/thresholds. All three observations line up only under this Part-2 model.
   path regressed (was proven exact twice); if they don't match, the `+0x78` read or identity
   keying needs re-examination — those are the only two links left in the chain.
 
+## LIVE IN-PLACE LIST REORDERING via the game's own permutation array, plus removal of the delivery hold (2026-07-12, same session)
+
+User confirmed the Delay-column fix works, then asked for two things: (1) real-time
+manipulation of the on-screen list (reorder as measurements arrive, no refresh needed), and
+(2) complete removal of the 2s/6s pre-delivery hold ("the refreshes should be responsive as
+fast as possible"). Both are now implemented, built on a write-side RE pass of the row-list
+structures this doc had already mapped read-side. All static analysis; no live debugger.
+
+### RE findings that make in-place manipulation safe (all verified this session)
+
+1. **Every consumer of the visible row order resolves through the SAME permutation array**
+   (`listStruct+0xaf4`, 50 dwords, maps visible slot -> logical list position, walked via
+   `FUN_004a5450`):
+   - The row RENDERER `FUN_00661060` calls `FUN_004a7b40(visibleRow)` **every frame** and
+     draws every cell (name, member count, level, icon, Delay digit) from the resolved ENTRY
+     per frame - nothing positional is cached in the UI slots (`FUN_00649100(row)` slots hold
+     only active/highlight flags at `+4`/`+8`).
+   - The row SELECTION/join paths (`FUN_004a89d0`: `perm[selectedRow]` -> join-request struct;
+     `FUN_004ac6c0` case 0x4A and `FUN_004ae6d0` case 0x27, both:
+     `FUN_004a5450(listStruct[selectedRow + 0x2bd])` - dword index 0x2bd*4 = 0xAF4) resolve
+     the user's selected visible row through the same array. **So a permutation rewrite moves
+     whole rows consistently for rendering, cursor selection, and auto-connect - clicking
+     visual row N always targets the entry displayed at row N.**
+   - Bonus: the auto-connect state machines gate on the entry's slot 0x30 (+0x78 RTT) being
+     resolved (`"RMSR_CheckingRTT"` wait) and compare `FUN_004a6620(rtt)` against the
+     RANK_RTT_FILTER tier - further confirmation the Delay digit chain from the previous
+     section is the game's own operative connection metric.
+2. **The game writes the permutation array in exactly one place** (`FUN_004a5430`, identity
+   reset, confirmed via BOM-skipped disasm grep: only two call sites, `0x004A44B7` and
+   `0x004A950E`, both in search-start/clear functions that also zero the row count at
+   `+0xae8` first). It is NOT rewritten per delivery, per frame, or by the row-populate
+   function - a mod-written order persists until the next search starts.
+3. **Row population (`FUN_0046d890`) reuses pre-existing pooled nodes**: it walks the node
+   chain (`node+4` next pointers) while filling from raw result records at `listStruct+0xcf4`
+   (stride 0x14, count at `+0xcf0`, up to 100), applies the game's own filters (compacting in
+   place), sets `+0xae8` to the kept count, resets the walk cursor cache (`+0xaec`/`+0xaf0`) -
+   and never touches the permutation array. Also: `FUN_0046fcc0`'s FIRST store is
+   `entry+0x114 = record` - **the Steam64 identity sub-object is attached synchronously at
+   populate time**, not "later when resolved" as an earlier section assumed (only the +0x78
+   RTT resolves later).
+4. **`FUN_004a5450` (the walker) has NO bounds check** - it blindly follows next/prev
+   pointers. Mitigations built in: the mod only ever writes permutation values `< count`
+   (validated against a live count read in the same pass), and restores the identity mapping
+   immediately after every delivery (same call stack as `handler->Run()`, see below). Worst
+   remaining case (game-side count shrink inside the 400ms window between passes) walks into
+   the still-linked node pool (physically >= 50 nodes, proven by the populate function itself
+   walking up to raw-count nodes blindly) -> a stale-but-valid node -> at most a one-pass
+   ghost row, self-corrected within 400ms. No crash surface identified.
+5. **Threading: the Steam callback pump, the renderer, and the selection state machines all
+   run on the game's main thread** (single thread ID across pump logs and frame logs in every
+   DEBUG.txt session) - permutation writes are frame-atomic by construction.
+
+### Implementation (all in `RankedListConnectionFilter`, build verified clean Debug|Win32)
+
+- **`PollGameListAndApplyOrder()`** (new; replaces both `PollGameTiers()` and the proven-no-op
+  `TryLiveResort()`/`Run()`-replay mechanism, both now deleted): every 400ms while a list is
+  delivered and the pipeline is active - walks the game's rows by logical index, harvests
+  Steam64 ID (+0x114 -> +0xc/+0x10) and Delay RTT (+0x78) into `m_verdicts` (subsuming the old
+  PollGameTiers), computes the desired visible order (existing `SortShownCandidates`
+  comparator on matched candidates + unmatched rows after them + hidden-pending peers sunk to
+  the tail when the filter is on), and rewrites `perm[]` in place only when it actually
+  changed (logged as `live order applied`, with per-row name + delay digit). When the
+  features get turned off mid-session it restores the identity mapping once.
+- **`WriteIdentityGamePermutation()`** (new): the exact write the game's own search-start
+  reset performs (perm[i]=i, all 50 slots). Called right after every `handler->Run()` in
+  `BuildCompactedListAndDeliver` - the game only resets perm at search START, so without this
+  a custom order from list N would scramble the freshly rebuilt list N+1. Same call stack as
+  the delivery, so nothing can observe the stale state. Also arms the live pass to run on the
+  very next pump (throttle reset).
+- **Hold removed entirely**: `OnLobbyListResultDelivered` now delivers immediately, always -
+  `kHoldDeadlineMs`/`kConnectionSortHoldDeadlineMs`, the `Holding` pipeline state,
+  `IsPeerUnresolved()`, and the hold logic in `OnSteamCallbacksPump` are deleted. Initial
+  order uses whatever the caches already know; everything that matures afterward (probes,
+  Delay RTTs - which only START measuring once the list exists anyway) reaches the screen via
+  the live permutation rewrites within ~400ms instead of a pre-delivery wait. The searching
+  popup delay is now whatever Steam itself takes, full stop.
+- Deleted with the old mechanism: `m_lastGameLobbyListHandler`, `forceDeliver` parameter and
+  the unchanged-skip logic in `BuildCompactedListAndDeliver`, `m_lastLiveResortTickMs`
+  (replaced by `m_lastLiveOrderTickMs`), `m_holdDeadlineTickMs`.
+- `SortShownCandidates` gained a `logOrder` flag so the 2.5x/sec live path doesn't spam the
+  `sort order` log (real deliveries still log it; the live path logs only actual changes).
+
+### What was deliberately NOT done (and why)
+
+- **True live row REMOVAL (count manipulation)**: shrinking `+0xae8` after sinking hidden
+  rows to the tail would remove them visually, but the game's RTT resolver (`FUN_0046db40`)
+  and populate function iterate logical positions `< count` - a shrunk count would stop RTT
+  resolution for whatever nodes physically sit at the tail positions, which are NOT
+  necessarily the hidden rows (node order is delivery order, not visible order). v1 therefore
+  only sinks hidden-pending peers to the tail instantly; their true removal still happens on
+  the next real delivery (~8-16s). If this proves insufficient, the follow-up experiment is
+  node-pointer surgery (relink `+4`/`+8` around hidden nodes + fix the cursor cache) - higher
+  risk, not attempted.
+- **Live row CREATION**: rows are populated from the raw records at `+0xcf4` delivered by
+  Steam; injecting synthetic records is possible in principle but has no current use case
+  (the mod already controls delivery membership).
+
+### Test protocol for the next session
+
+1. Search ranked with Best Connection sort on. The list should appear **immediately** (no 6s
+   wait - log line `lobby list received: N lobbies, delivering immediately`).
+2. Sit on the list without touching anything: rows should visibly REORDER in place over the
+   first several seconds as Delay digits resolve (grep `live order applied` and compare its
+   name/delay sequence against the screen at that moment). This is the acid test - if rows
+   visibly jump into sorted position without a refresh, the whole mechanism works.
+3. Verify row selection targets the right lobby after reordering (click a row, confirm the
+   name on the connect/confirmation flow matches the row clicked).
+4. If the filter is on and a probe fails while the list is up, the peer should visibly drop
+   to the bottom within ~1s (`live order applied` with `hidden-pending` count > 0).
+5. Watch for any visual anomaly right after the game's own auto-refresh (~8-16s cadence) -
+   a scrambled list that fixes itself within half a second would indicate the identity-reset-
+   after-Run ordering needs revisiting; a persistent scramble would be a real bug.
+
 ## Testing protocol reminder
 
 User builds/deploys manually via Visual Studio ("Release Deploy" config) — Claude never
