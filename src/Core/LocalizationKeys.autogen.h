@@ -642,11 +642,14 @@ struct LocalizationKeysAccessor
         // Hide unreachable players from ranked list
         inline const char* Hide_unreachable_players_from_ranked_list() const { return Get("Hide unreachable players from ranked list"); }
 
-        // Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below.
-        inline const char* Checks_in_the_background_whether_listed_players_are_actually_reachable_and_hides_confirmed_unreachable_ones_from_the_ranked_search_list_One_off_connection_failures_only_hide_a_player_briefly_repeat_offenders_stay_hidden_for_the_session_Hidden_players_can_be_restored_below() const { return Get("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. One-off connection failures only hide a player briefly; repeat offenders stay hidden for the session. Hidden players can be restored below."); }
+        // Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. Everyone (hidden players included) is re-checked every 15 seconds, so players whose connection recovers reappear on their own. Click the hidden counter below to see and restore hidden players manually.
+        inline const char* Checks_in_the_background_whether_listed_players_are_actually_reachable_and_hides_confirmed_unreachable_ones_from_the_ranked_search_list_Everyone_hidden_players_included_is_re_checked_every_15_seconds_so_players_whose_connection_recovers_reappear_on_their_own_Click_the_hidden_counter_below_to_see_and_restore_hidden_players_manually() const { return Get("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. Everyone (hidden players included) is re-checked every 15 seconds, so players whose connection recovers reappear on their own. Click the hidden counter below to see and restore hidden players manually."); }
 
-        // Last search: %d shown, %d hidden
-        inline const char* Last_search_d_shown_d_hidden() const { return Get("Last search: %d shown, %d hidden"); }
+        // Last search: %d shown,
+        inline const char* Last_search_d_shown() const { return Get("Last search: %d shown,"); }
+
+        // %d hidden
+        inline const char* d_hidden() const { return Get("%d hidden"); }
 
         // Hidden players
         inline const char* Hidden_players() const { return Get("Hidden players"); }
@@ -659,6 +662,39 @@ struct LocalizationKeysAccessor
 
         // No players are currently hidden.
         inline const char* No_players_are_currently_hidden() const { return Get("No players are currently hidden."); }
+
+        // below network filter
+        inline const char* below_network_filter() const { return Get("below network filter"); }
+
+        // network requirements not met
+        inline const char* network_requirements_not_met() const { return Get("network requirements not met"); }
+
+        // Network Filter
+        inline const char* Network_Filter() const { return Get("Network Filter"); }
+
+        // All
+        inline const char* All() const { return Get("All"); }
+
+        // 1 and above
+        inline const char* _1_and_above() const { return Get("1 and above"); }
+
+        // 2 and above
+        inline const char* _2_and_above() const { return Get("2 and above"); }
+
+        // 3 and above
+        inline const char* _3_and_above() const { return Get("3 and above"); }
+
+        // 4 only
+        inline const char* _4_only() const { return Get("4 only"); }
+
+        // Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.
+        inline const char* Hides_players_whose_Delay_rating_0_4_is_below_the_selected_level_Players_whose_rating_hasn_t_been_measured_yet_stay_visible_until_it_resolves_rows_are_hidden_and_restored_live_as_ratings_change() const { return Get("Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change."); }
+
+        // Hide rooms with unmet network requirements
+        inline const char* Hide_rooms_with_unmet_network_requirements() const { return Get("Hide rooms with unmet network requirements"); }
+
+        // Some rooms require a minimum connection quality and show "The room's connectivity requirements are not met" when you try to enter. This hides those rooms once your Delay rating to them is measured, so everything left in the list is actually joinable.
+        inline const char* Some_rooms_require_a_minimum_connection_quality_and_show_The_room_s_connectivity_requirements_are_not_met_when_you_try_to_enter_This_hides_those_rooms_once_your_Delay_rating_to_them_is_measured_so_everything_left_in_the_list_is_actually_joinable() const { return Get("Some rooms require a minimum connection quality and show \"The room's connectivity requirements are not met\" when you try to enter. This hides those rooms once your Delay rating to them is measured, so everything left in the list is actually joinable."); }
 
         // Ranked List Config
         inline const char* Ranked_List_Config() const { return Get("Ranked List Config"); }

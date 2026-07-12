@@ -22,18 +22,20 @@
 //    the game's handler so Steam delivers the LobbyMatchList_t payload to US.
 //    (Reading the payload manually consumes it - the proxy is the only way to
 //    inspect-and-forward.)
-// 2. On delivery we immediately invoke the game's handler with a
-//    count-patched copy: confirmed-bad players are removed and
-//    GetLobbyByIndex serves the compacted list. Unknown players are SHOWN
-//    (benefit of the doubt) - hiding is reserved for confirmed evidence.
+// 2. On delivery we immediately invoke the game's handler with the FULL
+//    (sorted, but unfiltered) list - nobody is hidden at delivery time.
 //    There is deliberately NO hold/delay - responsiveness is prioritized,
-//    and ordering corrections happen live after delivery (see step 3).
-// 3. Probes keep running in the background after delivery, and
-//    PollGameListAndApplyOrder() rewrites the game's own row permutation
-//    array in place (~2x/sec) as verdicts/Delay values mature - the visible
-//    list reorders itself live, and hidden-pending peers sink to the tail,
-//    without waiting for the game's own next auto-refresh. Confirmed-dead
-//    players are fully removed on the next real refresh.
+//    and every hide/restore decision is applied live afterward (step 3).
+// 3. PollGameListAndApplyOrder() (~2.5x/sec) reads each game row's live
+//    Delay data, then manipulates the game's own row structures in place:
+//    reorders via the permutation array, and hides/restores rows via node
+//    payload partition + row-count control. Hide criteria: reputation
+//    (unreachable/failed peers, when the hide checkbox is on), the Network
+//    Filter Delay-tier floor, and the unmet-connection-requirement filter.
+//    A periodic whole-list re-probe (kListRecheckIntervalMs, hidden entries
+//    included) keeps verdicts current in both directions, so recovered
+//    peers pop back into the list live and newly-dead ones drop out - no
+//    refresh needed for any of it.
 //
 // Reputation rules:
 // - Probe confirmed unreachable (Steam P2P error): hidden for
@@ -116,16 +118,23 @@ public:
 
 	bool IsSteamIdFiltered(uint64_t steamId) const;
 
-	// UI support (RankedMainMenuSection): snapshot of currently hidden players
-	// and manual restore. Restoring erases the peer's bad verdict, so they
-	// reappear on the next list refresh; if they fail again they get re-hidden.
+	// UI support: snapshot of players currently hidden from the LIVE list
+	// (all hide reasons included), and manual restore. Restoring clears the
+	// peer's bad verdict and exempts them from the rule-based filters until
+	// the next periodic recheck - the row returns within ~400ms, and may get
+	// re-hidden once fresh data says so again.
+	enum class HiddenReason
+	{
+		Unreachable,      // probe confirmed unreachable
+		ConnectionFailed, // a real join attempt failed recently
+		NetworkFilter,    // Delay rating below the Network Filter floor
+		Requirement,      // room's connection requirement not met by us
+	};
 	struct HiddenPeerInfo
 	{
 		uint64_t steamId = 0;
 		std::string name;
-		int reactiveFailCount = 0;
-		bool sessionBlocked = false;
-		bool probeUnreachable = false;
+		HiddenReason reason = HiddenReason::Unreachable;
 	};
 	void GetHiddenPeers(std::vector<HiddenPeerInfo>* outPeers) const;
 	void RestorePeer(uint64_t steamId);
@@ -171,7 +180,6 @@ private:
 		unsigned long long verdictTickMs = 0;
 		unsigned long long lastReactiveFailTickMs = 0;
 		int reactiveFailCount = 0;
-		bool sessionBlocked = false;
 		std::string lastKnownName; // best-effort, for the hidden-players UI
 		// Connection-quality estimate from the reachability probe: how long the
 		// P2P session took to establish, and whether it went through a relay.
@@ -229,7 +237,10 @@ private:
 	void DiagnosticLogRankedListMgrSlot() const;
 
 	void OnLobbyListResultDelivered(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall);
-	void StartProbeIfNeeded(uint64_t steamId);
+	// force=true (the periodic whole-list recheck) bypasses verdict-freshness
+	// gating so even peers with a live verdict get re-measured; session-
+	// blocked peers are never probed either way.
+	void StartProbeIfNeeded(uint64_t steamId, bool force = false);
 	void PollProbes();
 	// The live in-place list manipulator (see progress doc 2026-07-12 "Live
 	// permutation" section). Every ~400ms while a list is on screen: walks
@@ -254,6 +265,13 @@ private:
 	// singleton chain (base+0x897E3C -> mgr vtable slot 7). Returns nullptr
 	// when unavailable. All guards IsBadReadPtr-based, no allocation.
 	uint8_t* ResolveGameRowListStruct() const;
+	// Resolves the ranked search-result list WIDGET (the UI object that owns
+	// the scrollbar, cursor and row slots - built by the game's FUN_0064bfb0,
+	// identified by its "Rank Match Search Result" config pointer) and
+	// rewrites its item count / page bounds / cursor / per-slot active flags
+	// to match the given row count, so scrolling and selection can never
+	// reach past the live-shrunk list. Write-on-change only.
+	void FixupRankedResultWidget(int32_t shownCount);
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.
 	// logOrder=false suppresses the per-call "sort order" log line (used by the
@@ -319,6 +337,15 @@ private:
 	// trusting a possibly-stale read.
 	bool m_gameListResyncPending = false;
 	unsigned long long m_lastDeliveryTickMs = 0;
+	// Periodic whole-list reachability recheck timer (kListRecheckIntervalMs).
+	unsigned long long m_lastListRecheckTickMs = 0;
+	// Snapshot of currently live-hidden rows (steamId -> reason), rebuilt by
+	// every PollGameListAndApplyOrder pass - what GetHiddenPeers serves.
+	std::unordered_map<uint64_t, HiddenPeerInfo> m_liveHiddenPeers;
+	// Peers the user manually restored: exempt from the rule-based filters
+	// (network tier / requirement) until the next periodic recheck, so the
+	// restore is actually visible instead of being undone 400ms later.
+	std::unordered_set<uint64_t> m_restoreExemptions;
 
 	uint64_t m_pendingConnectionTarget = 0;
 	uint64_t m_pendingLobbyId = 0;

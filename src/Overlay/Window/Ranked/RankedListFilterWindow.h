@@ -27,4 +27,12 @@ public:
 protected:
 	void Draw() override;
 	void AfterDraw() override;
+
+private:
+	// Draws the separate "Hidden players" modal (opened by clicking the
+	// "N hidden" status text) with its scrollable restore list.
+	void DrawHiddenPlayersPopup();
+
+	// True while the hidden-players modal is open.
+	bool m_showHiddenPopup = false;
 };

@@ -2866,6 +2866,170 @@ Build verified clean (Debug|Win32). **Not yet live-tested.**
 4. Cross-check no ghost/duplicate rows right after the game's own auto-refresh (count resync
    window) and after backing out + re-searching (search-start clear).
 
+## VERIFIED: live deletion works; full rework to all-live filtering, periodic re-probe, new Network Filter + requirement filter, and config-window UI overhaul (2026-07-12, same day)
+
+### Live-deletion verification (fresh DEBUG.txt, md5-verified deployed build)
+
+96 `live row count` / `live order applied` events across the session, all consistent:
+initial bulk hide (`28 -> 19 (9 hidden of 28)`), incremental hides as verdicts landed
+(`23 -> 22`, `22 -> 21`), correct partition swap counts throughout, no anomalies after
+auto-refreshes or re-searches. Also **zero** occurrences of `onList=0` while `state1=39` -
+the window-disappearance fix from the previous section held. Both mechanisms are
+confirmed working in real gameplay.
+
+### Rework: filtering is now fully live (user-directed redesign)
+
+Since rows can now be hidden AND restored in place, delivery-time compaction was removed
+entirely:
+
+- **Delivery serves the full list, always** (`BuildCompactedListAndDeliver` no longer
+  consults `ShouldHidePeer`) - the list appears instantly and complete, then "polishes
+  itself" live. This also kills the old asymmetry where a peer hidden at delivery had no
+  game row to restore without a refresh - now EVERY hide is live-reversible.
+- **All hide criteria live in `PollGameListAndApplyOrder()`** (~2.5x/sec), evaluated per
+  row from the game's own live data:
+  1. Reputation (unreachable/failed peers) - gated by the existing
+     `enableRankedListConnectionFilter` checkbox. Newly-hidden announcements moved here
+     (same once-per-episode dedup via `m_announcedHidden`).
+  2. **Network Filter** (new setting `rankedListNetworkFilter`, 0-4): hides rows whose
+     current Delay digit is below the floor (0=All/off, 1-3="N and above", 4="4 only").
+     Unresolved digits stay visible until they resolve.
+  3. **Unmet-requirement filter** (new setting `hideUnmetRequirementRooms`): replicates
+     the game's own join gate (`FUN_004ae6d0` case 0x27, the source of "The room's
+     connectivity requirements are not met"): required tier = row's RANK_RTT_FILTER word
+     (`entry+0x10a`, values 1-4, other nonzero = 4), else RANK_AREA_FILTER (`entry+0x5e`,
+     1 -> requires digit 2, 2 -> requires digit 3); hide when my measured Delay digit to
+     that host (`GameDelayDigitFromRtt(entry+0x78)`) is below it. Unresolved RTT = shown
+     (the game itself waits in "RMSR_CheckingRTT" rather than rejecting).
+  `IsPipelineActive()` now includes both new settings.
+- **Periodic whole-list re-probe** (`kListRecheckIntervalMs = 15s`): every listed
+  candidate - hidden included - gets a forced P2P re-probe (`StartProbeIfNeeded(id, force
+  =true)` bypasses verdict-freshness TTLs; session-blocked peers still excluded). A
+  recovered peer flips to Reachable when the probe lands and their row pops back within
+  ~400ms; still-dead peers re-confirm (Steam error typically within ~20s). The cycle
+  timer resets per search (`m_lastListRecheckTickMs`). Log line: `periodic list recheck:
+  re-probing N of M candidates`.
+- **`probeElapsedMs` is now first-measurement-only** in `PollProbes()` - re-probes of
+  still-open sessions resolve in one pump (~16ms) and would otherwise flatten the
+  fallback sort metric for every reachable peer.
+
+### Config window UI overhaul (RankedListFilterWindow)
+
+- Layout now: Sort combo | separator | **Network Filter combo** (All / 1 and above /
+  2 and above / 3 and above / 4 only) | Hide-unreachable checkbox | **"Hide rooms that
+  would reject your connection"** checkbox | status line.
+- The hidden-players list is GONE from the main window. The status line is split:
+  `Last search: N shown,` + **`M hidden` as a clickable link** (underlined on hover -
+  note: this repo's old ImGui has no `ImGuiMouseCursor_Hand`, so the underline is the
+  affordance) that toggles a separate **"Hidden players" window**: fixed default size
+  (380x260, user-resizable), "Restore all" pinned at top, and the per-player
+  Restore+name+reason list inside a **scrollable child region** so it never grows off
+  screen. Note shown when empty: filter-hidden (tier/requirement) players are not
+  listed there - those are rule-based and un-hide automatically; only reputation-hidden
+  peers are individually restorable (RestorePeer erases the verdict -> row returns live
+  within ~400ms).
+- New settings rows in `settings.def`: `RankedListNetworkFilter` (int, "0"),
+  `HideUnmetRequirementRooms` (bool, "0"). New/updated localization rows (key/en/es) for
+  all new labels and help texts; the split status-line strings are
+  `"Last search: %d shown,"` and `"%d hidden"`.
+- Fixed while in there: the old code's `reasonText = L(...).c_str()` dangling-pointer
+  pattern (temporary std::string destroyed at end of expression) - now holds the
+  std::string.
+
+Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+### Test protocol for the next session
+
+1. Fresh search: full list appears instantly (nobody pre-hidden), then known-bad peers
+   vanish within ~1s.
+2. `periodic list recheck` lines every 15s; a hidden peer whose connection recovered
+   should reappear without any user action (the acid test for the rework).
+3. Network Filter at "2 and above": all rows showing Delay 0/1 vanish once measured;
+   switching back to "All" restores them all within ~1s.
+4. Requirement checkbox: rows that would show "connectivity requirements not met" vanish
+   once your Delay to them resolves. Verify against a room you know rejects you.
+5. Click "M hidden" -> Hidden players window opens, scrolls when long, Restore works
+   live (row returns without refresh), closing via X works, link toggles.
+6. Watch for count flapping: a peer on the hide boundary (e.g. Delay exactly at the
+   floor as it fluctuates) will hide/restore repeatedly - if that looks bad in practice,
+   add hysteresis (require the digit to differ from the threshold for 2+ consecutive
+   passes before flipping).
+
+## Post-test fixes: unified hidden-players list with reasons, session-block system removed, and the scrollbar/cursor overflow bug fixed via the list WIDGET (2026-07-12, same day)
+
+User live-tested the all-live rework: everything works except three issues, all fixed this
+session.
+
+### 1. Hidden-players window now lists EVERY hidden row, with its reason, all restorable
+
+Previously only reputation-hidden peers appeared (GetHiddenPeers scanned m_verdicts).
+Now `PollGameListAndApplyOrder()` rebuilds `m_liveHiddenPeers` (steamId -> name + reason)
+every pass from the actual hide decisions, and `GetHiddenPeers` serves that snapshot:
+- Reasons shown: "unreachable", "connection failed", "below network filter",
+  "network requirements not met" (`HiddenReason` enum replaces the old flag fields on
+  `HiddenPeerInfo`).
+- **Entries with no known display name are skipped** (user: "??? - unreachable" rows are
+  noise; if we can't name them, don't list them).
+- **Restore now works for rule-based hides too**: `RestorePeer`/`RestoreAllPeers` clear the
+  reputation verdict AND add the peer to `m_restoreExemptions`, which suppresses the
+  network-tier and requirement filters for that peer until the next periodic recheck
+  (15s) - so a restore visibly sticks instead of being undone 400ms later, and then fresh
+  data decides again (user explicitly OK'd re-hiding on next probe). Exemptions also clear
+  at search start.
+- Checkbox renamed: "Hide rooms that would reject your connection" -> **"Hide rooms with
+  unmet network requirements"** (user found the old name horrible). CSV updated (en/es).
+
+### 2. Session-block / repeat-offender system REMOVED
+
+With the 15s clean-slate recheck, permanent per-session penalties only create stale hides.
+Removed: `PeerVerdict::sessionBlocked`, `kSessionBlockFailCount`, the escalation in
+`MarkUnreachable`, the probe exclusion, and the "blocked (repeated failures)" UI reason.
+Kept: the brief `kReactiveFailHideMs` (2min) hide for a real failed join - that is direct
+evidence, but it now expires on its own and the peer gets re-tested like everyone else.
+
+### 3. Scrollbar/cursor reaching into hidden territory: root cause = the list WIDGET keeps its own delivery-time count
+
+The row list (count at listStruct+0xae8) is only the DATA side. The scrollbar, cursor
+movement, and row selection are owned by a separate UI **widget** object that captures the
+row count when the game builds it and never re-reads ours. RE'd this session (raw disasm,
+no live debugger):
+
+- Builder: `FUN_0064bfb0` ("NetworkRankMatchSearchResultWindow"). A lazy-init UI context
+  singleton (`FUN_00643b40`, static RVA `0xEF1ED0`, guard bit RVA `0xEF4898`) holds a pool
+  pointer at `+0x29C4` -> 4 widget containers of stride `0x15D90` (in-use flag `+0x8C`,
+  config-string pointer `+0x90`). The ranked list's container is identified by its config
+  pointer == the static "Rank Match Search Result" string (RVA `0x566238`); its sibling
+  `FUN_0064c160` builds the casual "Room Search Result" widget the same way (config RVA
+  `0x56611C`) - do not confuse them.
+- Widget struct at container+0x68: `+0x3C` scroll top, `+0x40` slot array (50 x 0x6FC,
+  slot+4 = active flag), `+0x15D78` cursor, `+0x15D80` bottom visible row, `+0x15D84`
+  page-size-minus-1 (builder clamps to 10 -> 11 visible rows), `+0x15D88` item count
+  (bounds cursor wrap - see cursor-next `0x00648DF0` / cursor-prev `0x00648ED0` - and the
+  scrollbar). Builder tail (`0x0064C126`) sets `15D84`/`15D80` = min(count-1, 10).
+- Fix: new `FixupRankedResultWidget(shownCount)` (called from the live pass right after
+  the row-count write, and from the features-off cleanup): resolves the widget via the
+  chain above (guard-checked, IsBadReadPtr/WritePtr everywhere), then - write-on-change
+  only - sets count, pageM1 = min(count-1,10), clamps cursor and scroll top, recomputes
+  bottom = top + pageM1, and sets slot active flags to exactly rows 0..count-1. Log line:
+  `widget fixup: count N -> M`.
+- The features-off cleanup branch now also restores the game-authored row count
+  (`m_gameListOrigCount`) and re-fixes the widget, so turning everything off brings the
+  full list back instantly (consistent with the all-live philosophy).
+
+Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+### Test protocol for the next session
+
+1. Hide some rows via each mechanism (unreachable, network filter, requirement) - ALL of
+   them should appear in the Hidden players window with the right reason; no "???" rows.
+2. Restore a network-filter-hidden peer: row returns within ~1s and STAYS until the next
+   15s recheck (then re-hides if still below the floor).
+3. The scroll bar should now match the visible list exactly, and the cursor must not be
+   able to move past the last visible row (this was the main visual bug).
+4. Turn all filter features off mid-list: every hidden row should return immediately,
+   scrollbar included.
+5. Grep `widget fixup:` lines and sanity-check the counts track `live row count` lines.
+
 ## Testing protocol reminder
 
 User builds/deploys manually via Visual Studio ("Release Deploy" config) — Claude never

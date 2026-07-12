@@ -43,6 +43,8 @@ SETTING(bool, enableInDevelopmentFeatures, "EnableInDevelopmentFeatures", "0");
 SETTING(bool, enableRankedListConnectionFilter, "EnableRankedListConnectionFilter", "0");
 SETTING(bool, showRankedListFilterWindow, "ShowRankedListFilterWindow", "1");
 SETTING(int, rankedListSortMode, "RankedListSortMode", "0");
+SETTING(int, rankedListNetworkFilter, "RankedListNetworkFilter", "0");
+SETTING(bool, hideUnmetRequirementRooms, "HideUnmetRequirementRooms", "0");
 SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
 SETTING(bool, allowPaletteDownloads, "AllowPaletteDownloads", "0");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");

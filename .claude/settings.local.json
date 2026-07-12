@@ -128,7 +128,11 @@
       "Bash(sed -i 's|// PollGameTiers\\(\\) now reads that RTT field; no metadata tier read here.|// PollGameListAndApplyOrder\\(\\) now reads that RTT field; no metadata tier read here.|; s|// recently for this peer, read live by PollGameTiers\\(\\). Sorting by|// recently for this peer, read live by PollGameListAndApplyOrder\\(\\). Sorting by|' src/Network/RankedListConnectionFilter.cpp)",
       "Bash(sed -i 's|// read from the ranked-list row entry.s +0x78 field via PollGameTiers\\(\\)|// read from the ranked-list row entry'\"'\"'s +0x78 field via PollGameListAndApplyOrder\\(\\)|' src/Network/RankedListConnectionFilter.h)",
       "Bash(uniq -c -f2)",
-      "Bash(grep -iE \"error|dinput8.dll$\")"
+      "Bash(grep -iE \"error|dinput8.dll$\")",
+      "Bash(sed -n '/bool RankedListConnectionFilter::IsPipelineActive/,/^}/p' src/Network/RankedListConnectionFilter.cpp)",
+      "Bash(sed -n '/void RankedListConnectionFilter::GetHiddenPeers/,/^}/p' src/Network/RankedListConnectionFilter.cpp)",
+      "Bash(grep -iE \"error|dinput8\\\\.dll$\")",
+      "Bash(grep -nE \"dword ptr \\\\[[a-z]+\\\\+0?0*15D80h?\\\\],|\\\\[[a-z]+\\\\+0?0*15D80h?\\\\]$\")"
     ]
   }
 }

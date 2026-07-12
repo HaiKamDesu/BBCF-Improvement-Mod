@@ -48,6 +48,15 @@ namespace
 	// why an unconditional per-search wipe was tried and reverted instead.
 	constexpr unsigned long long kGameTierTtlMs = 45 * 1000;
 
+	// Periodic whole-list reachability recheck (2026-07-12 rework): every
+	// interval, every listed candidate - hidden ones included - gets a fresh
+	// P2P probe regardless of verdict freshness (session-blocked peers
+	// excepted). A peer whose network recovered flips back to Reachable when
+	// the probe lands, and the live pass restores their row within ~400ms;
+	// one that is still dead just re-confirms. This is what makes hide AND
+	// restore fully live instead of "hidden until some long TTL expires".
+	constexpr unsigned long long kListRecheckIntervalMs = 15 * 1000;
+
 	// Size of the game's ranked-list row permutation array at listStruct+0xaf4
 	// (0x32 entries - both the game's own identity reset FUN_004a5430 and the
 	// row renderer FUN_00661060 use exactly 50).
@@ -63,6 +72,40 @@ namespace
 	constexpr size_t kNodePayloadOffset = 0xC;
 	constexpr size_t kNodePayloadSize = 0x118 - kNodePayloadOffset;
 
+	// The ranked search-result list WIDGET - the UI object owning the
+	// scrollbar, cursor and 50 row slots. Built by the game's FUN_0064bfb0
+	// ("NetworkRankMatchSearchResultWindow"): a lazy-init UI context singleton
+	// (FUN_00643b40, static at RVA 0xEF1ED0, guard bit RVA 0xEF4898) holds a
+	// pool pointer at +0x29C4 -> 4 containers of stride 0x15D90 (in-use flag
+	// +0x8C, config-string pointer +0x90); the ranked one's config pointer is
+	// the static "Rank Match Search Result" string (RVA 0x566238). The widget
+	// struct itself sits at container+0x68:
+	//   +0x3C     scroll top (first visible row)
+	//   +0x40     slot array, 50 x 0x6FC (slot+0x4 = active flag)
+	//   +0x15D78  cursor (selected row)
+	//   +0x15D80  bottom visible row
+	//   +0x15D84  page size - 1 (builder clamps to 10 -> 11 visible rows)
+	//   +0x15D88  item count (bounds cursor wrap and the scrollbar)
+	// Semantics recovered from the widget's own member functions (cursor-next
+	// 0x00648DF0, cursor-prev 0x00648ED0, AddItem 0x006480C0) and the
+	// builder's tail (0x0064C126: 15D84/15D80 = min(count-1, 10)).
+	constexpr uintptr_t kUiContextRva = 0xEF1ED0;
+	constexpr uintptr_t kUiContextGuardRva = 0xEF4898;
+	constexpr uintptr_t kUiWidgetPoolOffset = 0x29C4;
+	constexpr uintptr_t kUiContainerStride = 0x15D90;
+	constexpr uintptr_t kUiContainerInUseOffset = 0x8C;
+	constexpr uintptr_t kUiContainerConfigOffset = 0x90;
+	constexpr uintptr_t kRankedResultConfigStrRva = 0x566238;
+	constexpr uintptr_t kUiContainerWidgetOffset = 0x68;
+	constexpr uintptr_t kWidgetScrollTopOffset = 0x3C;
+	constexpr uintptr_t kWidgetSlotArrayOffset = 0x40;
+	constexpr uintptr_t kWidgetSlotStride = 0x6FC;
+	constexpr uintptr_t kWidgetCursorOffset = 0x15D78;
+	constexpr uintptr_t kWidgetBottomRowOffset = 0x15D80;
+	constexpr uintptr_t kWidgetPageM1Offset = 0x15D84;
+	constexpr uintptr_t kWidgetCountOffset = 0x15D88;
+	constexpr int32_t kWidgetMaxPageM1 = 10;
+
 	// Exact reproduction of the game's own RTT -> Delay-digit bucketing
 	// (FUN_004a6620, used by the ranked list row renderer FUN_00661060 to draw
 	// the '0'+digit glyph): negative = unresolved (nothing drawn), <60ms = 4,
@@ -77,11 +120,14 @@ namespace
 		return 0;
 	}
 
-	// One real connection failure hides the peer only briefly - live testing
-	// showed one-off transient failures happen to otherwise-fine players.
-	// Repeat offenders get blocked for the session.
+	// A real connection failure hides the peer only briefly - live testing
+	// showed one-off transient failures happen to otherwise-fine players, and
+	// the periodic whole-list recheck (kListRecheckIntervalMs) means everyone
+	// gets a clean-slate re-test regularly anyway. (An earlier design also
+	// blocked repeat offenders for the whole session - removed 2026-07-12 per
+	// user direction: with continuous rechecking, permanent penalties are
+	// unnecessary and only create stale hides.)
 	constexpr unsigned long long kReactiveFailHideMs = 2 * 60 * 1000;
-	constexpr int kSessionBlockFailCount = 2;
 
 	// Raw ranked network state struct (same one RankedProgressWindow.cpp reads
 	// unconditionally every frame as "networkState.state/state1"). state==4 is
@@ -203,10 +249,6 @@ void RankedListConnectionFilter::MarkUnreachable(uint64_t steamId, const char* r
 	PeerVerdict& verdict = m_verdicts[steamId];
 	verdict.reactiveFailCount += 1;
 	verdict.lastReactiveFailTickMs = GetTickCount64();
-	if (verdict.reactiveFailCount >= kSessionBlockFailCount)
-	{
-		verdict.sessionBlocked = true;
-	}
 
 	const char* name = "<unknown>";
 	if (g_interfaces.pSteamFriendsWrapper != nullptr)
@@ -221,9 +263,8 @@ void RankedListConnectionFilter::MarkUnreachable(uint64_t steamId, const char* r
 	{
 		verdict.lastKnownName = name;
 	}
-	LOG(1, "[RankedListFilter] %s steamId=%llu name=\"%s\" - fail #%d (%s)\n",
-		reason, static_cast<unsigned long long>(steamId), name, verdict.reactiveFailCount,
-		verdict.sessionBlocked ? "blocked for session" : "hidden temporarily");
+	LOG(1, "[RankedListFilter] %s steamId=%llu name=\"%s\" - fail #%d (hidden temporarily)\n",
+		reason, static_cast<unsigned long long>(steamId), name, verdict.reactiveFailCount);
 
 	if (g_interfaces.pSteamNetworkingWrapper != nullptr)
 	{
@@ -247,6 +288,11 @@ void RankedListConnectionFilter::OnLobbyListRequestIssued(uint64_t apiCallHandle
 	// The game resets its own permutation array (identity) as part of search
 	// start, so whatever custom order we wrote is gone with it.
 	m_gamePermCustomized = false;
+	// Restart the periodic reachability recheck cycle relative to the new
+	// search's own delivery-time probes.
+	m_lastListRecheckTickMs = 0;
+	m_restoreExemptions.clear();
+	m_liveHiddenPeers.clear();
 
 	if (!IsPipelineActive() || apiCallHandle == 0)
 	{
@@ -392,7 +438,7 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 	BuildCompactedListAndDeliver("immediate");
 }
 
-void RankedListConnectionFilter::StartProbeIfNeeded(uint64_t steamId)
+void RankedListConnectionFilter::StartProbeIfNeeded(uint64_t steamId, bool force)
 {
 	if (steamId == 0 || m_probesInFlight.find(steamId) != m_probesInFlight.end())
 	{
@@ -404,19 +450,22 @@ void RankedListConnectionFilter::StartProbeIfNeeded(uint64_t steamId)
 	if (it != m_verdicts.end())
 	{
 		const PeerVerdict& verdict = it->second;
-		if (verdict.sessionBlocked)
+		// force (the periodic whole-list recheck) skips the freshness gates:
+		// the whole point is re-measuring peers whose verdict is still
+		// within TTL, in both directions (restore recovered peers quickly,
+		// re-confirm dead ones).
+		if (!force)
 		{
-			return; // no point probing a session-blocked peer
-		}
-		if (verdict.kind == PeerVerdict::Kind::Reachable &&
-			now - verdict.verdictTickMs < kReachableTtlMs)
-		{
-			return; // verdict still fresh
-		}
-		if (verdict.kind == PeerVerdict::Kind::ProbeUnreachable &&
-			now - verdict.verdictTickMs < kProbeUnreachableTtlMs)
-		{
-			return; // verdict still fresh
+			if (verdict.kind == PeerVerdict::Kind::Reachable &&
+				now - verdict.verdictTickMs < kReachableTtlMs)
+			{
+				return; // verdict still fresh
+			}
+			if (verdict.kind == PeerVerdict::Kind::ProbeUnreachable &&
+				now - verdict.verdictTickMs < kProbeUnreachableTtlMs)
+			{
+				return; // verdict still fresh
+			}
 		}
 	}
 
@@ -453,7 +502,14 @@ void RankedListConnectionFilter::PollProbes()
 			PeerVerdict& verdict = m_verdicts[steamId];
 			verdict.kind = PeerVerdict::Kind::Reachable;
 			verdict.verdictTickMs = now;
-			verdict.probeElapsedMs = now - it->second;
+			// Keep the FIRST establishment time - the periodic whole-list
+			// recheck re-probes sessions that are often still open, which
+			// resolves in one pump (~16ms) and would otherwise flatten the
+			// fallback sort metric for every reachable peer.
+			if (verdict.probeElapsedMs == ~0ull)
+			{
+				verdict.probeElapsedMs = now - it->second;
+			}
 			verdict.usedRelay = state.m_bUsingRelay != 0;
 			LOG(1, "[RankedListFilter] probe steamId=%llu reachable=1 relay=%u elapsedMs=%llu\n",
 				static_cast<unsigned long long>(steamId),
@@ -541,18 +597,144 @@ void RankedListConnectionFilter::WriteIdentityGamePermutation()
 	m_gamePermCustomized = false;
 }
 
+void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
+{
+	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+	if (moduleBase == 0 || shownCount < 0)
+	{
+		return;
+	}
+	// Lazy-init guard first - never touch the context before the game built it.
+	const uint8_t* const guard = reinterpret_cast<const uint8_t*>(moduleBase + kUiContextGuardRva);
+	if (IsBadReadPtr(guard, 1) || (*guard & 1) == 0)
+	{
+		return;
+	}
+	const uint8_t* const ctx = reinterpret_cast<const uint8_t*>(moduleBase + kUiContextRva);
+	if (IsBadReadPtr(ctx + kUiWidgetPoolOffset, sizeof(void*)))
+	{
+		return;
+	}
+	uint8_t* const pool = *reinterpret_cast<uint8_t* const*>(ctx + kUiWidgetPoolOffset);
+	if (pool == nullptr)
+	{
+		return;
+	}
+	const void* const rankedConfigStr =
+		reinterpret_cast<const void*>(moduleBase + kRankedResultConfigStrRva);
+
+	for (int i = 0; i < 4; ++i)
+	{
+		uint8_t* const container = pool + static_cast<uintptr_t>(i) * kUiContainerStride;
+		if (IsBadReadPtr(container, kUiContainerConfigOffset + sizeof(void*)))
+		{
+			return;
+		}
+		if (*reinterpret_cast<const int32_t*>(container + kUiContainerInUseOffset) == 0 ||
+			*reinterpret_cast<void* const*>(container + kUiContainerConfigOffset) != rankedConfigStr)
+		{
+			continue;
+		}
+
+		uint8_t* const widget = container + kUiContainerWidgetOffset;
+		if (IsBadWritePtr(widget + kWidgetCountOffset, sizeof(int32_t)))
+		{
+			return;
+		}
+		int32_t* const count = reinterpret_cast<int32_t*>(widget + kWidgetCountOffset);
+		int32_t* const pageM1 = reinterpret_cast<int32_t*>(widget + kWidgetPageM1Offset);
+		int32_t* const cursor = reinterpret_cast<int32_t*>(widget + kWidgetCursorOffset);
+		int32_t* const bottom = reinterpret_cast<int32_t*>(widget + kWidgetBottomRowOffset);
+		int32_t* const scrollTop = reinterpret_cast<int32_t*>(widget + kWidgetScrollTopOffset);
+
+		const int32_t cap = (shownCount < kGamePermSlots) ? shownCount : kGamePermSlots;
+		if (*count == cap)
+		{
+			return; // already consistent - the common case, nothing to write
+		}
+		LOG(1, "[RankedListFilter] widget fixup: count %d -> %d (cursor=%d top=%d)\n",
+			*count, cap, *cursor, *scrollTop);
+		*count = cap;
+		const int32_t lastIndex = cap > 0 ? cap - 1 : 0;
+		const int32_t newPageM1 = (lastIndex < kWidgetMaxPageM1) ? lastIndex : kWidgetMaxPageM1;
+		*pageM1 = newPageM1;
+		if (*cursor > lastIndex)
+		{
+			*cursor = lastIndex;
+		}
+		if (*cursor < 0)
+		{
+			*cursor = 0;
+		}
+		// Keep the visible window valid: top in [0, count-1-pageM1], bottom =
+		// top + pageM1, cursor within [top, bottom].
+		int32_t maxTop = lastIndex - newPageM1;
+		if (maxTop < 0)
+		{
+			maxTop = 0;
+		}
+		if (*scrollTop > maxTop)
+		{
+			*scrollTop = maxTop;
+		}
+		if (*scrollTop < 0)
+		{
+			*scrollTop = 0;
+		}
+		if (*cursor < *scrollTop)
+		{
+			*scrollTop = *cursor;
+		}
+		if (*cursor > *scrollTop + newPageM1)
+		{
+			*scrollTop = *cursor - newPageM1;
+		}
+		*bottom = *scrollTop + newPageM1;
+
+		// Per-slot active flags: exactly the rows 0..count-1, like the
+		// builder leaves them. (Re-activated slots past a game rebuild that
+		// used a shrunk count get their info-string pointer refreshed by the
+		// game's own next rebuild; the renderer reads row content live from
+		// the entries, not from the slots.)
+		for (int32_t slot = 0; slot < kGamePermSlots; ++slot)
+		{
+			uint8_t* const slotPtr = widget + kWidgetSlotArrayOffset +
+				static_cast<uintptr_t>(slot) * kWidgetSlotStride;
+			if (IsBadWritePtr(slotPtr + 4, sizeof(int32_t)))
+			{
+				break;
+			}
+			*reinterpret_cast<int32_t*>(slotPtr + 4) = (slot < cap) ? 1 : 0;
+		}
+		return;
+	}
+}
+
 void RankedListConnectionFilter::PollGameListAndApplyOrder()
 {
 	if (!m_hasRemapResult || m_candidates.empty() || !IsPipelineActive())
 	{
-		// Features were turned off (or nothing delivered): if we left a custom
-		// order in the game's permutation array, put it back the way the game
-		// expects it, once. (A shrunk count is left alone - the next populate
-		// or search-clear rewrites it wholesale anyway, and restoring rows the
-		// user asked to hide just because the window closed would be wrong.)
+		// Features were turned off (or nothing delivered): put everything
+		// back the way the game expects it, once - identity permutation,
+		// the full game-authored row count, and the widget bounds. All-live
+		// filtering means turning the features off restores the full list
+		// immediately, no refresh needed.
 		if (m_gamePermCustomized)
 		{
 			WriteIdentityGamePermutation();
+			if (m_gameListOrigCount > 0)
+			{
+				uint8_t* const listStructOff = ResolveGameRowListStruct();
+				if (listStructOff != nullptr &&
+					!IsBadWritePtr(listStructOff + 0xae8, sizeof(int32_t)))
+				{
+					*reinterpret_cast<int32_t*>(listStructOff + 0xae8) = m_gameListOrigCount;
+					m_gameListLastCountWritten = m_gameListOrigCount;
+					FixupRankedResultWidget(m_gameListOrigCount);
+				}
+			}
+			m_liveHiddenPeers.clear();
+			m_lastHiddenCount = 0;
 		}
 		return;
 	}
@@ -636,6 +818,9 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	{
 		uint8_t* node = nullptr;
 		uint64_t steamId = 0;
+		int32_t rttMs = -1;        // entry+0x78, -1 until the game resolves it
+		int16_t rttFilter = 0;     // entry+0x10a, RANK_RTT_FILTER (host requirement)
+		int16_t areaFilter = 0;    // entry+0x5e, RANK_AREA_FILTER (secondary requirement)
 	};
 	std::vector<LiveRow> rows(static_cast<size_t>(orig));
 	for (int32_t logical = 0; logical < orig; ++logical)
@@ -657,9 +842,13 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			row.steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
 		}
 
+		row.rttMs = *reinterpret_cast<const int32_t*>(row.node + 0x78);
+		row.rttFilter = *reinterpret_cast<const int16_t*>(row.node + 0x10a);
+		row.areaFilter = *reinterpret_cast<const int16_t*>(row.node + 0x5e);
+
 		if (row.steamId != 0)
 		{
-			const int32_t rttMs = *reinterpret_cast<const int32_t*>(row.node + 0x78);
+			const int32_t rttMs = row.rttMs;
 			if (rttMs >= 0)
 			{
 				PeerVerdict& verdict = m_verdicts[row.steamId];
@@ -722,14 +911,135 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	// peer no longer hidden simply stops being partitioned out, the count
 	// grows back, and their parked payload re-enters the visible region.
 	const bool filterEnabled = Settings::settingsIni.enableRankedListConnectionFilter;
-	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
-	if (filterEnabled)
+	// Network tier filter: 0 = All (off), 1-3 = "N and above", 4 = "4 only".
+	// Hides rows whose CURRENT Delay digit is below the floor. Rows whose RTT
+	// hasn't resolved yet (digit unknown) are shown - benefit of the doubt,
+	// they get hidden within ~400ms of the digit resolving if it's too low.
+	int networkFloor = Settings::settingsIni.rankedListNetworkFilter;
+	if (networkFloor < 0 || networkFloor > 4)
 	{
-		for (int32_t logical = 0; logical < orig; ++logical)
+		networkFloor = 0;
+	}
+	// Requirement filter: replicate the game's own join gate
+	// (FUN_004ae6d0 case 0x27) that produces "The room's connectivity
+	// requirements are not met" - the row's RANK_RTT_FILTER (entry+0x10a,
+	// required = 1..4, anything else nonzero = 4) or, failing that, its
+	// RANK_AREA_FILTER (entry+0x5e, 1 -> requires digit 2, 2 -> requires
+	// digit 3) is compared against OUR measured Delay digit to that host.
+	// Rows we'd be rejected from are hidden preemptively. Unresolved RTT
+	// (digit unknown) rows are shown - the game itself waits in
+	// "RMSR_CheckingRTT" rather than rejecting in that state.
+	const bool hideUnmet = Settings::settingsIni.hideUnmetRequirementRooms;
+	std::unordered_set<uint64_t> newlyHiddenUnreachable;
+	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
+	std::unordered_set<uint64_t> hiddenThisPass;
+	m_liveHiddenPeers.clear();
+	for (int32_t logical = 0; logical < orig; ++logical)
+	{
+		const LiveRow& row = rows[static_cast<size_t>(logical)];
+		bool hide = false;
+		HiddenReason reason = HiddenReason::Unreachable;
+		// A user-restored peer is exempt from the rule-based filters until
+		// the next periodic recheck, so the restore actually sticks for a
+		// visible while instead of being undone 400ms later.
+		const bool restoreExempt =
+			row.steamId != 0 && m_restoreExemptions.find(row.steamId) != m_restoreExemptions.end();
+		if (filterEnabled && row.steamId != 0 && ShouldHidePeer(row.steamId, now))
 		{
-			const uint64_t steamId = rows[static_cast<size_t>(logical)].steamId;
-			hiddenAt[static_cast<size_t>(logical)] = steamId != 0 && ShouldHidePeer(steamId, now);
+			hide = true;
+			const auto verdictIt = m_verdicts.find(row.steamId);
+			reason = (verdictIt != m_verdicts.end() && verdictIt->second.reactiveFailCount > 0)
+				? HiddenReason::ConnectionFailed : HiddenReason::Unreachable;
+			// Notify (once per hide episode) only for reputation hides -
+			// tier/requirement hides are rule-driven and would be spam.
+			if (m_announcedHidden.find(row.steamId) == m_announcedHidden.end())
+			{
+				m_announcedHidden.insert(row.steamId);
+				newlyHiddenUnreachable.insert(row.steamId);
+			}
 		}
+		const int delayDigit = GameDelayDigitFromRtt(row.rttMs);
+		if (!hide && !restoreExempt && networkFloor > 0 && delayDigit >= 0 && delayDigit < networkFloor)
+		{
+			hide = true;
+			reason = HiddenReason::NetworkFilter;
+		}
+		if (!hide && !restoreExempt && hideUnmet && delayDigit >= 0)
+		{
+			int requiredDigit = 0;
+			if (row.rttFilter != 0)
+			{
+				requiredDigit = (row.rttFilter >= 1 && row.rttFilter <= 4)
+					? row.rttFilter : 4;
+			}
+			else if (row.areaFilter == 1)
+			{
+				requiredDigit = 2;
+			}
+			else if (row.areaFilter == 2)
+			{
+				requiredDigit = 3;
+			}
+			if (delayDigit < requiredDigit)
+			{
+				hide = true;
+				reason = HiddenReason::Requirement;
+			}
+		}
+		hiddenAt[static_cast<size_t>(logical)] = hide;
+		if (hide && row.steamId != 0)
+		{
+			hiddenThisPass.insert(row.steamId);
+			HiddenPeerInfo info;
+			info.steamId = row.steamId;
+			info.reason = reason;
+			const auto verdictIt = m_verdicts.find(row.steamId);
+			if (verdictIt != m_verdicts.end() && !verdictIt->second.lastKnownName.empty())
+			{
+				info.name = verdictIt->second.lastKnownName;
+			}
+			else
+			{
+				for (const LobbyCandidate& candidate : m_candidates)
+				{
+					if (candidate.ownerSteamId == row.steamId && !candidate.ownerName.empty())
+					{
+						info.name = candidate.ownerName;
+						break;
+					}
+				}
+			}
+			m_liveHiddenPeers[row.steamId] = info;
+		}
+	}
+	// Forget announced players who are no longer hidden, so a later re-hide
+	// (after a live restore) announces again.
+	for (auto it = m_announcedHidden.begin(); it != m_announcedHidden.end();)
+	{
+		if (hiddenThisPass.find(*it) == hiddenThisPass.end())
+		{
+			it = m_announcedHidden.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+	if (!newlyHiddenUnreachable.empty() && g_notificationBar != nullptr)
+	{
+		std::string names;
+		for (const uint64_t steamId : newlyHiddenUnreachable)
+		{
+			if (!names.empty())
+			{
+				names += ", ";
+			}
+			const auto it = m_verdicts.find(steamId);
+			names += (it != m_verdicts.end() && !it->second.lastKnownName.empty())
+				? it->second.lastKnownName : "<unknown>";
+		}
+		g_notificationBar->AddNotification("Ranked list filter: hiding %zu unreachable player%s (%s)",
+			newlyHiddenUnreachable.size(), newlyHiddenUnreachable.size() == 1 ? "" : "s", names.c_str());
 	}
 
 	// newPosOf[preMoveLogical] = position after the partition.
@@ -810,8 +1120,12 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	}
 	m_gameListLastCountWritten = shownCount;
 	m_lastShownCount = static_cast<size_t>(shownCount);
-	m_lastHiddenCount = m_candidates.size() > static_cast<size_t>(shownCount)
-		? m_candidates.size() - static_cast<size_t>(shownCount) : 0;
+	m_lastHiddenCount = static_cast<size_t>(hiddenCount);
+
+	// Keep the scrollbar/cursor widget consistent with the shrunk/grown list
+	// (write-on-change inside) - without this, the scroll range and cursor
+	// kept the delivery-time size and could select into hidden territory.
+	FixupRankedResultWidget(shownCount);
 
 	if (shownCount <= 0)
 	{
@@ -974,10 +1288,6 @@ bool RankedListConnectionFilter::ShouldHidePeer(uint64_t steamId, unsigned long 
 	}
 
 	const PeerVerdict& verdict = it->second;
-	if (verdict.sessionBlocked)
-	{
-		return true;
-	}
 	if (verdict.reactiveFailCount > 0 &&
 		nowMs - verdict.lastReactiveFailTickMs < kReactiveFailHideMs)
 	{
@@ -1231,64 +1541,23 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 
 void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason)
 {
-	const unsigned long long now = GetTickCount64();
-
 	m_reachableLobbies.clear();
 	std::vector<const LobbyCandidate*> shownCandidates;
-	std::string hiddenNames;
-	size_t newlyHiddenCount = 0;
-	std::unordered_set<uint64_t> hiddenThisPass;
-	// The pipeline (this function) also runs purely for sorting, with the
-	// hide-filter checkbox off (see IsPipelineActive) - ShouldHidePeer must
-	// never be consulted in that case, or reputation-based hiding silently
-	// applies regardless of the checkbox state. Confirmed live: this was
-	// previously unconditional, so toggling the checkbox off while a non-
-	// default sort mode was active did not actually stop hiding.
-	const bool filterEnabled = Settings::settingsIni.enableRankedListConnectionFilter;
+	// REWORK (2026-07-12, per explicit user direction): delivery no longer
+	// hides ANYONE. The full list is served instantly, and every hide/restore
+	// decision (reputation, network tier filter, requirement filter) is
+	// applied afterward by PollGameListAndApplyOrder()'s live row
+	// manipulation - which can now both remove AND resurrect rows in place,
+	// so there is nothing a pre-delivery compaction can do that the live
+	// pass can't do better (and reversibly). This also removes the old
+	// asymmetry where a peer hidden at delivery had no game row to restore
+	// without a refresh.
 	for (const LobbyCandidate& candidate : m_candidates)
 	{
-		if (!filterEnabled || !ShouldHidePeer(candidate.ownerSteamId, now))
-		{
-			shownCandidates.push_back(&candidate);
-			continue;
-		}
-
-		hiddenThisPass.insert(candidate.ownerSteamId);
-		if (!candidate.ownerName.empty())
+		shownCandidates.push_back(&candidate);
+		if (candidate.ownerSteamId != 0 && !candidate.ownerName.empty())
 		{
 			m_verdicts[candidate.ownerSteamId].lastKnownName = candidate.ownerName;
-		}
-		LOG(1, "[RankedListFilter] hiding lobby %llu (owner %llu, name \"%s\")\n",
-			static_cast<unsigned long long>(candidate.lobbyId),
-			static_cast<unsigned long long>(candidate.ownerSteamId),
-			candidate.ownerName.c_str());
-
-		// Only announce players newly hidden since the last list, so the
-		// notification bar isn't spammed with the same names every few seconds
-		// as the game auto-refreshes.
-		if (m_announcedHidden.find(candidate.ownerSteamId) == m_announcedHidden.end())
-		{
-			m_announcedHidden.insert(candidate.ownerSteamId);
-			++newlyHiddenCount;
-			if (!hiddenNames.empty())
-			{
-				hiddenNames += ", ";
-			}
-			hiddenNames += candidate.ownerName.empty() ? "<unknown>" : candidate.ownerName;
-		}
-	}
-
-	// Forget announced players who are no longer listed/hidden, so if they
-	// come back later and get hidden again, that gets announced again.
-	for (auto it = m_announcedHidden.begin(); it != m_announcedHidden.end();)
-	{
-		if (hiddenThisPass.find(*it) == hiddenThisPass.end())
-		{
-			it = m_announcedHidden.erase(it);
-		}
-		else
-		{
-			++it;
 		}
 	}
 
@@ -1299,16 +1568,10 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	}
 
 	m_lastShownCount = m_reachableLobbies.size();
-	m_lastHiddenCount = m_candidates.size() - m_reachableLobbies.size();
-	LOG(1, "[RankedListFilter] delivering (%s): %zu/%zu lobbies shown, sortMode=%d\n",
-		reason, m_reachableLobbies.size(), m_candidates.size(),
+	m_lastHiddenCount = 0; // live pass recomputes both within ~400ms
+	LOG(1, "[RankedListFilter] delivering (%s): %zu lobbies (full list, live pass filters), sortMode=%d\n",
+		reason, m_reachableLobbies.size(),
 		Settings::settingsIni.rankedListSortMode);
-
-	if (newlyHiddenCount > 0 && g_notificationBar != nullptr)
-	{
-		g_notificationBar->AddNotification("Ranked list filter: hiding %zu unreachable player%s (%s)",
-			newlyHiddenCount, newlyHiddenCount == 1 ? "" : "s", hiddenNames.c_str());
-	}
 
 	m_hasRemapResult = true;
 	m_pipelineState = PipelineState::Idle;
@@ -1385,6 +1648,37 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	// every few seconds and picks up the results).
 	PollProbes();
 	PollPendingConnectionConfirmation();
+
+	// Periodic whole-list reachability recheck - hidden entries included, so
+	// recovered peers get restored live (see kListRecheckIntervalMs).
+	if (m_hasRemapResult && !m_candidates.empty() && IsPipelineActive())
+	{
+		const unsigned long long now = GetTickCount64();
+		if (m_lastListRecheckTickMs == 0)
+		{
+			// Delivery already probed everyone; start the cycle from there.
+			m_lastListRecheckTickMs = now;
+		}
+		else if (now - m_lastListRecheckTickMs >= kListRecheckIntervalMs)
+		{
+			m_lastListRecheckTickMs = now;
+			// Manual-restore exemptions last exactly one recheck cycle - from
+			// here on, fresh data decides again.
+			m_restoreExemptions.clear();
+			int reprobed = 0;
+			for (const LobbyCandidate& candidate : m_candidates)
+			{
+				const size_t inFlightBefore = m_probesInFlight.size();
+				StartProbeIfNeeded(candidate.ownerSteamId, true);
+				if (m_probesInFlight.size() != inFlightBefore)
+				{
+					++reprobed;
+				}
+			}
+			LOG(1, "[RankedListFilter] periodic list recheck: re-probing %d of %zu candidates\n",
+				reprobed, m_candidates.size());
+		}
+	}
 
 	if (m_pipelineState == PipelineState::Idle)
 	{
@@ -1496,49 +1790,43 @@ void RankedListConnectionFilter::GetHiddenPeers(std::vector<HiddenPeerInfo>* out
 	}
 	outPeers->clear();
 
-	const unsigned long long now = GetTickCount64();
-	for (const auto& entry : m_verdicts)
+	// Serve the live snapshot built by PollGameListAndApplyOrder - every row
+	// currently hidden from the on-screen list, whatever the reason
+	// (reputation, network tier filter, requirement filter). Peers with no
+	// displayable name are skipped per user direction - an anonymous
+	// "??? - unreachable" row is just noise.
+	for (const auto& entry : m_liveHiddenPeers)
 	{
-		if (!ShouldHidePeer(entry.first, now))
+		if (entry.second.name.empty())
 		{
 			continue;
 		}
-		HiddenPeerInfo info;
-		info.steamId = entry.first;
-		info.name = entry.second.lastKnownName;
-		info.reactiveFailCount = entry.second.reactiveFailCount;
-		info.sessionBlocked = entry.second.sessionBlocked;
-		info.probeUnreachable = entry.second.kind == PeerVerdict::Kind::ProbeUnreachable;
-		outPeers->push_back(info);
+		outPeers->push_back(entry.second);
 	}
 }
 
 void RankedListConnectionFilter::RestorePeer(uint64_t steamId)
 {
-	if (m_verdicts.erase(steamId) > 0)
-	{
-		m_announcedHidden.erase(steamId);
-		LOG(1, "[RankedListFilter] user restored steamId=%llu - verdict cleared\n",
-			static_cast<unsigned long long>(steamId));
-	}
+	// Clears any reputation verdict AND exempts the peer from the rule-based
+	// filters (network tier / requirement) until the next periodic recheck -
+	// the row returns within ~400ms either way, and may legitimately re-hide
+	// once fresh data says so again.
+	m_verdicts.erase(steamId);
+	m_announcedHidden.erase(steamId);
+	m_restoreExemptions.insert(steamId);
+	LOG(1, "[RankedListFilter] user restored steamId=%llu - verdict cleared, filters exempted until next recheck\n",
+		static_cast<unsigned long long>(steamId));
 }
 
 void RankedListConnectionFilter::RestoreAllPeers()
 {
-	const unsigned long long now = GetTickCount64();
 	size_t restored = 0;
-	for (auto it = m_verdicts.begin(); it != m_verdicts.end();)
+	for (const auto& entry : m_liveHiddenPeers)
 	{
-		if (ShouldHidePeer(it->first, now))
-		{
-			m_announcedHidden.erase(it->first);
-			it = m_verdicts.erase(it);
-			++restored;
-		}
-		else
-		{
-			++it;
-		}
+		m_verdicts.erase(entry.first);
+		m_announcedHidden.erase(entry.first);
+		m_restoreExemptions.insert(entry.first);
+		++restored;
 	}
 	LOG(1, "[RankedListFilter] user restored all hidden peers (%zu)\n", restored);
 }
@@ -1558,7 +1846,9 @@ void RankedListConnectionFilter::GetLastListCounts(size_t* outShown, size_t* out
 bool RankedListConnectionFilter::IsPipelineActive() const
 {
 	return Settings::settingsIni.enableRankedListConnectionFilter ||
-		Settings::settingsIni.rankedListSortMode != RankedListSortMode_Default;
+		Settings::settingsIni.rankedListSortMode != RankedListSortMode_Default ||
+		Settings::settingsIni.rankedListNetworkFilter != 0 ||
+		Settings::settingsIni.hideUnmetRequirementRooms;
 }
 
 int RankedListConnectionFilter::CountPopulatedGameRows() const
