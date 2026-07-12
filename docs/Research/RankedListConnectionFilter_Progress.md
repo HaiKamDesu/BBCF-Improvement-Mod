@@ -2774,6 +2774,98 @@ structures this doc had already mapped read-side. All static analysis; no live d
    a scrambled list that fixes itself within half a second would indicate the identity-reset-
    after-Run ordering needs revisiting; a persistent scramble would be a real bug.
 
+## LIVE ROW DELETION/RESTORE (payload-partition + count control), and config-window disappearance root-caused and fixed (2026-07-12, same day)
+
+User confirmed live reordering works. Two follow-ups this session: (1) the config window
+disappears after idling on the list a while, (2) implement live row creation/deletion so the
+hide filter works in real time.
+
+### Config window disappearance: the 50s "recent list activity" window was wrong
+
+`DEBUG.txt` (session 01:48-01:57) shows three long stretches of `onList=0` with
+`state1=39 state=4` (still on the results screen): starting 01:52:13, 01:53:48, 01:56:12 -
+each beginning EXACTLY 50 seconds after the previous lobby-list request (deliveries at
+01:51:23 -> 01:52:58 -> 01:55:22, i.e. request gaps of 95s and 144s). The old
+`IsLobbyListLikelyOpen()` required a `RequestLobbyList` within the last 50s
+(`kListActivityWindowMs`) - but the game's auto-refresh cadence is NOT bounded (the earlier
+"every ~8-16s" observation was a small-sample artifact; a stable list can idle for minutes
+between refreshes). **Fixed:** replaced the recency window with `gameListHasRows` - the
+game's own row list currently holds rows (count at `listStruct+0xae8` > 0, read via the
+already-proven mgr chain, OR `m_gameListOrigCount > 0` to cover the all-rows-hidden-live
+case). The row list is authoritative: populated per delivery, zeroed by the same
+search-start/back-out functions that reset the permutation array, so it is true exactly while
+the list screen has content, indefinitely. All other conditions (gstate==27, state==4,
+state1 in {36,38,39}, not-in-functional-room-with-opponent) unchanged.
+
+### Live row deletion/restore: how it works
+
+The permutation array alone cannot remove rows (the renderer's bound is the visible-row index
+vs count, and the RTT resolver iterates logical positions, so perm games either leave ghost
+rows or starve tail rows of Delay resolution - see the previous section's "What was
+deliberately NOT done"). The clean mechanism, now implemented in
+`PollGameListAndApplyOrder()`:
+
+1. **Payload partition**: rows whose peer should be hidden get their node payloads (bytes
+   `0xC..0x117` of the 0x118-byte `GAMESTEAM_SearchResultNode` - everything except the vtable
+   at +0 and the intrusive list links at +4/+8) swapped to the logical tail via a two-pointer
+   partition. The node chain, walker cursor cache, and all node addresses stay untouched -
+   only contents move. The identity sub-object pointer (+0x114) moves with its payload, so
+   identity/RTT attribution stays correct.
+2. **Count shrink**: the game's row count (`+0xae8`) is then set to `orig - hiddenCount`.
+   Positions `0..shown-1` now form exactly the shape the game's own populate pass
+   (`FUN_0046d890`) produces when a refresh returns fewer lobbies - count shrink is a
+   vanilla-exercised path (renderer stops drawing, selection can't reach, RTT resolver skips,
+   "not matching" text appears at count 0). Hidden rows physically persist past the count,
+   parked in the pool.
+3. **Restore = the same thing in reverse**: a peer who stops being hidden (TTL expiry, manual
+   Restore in the config window) simply stops being partitioned out on the next pass - their
+   parked payload swaps back into the visible region and the count grows back. Fully
+   symmetric, no refresh needed, works because nothing overwrites parked payloads between
+   populates.
+4. **Count resync protocol** (the game also writes this field): after every delivery
+   (`handler->Run()`), `m_gameListResyncPending` is set - the populate pass runs on a
+   subsequent tick, so the live pass waits until the count visibly changes from the last
+   value we wrote (or 1.5s passes, covering the kept-count-coincides case) and re-learns the
+   game-authored count (`m_gameListOrigCount`). Outside deliveries, any count read that
+   differs from what we last wrote means the game repopulated on its own (e.g. metadata
+   update re-running populate from the cached records at `+0xcf4` - which also resurrects
+   hidden rows for <=400ms until the pass re-hides them; cosmetic only). Spontaneous
+   repopulates always restore the game-authored count (computed from the same records), so
+   they cannot be confused with our shrunken value while any row is hidden.
+5. **Ordering** (the existing permutation rewrite) then operates purely within the shown
+   region `0..shown-1`, stable against the pre-partition visible order. If the partition ever
+   aborts mid-way (bad pointer - never expected), the count write is skipped entirely so a
+   half-partitioned region can never be clipped.
+
+Safety recap: all writes are plain memory on the game's main thread (frame-atomic vs
+renderer/selection - same-thread), no vtable calls beyond the long-proven mgr slot-7 getter,
+walking parked positions past the count is fine (physical node pool >= raw record count, the
+game's own populate walks it blindly the same way), and every consumer of rows resolves
+through perm/count which are kept mutually consistent within a single pass.
+
+**Deliberately unchanged:** delivery-time compaction still removes already-known-bad peers
+before the game ever sees them (no visible blip). Consequence: a peer hidden AT DELIVERY has
+no game row to restore live - manual Restore still needs the next refresh for those, as the
+config window already says. Peers hidden LIVE (verdict landed while the list was up) now
+disappear within ~400ms and can reappear within ~400ms of being restored. True row CREATION
+(injecting rows the game never delivered) remains out of scope - no use case, since the mod
+controls delivery membership.
+
+Build verified clean (Debug|Win32). **Not yet live-tested.**
+
+### Test protocol for the next session
+
+1. Idle on a populated list for 3+ minutes without touching anything: the config window must
+   stay up the entire time (the old bug killed it at exactly +50s after the last refresh).
+   Back out of the list: window must still close promptly.
+2. With the filter ON, wait for a probe failure while the list is up (or force one): the row
+   should VANISH (not just sink) within ~1s - grep `live row count N -> M`. Row count text/
+   scroll behavior should look exactly like a smaller natural list.
+3. Restore the peer from the config window: if their row was live-hidden, it should reappear
+   within ~1s at its sorted position.
+4. Cross-check no ghost/duplicate rows right after the game's own auto-refresh (count resync
+   window) and after backing out + re-searching (search-start clear).
+
 ## Testing protocol reminder
 
 User builds/deploys manually via Visual Studio ("Release Deploy" config) — Claude never

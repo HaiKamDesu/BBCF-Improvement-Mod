@@ -299,6 +299,26 @@ private:
 	// identity) order - lets the pipeline restore identity exactly once when
 	// the features get turned off mid-session.
 	bool m_gamePermCustomized = false;
+	// Live hide/restore bookkeeping (see PollGameListAndApplyOrder). The
+	// game's row count (+0xae8) is shrunk to hide rows live: hidden rows'
+	// node payloads are swapped to the logical tail first, so positions
+	// 0..count-1 stay a consistent, fully game-owned shorter list - the same
+	// shape the game's own populate function produces, exercised by vanilla
+	// gameplay whenever a refresh returns fewer lobbies.
+	// The full (game-authored) row count of the current list, before any
+	// mod-side shrink - the region 0..orig-1 always physically holds all
+	// delivered rows, hidden ones parked at the tail.
+	int32_t m_gameListOrigCount = 0;
+	// The count value the mod last wrote to +0xae8 (or synced from the game);
+	// a live count read differing from this means the game repopulated the
+	// list on its own and m_gameListOrigCount must be re-learned.
+	int32_t m_gameListLastCountWritten = -1;
+	// Set right after each delivery's handler->Run(): the game's populate
+	// pass (which rewrites contents and count) runs on a subsequent tick, so
+	// the next live pass must re-learn the game-authored count instead of
+	// trusting a possibly-stale read.
+	bool m_gameListResyncPending = false;
+	unsigned long long m_lastDeliveryTickMs = 0;
 
 	uint64_t m_pendingConnectionTarget = 0;
 	uint64_t m_pendingLobbyId = 0;

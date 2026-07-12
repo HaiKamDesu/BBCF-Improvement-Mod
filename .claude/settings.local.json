@@ -126,7 +126,9 @@
       "Bash(cmd.exe /c \"run_ghidra_searchresultnode_populate_caller.cmd\")",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /v:m)",
       "Bash(sed -i 's|// PollGameTiers\\(\\) now reads that RTT field; no metadata tier read here.|// PollGameListAndApplyOrder\\(\\) now reads that RTT field; no metadata tier read here.|; s|// recently for this peer, read live by PollGameTiers\\(\\). Sorting by|// recently for this peer, read live by PollGameListAndApplyOrder\\(\\). Sorting by|' src/Network/RankedListConnectionFilter.cpp)",
-      "Bash(sed -i 's|// read from the ranked-list row entry.s +0x78 field via PollGameTiers\\(\\)|// read from the ranked-list row entry'\"'\"'s +0x78 field via PollGameListAndApplyOrder\\(\\)|' src/Network/RankedListConnectionFilter.h)"
+      "Bash(sed -i 's|// read from the ranked-list row entry.s +0x78 field via PollGameTiers\\(\\)|// read from the ranked-list row entry'\"'\"'s +0x78 field via PollGameListAndApplyOrder\\(\\)|' src/Network/RankedListConnectionFilter.h)",
+      "Bash(uniq -c -f2)",
+      "Bash(grep -iE \"error|dinput8.dll$\")"
     ]
   }
 }

@@ -53,6 +53,16 @@ namespace
 	// row renderer FUN_00661060 use exactly 50).
 	constexpr int32_t kGamePermSlots = 50;
 
+	// GAMESTEAM_SearchResultNode payload region for live hide/restore swaps:
+	// the node is 0x118 bytes (operator_new size in its constructor
+	// FUN_0046f680); +0 is the vtable pointer and +4/+8 are the intrusive
+	// list next/prev links, all of which must stay put - everything from +0xC
+	// up (the exact range the field-initializer FUN_0046dc00 zeroes, plus the
+	// +0x114 identity sub-object pointer) is per-row payload and moves as a
+	// unit.
+	constexpr size_t kNodePayloadOffset = 0xC;
+	constexpr size_t kNodePayloadSize = 0x118 - kNodePayloadOffset;
+
 	// Exact reproduction of the game's own RTT -> Delay-digit bucketing
 	// (FUN_004a6620, used by the ranked list row renderer FUN_00661060 to draw
 	// the '0'+digit glyph): negative = unresolved (nothing drawn), <60ms = 4,
@@ -537,7 +547,9 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	{
 		// Features were turned off (or nothing delivered): if we left a custom
 		// order in the game's permutation array, put it back the way the game
-		// expects it, once.
+		// expects it, once. (A shrunk count is left alone - the next populate
+		// or search-clear rewrites it wholesale anyway, and restoring rows the
+		// user asked to hide just because the window closed would be wrong.)
 		if (m_gamePermCustomized)
 		{
 			WriteIdentityGamePermutation();
@@ -558,9 +570,50 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	{
 		return;
 	}
-	const int32_t rowCount = *reinterpret_cast<const int32_t*>(listStruct + 0xae8);
-	const int32_t cap = (rowCount < kGamePermSlots) ? rowCount : kGamePermSlots;
-	if (cap <= 0)
+	int32_t* const countField = reinterpret_cast<int32_t*>(listStruct + 0xae8);
+	if (IsBadWritePtr(countField, sizeof(int32_t)))
+	{
+		return;
+	}
+	const int32_t countRead = *countField;
+
+	// --- Count resync: learn the game-authored full row count. ---
+	// The game's populate pass (FUN_0046d890) rewrites node payloads and the
+	// count on its own tick shortly after each delivery (and again on
+	// spontaneous repopulates, e.g. lobby-metadata updates re-running it from
+	// the cached records). Any count value we did not write ourselves is
+	// game-authored and defines the true full list size. While a resync is
+	// pending right after a delivery, the count may still be a stale value
+	// from before the populate pass - hands off until it is unambiguous.
+	if (m_gameListResyncPending)
+	{
+		if (countRead != m_gameListLastCountWritten || now - m_lastDeliveryTickMs > 1500)
+		{
+			// Either the populate pass visibly ran (count differs from
+			// whatever we last wrote), or enough time passed that it
+			// certainly ran and its kept-count merely coincides with the old
+			// value. Both ways the current count is game-authored.
+			m_gameListOrigCount = countRead;
+			m_gameListLastCountWritten = countRead;
+			m_gameListResyncPending = false;
+		}
+		else
+		{
+			return;
+		}
+	}
+	else if (countRead != m_gameListLastCountWritten)
+	{
+		// The game changed the count outside a delivery we know about
+		// (spontaneous repopulate, or the search-start clear zeroing it).
+		// Re-learn it. A spontaneous repopulate also resurrects any rows we
+		// had hidden - the partition below re-hides them within this pass.
+		m_gameListOrigCount = countRead;
+		m_gameListLastCountWritten = countRead;
+	}
+
+	const int32_t orig = (m_gameListOrigCount < kGamePermSlots) ? m_gameListOrigCount : kGamePermSlots;
+	if (orig <= 0)
 	{
 		return;
 	}
@@ -573,118 +626,222 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	typedef void* (__thiscall * WalkRowListFn)(void*, int32_t);
 	const WalkRowListFn walkRowList = reinterpret_cast<WalkRowListFn>(moduleBase + kWalkRowListRva);
 
-	// Pass 1: walk the game's rows by LOGICAL list position (0..count-1, the
-	// index space the permutation array maps into) and harvest each row's
-	// identity + measured RTT. The identity sub-object pointer (entry+0x114)
-	// is set synchronously when the game populates the row (FUN_0046fcc0's
-	// first store), so it is available immediately after a delivery; the RTT
-	// (entry+0x78, the value behind the on-screen 0-4 Delay digit) resolves
-	// asynchronously and reads -1 until then. Both are plain field reads -
-	// no virtual calls.
+	// Pass 1: walk ALL delivered rows (0..orig-1, including any currently
+	// parked past a shrunk count - the node chain is a physical pool the
+	// walker traverses without bounds checks, and tail nodes still hold the
+	// payloads parked there) and harvest node pointer, Steam64 identity
+	// (entry+0x114 -> +0xc/+0x10, attached synchronously at populate) and
+	// Delay RTT (entry+0x78, resolves asynchronously, -1 until then).
 	struct LiveRow
 	{
-		int32_t logical = 0;
+		uint8_t* node = nullptr;
 		uint64_t steamId = 0;
 	};
-	std::vector<LiveRow> rows;
-	rows.reserve(static_cast<size_t>(cap));
-	for (int32_t logical = 0; logical < cap; ++logical)
+	std::vector<LiveRow> rows(static_cast<size_t>(orig));
+	for (int32_t logical = 0; logical < orig; ++logical)
 	{
-		LiveRow row;
-		row.logical = logical;
-
+		LiveRow& row = rows[static_cast<size_t>(logical)];
 		void* const entry = walkRowList(listStruct, logical);
-		if (entry != nullptr && !IsBadReadPtr(entry, sizeof(void*)))
+		if (entry == nullptr || IsBadReadPtr(entry, 0x118))
 		{
-			const uint8_t* const idSubObjPtr = reinterpret_cast<const uint8_t*>(entry) + 0x114;
-			if (!IsBadReadPtr(idSubObjPtr, sizeof(void*)))
-			{
-				const void* const idSubObj = *reinterpret_cast<void* const*>(idSubObjPtr);
-				if (idSubObj != nullptr &&
-					!IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
-				{
-					const uint32_t idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
-					const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
-					row.steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
-				}
-			}
+			continue;
+		}
+		row.node = reinterpret_cast<uint8_t*>(entry);
 
-			const uint8_t* const rttFieldPtr = reinterpret_cast<const uint8_t*>(entry) + 0x78;
-			if (row.steamId != 0 && !IsBadReadPtr(rttFieldPtr, sizeof(int32_t)))
+		const void* const idSubObj = *reinterpret_cast<void* const*>(row.node + 0x114);
+		if (idSubObj != nullptr &&
+			!IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
+		{
+			const uint32_t idLow = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+			const uint32_t idHigh = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+			row.steamId = (static_cast<uint64_t>(idHigh) << 32) | idLow;
+		}
+
+		if (row.steamId != 0)
+		{
+			const int32_t rttMs = *reinterpret_cast<const int32_t*>(row.node + 0x78);
+			if (rttMs >= 0)
 			{
-				const int32_t rttMs = *reinterpret_cast<const int32_t*>(rttFieldPtr);
-				if (rttMs >= 0)
+				PeerVerdict& verdict = m_verdicts[row.steamId];
+				verdict.gameRttMs = rttMs;
+				verdict.gameTier = GameDelayDigitFromRtt(rttMs);
+				verdict.gameTierTickMs = now;
+				// Cumulative average kept for diagnostics only (user chose
+				// latest-reading sorting).
+				if (verdict.gameTierSampleCount <= 0)
 				{
-					PeerVerdict& verdict = m_verdicts[row.steamId];
-					verdict.gameRttMs = rttMs;
-					verdict.gameTier = GameDelayDigitFromRtt(rttMs);
-					verdict.gameTierTickMs = now;
-					// Cumulative average kept for diagnostics only (user chose
-					// latest-reading sorting).
-					if (verdict.gameTierSampleCount <= 0)
-					{
-						verdict.gameTierAverage = static_cast<double>(rttMs);
-					}
-					else
-					{
-						verdict.gameTierAverage =
-							(verdict.gameTierAverage * verdict.gameTierSampleCount + rttMs) /
-							(verdict.gameTierSampleCount + 1);
-					}
-					++verdict.gameTierSampleCount;
+					verdict.gameTierAverage = static_cast<double>(rttMs);
 				}
+				else
+				{
+					verdict.gameTierAverage =
+						(verdict.gameTierAverage * verdict.gameTierSampleCount + rttMs) /
+						(verdict.gameTierSampleCount + 1);
+				}
+				++verdict.gameTierSampleCount;
 			}
 		}
-		rows.push_back(row);
 	}
 
-	// Pass 2: current visible order as the stability baseline, from the
-	// permutation array as it stands. Invalid/stale/duplicate perm values
-	// (possible for one pass right after the game rebuilt the list) fall back
-	// to appending the missed logical indices in ascending order.
-	std::vector<int32_t> visibleSeq;
-	visibleSeq.reserve(static_cast<size_t>(cap));
-	std::vector<bool> logicalUsed(static_cast<size_t>(cap), false);
-	for (int32_t slot = 0; slot < cap; ++slot)
+	// Pass 2: capture the current visible sequence as a stability baseline
+	// BEFORE any payload moves. Tracked as pre-move logical indices;
+	// `newPosOf` translates them after the partition. Invalid/stale/duplicate
+	// perm values fall back to appending the missed indices in ascending
+	// order.
+	std::vector<int32_t> baselineSeq;
+	baselineSeq.reserve(static_cast<size_t>(orig));
 	{
-		const int32_t logical = perm[slot];
-		if (logical >= 0 && logical < cap && !logicalUsed[static_cast<size_t>(logical)])
+		std::vector<bool> used(static_cast<size_t>(orig), false);
+		for (int32_t slot = 0; slot < orig; ++slot)
 		{
-			logicalUsed[static_cast<size_t>(logical)] = true;
-			visibleSeq.push_back(logical);
+			const int32_t logical = perm[slot];
+			if (logical >= 0 && logical < orig && !used[static_cast<size_t>(logical)])
+			{
+				used[static_cast<size_t>(logical)] = true;
+				baselineSeq.push_back(logical);
+			}
 		}
-	}
-	for (int32_t logical = 0; logical < cap; ++logical)
-	{
-		if (!logicalUsed[static_cast<size_t>(logical)])
+		for (int32_t logical = 0; logical < orig; ++logical)
 		{
-			visibleSeq.push_back(logical);
+			if (!used[static_cast<size_t>(logical)])
+			{
+				baselineSeq.push_back(logical);
+			}
 		}
 	}
 
-	// Pass 3: desired visible order. Split the current sequence into
-	// [sortable rows] / [rows with no matching candidate] / [hidden-pending
-	// rows], sort the first group with the exact same comparator the
-	// delivery path uses, and reassemble. Hidden-pending peers (confirmed
-	// bad AFTER this list was delivered) sink to the tail instantly - their
-	// full removal still happens on the next real delivery.
+	// Pass 3: LIVE HIDE/RESTORE. Rows whose peer should currently be hidden
+	// get their node payloads swapped to the logical tail, and the game's row
+	// count is shrunk so positions 0..shownCount-1 form a consistent, fully
+	// game-shaped shorter list (identical to what the game's own populate
+	// pass produces when a refresh returns fewer lobbies - a vanilla-
+	// exercised shape). Payload swaps move bytes 0xC..0x117 of the 0x118-byte
+	// GAMESTEAM_SearchResultNode and leave the vtable (+0) and the intrusive
+	// list links (+4/+8) in place, so the node chain and the walker's cursor
+	// cache stay untouched. Restores are the same mechanism in reverse: a
+	// peer no longer hidden simply stops being partitioned out, the count
+	// grows back, and their parked payload re-enters the visible region.
 	const bool filterEnabled = Settings::settingsIni.enableRankedListConnectionFilter;
+	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
+	if (filterEnabled)
+	{
+		for (int32_t logical = 0; logical < orig; ++logical)
+		{
+			const uint64_t steamId = rows[static_cast<size_t>(logical)].steamId;
+			hiddenAt[static_cast<size_t>(logical)] = steamId != 0 && ShouldHidePeer(steamId, now);
+		}
+	}
+
+	// newPosOf[preMoveLogical] = position after the partition.
+	std::vector<int32_t> newPosOf(static_cast<size_t>(orig));
+	std::vector<int32_t> preAt(static_cast<size_t>(orig)); // position -> pre-move logical
+	for (int32_t i = 0; i < orig; ++i)
+	{
+		newPosOf[static_cast<size_t>(i)] = i;
+		preAt[static_cast<size_t>(i)] = i;
+	}
+
+	int32_t front = 0;
+	int32_t back = orig - 1;
+	int32_t swapsDone = 0;
+	bool partitionAborted = false;
+	while (front < back)
+	{
+		if (!hiddenAt[static_cast<size_t>(front)])
+		{
+			++front;
+			continue;
+		}
+		if (hiddenAt[static_cast<size_t>(back)])
+		{
+			--back;
+			continue;
+		}
+		uint8_t* const nodeA = rows[static_cast<size_t>(front)].node;
+		uint8_t* const nodeB = rows[static_cast<size_t>(back)].node;
+		if (nodeA == nullptr || nodeB == nullptr ||
+			IsBadWritePtr(nodeA + kNodePayloadOffset, kNodePayloadSize) ||
+			IsBadWritePtr(nodeB + kNodePayloadOffset, kNodePayloadSize))
+		{
+			partitionAborted = true;
+			break; // something is off - leave the list alone this pass
+		}
+		uint8_t tmp[kNodePayloadSize];
+		memcpy(tmp, nodeA + kNodePayloadOffset, kNodePayloadSize);
+		memcpy(nodeA + kNodePayloadOffset, nodeB + kNodePayloadOffset, kNodePayloadSize);
+		memcpy(nodeB + kNodePayloadOffset, tmp, kNodePayloadSize);
+		++swapsDone;
+
+		std::swap(rows[static_cast<size_t>(front)].steamId, rows[static_cast<size_t>(back)].steamId);
+		const bool hf = hiddenAt[static_cast<size_t>(front)];
+		hiddenAt[static_cast<size_t>(front)] = hiddenAt[static_cast<size_t>(back)];
+		hiddenAt[static_cast<size_t>(back)] = hf;
+		const int32_t preF = preAt[static_cast<size_t>(front)];
+		const int32_t preB = preAt[static_cast<size_t>(back)];
+		preAt[static_cast<size_t>(front)] = preB;
+		preAt[static_cast<size_t>(back)] = preF;
+		newPosOf[static_cast<size_t>(preF)] = back;
+		newPosOf[static_cast<size_t>(preB)] = front;
+	}
+
+	if (partitionAborted)
+	{
+		// A half-partitioned region must not be clipped by a count write -
+		// some hidden rows could stay visible and shown rows get cut off.
+		// Leave everything as-is; the next pass retries from scratch.
+		return;
+	}
+
+	int32_t hiddenCount = 0;
+	for (int32_t i = 0; i < orig; ++i)
+	{
+		if (hiddenAt[static_cast<size_t>(i)])
+		{
+			++hiddenCount;
+		}
+	}
+	const int32_t shownCount = orig - hiddenCount;
+
+	if (*countField != shownCount)
+	{
+		LOG(1, "[RankedListFilter] live row count %d -> %d (%d hidden of %d, %d payload swaps)\n",
+			*countField, shownCount, hiddenCount, orig, swapsDone);
+		*countField = shownCount;
+	}
+	m_gameListLastCountWritten = shownCount;
+	m_lastShownCount = static_cast<size_t>(shownCount);
+	m_lastHiddenCount = m_candidates.size() > static_cast<size_t>(shownCount)
+		? m_candidates.size() - static_cast<size_t>(shownCount) : 0;
+
+	if (shownCount <= 0)
+	{
+		// Everything hidden: nothing to order. Keep perm identity so the
+		// game sees a fully consistent (empty) list.
+		for (int32_t slot = 0; slot < kGamePermSlots; ++slot)
+		{
+			perm[slot] = slot;
+		}
+		return;
+	}
+
+	// Pass 4: desired visible order over the shown region (post-partition
+	// positions 0..shownCount-1), stable against the pre-partition visible
+	// sequence. Rows are matched to delivered candidates by owner steamId
+	// (consuming each candidate once, keeping the mapping one-to-one) and
+	// sorted with the exact comparator the delivery path uses; rows with no
+	// matching candidate keep their relative order after the sorted block.
 	std::vector<int32_t> sortableLogicals;
 	std::vector<const LobbyCandidate*> sortableCandidates;
 	std::vector<int32_t> unmatchedLogicals;
-	std::vector<int32_t> hiddenLogicals;
 	std::vector<bool> candidateConsumed(m_candidates.size(), false);
-	for (const int32_t logical : visibleSeq)
+	for (const int32_t preLogical : baselineSeq)
 	{
-		const uint64_t steamId = rows[static_cast<size_t>(logical)].steamId;
-		if (filterEnabled && steamId != 0 && ShouldHidePeer(steamId, now))
+		const int32_t logical = newPosOf[static_cast<size_t>(preLogical)];
+		if (logical >= shownCount)
 		{
-			hiddenLogicals.push_back(logical);
-			continue;
+			continue; // parked hidden row - not part of the visible region
 		}
-		// Match this row to one of our delivered candidates by owner steamId,
-		// consuming each candidate at most once (two lobbies can share an
-		// owner in weird cases; consumption keeps the mapping one-to-one).
+		const uint64_t steamId = rows[static_cast<size_t>(logical)].steamId;
 		const LobbyCandidate* matched = nullptr;
 		if (steamId != 0)
 		{
@@ -710,12 +867,11 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	}
 
 	// Sort the matched rows with the shared comparator (quietly - this runs
-	// ~2x/sec; we log only when the on-screen order actually changes).
+	// ~2.5x/sec; we log only when the on-screen order actually changes).
 	std::vector<const LobbyCandidate*> sortedCandidates = sortableCandidates;
 	SortShownCandidates(&sortedCandidates, false);
-	// Map the sorted candidate sequence back to logical indices.
 	std::vector<int32_t> desired;
-	desired.reserve(static_cast<size_t>(cap));
+	desired.reserve(static_cast<size_t>(shownCount));
 	{
 		std::vector<bool> rowTaken(sortableLogicals.size(), false);
 		for (const LobbyCandidate* const candidate : sortedCandidates)
@@ -732,36 +888,53 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		}
 	}
 	desired.insert(desired.end(), unmatchedLogicals.begin(), unmatchedLogicals.end());
-	desired.insert(desired.end(), hiddenLogicals.begin(), hiddenLogicals.end());
+	// Safety net: any shown position not covered above (shouldn't happen)
+	// still needs to appear exactly once for perm to stay a permutation.
+	{
+		std::vector<bool> present(static_cast<size_t>(shownCount), false);
+		for (const int32_t logical : desired)
+		{
+			if (logical >= 0 && logical < shownCount)
+			{
+				present[static_cast<size_t>(logical)] = true;
+			}
+		}
+		for (int32_t logical = 0; logical < shownCount; ++logical)
+		{
+			if (!present[static_cast<size_t>(logical)])
+			{
+				desired.push_back(logical);
+			}
+		}
+	}
 
-	// Pass 4: write the permutation only if it actually changed. Same thread
+	// Pass 5: write the permutation only if it actually changed. Same thread
 	// as the renderer/selection logic (the Steam callback pump runs on the
 	// game's main thread), so this is frame-atomic - no torn reads possible.
-	bool changed = false;
-	for (int32_t slot = 0; slot < cap; ++slot)
+	bool changed = swapsDone > 0;
+	for (int32_t slot = 0; slot < shownCount && !changed; ++slot)
 	{
 		if (perm[slot] != desired[static_cast<size_t>(slot)])
 		{
 			changed = true;
-			break;
 		}
 	}
 	if (!changed)
 	{
 		return;
 	}
-	for (int32_t slot = 0; slot < cap; ++slot)
+	for (int32_t slot = 0; slot < shownCount; ++slot)
 	{
 		perm[slot] = desired[static_cast<size_t>(slot)];
 	}
-	for (int32_t slot = cap; slot < kGamePermSlots; ++slot)
+	for (int32_t slot = shownCount; slot < kGamePermSlots; ++slot)
 	{
 		perm[slot] = slot;
 	}
 	m_gamePermCustomized = true;
 
 	std::string orderDump;
-	for (int32_t slot = 0; slot < cap; ++slot)
+	for (int32_t slot = 0; slot < shownCount; ++slot)
 	{
 		const uint64_t steamId = rows[static_cast<size_t>(desired[static_cast<size_t>(slot)])].steamId;
 		const char* name = "???";
@@ -783,8 +956,8 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		snprintf(part, sizeof(part), " #%d %s(delay=%d)", slot, name, delay);
 		orderDump += part;
 	}
-	LOG(1, "[RankedListFilter] live order applied (%d rows, %zu hidden-pending):%s\n",
-		cap, hiddenLogicals.size(), orderDump.c_str());
+	LOG(1, "[RankedListFilter] live order applied (%d shown, %d hidden live):%s\n",
+		shownCount, hiddenCount, orderDump.c_str());
 }
 
 bool RankedListConnectionFilter::ShouldHidePeer(uint64_t steamId, unsigned long long nowMs) const
@@ -1162,6 +1335,13 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	// re-apply the proper order within ~400ms.
 	WriteIdentityGamePermutation();
 	m_lastLiveOrderTickMs = 0; // let the live pass run on the very next pump
+
+	// The game's populate pass (which rewrites node payloads and the row
+	// count from this delivery's records) runs on a subsequent tick, not
+	// inside Run() - flag the live pass to re-learn the game-authored count
+	// before it resumes any live hide/reorder work.
+	m_gameListResyncPending = true;
+	m_lastDeliveryTickMs = GetTickCount64();
 }
 
 void RankedListConnectionFilter::PollPendingConnectionConfirmation()
@@ -1702,12 +1882,29 @@ bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 			// actual signal we want here.
 			const bool isSearchResultsState = state1 == 36 || state1 == 38 || state1 == 39;
 
-			// Real list-request activity only happens while actually browsing -
-			// once a lobby is joined, no further RequestLobbyList calls fire, so
-			// recency of the last one helps exclude later screens too.
-			constexpr unsigned long long kListActivityWindowMs = 50000;
-			const bool recentListActivity =
-				m_lastListRequestTickMs != 0 && now - m_lastListRequestTickMs < kListActivityWindowMs;
+			// The game's own row list currently holds rows. This replaces an
+			// earlier "RequestLobbyList issued within the last 50s" recency
+			// window, which live testing (2026-07-12 DEBUG.txt) proved wrong:
+			// the game's auto-refresh cadence is NOT bounded - observed gaps
+			// of 95s and 144s between requests while idling on a perfectly
+			// stable list - so the window expired and the config window
+			// vanished mid-list (onList=0 with state1=39 for 45-90s stretches,
+			// starting exactly 50s after the last request every time). The
+			// row list itself is authoritative: populated per delivery,
+			// cleared at search start/back-out (its count is zeroed by the
+			// same functions that reset the permutation array).
+			// m_gameListOrigCount covers the corner where the live hide pass
+			// has temporarily shrunk the game's count to zero (all rows
+			// hidden) - the list screen is still very much on screen then.
+			bool gameListHasRows = m_gameListOrigCount > 0;
+			if (!gameListHasRows)
+			{
+				const uint8_t* const listStruct = ResolveGameRowListStruct();
+				if (listStruct != nullptr)
+				{
+					gameListHasRows = *reinterpret_cast<const int32_t*>(listStruct + 0xae8) > 0;
+				}
+			}
 
 			// Additional exclusion: once a real room is joined with an actual
 			// opponent (character select onward), IsRoomFunctional() goes true
@@ -1727,7 +1924,7 @@ bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 				!g_interfaces.pRoomManager->GetOtherRoomMemberEntriesInCurrentMatch().empty();
 
 			onList = gstate == GameState_MainMenu && state == 4 && isSearchResultsState &&
-				recentListActivity && !inFunctionalRoomWithOpponent;
+				gameListHasRows && !inFunctionalRoomWithOpponent;
 		}
 	}
 
