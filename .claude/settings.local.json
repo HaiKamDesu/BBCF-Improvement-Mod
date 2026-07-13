@@ -132,7 +132,15 @@
       "Bash(sed -n '/bool RankedListConnectionFilter::IsPipelineActive/,/^}/p' src/Network/RankedListConnectionFilter.cpp)",
       "Bash(sed -n '/void RankedListConnectionFilter::GetHiddenPeers/,/^}/p' src/Network/RankedListConnectionFilter.cpp)",
       "Bash(grep -iE \"error|dinput8\\\\.dll$\")",
-      "Bash(grep -nE \"dword ptr \\\\[[a-z]+\\\\+0?0*15D80h?\\\\],|\\\\[[a-z]+\\\\+0?0*15D80h?\\\\]$\")"
+      "Bash(grep -nE \"dword ptr \\\\[[a-z]+\\\\+0?0*15D80h?\\\\],|\\\\[[a-z]+\\\\+0?0*15D80h?\\\\]$\")",
+      "Bash(cmd.exe /c run_ghidra_dcode_bug8.cmd)",
+      "Bash(sed -i 's/—/--/g; s/’/'\"'\"'/g' DecompileDCodeBug8.py)",
+      "Bash(sed -i '1i # -*- coding: utf-8 -*-' DecompileDCodeBug8.py)",
+      "Bash(sed -e 's/phase 8.*/phase 9: follow-ups from phase 8./' DCodeBug8GhidraReport.txt)",
+      "Bash(sed -i 's/DecompileDCodeBug8/DecompileDCodeBug9/; s/dcode_bug8/dcode_bug9/' ghidra_scripts/DecompileDCodeBug9.py)",
+      "Bash(sed -i 's/Bug8/Bug9/g; s/bug8/bug9/g' run_ghidra_dcode_bug9.cmd)",
+      "Bash(cmd.exe /c run_ghidra_dcode_bug9.cmd)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 tools/bbcf_disasm.txt)"
     ]
   }
 }

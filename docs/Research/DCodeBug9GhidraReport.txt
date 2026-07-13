@@ -1,0 +1,205 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 0040df10 containing 0040df10 -----
+Function: FUN_0040df10
+
+bool FUN_0040df10(int param_1,uint param_2)
+
+{
+  int iVar1;
+  uint uVar2;
+  uint uVar3;
+  
+  iVar1 = 0;
+  uVar3 = 0;
+  if (param_2 >> 1 != 0) {
+    do {
+      uVar2 = iVar1 + (uint)*(ushort *)(param_1 + uVar3 * 2);
+      uVar3 = uVar3 + 1;
+      iVar1 = (uVar2 & 0xffff) + (uVar2 >> 0x10);
+    } while (uVar3 < param_2 >> 1);
+  }
+  return (short)iVar1 == -1;
+}
+
+
+
+----- DECOMPILE 004717c0 containing 004717c0 -----
+Function: FUN_004717c0
+
+undefined4 * __fastcall FUN_004717c0(undefined4 *param_1)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00828fa8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  FUN_004b8b90(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  *param_1 = GAMESTEAM_COnlineStorageTransfer::vftable;
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 0047c8c0 containing 0047c8c0 -----
+Function: FUN_0047c8c0
+
+undefined * FUN_0047c8c0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082a09e;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00c7a114 & 1) == 0) {
+    DAT_00c7a114 = DAT_00c7a114 | 1;
+    local_8 = 0;
+    FUN_0047bd50(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    FUN_0047bcb0();
+  }
+  ExceptionList = local_10;
+  return &DAT_00a79658;
+}
+
+
+
+----- DECOMPILE 0049a940 containing 0049a940 -----
+Function: FUN_0049a940
+
+void FUN_0049a940(void)
+
+{
+  FUN_004a0fe0();
+  FUN_004a25c0();
+  FUN_004a0fe0();
+  FUN_004a0b80();
+  return;
+}
+
+
+
+----- DECOMPILE 004a1a00 containing 004a1a00 -----
+Function: FUN_004a1a00
+
+bool __fastcall FUN_004a1a00(int param_1)
+
+{
+  return *(int *)(*(int *)(param_1 + 0x68a0) + 0xcc) == 1;
+}
+
+
+
+----- DECOMPILE 004a2870 containing 004a2870 -----
+Function: FUN_004a2870
+
+void __fastcall FUN_004a2870(int param_1)
+
+{
+  ushort *puVar1;
+  int iVar2;
+  undefined4 extraout_EDX;
+  int *piVar3;
+  int iVar4;
+  int iVar5;
+  uint uVar6;
+  int *piVar7;
+  uint local_ac;
+  int local_a8 [40];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  local_ac = 0;
+  piVar3 = (int *)(param_1 + 0xe0);
+  do {
+    uVar6 = 0;
+    piVar7 = piVar3;
+    do {
+      switch(local_ac) {
+      case 0:
+        iVar5 = FUN_004bdff0(piVar3 + -3);
+        break;
+      case 1:
+        iVar5 = *piVar3;
+        break;
+      case 2:
+        iVar5 = piVar3[2];
+        break;
+      case 3:
+        iVar2 = 0;
+        puVar1 = (ushort *)((int)piVar3 + 0x1a);
+        iVar5 = 0;
+        iVar4 = 0x20;
+        do {
+          iVar2 = iVar2 + (uint)puVar1[-1];
+          iVar5 = iVar5 + (uint)*puVar1;
+          puVar1 = puVar1 + 2;
+          iVar4 = iVar4 + -1;
+        } while (iVar4 != 0);
+        iVar5 = iVar5 + iVar2;
+        break;
+      default:
+        goto switchD_004a28b5_default;
+      }
+      local_a8[uVar6] = iVar5;
+switchD_004a28b5_default:
+      uVar6 = uVar6 + 1;
+      piVar3 = piVar3 + 0x60;
+    } while (uVar6 < 0x28);
+    FUN_004a2050(local_a8);
+    local_ac = local_ac + 1;
+    piVar3 = piVar7;
+    if (3 < local_ac) {
+      __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc,extraout_EDX,piVar7,param_1);
+      return;
+    }
+  } while( true );
+}
+
+
+
+===== CALLEES =====
+--- callees of 0040df10 (FUN_0040df10) ---
+
+--- callees of 004717c0 (FUN_004717c0) ---
+  004b8b90 FUN_004b8b90
+
+--- callees of 0047c8c0 (FUN_0047c8c0) ---
+  0047bcb0 FUN_0047bcb0
+  0047bd50 FUN_0047bd50
+
+--- callees of 0049a940 (FUN_0049a940) ---
+  004a25c0 FUN_004a25c0
+  004a0fe0 FUN_004a0fe0
+  004a0b80 FUN_004a0b80
+
+--- callees of 004a1a00 (FUN_004a1a00) ---
+
+--- callees of 004a2870 (FUN_004a2870) ---
+  004bdff0 FUN_004bdff0
+  0079e869 __security_check_cookie
+  004a2050 FUN_004a2050
+
+===== CALLERS =====
+--- callers of 0040df10 (FUN_0040df10) ---
+  006c4990 FUN_006c4990
+  004bb080 FUN_004bb080
+  00428ac0 FUN_00428ac0
+  004b0970 FUN_004b0970
+  0042edd0 FUN_0042edd0
+  004a1dd0 FUN_004a1dd0
+
+--- callers of 0049d440 (FUN_0049d440) ---
+  004a6f70 FUN_004a6f70
+
+--- callers of 0049a230 (FUN_0049a230) ---
+  004b0970 FUN_004b0970
+

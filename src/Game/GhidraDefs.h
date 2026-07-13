@@ -441,3 +441,28 @@ struct InputQueue {
     undefined field13_0xe47;
 };
 
+
+// ---------------------------------------------------------------------------
+// D-Code / per-room-member profile fetch state machine (docs/Research/
+// DCodeNetworkStallBug.md, DCodeBug8/9GhidraReport.txt). Addresses are
+// base-relative RVAs unless noted (Ghidra VAs assume image base 0x00400000).
+// row = netUserData(base+0x8AD0C0) + 0x2326C + slot*0x68A4; the row's first
+// 0x6800 bytes are the member's profile blob (0x28 per-character 0x180-stride
+// ranked entries at +0xD4). subobj = *(row+0x68A0); fetch state at subobj+0xCC:
+// 0 idle, 1 queued, 2 in flight, 3 ready, 6 rejected (permanent wedge).
+// ---------------------------------------------------------------------------
+// Ghidra FUN_0049D440 - per-frame pump, ticks all 6 rows (caller FUN_004A6F70)
+static constexpr uintptr_t ADDR_DCodeFetchPump = 0x0009D440;
+// Ghidra FUN_004A25C0 - per-slot fetch tick (__fastcall, ecx=row); hooked by
+// the DCodeFetchTick JMP patch in hooks_bbcf.cpp
+static constexpr uintptr_t ADDR_DCodeFetchTick = 0x000A25C0;
+// Ghidra FUN_004A1DD0 - payload validator (size 0x6800 + checksum), sets state 3
+static constexpr uintptr_t ADDR_DCodePayloadValidator = 0x000A1DD0;
+// Ghidra FUN_0040DF10 - 16-bit ones'-complement checksum, valid iff sum==0xFFFF;
+// shared with save-data code (FUN_006C4990/FUN_004BB080)
+static constexpr uintptr_t ADDR_ProfileChecksum16 = 0x0000DF10;
+// Ghidra FUN_004A0D50 - blob reset (memset 0x6800 + reinit) run before state:=6
+static constexpr uintptr_t ADDR_DCodeBlobReset = 0x000A0D50;
+// Ghidra FUN_004B8F70 - lazy singleton getter for GAMESTEAM_COnlineStorageTransfer
+// (ctor FUN_004717C0, 0x1C bytes) - the transport behind the profile exchange
+static constexpr uintptr_t ADDR_OnlineStorageTransferSingleton = 0x000B8F70;

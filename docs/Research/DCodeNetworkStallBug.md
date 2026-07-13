@@ -191,8 +191,113 @@ to read it back out of game memory.
 
 ## Reproducing the RE session
 
-Scripts: `docs/Research/ghidra_scripts/DecompileDCodeBug.py`,
-`DecompileDCodeBug2.py`, `DecompileDCodeBug3.py`. Run via
-`run_ghidra_dcode_bug.cmd` / `_bug2.cmd` / `_bug3.cmd`. Reports:
-`DCodeBugGhidraReport.txt`, `DCodeBug2GhidraReport.txt`,
-`DCodeBug3GhidraReport.txt` (same directory).
+Scripts: `docs/Research/ghidra_scripts/DecompileDCodeBug.py` through
+`DecompileDCodeBug9.py`. Run via `run_ghidra_dcode_bug.cmd` ..
+`run_ghidra_dcode_bug9.cmd`. Reports: `DCodeBugGhidraReport.txt` ..
+`DCodeBug9GhidraReport.txt` (same directory).
+
+## 2026-07-12: FIRST LIVE CAPTURE — the wedge is state 6, not state 2
+
+`Debug_DCodeError1.txt` (this directory) is a full session log with the bug
+occurring. Session 20:42–21:00, clean shutdown, versus screens at 20:43,
+20:47, 20:50, 20:54. Key `[NetStall]` events:
+
+```text
+20:43:05  slot 1 (opponent) 0 -> 2      # first match, healthy
+20:43:07  slot 1 2 -> 3
+20:43:41  slot 0 (self)     0 -> 2
+20:43:43  slot 0 2 -> 3
+20:50:49.120  slot 0 3 -> 2             # re-fetch right before 3rd match
+20:50:50.132  slot 0 2 -> 6             # response arrived, REJECTED
+              (no further slot transitions until shutdown — wedged at 6)
+20:50:52  GetGameStateVersusScreen      # match 3 starts with slot 0 dead
+```
+
+So the theorized "silent stall at state 2 with no timeout" is NOT what
+happened here: a response **arrived within ~1s and failed validation**
+(size != 0x6800 or checksum failure), producing the state-6 wedge, which is
+just as permanent (see below). The 15s state-2 watchdog theory stays as a
+secondary failure shape but the state-6 path is the observed one.
+
+Also found in that log: the auto-save-trigger diagnostic printed constant
+garbage (`auto-save trigger -2 -> -1956749403`) because
+`NetworkStallDiagnostics.cpp` had `kAutoSaveTriggerRva = 0xA97C8` — a dropped
+digit; VA `0x00EA97C8` − base `0x00400000` = RVA `0xAA97C8`. Fixed. All
+save-manager readings in Debug_DCodeError1.txt for that field are therefore
+meaningless; the `save manager actionRunning/nextAction` lines used the
+correct address and remain valid (note: at 20:58:21, after the wedge,
+`nextAction` pulsed `0 -> 7 -> 0` while `actionRunning` never left 0 — a
+possible "save requested but never executed" signature, though the 200ms
+poll may simply have missed the run).
+
+## Phase 8/9 static findings (DCodeBug8/9GhidraReport.txt)
+
+- **`FUN_0049D440` is the per-frame pump** (sole caller: `FUN_004A6F70`). It
+  walks all 6 rows (`0x273D8 / 0x68A4`), and for each: if `FUN_004A1AB0`
+  (busy) and not `FUN_004A1A00` (state==1), ticks `FUN_004A25C0`; then a
+  second unconditional tick loop over all rows. This is the hook point used
+  for live instrumentation (we hook `FUN_004A25C0`'s entry itself, which
+  also covers the `FUN_0049A940` and `FUN_004A26A0` call paths).
+- **The row IS the payload.** `FUN_004A1DD0` (validator) takes the row and
+  checks `FUN_0040DF10(row, 0x6800)`. The first 0x6800 bytes of each room
+  row are the member's profile blob; at `+0xD4` sit 0x28 entries of 0x180
+  bytes (the per-character ranked rows — cf. `RankedInternals.md`).
+- **`FUN_0040DF10` is a 16-bit ones'-complement checksum** (valid iff the
+  running sum ends at 0xFFFF — internet-checksum style). Its other callers
+  (`FUN_006C4990` save/load menu machine, `FUN_004BB080`, `FUN_004B0970`,
+  `FUN_00428AC0`, `FUN_0042EDD0`) are save-data machinery: the network
+  profile blob is validated exactly like a save file.
+- **Transport is `GAMESTEAM_COnlineStorageTransfer`** (named vtable in the
+  Ghidra project; lazy singleton built by `FUN_004B8F70` /
+  ctor `FUN_004717C0`, 0x1C bytes). `FUN_004B8CE0` is a virtual dispatch
+  (`obj->vtbl[+8]()` then tail-jump `target->vtbl[+0x18]`), so its return
+  codes (-100 = pending, anything else = done/error) come from the concrete
+  transfer object; not further resolved statically.
+- **State 6 wipes the evidence.** `FUN_004A0D50` (called right before
+  `state = 6`) memsets the row's 0x6800 bytes to 0, reinits the 0x28
+  per-character entries, and restores the `0x10001` magic at row+8. So by
+  the time any poller sees state 6, the offending payload is gone — this is
+  why the live hook snapshots the blob at tick entry while state==2.
+- **State 6 is permanent, confirmed**: `FUN_004A0B80` returns 100 (hard
+  error) for state 6; `FUN_004A1AB0` reports "busy" (state != 0 && != 3);
+  `FUN_004A25C0` early-outs for state 6. Nothing in the binary writes the
+  state back to 0 except object construction.
+- Bonus rollback lead: since slot 0 (self) wedging at 6 leaves your OWN
+  profile row zeroed and hard-errored, any post-match commit logic that
+  reads or gates on this row would silently skip persisting — consistent
+  with "everything after the bug is rolled back on restart".
+
+## Instrumentation shipped 2026-07-12 (branch release/8-0)
+
+- `src/Hooks/hooks_bbcf.cpp`: `DCodeFetchTick` JMP hook at `FUN_004A25C0`
+  entry (unique 17-byte signature, 10 bytes stolen). Calls
+  `NetworkStallDiagnostics::OnFetchTickEnter(row)` every tick.
+- `src/Game/NetworkStallDiagnostics.cpp`:
+  - While a slot is at state 2, snapshots the full 0x6800 blob + transport
+    context dwords (subobj+0xD0..0xE8) each tick.
+  - Logs every state transition with recvSize and time-in-previous-state
+    (`[DCodeTick]` tag, active whenever GenerateDebugLogs=1 — no dev gate).
+  - On 2→3 logs the accepted payload's checksum as a healthy baseline.
+  - On →6 (or a >15s state-2 stall): logs live+snapshot transport context,
+    snapshot checksum, first 0x40 bytes hexdump, and dumps the entire
+    pre-wipe blob to `BBCF_IM\DCodeBlobFail_slot<N>_tick<T>.bin`.
+  - **Auto-recovery watchdog** (`DCodeAutoRecover=1` in settings.ini, new
+    setting): forces the slot state back to 0 (the game's own retry
+    precondition) after logging, capped at 3 recoveries per slot per
+    process to avoid a retry storm against a genuinely corrupt peer.
+  - Fixed `kAutoSaveTriggerRva` to `0xAA97C8`.
+  - **Persistent incident sink** (added same day, since DEBUG.txt is
+    recreated on every launch): every important `[DCodeTick]` line is also
+    appended (with its own timestamp) to `BBCF_IM\DCodeIncidents.log`, which
+    is never truncated and accumulates across sessions. On each failure the
+    current DEBUG.txt is additionally copied to
+    `BBCF_IM\DEBUG_DCodeIncident_<date>_<time>_slot<N>.txt` (max 5 copies
+    per session), after all the failure lines have been flushed into it.
+    So a week of unattended play yields: one cumulative incidents log,
+    plus a full-log snapshot and a payload .bin per failure.
+
+Next capture should tell us: whether the rejected payload was all-zero
+(transport error), truncated (recvSize != 0x6800), or genuinely corrupt
+(full-size, bad checksum) — and whether a forced retry succeeds, which
+decides between "transient corruption, watchdog is the full fix" and
+"deterministic corruption, need to look at the sender".

@@ -33,6 +33,10 @@ SETTING(bool, rankedAutomationHarnessEnabled, "RankedAutomationHarnessEnabled", 
 SETTING(std::string, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8");
 SETTING(bool, rankedAutomationHarnessAutorun, "RankedAutomationHarnessAutorun", "0");
 SETTING(bool, rankedAutomationHarnessQuitOnFinish, "RankedAutomationHarnessQuitOnFinish", "0");
+// Watchdog for the "D-Code bug": when a per-room-member profile fetch wedges
+// (state 6 payload-rejected, or a >15s state-2 stall), force the slot back to
+// idle so the game's own retry path re-fetches. See docs/Research/DCodeNetworkStallBug.md.
+SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
 SETTING(bool, urtReTraceEnabled, "URT_RE_TraceEnabled", "0");
 SETTING(int, urtReTraceLevel, "URT_RE_TraceLevel", "2");
 SETTING(int, urtReTraceMaxFileMB, "URT_RE_MaxFileMB", "16");

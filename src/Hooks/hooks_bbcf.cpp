@@ -5,6 +5,7 @@
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/MatchState.h"
+#include "Game/NetworkStallDiagnostics.h"
 #include "Game/gamestates.h"
 #include "Game/stages.h"
 #include "Hooks/HookManager.h"
@@ -8719,6 +8720,32 @@ void __declspec(naked)MatchIntroStartsPlayingFunc()
 	}
 }
 
+// Entry of the per-room-member async profile-fetch tick (FUN_004A25C0, ecx = row).
+// Runs for all 6 room rows every frame from the pump FUN_0049D440. The thunk
+// snapshots in-flight payloads and drives the D-Code wedge detector/watchdog --
+// see NetworkStallDiagnostics::OnFetchTickEnter and docs/Research/DCodeNetworkStallBug.md.
+DWORD DCodeFetchTickJmpBackAddr = 0;
+static void(__cdecl* const g_pDCodeFetchTickEnterThunk)(void*) = DCodeFetchTickEnterThunk;
+void __declspec(naked)DCodeFetchTickHookFunc()
+{
+	__asm
+	{
+		pushfd
+		pushad
+		push ecx
+		call g_pDCodeFetchTickEnterThunk
+		add esp, 4
+		popad
+		popfd
+		// original 10 bytes replaced by the JMP patch
+		push esi
+		mov esi, ecx
+		push edi
+		mov edi, dword ptr[esi + 68A0h]
+		jmp[DCodeFetchTickJmpBackAddr]
+	}
+}
+
 DWORD GetStageSelectAddrJmpBackAddr = 0;
 void __declspec(naked)GetStageSelectAddr()
 {
@@ -9193,6 +9220,12 @@ bool placeHooks_bbcf()
 
 	MatchIntroStartsPlayingJmpBackAddr = HookManager::SetHook("MatchIntroStartsPlaying", "\x83\xA0\x78\x27\x00\x00\x00\x83\x66\x30",
 		"xxxxxx?xxx", 7, MatchIntroStartsPlayingFunc);
+
+	// FUN_004A25C0 prologue: push esi / mov esi,ecx / push edi / mov edi,[esi+68A0h]
+	// / cmp dword ptr [edi+0CCh],1. The [esi+68A0h] load is unique in the exe.
+	DCodeFetchTickJmpBackAddr = HookManager::SetHook("DCodeFetchTick",
+		"\x56\x8B\xF1\x57\x8B\xBE\xA0\x68\x00\x00\x83\xBF\xCC\x00\x00\x00\x01",
+		"xxxxxxxxxxxxxxxxx", 10, DCodeFetchTickHookFunc);
 
 	GetStageSelectAddrJmpBackAddr = HookManager::SetHook("GetStageSelectAddr", "\xc7\x81\x54\x0f\x00\x00\x00\x00\x00\x00\x8d\x41\x0c",
 		"xxxxxxxxxxxxx", 10, GetStageSelectAddr);
