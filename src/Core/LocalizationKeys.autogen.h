@@ -1838,6 +1838,27 @@ struct LocalizationKeysAccessor
 
         // Update to %s
         inline const char* Update_to_s() const { return Get("Update to %s"); }
+
+        // Share_your_custom_palettes
+        inline const char* Share_your_custom_palettes() const { return Get("Share_your_custom_palettes"); }
+
+        // Palette_share_popup_description
+        inline const char* Palette_share_popup_description() const { return Get("Palette_share_popup_description"); }
+
+        // Yes_share_them
+        inline const char* Yes_share_them() const { return Get("Yes_share_them"); }
+
+        // No_dont_share
+        inline const char* No_dont_share() const { return Get("No_dont_share"); }
+
+        // Download_palette
+        inline const char* Download_palette() const { return Get("Download_palette"); }
+
+        // Palette_download_denied_tooltip
+        inline const char* Palette_download_denied_tooltip() const { return Get("Palette_download_denied_tooltip"); }
+
+        // Palette_download_unsupported_tooltip
+        inline const char* Palette_download_unsupported_tooltip() const { return Get("Palette_download_unsupported_tooltip"); }
 };
 
 

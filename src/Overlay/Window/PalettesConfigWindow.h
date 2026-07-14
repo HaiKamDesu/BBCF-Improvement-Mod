@@ -41,7 +41,9 @@ private:
 	// Draft copy of the palettes.ini slot table (per character, one string per color).
 	// This is what gets written on save; Cancel throws it away.
 	std::vector<std::vector<std::string>> m_draftSlots;
-	bool m_draftAllowDownloads = true;
+	// Mirrors AllowPaletteDownloads: -1 unset, 0 deny, 1 allow. Stays -1 until
+	// the user actually touches the checkbox so an untouched Save keeps "unset".
+	int m_draftAllowDownloads = -1;
 	ImGuiTextFilter m_filter;
 
 	// Pending .hpl import waiting for the user to pick a character (the legacy

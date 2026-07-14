@@ -779,3 +779,20 @@ Later,Later,Más tarde
 Skip this version,Skip this version,Omitir esta versión
 Open release page,Open release page,Abrir página de la versión
 Update to %s,Update to %s,Actualizar a %s
+Share_your_custom_palettes,Share your custom palettes?,¿Compartir tus paletas personalizadas?
+Palette_share_popup_description,"When you play online, players who also use the Improvement Mod can already SEE the custom palette you're using.
+
+If you allow sharing, they'll also get a button to SAVE your palette and use it themselves.
+If you say no, they can look, but they can't keep it.
+
+You can change this anytime in the Palettes window.","Cuando juegas en línea, los jugadores que también usan el Improvement Mod ya pueden VER la paleta personalizada que estás usando.
+
+Si permites compartirla, también tendrán un botón para GUARDAR tu paleta y usarla ellos mismos.
+Si dices que no, podrán verla, pero no quedársela.
+
+Puedes cambiar esto en cualquier momento en la ventana de Paletas."
+Yes_share_them,"Yes, share them","Sí, compartirlas"
+No_dont_share,"No, don't share",No compartir
+Download_palette,Download palette,Descargar paleta
+Palette_download_denied_tooltip,This player hasn't allowed their palettes to be downloaded.,Este jugador no ha permitido que se descarguen sus paletas.
+Palette_download_unsupported_tooltip,This player's mod version doesn't support palette downloads.,La versión del mod de este jugador no permite descargar paletas.

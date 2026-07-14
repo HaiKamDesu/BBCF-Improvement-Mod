@@ -9,6 +9,15 @@
 class OnlinePaletteManager
 {
 public:
+	// Whether an opponent lets us save their custom palette. Unknown means no
+	// permission packet arrived (mod version without the feature, or no mod).
+	enum class PaletteDownloadPermission : uint8_t
+	{
+		Unknown,
+		Denied,
+		Granted,
+	};
+
 	OnlinePaletteManager(PaletteManager* pPaletteManager, CharPaletteHandle* pP1CharPalHandle,
 		CharPaletteHandle* pP2CharPalHandle, RoomManager* pRoomManager);
 	void SendPalettePackets();
@@ -20,6 +29,7 @@ public:
 	void OnMatchInit();
 	void OnUpdate();
 	bool CanDownloadPalette(uint16_t matchPlayerIndex) const;
+	PaletteDownloadPermission GetDownloadPermission(uint16_t matchPlayerIndex) const;
 
 private:
 	bool IsPaletteHandleReady(const CharPaletteHandle& charPalHandle) const;
@@ -66,5 +76,5 @@ private:
 	RoomManager* m_pRoomManager;
 	bool m_matchInitPending = false;
 	bool m_loggedMatchInitWait = false;
-	bool m_playerPaletteDownloadPermissions[2] = {};
+	PaletteDownloadPermission m_playerPaletteDownloadPermissions[2] = {};
 };

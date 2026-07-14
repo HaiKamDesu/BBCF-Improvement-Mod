@@ -67,7 +67,7 @@ namespace {
 		{ "RankedListNetworkFilter", "Ranked list network filter", "Ranked", "Hides ranked list players whose Delay rating (0-4) is below this level. 0 shows everyone; players without a measured rating stay visible until it resolves." },
 		{ "HideUnmetRequirementRooms", "Hide unmet-requirement rooms", "Ranked", "Hides rooms whose minimum connection quality your measured Delay rating does not meet, so everything left in the ranked list is actually joinable." },
 		{ "LoadForeignPalettesToggleDefault", "Load foreign palettes by default", "Palettes", "Default state for loading opponent or foreign custom palettes." },
-		{ "AllowPaletteDownloads", "Allow palette downloads", "Palettes", "Allows opponents to save your visible custom palette from the match UI." },
+		{ "AllowPaletteDownloads", "Allow palette downloads", "Palettes", "Allows opponents to save your visible custom palette from the match UI. -1 = not chosen yet (the mod asks once in-game), 0 = no, 1 = yes." },
 		{ "SwapControllerPos", "Swap controller positions", "Controller", "Swaps local controller positions. Disabled on startup if known crash risk is detected." },
 		{ "EnableControllerHooks", "Enable controller hooks", "Controller", "Enables controller setting hooks used by the mod's controller tools." },
 		{ "ForceEnableControllerSettingHooks", "Force controller hooks", "Controller", "Overrides Wine/Proton safety detection and forces controller hooks on." },

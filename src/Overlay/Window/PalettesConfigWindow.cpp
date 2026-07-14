@@ -768,7 +768,9 @@ void PalettesConfigWindow::DrawModal()
 
 	ImGui::EndChild();
 
-	ImGui::Checkbox("Allow opponents to download your palettes", &m_draftAllowDownloads);
+	bool allowDownloadsChecked = (m_draftAllowDownloads == 1);
+	if (ImGui::Checkbox("Allow opponents to download your palettes", &allowDownloadsChecked))
+		m_draftAllowDownloads = allowDownloadsChecked ? 1 : 0;
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker("Allows opponents to save your visible custom palette from the match UI. "
 		"Applied when you hit Save.");
@@ -792,7 +794,7 @@ void PalettesConfigWindow::DrawModal()
 		if (m_draftAllowDownloads != Settings::settingsIni.allowPaletteDownloads)
 		{
 			Settings::settingsIni.allowPaletteDownloads = m_draftAllowDownloads;
-			Settings::changeSetting("AllowPaletteDownloads", m_draftAllowDownloads ? "1" : "0");
+			Settings::changeSetting("AllowPaletteDownloads", std::to_string(m_draftAllowDownloads));
 		}
 
 		ImGui::CloseCurrentPopup();

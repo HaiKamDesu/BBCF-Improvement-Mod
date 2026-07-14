@@ -169,6 +169,11 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 		m_windowContainer->GetWindow(WindowType_ReplayDBPopup)->Open();
 	}
 
+	if (Settings::settingsIni.allowPaletteDownloads == -1)
+	{
+		m_windowContainer->GetWindow(WindowType_PaletteSharePopup)->Open();
+	}
+
 
 
 

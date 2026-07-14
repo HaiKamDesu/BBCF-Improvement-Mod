@@ -24,4 +24,5 @@ enum WindowType_
         WindowType_UnlimitedReplayTakeover,
         WindowType_ReleaseChecker,
         WindowType_RankedListFilter,
+        WindowType_PaletteSharePopup,
 };

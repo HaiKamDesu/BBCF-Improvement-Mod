@@ -12,6 +12,7 @@
 #include "Overlay/Window/PlaybackEditorWindow.h"
 #include "Overlay/Window/ComboDataWindow.h"
 #include "Overlay/Window/ReplayDBPopupWindow.h" 
+#include "Overlay/Window/PaletteSharePopupWindow.h"
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
 #include "Overlay/Window/ReplayRewindWindow.h"
@@ -84,6 +85,9 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_WinePopup,
                 new WinePopupWindow("Wine Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
+
+        AddWindow(WindowType_PaletteSharePopup,
+                new PaletteSharePopupWindow("Palette Share Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
 
         AddWindow(WindowType_UnlimitedPlayback,
                 new UnlimitedPlaybackWindow(L("Unlimited Playback (BETA)").c_str(), true, *this));

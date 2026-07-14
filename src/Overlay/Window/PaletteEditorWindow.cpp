@@ -724,16 +724,28 @@ void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uin
 
 	ImGui::HoverTooltip(Messages.Reset_palette());
 
-	if (g_interfaces.pOnlinePaletteManager->CanDownloadPalette(matchPlayerIndex))
+	const OnlinePaletteManager::PaletteDownloadPermission downloadPermission =
+		g_interfaces.pOnlinePaletteManager->GetDownloadPermission(matchPlayerIndex);
+	char downloadButtonId[48];
+	sprintf_s(downloadButtonId, " Download ##download%s", btnText);
+	ImGui::SameLine();
+	if (downloadPermission == OnlinePaletteManager::PaletteDownloadPermission::Granted)
 	{
-		char downloadButtonId[48];
-		sprintf_s(downloadButtonId, " Download ##download%s", btnText);
-		ImGui::SameLine();
 		if (ImGui::Button(downloadButtonId))
 		{
 			DownloadOnlinePalette(playerHandle, matchPlayerIndex);
 		}
-		ImGui::HoverTooltip("Download palette");
+		ImGui::HoverTooltip(Messages.Download_palette());
+	}
+	else
+	{
+		// Greyed out but not item-disabled, so the explanatory tooltip still shows.
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		ImGui::Button(downloadButtonId);
+		ImGui::PopStyleVar();
+		ImGui::HoverTooltip(downloadPermission == OnlinePaletteManager::PaletteDownloadPermission::Denied
+			? Messages.Palette_download_denied_tooltip()
+			: Messages.Palette_download_unsupported_tooltip());
 	}
 
 	// Dummy button

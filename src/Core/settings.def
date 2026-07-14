@@ -58,7 +58,8 @@ SETTING(int, rankedListSortMode, "RankedListSortMode", "0");
 SETTING(int, rankedListNetworkFilter, "RankedListNetworkFilter", "0");
 SETTING(bool, hideUnmetRequirementRooms, "HideUnmetRequirementRooms", "0");
 SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
-SETTING(bool, allowPaletteDownloads, "AllowPaletteDownloads", "1");
+// -1 = unset (the mod asks once via an in-game popup), 0 = deny, 1 = allow.
+SETTING(int, allowPaletteDownloads, "AllowPaletteDownloads", "-1");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
 SETTING(bool, EnableControllerHooks, "EnableControllerHooks", "1");
 SETTING(bool, ForceEnableControllerSettingHooks, "ForceEnableControllerSettingHooks", "0");

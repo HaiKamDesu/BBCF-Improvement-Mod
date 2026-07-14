@@ -88,7 +88,8 @@ void OnlinePaletteManager::RecvPaletteDownloadPermissionPacket(Packet* packet)
 
 	bool allowDownload = false;
 	memcpy_s(&allowDownload, sizeof(allowDownload), packet->data, sizeof(allowDownload));
-	m_playerPaletteDownloadPermissions[matchPlayerIndex] = allowDownload;
+	m_playerPaletteDownloadPermissions[matchPlayerIndex] =
+		allowDownload ? PaletteDownloadPermission::Granted : PaletteDownloadPermission::Denied;
 }
 
 void OnlinePaletteManager::ProcessSavedPalettePackets()
@@ -110,16 +111,16 @@ void OnlinePaletteManager::ClearSavedPalettePacketQueues()
 	m_unprocessedPaletteFiles = {};
 	m_matchInitPending = false;
 	m_loggedMatchInitWait = false;
-	m_playerPaletteDownloadPermissions[0] = false;
-	m_playerPaletteDownloadPermissions[1] = false;
+	m_playerPaletteDownloadPermissions[0] = PaletteDownloadPermission::Unknown;
+	m_playerPaletteDownloadPermissions[1] = PaletteDownloadPermission::Unknown;
 }
 
 void OnlinePaletteManager::OnMatchInit()
 {
 	LOG(2, "OnlinePaletteManager::OnMatchInit\n");
 
-	m_playerPaletteDownloadPermissions[0] = false;
-	m_playerPaletteDownloadPermissions[1] = false;
+	m_playerPaletteDownloadPermissions[0] = PaletteDownloadPermission::Unknown;
+	m_playerPaletteDownloadPermissions[1] = PaletteDownloadPermission::Unknown;
 	m_matchInitPending = true;
 	m_loggedMatchInitWait = false;
 	OnUpdate();
@@ -168,8 +169,13 @@ void OnlinePaletteManager::OnUpdate()
 
 bool OnlinePaletteManager::CanDownloadPalette(uint16_t matchPlayerIndex) const
 {
+	return GetDownloadPermission(matchPlayerIndex) == PaletteDownloadPermission::Granted;
+}
+
+OnlinePaletteManager::PaletteDownloadPermission OnlinePaletteManager::GetDownloadPermission(uint16_t matchPlayerIndex) const
+{
 	if (matchPlayerIndex > 1)
-		return false;
+		return PaletteDownloadPermission::Unknown;
 
 	return m_playerPaletteDownloadPermissions[matchPlayerIndex];
 }
@@ -178,7 +184,8 @@ void OnlinePaletteManager::SendPaletteDownloadPermissionPacket(uint16_t roomMemb
 {
 	LOG(2, "OnlinePaletteManager::SendPaletteDownloadPermissionPacket\n");
 
-	bool allowDownload = Settings::settingsIni.allowPaletteDownloads;
+	// Unset (-1) counts as not having given permission.
+	bool allowDownload = Settings::settingsIni.allowPaletteDownloads == 1;
 	Packet packet = Packet(
 		(char*)&allowDownload,
 		(uint16_t)sizeof(allowDownload),
