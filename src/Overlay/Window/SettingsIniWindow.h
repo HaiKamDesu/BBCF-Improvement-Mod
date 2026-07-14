@@ -21,8 +21,10 @@ private:
 		std::string displayName;
 		std::string category;
 		std::string tooltip;
+		std::string defaultValue;
 		std::function<bool()> draw;
 		std::function<bool()> differsFromOriginal;
+		std::function<void()> resetToDefault;
 		bool isRestartRequired;
 	};
 

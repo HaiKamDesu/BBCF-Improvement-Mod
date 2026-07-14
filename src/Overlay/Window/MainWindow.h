@@ -1,6 +1,7 @@
 #pragma once
 #include "IWindow.h"
 
+#include "PalettesConfigWindow.h"
 #include "SettingsIniWindow.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 
@@ -36,4 +37,5 @@ private:
 	const ImVec2 BTN_SIZE = ImVec2(60, 20);
 	WindowContainer* m_pWindowContainer = nullptr;
 	SettingsIniWindow m_settingsIniWindow;
+	PalettesConfigWindow m_palettesConfigWindow;
 };

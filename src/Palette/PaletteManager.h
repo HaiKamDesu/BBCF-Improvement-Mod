@@ -44,6 +44,8 @@ public:
 	void SetCurrentPalInfo(CharPaletteHandle& palHandle, IMPL_info_t& palInfo);
 	const IMPL_data_t& GetCurrentPalData(CharPaletteHandle& palHandle);
 	void LoadPaletteSettingsFile();
+	const std::vector<std::vector<std::string>>& GetPaletteSlots() const { return m_paletteSlots; }
+	bool SavePaletteSettingsFile(const std::vector<std::vector<std::string>>& slots);
 
 	// Call it ONCE per frame
 	void OnUpdate(CharPaletteHandle& P1, CharPaletteHandle& P2);

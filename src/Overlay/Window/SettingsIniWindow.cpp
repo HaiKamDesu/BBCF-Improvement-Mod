@@ -1,9 +1,11 @@
 #include "SettingsIniWindow.h"
 
+#include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
 
 #include <Windows.h>
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 
@@ -62,6 +64,8 @@ namespace {
 		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked", "Opens the ranked list filter window when the ranked player list is visible." },
 		{ "ShowRankedListHiddenPopup", "Show hidden players popup", "Ranked", "Remembers whether the hidden-players popup was left open, so it reopens automatically next time." },
 		{ "RankedListSortMode", "Ranked list sort mode", "Ranked", "Sort mode used by the ranked list filter window." },
+		{ "RankedListNetworkFilter", "Ranked list network filter", "Ranked", "Hides ranked list players whose Delay rating (0-4) is below this level. 0 shows everyone; players without a measured rating stay visible until it resolves." },
+		{ "HideUnmetRequirementRooms", "Hide unmet-requirement rooms", "Ranked", "Hides rooms whose minimum connection quality your measured Delay rating does not meet, so everything left in the ranked list is actually joinable." },
 		{ "LoadForeignPalettesToggleDefault", "Load foreign palettes by default", "Palettes", "Default state for loading opponent or foreign custom palettes." },
 		{ "AllowPaletteDownloads", "Allow palette downloads", "Palettes", "Allows opponents to save your visible custom palette from the match UI." },
 		{ "SwapControllerPos", "Swap controller positions", "Controller", "Swaps local controller positions. Disabled on startup if known crash risk is detected." },
@@ -169,6 +173,12 @@ namespace {
 		return false;
 	}
 
+	// Parse a settings.def default-value literal into each supported type.
+	static void SettingAssignFromString(bool& val, const char* str) { val = atoi(str) != 0; }
+	static void SettingAssignFromString(int& val, const char* str) { val = atoi(str); }
+	static void SettingAssignFromString(float& val, const char* str) { val = (float)atof(str); }
+	static void SettingAssignFromString(std::string& val, const char* str) { val = str; }
+
 	static std::string SettingValueToString(bool val) { return val ? "1" : "0"; }
 	static std::string SettingValueToString(int val) { return std::to_string(val); }
 	static std::string SettingValueToString(float val)
@@ -194,11 +204,11 @@ namespace {
 
 void SettingsIniWindow::DrawOpenButton()
 {
-	if (!ImGui::Button("Settings.ini"))
+	if (!ImGui::Button("Settings"))
 		return;
 
 	BuildRows();
-	ImGui::OpenPopup("Settings.ini##modal");
+	ImGui::OpenPopup("Settings##modal");
 }
 
 void SettingsIniWindow::BuildRows()
@@ -215,12 +225,14 @@ void SettingsIniWindow::BuildRows()
 		metadata_##_var ? metadata_##_var->displayName : _inistring, \
 		metadata_##_var ? metadata_##_var->category : "Other", \
 		metadata_##_var ? metadata_##_var->tooltip : "No description available.", \
+		_defaultval, \
 		[this]() -> bool { \
 			char buf[128] = "##"; \
 			strncat_s(buf, sizeof(buf), _inistring, _TRUNCATE); \
 			return DrawValueWidget(buf, m_settingsDraft._var); \
 		}, \
 		[this]() -> bool { return m_settingsDraft._var != Settings::settingsIni._var; }, \
+		[this]() { SettingAssignFromString(m_settingsDraft._var, _defaultval); }, \
 		IsRestartRequired(_inistring) \
 	});
 #include "Core/settings.def"
@@ -235,12 +247,12 @@ void SettingsIniWindow::DrawModal()
 	const float footerHeight = m_needsRestart ? 64.0f : 40.0f;
 
 	ImGui::SetNextWindowSize(ImVec2(760, 620), ImGuiCond_Always);
-	if (!ImGui::BeginPopupModal("Settings.ini##modal", nullptr, ImGuiWindowFlags_NoResize))
+	if (!ImGui::BeginPopupModal("Settings##modal", nullptr, ImGuiWindowFlags_NoResize))
 		return;
 
 	ImGui::TextUnformatted("Settings");
 	ImGui::SameLine();
-	ImGui::TextDisabled("Hover (?) for details. Changes are written to settings.ini when saved.");
+	ImGui::TextDisabled("Hover (?) for details. Right-click a setting name to reset it to its default.");
 	m_settingsFilter.Draw("Search by name, category, or key##settings_filter", -1.0f);
 
 	ImGui::BeginChild("##settings_scroll", ImVec2(0, -footerHeight), true);
@@ -299,6 +311,19 @@ void SettingsIniWindow::DrawModal()
 
 			ImGui::PushID(row.name.c_str());
 			ImGui::TextUnformatted(row.displayName.c_str());
+			if (ImGui::BeginPopupContextItem("##reset_ctx"))
+			{
+				char resetLabel[192];
+				snprintf(resetLabel, sizeof(resetLabel), "Reset to default (%s)",
+					row.defaultValue.empty() ? "empty" : row.defaultValue.c_str());
+				if (ImGui::MenuItem(resetLabel))
+				{
+					row.resetToDefault();
+					if (row.isRestartRequired)
+						anyRestartRowChangedThisFrame = true;
+				}
+				ImGui::EndPopup();
+			}
 			ImGui::SameLine();
 			ImGui::ShowHelpMarker(row.tooltip.c_str());
 			ImGui::TextDisabled("%s", row.name.c_str());
@@ -343,14 +368,21 @@ void SettingsIniWindow::DrawModal()
 		ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
 			"Some changes require a restart to take effect.");
 
+	const float saveButtonWidth = m_needsRestart ? 150.0f : 120.0f;
+	const float footerWidth = 120.0f + saveButtonWidth + 120.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
+		(ImGui::GetWindowWidth() - footerWidth) * 0.5f));
+
 	if (ImGui::Button("Cancel", ImVec2(120, 0)))
 		ImGui::CloseCurrentPopup();
 
 	ImGui::SameLine();
 
 	const char* saveLabel = m_needsRestart ? "Save and Restart" : "Save";
-	if (ImGui::Button(saveLabel, ImVec2(m_needsRestart ? 150.0f : 120.0f, 0)))
+	if (ImGui::Button(saveLabel, ImVec2(saveButtonWidth, 0)))
 	{
+		const bool debugLogsWereEnabled = Settings::settingsIni.generateDebugLogs;
+
 #define SETTING(_type, _var, _inistring, _defaultval) \
 		if (m_settingsDraft._var != Settings::settingsIni._var) { \
 			Settings::changeSetting(_inistring, SettingValueToString(m_settingsDraft._var)); \
@@ -358,6 +390,9 @@ void SettingsIniWindow::DrawModal()
 		}
 #include "Core/settings.def"
 #undef SETTING
+
+		if (Settings::settingsIni.generateDebugLogs != debugLogsWereEnabled)
+			SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);
 
 		ImGui::CloseCurrentPopup();
 

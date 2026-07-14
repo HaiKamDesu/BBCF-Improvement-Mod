@@ -165,6 +165,9 @@ struct LocalizationKeysAccessor
         // Copy to clipboard
         inline const char* Copy_to_clipboard() const { return Get("Copy to clipboard"); }
 
+        // Save as...
+        inline const char* Save_as() const { return Get("Save as..."); }
+
         // Search
         inline const char* Search() const { return Get("Search"); }
 

@@ -75,17 +75,9 @@ void MainWindow::Draw()
 	DrawLanguageSelector();
 
 	ImGui::HorizontalSpacing();
-	bool generateDebugLogs = Settings::settingsIni.generateDebugLogs;
-	if (ImGui::Checkbox(Messages.Generate_Debug_Logs(), &generateDebugLogs))
-	{
-		Settings::settingsIni.generateDebugLogs = generateDebugLogs;
-		Settings::changeSetting("GenerateDebugLogs", generateDebugLogs ? "1" : "0");
-		SetLoggingEnabled(generateDebugLogs);
-	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(Messages.Debug_log_details());
-	ImGui::SameLine();
 	m_settingsIniWindow.DrawOpenButton();
+	ImGui::SameLine();
+	m_palettesConfigWindow.DrawOpenButton();
 
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted("P$"); ImGui::SameLine();
@@ -105,6 +97,7 @@ void MainWindow::Draw()
 	DrawAvatarSection();
 	DrawControllerSettingSection();
 	m_settingsIniWindow.DrawModal();
+	m_palettesConfigWindow.DrawModal();
 	DrawUtilButtons();
 
 	ImGui::VerticalSpacing(5);

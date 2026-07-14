@@ -1,5 +1,7 @@
 #include "ImGuiLogger.h"
 
+#include "Core/logger.h"
+
 #include <atltime.h>
 #include <sstream>
 
@@ -69,6 +71,10 @@ void ImGuiLogger::Log(const char * fmt, ...)
 
 	va_end(args_copy);
 	va_end(args);
+
+	// Mirror every overlay log message into DEBUG.txt so the log window and
+	// the on-disk log always show the same information.
+	LOG(1, "[Overlay] %s", result.c_str());
 
 	std::string fullMessage = GetTime() + " " + result;
 

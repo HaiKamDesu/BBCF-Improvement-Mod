@@ -399,18 +399,21 @@ void PaletteManager::LoadHplFile(const std::string& fullPath, const std::string&
 	}
 }
 
+static std::wstring GetPalettesIniFullPath()
+{
+	TCHAR pathBuf[MAX_PATH];
+	GetModuleFileName(NULL, pathBuf, MAX_PATH);
+	std::wstring::size_type pos = std::wstring(pathBuf).find_last_of(L"\\");
+	return std::wstring(pathBuf).substr(0, pos) + L"\\palettes.ini";
+}
+
 void PaletteManager::LoadPaletteSettingsFile()
 {
 	InitPaletteSlotsVector();
 
 	LOG(2, "LoadPaletteSettingsFile\n");
 
-	TCHAR pathBuf[MAX_PATH];
-	GetModuleFileName(NULL, pathBuf, MAX_PATH);
-	std::wstring::size_type pos = std::wstring(pathBuf).find_last_of(L"\\");
-	std::wstring wFullPath = std::wstring(pathBuf).substr(0, pos);
-
-	wFullPath += L"\\palettes.ini";
+	std::wstring wFullPath = GetPalettesIniFullPath();
 
 	if (!PathFileExists(wFullPath.c_str()))
 	{
@@ -445,6 +448,58 @@ void PaletteManager::LoadPaletteSettingsFile()
 			m_paletteSlots[i][iSlot-1] = pszConvertedAnsiString;
 		}
 	}
+}
+
+bool PaletteManager::SavePaletteSettingsFile(const std::vector<std::vector<std::string>>& slots)
+{
+	LOG(2, "SavePaletteSettingsFile\n");
+
+	const std::wstring wFullPath = GetPalettesIniFullPath();
+
+	// Keep the General section alive when creating the file from scratch.
+	if (!PathFileExists(wFullPath.c_str()))
+	{
+		if (!WritePrivateProfileString(L"General", L"OnlinePalettes", L"1", wFullPath.c_str()))
+		{
+			LOG(2, "\tCouldn't create 'palettes.ini'!\n");
+			g_imGuiLogger->Log("[error] Couldn't create 'palettes.ini'!\n");
+			return false;
+		}
+		m_loadOnlinePalettes = true;
+	}
+
+	for (int i = 0; i < getCharactersCount() && i < (int)slots.size(); i++)
+	{
+		const std::wstring section = getCharacterNameByIndexW(i);
+
+		for (int iSlot = 1; iSlot <= MAX_NUM_OF_PAL_SLOTS; iSlot++)
+		{
+			const std::string& value = slots[i][iSlot - 1];
+			const std::wstring wKey = std::to_wstring(iSlot);
+
+			BOOL written;
+			if (value.empty())
+			{
+				// Removing the key keeps the ini free of empty entries.
+				written = WritePrivateProfileString(section.c_str(), wKey.c_str(), NULL, wFullPath.c_str());
+			}
+			else
+			{
+				CA2CT wValue(value.c_str());
+				written = WritePrivateProfileString(section.c_str(), wKey.c_str(), wValue, wFullPath.c_str());
+			}
+
+			if (!written)
+			{
+				LOG(2, "\tCouldn't write to 'palettes.ini'!\n");
+				g_imGuiLogger->Log("[error] Couldn't write to 'palettes.ini'!\n");
+				return false;
+			}
+		}
+	}
+
+	m_paletteSlots = slots;
+	return true;
 }
 
 void PaletteManager::InitPaletteSlotsVector()

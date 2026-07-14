@@ -146,7 +146,10 @@
       "Bash(grep -n \"^}$\" \"/mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Overlay/Window/Ranked/RankedProgressWindow.cpp\")",
       "Bash(cp run_ghidra_dcode_bug9.cmd run_ghidra_dcode_bug10.cmd)",
       "Bash(sed -i 's/Bug9/Bug10/g; s/bug9/bug10/g' run_ghidra_dcode_bug10.cmd)",
-      "Bash(cmd.exe /c run_ghidra_dcode_bug10.cmd)"
+      "Bash(cmd.exe /c run_ghidra_dcode_bug10.cmd)",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /nologo /v:m)",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /nologo /v:q)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }
