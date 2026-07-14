@@ -10,6 +10,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <vector>
 #include <fcntl.h>
 #include <io.h>
 
@@ -346,6 +347,59 @@ void ForceLog(const char* message, ...)
 	AppendCrashLogEntry(0, line, timestamp, threadId);
 }
 
+// Preserve the previous session's DEBUG.txt before CREATE_ALWAYS truncates it.
+// The old log moves to BBCF_IM\DebugHistory\DEBUG_<its last-write time>.txt and
+// the folder is pruned to the newest DebugLogSessionHistory files (0 disables,
+// restoring the old overwrite-every-launch behavior).
+static void RotatePreviousSessionLog()
+{
+    const int keep = Settings::settingsIni.debugLogSessionHistory;
+    if (keep <= 0)
+    {
+        return;
+    }
+
+    WIN32_FILE_ATTRIBUTE_DATA attr = {};
+    if (!GetFileAttributesExW(L"BBCF_IM\\DEBUG.txt", GetFileExInfoStandard, &attr))
+    {
+        return; // no previous log
+    }
+
+    CreateDirectoryW(L"BBCF_IM\\DebugHistory", nullptr);
+
+    SYSTEMTIME stUtc = {};
+    SYSTEMTIME st = {};
+    FileTimeToSystemTime(&attr.ftLastWriteTime, &stUtc);
+    SystemTimeToTzSpecificLocalTime(nullptr, &stUtc, &st);
+    wchar_t dest[MAX_PATH];
+    swprintf_s(dest, L"BBCF_IM\\DebugHistory\\DEBUG_%04u%02u%02u_%02u%02u%02u.txt",
+        st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    MoveFileExW(L"BBCF_IM\\DEBUG.txt", dest, MOVEFILE_REPLACE_EXISTING);
+
+    // Prune oldest entries; the timestamped names sort chronologically.
+    std::vector<std::wstring> entries;
+    WIN32_FIND_DATAW findData = {};
+    const HANDLE hFind = FindFirstFileW(L"BBCF_IM\\DebugHistory\\DEBUG_*.txt", &findData);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            entries.push_back(findData.cFileName);
+        } while (FindNextFileW(hFind, &findData));
+        FindClose(hFind);
+    }
+    std::sort(entries.begin(), entries.end());
+    const size_t keepCount = static_cast<size_t>(keep);
+    if (entries.size() > keepCount)
+    {
+        for (size_t i = 0; i < entries.size() - keepCount; ++i)
+        {
+            std::wstring victim = L"BBCF_IM\\DebugHistory\\" + entries[i];
+            DeleteFileW(victim.c_str());
+        }
+    }
+}
+
 void openLogger()
 {
     if (g_oFile)
@@ -354,6 +408,8 @@ void openLogger()
     }
 
     EnsureLogDirectory();
+
+    RotatePreviousSessionLog();
 
     // Use WinAPI to create/overwrite the file safely.
     HANDLE hFile = CreateFileW(

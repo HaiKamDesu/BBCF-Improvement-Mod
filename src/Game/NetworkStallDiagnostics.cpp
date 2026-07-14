@@ -52,18 +52,25 @@ namespace
 	constexpr uintptr_t kPopupMessageBufferRva = 0x01100BD8;
 	constexpr size_t kPopupMessageBufferSize = 0x40;
 
-	// Auto-save trigger flag driving GAME_CSaveTask::update_task (FUN_004B9F70).
-	// 0=idle, 1=start automatic write, 2=write in progress, 3=finalize.
-	// Ghidra VA 0x00EA97C8 -> RVA 0xAA97C8. (An earlier revision of this file had
-	// 0xA97C8 -- a dropped digit -- which is why Debug_DCodeError1.txt shows the
-	// trigger as constant garbage, -1956749403.)
-	constexpr uintptr_t kAutoSaveTriggerRva = 0x00AA97C8;
-
 	// CSaveDataManager singleton getter (FUN_004B9770, no-arg singleton accessor,
 	// same calling convention as RankedProgressWindow.cpp's kRankedTableBaseFnRva).
+	// Note (2026-07-14): live logging proved the "auto-save trigger global"
+	// DAT_00EA97C8 (RVA 0xAA97C8) read by GAME_CSaveTask::update_task IS
+	// manager+kSaveActionRunningOffset -- the manager is statically allocated, so
+	// the "global" and the field move in lockstep. Save requests are made by tiny
+	// helpers (FUN_004BB2C0 sets nextAction=7, FUN_004BB410 sets 1, FUN_004BB300
+	// sets 2, mode param stored at +0x1B11F8), all driven by the save-task state
+	// machine FUN_006C4990 (pumped per frame by FUN_006C4880). See
+	// DCodeBug10GhidraReport.txt.
 	constexpr uintptr_t kSaveDataManagerGetterRva = 0x000B9770;
 	constexpr uintptr_t kSaveActionRunningOffset = 0x1B11F0;
 	constexpr uintptr_t kSaveNextActionOffset = 0x1B11F4;
+	constexpr uintptr_t kSaveModeParamOffset = 0x1B11F8;
+
+	// Local player's net color (square color) and its progression counter, stored
+	// in the static netUserData block. Same offsets as NetworkSquareColorWindow.cpp.
+	constexpr uintptr_t kNetColorOffset = 0x0194;
+	constexpr uintptr_t kNetColorCounterOffset = 0x0195;
 
 	bool IsDiagnosticsEnabled()
 	{
@@ -71,9 +78,9 @@ namespace
 	}
 
 	int32_t g_lastSlotFetchState[kRoomSlotCount] = { -2, -2 }; // -2 = never observed, -1 = unreadable
-	int32_t g_lastAutoSaveTrigger = -2;
 	int32_t g_lastSaveActionRunning = -2;
 	int32_t g_lastSaveNextAction = -2;
+	ULONGLONG g_lastSaveFileWriteTime = 0;
 	char g_lastPopupMessage[kPopupMessageBufferSize + 1] = {};
 	bool g_havePopupMessage = false;
 	ULONGLONG g_lastPollTickMs = 0;
@@ -475,35 +482,63 @@ void NetworkStallDiagnostics::OnUpdate()
 		g_lastSlotFetchState[slot] = fetchState;
 	}
 
-	if (diagnosticsEnabled)
+	// --- Save machinery + on-disk save watch ---
+	// Promoted out of the dev gate after the 2026-07-13 rollback happened with a
+	// fully healthy fetch log: the save timeline of every session must survive in
+	// DCodeIncidents.log. Each line carries the current net color/counter so a
+	// future rollback shows exactly what progress existed at each save event.
 	{
-		// --- Auto-save trigger flag ---
-		const int32_t* const autoSaveTriggerPtr = reinterpret_cast<const int32_t*>(moduleBase + kAutoSaveTriggerRva);
-		if (!IsBadReadPtr(autoSaveTriggerPtr, sizeof(int32_t)))
+		char progress[64];
+		const uint8_t* const netColorBase = reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
+		if (!IsBadReadPtr(netColorBase + kNetColorOffset, 2))
 		{
-			const int32_t autoSaveTrigger = *autoSaveTriggerPtr;
-			if (autoSaveTrigger != g_lastAutoSaveTrigger)
-			{
-				LOG(1, "[NetStall] auto-save trigger %d -> %d\n", g_lastAutoSaveTrigger, autoSaveTrigger);
-				g_lastAutoSaveTrigger = autoSaveTrigger;
-			}
+			sprintf_s(progress, "netcolor=%u counter=%u",
+				netColorBase[kNetColorOffset], netColorBase[kNetColorCounterOffset]);
+		}
+		else
+		{
+			sprintf_s(progress, "netcolor=unreadable");
 		}
 
-		// --- CSaveDataManager save action state ---
+		// CSaveDataManager action state (actionRunning doubles as the "auto-save
+		// trigger global" -- same memory, see header comment).
 		typedef void* (__cdecl* SaveDataManagerGetterFn)();
 		const SaveDataManagerGetterFn saveDataManagerGetter =
 			reinterpret_cast<SaveDataManagerGetterFn>(moduleBase + kSaveDataManagerGetterRva);
 		const uint8_t* const saveDataManager = reinterpret_cast<const uint8_t*>(saveDataManagerGetter());
-		if (saveDataManager != nullptr && !IsBadReadPtr(saveDataManager + kSaveActionRunningOffset, sizeof(int32_t) * 2))
+		if (saveDataManager != nullptr && !IsBadReadPtr(saveDataManager + kSaveActionRunningOffset, sizeof(int32_t) * 3))
 		{
 			const int32_t actionRunning = *reinterpret_cast<const int32_t*>(saveDataManager + kSaveActionRunningOffset);
 			const int32_t nextAction = *reinterpret_cast<const int32_t*>(saveDataManager + kSaveNextActionOffset);
+			const int32_t modeParam = *reinterpret_cast<const int32_t*>(saveDataManager + kSaveModeParamOffset);
 			if (actionRunning != g_lastSaveActionRunning || nextAction != g_lastSaveNextAction)
 			{
-				LOG(1, "[NetStall] save manager actionRunning %d -> %d, nextAction %d -> %d\n",
-					g_lastSaveActionRunning, actionRunning, g_lastSaveNextAction, nextAction);
+				IncidentPrintf("[SaveWatch] save manager actionRunning %d -> %d, nextAction %d -> %d, mode=%d, %s\n",
+					g_lastSaveActionRunning, actionRunning, g_lastSaveNextAction, nextAction, modeParam, progress);
 				g_lastSaveActionRunning = actionRunning;
 				g_lastSaveNextAction = nextAction;
+			}
+		}
+
+		// bbsave.dat on disk -- filesystem ground truth that a save actually
+		// reached the file, independent of any in-memory state machine.
+		WIN32_FILE_ATTRIBUTE_DATA saveAttr = {};
+		if (GetFileAttributesExW(L"Save\\bbsave.dat", GetFileExInfoStandard, &saveAttr))
+		{
+			const ULONGLONG writeTime =
+				(static_cast<ULONGLONG>(saveAttr.ftLastWriteTime.dwHighDateTime) << 32) |
+				saveAttr.ftLastWriteTime.dwLowDateTime;
+			if (g_lastSaveFileWriteTime == 0)
+			{
+				g_lastSaveFileWriteTime = writeTime; // baseline, don't log old state as an event
+				IncidentPrintf("[SaveWatch] bbsave.dat baseline (size=%u), %s\n",
+					saveAttr.nFileSizeLow, progress);
+			}
+			else if (writeTime != g_lastSaveFileWriteTime)
+			{
+				g_lastSaveFileWriteTime = writeTime;
+				IncidentPrintf("[SaveWatch] bbsave.dat WRITTEN (size=%u), %s\n",
+					saveAttr.nFileSizeLow, progress);
 			}
 		}
 	}

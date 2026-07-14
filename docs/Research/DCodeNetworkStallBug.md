@@ -318,6 +318,55 @@ Remaining open question is only whether the natural failure is transient
 like the test (retry succeeds) or persistent (would exhaust the 3-retry
 cap), and whether recovery also prevents the ranked-progress rollback.
 
+## 2026-07-14: rollback WITHOUT a fetch wedge — save path is now primary suspect
+
+User played a long first-to-20 player-match set vs "heythan" on 2026-07-13
+(the 19:37 session in DCodeIncidents.log, ran past 20:22), gaining net-color
+progress from orange/0 to pink. On 2026-07-14 the progress was rolled back to
+orange/0. The incident log for that entire session is **completely healthy**:
+slots 1/2 fetched at join, 4/5 during matches, periodic re-fetches at
+19:52/20:13/20:22, all checksums 0xFFFF, zero state-6/stall events. Nothing
+in the fetch state machine misbehaved, and no crash occurred (last crash
+report is 2026-07-11). Conclusion: **the fetch wedge is not the only rollback
+path** — a session's progress can silently fail to persist with the D-Code
+system fully healthy. (The forced tests earlier that day were separate
+launches, 17:22/17:34, followed by two clean sessions before the set; they
+corrupted local receive-buffer memory only and recovered to checksum-valid
+fetches, so they are unlikely to be the cause — but not impossible to rule
+out entirely since the set session's DEBUG.txt was overwritten.)
+
+Save-side facts established from the 2026-07-14 session log (with the fixed
+trigger RVA):
+- The "auto-save trigger global" DAT_00EA97C8 and CSaveDataManager+0x1B11F0
+  (actionRunning) are THE SAME memory — the manager is statically allocated
+  (manager base VA 0xC986D8). Explains phase 7's "no static writers".
+- Save requests are made by tiny helpers: FUN_004BB2C0 (nextAction=7, the
+  one seen after matches), FUN_004BB410 (=1), FUN_004BB300 (=2), etc., mode
+  param at manager+0x1B11F8. All are called only from the save-task state
+  machine FUN_006C4990 (pumped per frame by FUN_006C4880); the network mode
+  drives saves through it. See DCodeBug10GhidraReport.txt.
+- In a healthy lobby session, actionRunning pulses 0->2->0 (write) every few
+  minutes, roughly correlated with slot-0 own-profile re-fetches.
+
+Instrumentation added 2026-07-14 in response (all in the deployed build):
+- **Per-session DEBUG.txt history**: at launch the previous DEBUG.txt is
+  rotated to `BBCF_IM\DebugHistory\DEBUG_<lastwrite>.txt`; setting
+  `DebugLogSessionHistory` (default 10) controls retention; 0 = old behavior.
+  No session's full log can be lost again.
+- **[SaveWatch] in DCodeIncidents.log** (not dev-gated): every save-manager
+  actionRunning/nextAction transition (with mode param), plus a filesystem
+  watch on `Save\bbsave.dat` (logs "WRITTEN size=..." whenever its mtime
+  changes) — ground truth that a save reached disk. Every [SaveWatch] line
+  carries the current `netcolor=X counter=Y` values, so the next rollback
+  will show exactly what progress existed at each save event and whether the
+  on-disk file was written with it.
+
+Next rollback should answer: did bbsave.dat get written during the lost
+session at all (if not: the request path was gated off — trace FUN_006C4990's
+input flags), and if it was written, did the netcolor values in [SaveWatch]
+lines at write time already show stale data (if so: the serialization source
+is stale — trace what buffer action-2 serializes).
+
 Next capture should tell us: whether the rejected payload was all-zero
 (transport error), truncated (recvSize != 0x6800), or genuinely corrupt
 (full-size, bad checksum) — and whether a forced retry succeeds, which

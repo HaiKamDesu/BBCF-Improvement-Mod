@@ -37,6 +37,7 @@ namespace {
 		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes DEBUG.txt with detailed runtime information for troubleshooting." },
 		{ "DCodeAutoRecover", "D-Code auto recovery", "Debug", "Detects the D-Code fetch wedge (profile payload rejected / stalled), dumps evidence to BBCF_IM, and forces the game's own retry path. Max 3 retries per slot per session." },
 		{ "DCodeForceFailureOnce", "Force D-Code failure (test)", "Debug", "TEST ONLY: corrupts the first in-flight profile fetch after launch so the game rejects it, to verify D-Code failure detection and auto recovery. Fires once per launch while enabled." },
+		{ "DebugLogSessionHistory", "Debug log session history", "Debug", "Number of previous sessions' DEBUG.txt files kept in BBCF_IM\\DebugHistory (rotated at launch). 0 overwrites DEBUG.txt every launch like before." },
 		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows the ranked progress overlay while ranked data is available." },
 		{ "ShowSquareColorProgress", "Show square color progress", "Ranked", "Shows square color progress information when available." },
 		{ "ShowRankedPrediction", "Show ranked prediction", "Ranked", "Shows the rank change prediction overlay during ranked matches." },

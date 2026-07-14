@@ -41,6 +41,9 @@ SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
 // the receive buffer so the game's checksum rejects it) to exercise the state-6
 // wedge + auto-recovery end-to-end. Fires once per launch while set to 1.
 SETTING(bool, dcodeForceFailureOnce, "DCodeForceFailureOnce", "0");
+// Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
+// launch). 0 = old behavior, DEBUG.txt is overwritten every launch.
+SETTING(int, debugLogSessionHistory, "DebugLogSessionHistory", "10");
 SETTING(bool, urtReTraceEnabled, "URT_RE_TraceEnabled", "0");
 SETTING(int, urtReTraceLevel, "URT_RE_TraceLevel", "2");
 SETTING(int, urtReTraceMaxFileMB, "URT_RE_MaxFileMB", "16");

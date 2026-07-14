@@ -143,7 +143,10 @@
       "Bash(iconv -f UTF-16LE -t UTF-8 tools/bbcf_disasm.txt)",
       "Bash(grep -n \"^namespace$\\\\|^namespace {\" \"/mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Overlay/Window/Ranked/RankedProgressWindow.cpp\")",
       "Bash(grep -n \"^[A-Za-z].*\\(.*\\)$\\\\|^}$\" \"/mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Overlay/Window/Ranked/RankedProgressWindow.cpp\")",
-      "Bash(grep -n \"^}$\" \"/mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Overlay/Window/Ranked/RankedProgressWindow.cpp\")"
+      "Bash(grep -n \"^}$\" \"/mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Overlay/Window/Ranked/RankedProgressWindow.cpp\")",
+      "Bash(cp run_ghidra_dcode_bug9.cmd run_ghidra_dcode_bug10.cmd)",
+      "Bash(sed -i 's/Bug9/Bug10/g; s/bug9/bug10/g' run_ghidra_dcode_bug10.cmd)",
+      "Bash(cmd.exe /c run_ghidra_dcode_bug10.cmd)"
     ]
   }
 }
