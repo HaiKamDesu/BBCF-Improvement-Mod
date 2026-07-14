@@ -1215,23 +1215,75 @@ void UnlimitedPlaybackWindow::Draw() {
             Settings::changeSetting("UnlimitedPlaybackLoopRestartLabState", restartLabState ? "1" : "0");
         }
         if (restartLabState) {
-            ImGui::TextUnformatted(L("Custom Snapshot").c_str());
-            DrawHelpInline(L("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.").c_str());
-            if (ImGui::Button(L("Save").c_str(), ImVec2(-1.0f, 0))) {
-                mgr.CaptureLoopCustomSnapshot();
-            }
-            DrawButtonTooltip(L("Save current lab state as the loop restart snapshot.").c_str());
-            if (mgr.HasLoopCustomSnapshot()) {
-                if (ImGui::Button(L("Load").c_str(), ImVec2(-1.0f, 0))) {
-                    mgr.LoadLoopCustomSnapshot();
+            static const int kResetModeOrder[] = {
+                UnlimitedPlaybackManager::LoopReset_Left,
+                UnlimitedPlaybackManager::LoopReset_Middle,
+                UnlimitedPlaybackManager::LoopReset_Right,
+                UnlimitedPlaybackManager::LoopReset_Custom,
+            };
+            const int currentResetMode = mgr.GetLoopRestartMode();
+            ImGui::TextUnformatted(L("Reset Position").c_str());
+            DrawHelpInline(L("Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.").c_str());
+            ImGui::PushItemWidth(-1.0f);
+            if (ImGui::BeginCombo("##up_loop_reset_mode", LoopResetModeLabel(currentResetMode))) {
+                for (int mode : kResetModeOrder) {
+                    const bool selected = (mode == currentResetMode);
+                    if (ImGui::Selectable(LoopResetModeLabel(mode), selected)) {
+                        mgr.SetLoopRestartMode(mode);
+                        Settings::settingsIni.unlimitedPlaybackLoopRestartMode = mgr.GetLoopRestartMode();
+                        Settings::changeSetting("UnlimitedPlaybackLoopRestartMode", std::to_string(mgr.GetLoopRestartMode()));
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
                 }
-                DrawButtonTooltip(L("Restore the saved loop snapshot now for verification.").c_str());
+                ImGui::EndCombo();
             }
-            ImGui::TextColored(
-                mgr.HasLoopCustomSnapshot() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
-                "%s",
-                mgr.HasLoopCustomSnapshot() ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+            ImGui::PopItemWidth();
+
+            if (currentResetMode == UnlimitedPlaybackManager::LoopReset_Custom) {
+                const bool customReady = mgr.IsLoopSnapshotReadyForMode(UnlimitedPlaybackManager::LoopReset_Custom);
+                ImGui::TextUnformatted(L("Custom Snapshot").c_str());
+                DrawHelpInline(L("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.").c_str());
+                if (ImGui::Button(L("Save").c_str(), ImVec2(-1.0f, 0))) {
+                    mgr.CaptureLoopCustomSnapshot();
+                }
+                DrawButtonTooltip(L("Save current lab state as the loop restart snapshot.").c_str());
+                if (customReady) {
+                    if (ImGui::Button(L("Load").c_str(), ImVec2(-1.0f, 0))) {
+                        mgr.LoadLoopCustomSnapshot();
+                    }
+                    DrawButtonTooltip(L("Restore the saved loop snapshot now for verification.").c_str());
+                }
+                ImGui::TextColored(
+                    customReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
+                    "%s",
+                    customReady ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+            } else {
+                const bool positionReady = mgr.IsLoopSnapshotReadyForMode(currentResetMode);
+                ImGui::TextColored(
+                    positionReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
+                    "%s",
+                    positionReady
+                        ? L("Reset position snapshot ready").c_str()
+                        : L("Position set up automatically when the loop starts").c_str());
+            }
         }
+    }
+    if (mgr.IsLoopPositionSetupActive()) {
+        // Deliberately NOT a modal: a focused ImGui window sets WantCaptureKeyboard, which makes
+        // PassKeyboardInputToGame() freeze the game's keyboard state (hooks_bbcf.cpp) and the
+        // forced reset combo's key releases would never reach the game.
+        const ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.25f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        if (ImGui::Begin("##up_loop_position_setup_banner", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoSavedSettings)) {
+            ImGui::TextUnformatted(L("Setting up loop reset position...").c_str());
+            ImGui::TextUnformatted(L("Inputs are temporarily overridden; this happens once per lab session.").c_str());
+        }
+        ImGui::End();
     }
     float loopSetupRemaining = 0.0f;
     float loopSetupTotal = 0.0f;

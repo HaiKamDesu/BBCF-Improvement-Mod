@@ -103,7 +103,11 @@ public:
     void SetLoopRestartMode(int mode);
     bool IsLoopActive() const;
     bool GetLoopSetupCountdown(float* outRemainingSeconds, float* outTotalSeconds) const;
+    bool IsLoopPositionSetupActive() const;
     bool HasLoopCustomSnapshot() const;
+    // True when the stored snapshot was captured for this reset mode (auto-captured for
+    // Left/Middle/Right, user-captured for Custom), so starting the loop can skip setup.
+    bool IsLoopSnapshotReadyForMode(int mode) const;
     bool CaptureLoopCustomSnapshot();
     bool LoadLoopCustomSnapshot();
     void ClearLoopCustomSnapshot();
@@ -205,7 +209,10 @@ private:
     void ExecutePendingPlayNow();
     void LogSlot4PlaybackDiagnostics();
     bool EnsureLoopSnapshotApparatus(bool preserveCustomSnapshot = false);
+    bool CaptureLoopSnapshotInternal();
     bool RestoreLoopCustomSnapshot(bool showToast);
+    void BeginLoopPositionSetup(int currentFrame);
+    void ProcessLoopPositionSetup(int currentFrame);
     bool ApplyLoopRestart();
     void StartNativeTrainingResetCombo(LoopResetMode mode);
     void CaptureNativeTrainingResetInputSnapshot(LoopResetMode mode);
@@ -269,6 +276,10 @@ private:
         LoopPhase_Setup,
         LoopPhase_Playing,
         LoopPhase_Ending,
+        // One-time takeover when reset mode is Left/Middle/Right and no matching snapshot
+        // exists yet: force the native training reset to the target position, wait for it to
+        // settle, auto-capture a snapshot, then the loop reuses that snapshot every cycle.
+        LoopPhase_PositionSetup,
     };
     LoopPhase m_loopPhase = LoopPhase_Idle;
     int m_loopPhaseStartFrame = -1;
@@ -277,12 +288,20 @@ private:
     int m_loopPlaybackInputEndedFrame = -1;
     int m_loopPlaybackIdleSinceFrame = -1;
     bool m_loopNativeResetPulseActive = false;
-    unsigned long long m_loopNativeResetReleaseAtMs = 0;
+    // Logic ticks left before the forced reset combo is released. Kept as short as possible
+    // (and cut to 0 as soon as the reset is observed) so the held direction cannot walk the
+    // character away from the freshly reset position before the snapshot is taken.
+    int m_loopNativeResetHoldTicksLeft = 0;
     std::array<WORD, 3> m_loopNativeResetKeys = {};
     std::vector<WORD> m_loopNativeResetRestoreKeys;
     std::vector<char> m_loopCustomSnapshotBytes;
     int m_loopCustomSnapshotSize = 0;
     int m_loopCustomSnapshotSlotIndex = -1;
+    // Which LoopResetMode the stored snapshot was captured for (-1 = none).
+    int m_loopSnapshotSourceMode = -1;
+    // Countdown (in observed logic ticks) between releasing the forced reset combo and
+    // auto-capturing the snapshot; frame-counter rollback safe. -1 = not waiting.
+    int m_loopPositionSetupSettleTicksLeft = -1;
     SnapshotApparatus* m_loopSnapshotApparatus = nullptr;
 
     PlaybackManager m_runtimePlaybackManager;

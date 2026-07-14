@@ -132,6 +132,12 @@ constexpr int kLoopCompletionMinimumPostInputFrames = 45;
 constexpr int kLoopCompletionIdleStableFrames = 12;
 constexpr int kLoopCompletionNoActionFallbackFrames = 90;
 constexpr int kLoopNativeResetSettleFrames = 45;
+// How many observed logic ticks the forced direction+reset combo is held before release.
+// Kept minimal (just enough for the game's input poll to register the press) so the held
+// direction cannot walk the character off the reset position; the reset itself is also
+// detected via the frame-counter rollback and releases the combo immediately.
+constexpr int kLoopNativeResetHoldTicks = 2;
+constexpr char kLoopPositionSetupToastKey[] = "loop_position_setup";
 
 bool PathExists(const std::string& path) {
     const DWORD attrs = GetFileAttributesA(path.c_str());
@@ -514,7 +520,10 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
     m_loopSetupSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds);
     m_loopEndingSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds);
     m_loopRestartLabState = Settings::settingsIni.unlimitedPlaybackLoopRestartLabState;
-    m_loopRestartMode = LoopReset_Custom;
+    const int savedRestartMode = Settings::settingsIni.unlimitedPlaybackLoopRestartMode;
+    m_loopRestartMode = (savedRestartMode >= LoopReset_Middle && savedRestartMode <= LoopReset_Custom)
+        ? savedRestartMode
+        : LoopReset_Middle;
     m_initialized = true;
 }
 
@@ -597,6 +606,11 @@ void UnlimitedPlaybackManager::Tick() {
         ForceResetTriggers(L("Trigger runtime resynced after training reset.").c_str());
         if (m_loopActive) {
             m_loopPhaseStartFrame = frame;
+        }
+        if (m_loopNativeResetPulseActive) {
+            // The training reset we forced just happened; drop the held combo this very tick
+            // so the direction key cannot walk the character off the reset position.
+            m_loopNativeResetHoldTicksLeft = 0;
         }
     }
     m_lastObservedFrame = frame;
@@ -835,11 +849,14 @@ void UnlimitedPlaybackManager::SetLoopRestartLabState(bool enabled) {
 }
 
 int UnlimitedPlaybackManager::GetLoopRestartMode() const {
-    return LoopReset_Custom;
+    return m_loopRestartMode;
 }
 
 void UnlimitedPlaybackManager::SetLoopRestartMode(int mode) {
-    m_loopRestartMode = LoopReset_Custom;
+    if (mode < LoopReset_Middle || mode > LoopReset_Custom) {
+        mode = LoopReset_Middle;
+    }
+    m_loopRestartMode = mode;
 }
 
 bool UnlimitedPlaybackManager::IsLoopActive() const {
@@ -874,6 +891,14 @@ bool UnlimitedPlaybackManager::GetLoopSetupCountdown(float* outRemainingSeconds,
 bool UnlimitedPlaybackManager::HasLoopCustomSnapshot() const {
     return m_loopCustomSnapshotSlotIndex >= 0 ||
         (!m_loopCustomSnapshotBytes.empty() && m_loopCustomSnapshotSize > 0);
+}
+
+bool UnlimitedPlaybackManager::IsLoopSnapshotReadyForMode(int mode) const {
+    return HasLoopCustomSnapshot() && m_loopSnapshotSourceMode == mode;
+}
+
+bool UnlimitedPlaybackManager::IsLoopPositionSetupActive() const {
+    return m_loopActive && m_loopPhase == LoopPhase_PositionSetup;
 }
 
 const std::vector<UnlimitedPlaybackManager::PlaybackEntry>& UnlimitedPlaybackManager::GetEntries() const {
@@ -2193,13 +2218,14 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
 void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     if (m_loopNativeResetPulseActive) {
         NeutralizeNativeTrainingResetDirections(static_cast<LoopResetMode>(m_loopRestartMode));
-        if (GetTickCount64() >= m_loopNativeResetReleaseAtMs) {
-            ReleaseNativeTrainingResetCombo();
-            m_loopRestartAppliedForCycle = true;
-            m_loopPhaseStartFrame = currentFrame + kLoopNativeResetSettleFrames;
-        } else {
+        if (m_loopNativeResetHoldTicksLeft > 0) {
+            --m_loopNativeResetHoldTicksLeft;
             return;
         }
+        ReleaseNativeTrainingResetCombo();
+        // Reset combo released; give the game time to finish the training reset (which can
+        // also roll the frame counter back) before auto-capturing the position snapshot.
+        m_loopPositionSetupSettleTicksLeft = kLoopNativeResetSettleFrames;
     }
 
     if (IsKeyPressedEdge(m_loopKeyCode)) {
@@ -2212,6 +2238,11 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     }
 
     if (!m_loopActive) {
+        return;
+    }
+
+    if (m_loopPhase == LoopPhase_PositionSetup) {
+        ProcessLoopPositionSetup(currentFrame);
         return;
     }
 
@@ -2264,18 +2295,61 @@ void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
         return;
     }
     if (m_loopRestartLabState &&
-        !HasLoopCustomSnapshot()) {
+        m_loopRestartMode == LoopReset_Custom &&
+        !IsLoopSnapshotReadyForMode(LoopReset_Custom)) {
         PushToast(L("Playback loop not started: custom snapshot missing."));
         return;
     }
 
     ResetRuntimePlaybackState(false);
     m_loopActive = true;
-    m_loopPhase = LoopPhase_Setup;
-    m_loopPhaseStartFrame = currentFrame;
     m_loopRestartAppliedForCycle = false;
     ResetLoopPlaybackCompletionState();
+    if (m_loopRestartLabState &&
+        m_loopRestartMode != LoopReset_Custom &&
+        !IsLoopSnapshotReadyForMode(m_loopRestartMode)) {
+        BeginLoopPositionSetup(currentFrame);
+    } else {
+        m_loopPhase = LoopPhase_Setup;
+        m_loopPhaseStartFrame = currentFrame;
+    }
     PushToast(L("Playback loop started."));
+}
+
+void UnlimitedPlaybackManager::BeginLoopPositionSetup(int currentFrame) {
+    ClearLoopCustomSnapshot();
+    m_loopPhase = LoopPhase_PositionSetup;
+    m_loopPhaseStartFrame = currentFrame;
+    m_loopPositionSetupSettleTicksLeft = -1;
+    PushStickyToast(kLoopPositionSetupToastKey, L("Setting up loop reset position - inputs are overridden for a moment..."));
+    LOG(1, "[UP] Loop position setup started (mode=%d).\n", m_loopRestartMode);
+    StartNativeTrainingResetCombo(static_cast<LoopResetMode>(m_loopRestartMode));
+}
+
+void UnlimitedPlaybackManager::ProcessLoopPositionSetup(int currentFrame) {
+    if (m_loopPositionSetupSettleTicksLeft < 0) {
+        // Still holding the forced reset combo; the pulse block at the top of
+        // ProcessLoopTick releases it and starts the settle countdown.
+        return;
+    }
+    if (m_loopPositionSetupSettleTicksLeft > 0) {
+        --m_loopPositionSetupSettleTicksLeft;
+        return;
+    }
+
+    m_loopPositionSetupSettleTicksLeft = -1;
+    RemoveStickyToast(kLoopPositionSetupToastKey);
+    if (!CaptureLoopSnapshotInternal()) {
+        StopLoop(L("Playback loop stopped: reset position snapshot failed.").c_str());
+        return;
+    }
+    m_loopSnapshotSourceMode = m_loopRestartMode;
+    LOG(1, "[UP] Loop position setup complete (mode=%d); snapshot captured.\n", m_loopRestartMode);
+    PushToast(L("Loop reset position saved."));
+    // We are already sitting at the reset position, so skip this first cycle's restore.
+    m_loopPhase = LoopPhase_Setup;
+    m_loopPhaseStartFrame = currentFrame;
+    m_loopRestartAppliedForCycle = true;
 }
 
 void UnlimitedPlaybackManager::StopLoop(const char* reason) {
@@ -2294,6 +2368,8 @@ void UnlimitedPlaybackManager::StopLoop(const char* reason) {
     m_loopPhase = LoopPhase_Idle;
     m_loopPhaseStartFrame = -1;
     m_loopRestartAppliedForCycle = false;
+    m_loopPositionSetupSettleTicksLeft = -1;
+    RemoveStickyToast(kLoopPositionSetupToastKey);
     ResetLoopPlaybackCompletionState();
     ReleaseNativeTrainingResetCombo();
     if (wasActive && reason && reason[0] != '\0') {
@@ -2438,10 +2514,8 @@ bool UnlimitedPlaybackManager::EnsureLoopSnapshotApparatus(bool preserveCustomSn
     return m_loopSnapshotApparatus != nullptr;
 }
 
-bool UnlimitedPlaybackManager::CaptureLoopCustomSnapshot() {
-    InitializeIfNeeded();
+bool UnlimitedPlaybackManager::CaptureLoopSnapshotInternal() {
     if (!EnsureLoopSnapshotApparatus()) {
-        PushToast(L("Custom loop snapshot failed: lab state unavailable."));
         return false;
     }
 
@@ -2449,13 +2523,26 @@ bool UnlimitedPlaybackManager::CaptureLoopCustomSnapshot() {
     const bool nativeOk = m_loopSnapshotApparatus->save_snapshot(nullptr);
     if (!nativeOk) {
         ClearLoopCustomSnapshot();
-        PushToast(L("Custom loop snapshot failed."));
         return false;
     }
     m_loopCustomSnapshotSlotIndex = savedSlot;
     m_loopCustomSnapshotSize = m_loopSnapshotApparatus->get_last_saved_snapshot_size();
 
     m_loopCustomSnapshotBytes.clear();
+    return true;
+}
+
+bool UnlimitedPlaybackManager::CaptureLoopCustomSnapshot() {
+    InitializeIfNeeded();
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        PushToast(L("Custom loop snapshot failed: lab state unavailable."));
+        return false;
+    }
+    if (!CaptureLoopSnapshotInternal()) {
+        PushToast(L("Custom loop snapshot failed."));
+        return false;
+    }
+    m_loopSnapshotSourceMode = LoopReset_Custom;
 
     PushToast(L("Custom loop snapshot captured for this lab session."));
     return true;
@@ -2470,6 +2557,7 @@ void UnlimitedPlaybackManager::ClearLoopCustomSnapshot() {
     m_loopCustomSnapshotBytes.clear();
     m_loopCustomSnapshotSize = 0;
     m_loopCustomSnapshotSlotIndex = -1;
+    m_loopSnapshotSourceMode = -1;
 }
 
 bool UnlimitedPlaybackManager::RestoreLoopCustomSnapshot(bool showToast) {
@@ -2544,7 +2632,7 @@ void UnlimitedPlaybackManager::StartNativeTrainingResetCombo(LoopResetMode mode)
     SendNativeTrainingResetKey(alternateDirectionVk, true);
     SendNativeTrainingResetKey(VK_BACK, true);
     m_loopNativeResetPulseActive = true;
-    m_loopNativeResetReleaseAtMs = GetTickCount64() + 90;
+    m_loopNativeResetHoldTicksLeft = kLoopNativeResetHoldTicks;
 }
 
 void UnlimitedPlaybackManager::CaptureNativeTrainingResetInputSnapshot(LoopResetMode mode) {
@@ -2609,7 +2697,7 @@ void UnlimitedPlaybackManager::ReleaseNativeTrainingResetCombo() {
     m_loopNativeResetKeys = {};
     m_loopNativeResetRestoreKeys.clear();
     m_loopNativeResetPulseActive = false;
-    m_loopNativeResetReleaseAtMs = 0;
+    m_loopNativeResetHoldTicksLeft = 0;
 }
 
 void UnlimitedPlaybackManager::SendNativeTrainingResetKey(WORD virtualKey, bool keyDown) const {
