@@ -37,6 +37,10 @@ SETTING(bool, rankedAutomationHarnessQuitOnFinish, "RankedAutomationHarnessQuitO
 // (state 6 payload-rejected, or a >15s state-2 stall), force the slot back to
 // idle so the game's own retry path re-fetches. See docs/Research/DCodeNetworkStallBug.md.
 SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
+// TEST ONLY: sabotage the first in-flight profile fetch after launch (corrupts
+// the receive buffer so the game's checksum rejects it) to exercise the state-6
+// wedge + auto-recovery end-to-end. Fires once per launch while set to 1.
+SETTING(bool, dcodeForceFailureOnce, "DCodeForceFailureOnce", "0");
 SETTING(bool, urtReTraceEnabled, "URT_RE_TraceEnabled", "0");
 SETTING(int, urtReTraceLevel, "URT_RE_TraceLevel", "2");
 SETTING(int, urtReTraceMaxFileMB, "URT_RE_MaxFileMB", "16");
@@ -46,6 +50,7 @@ SETTING(bool, urtReAllowUnsafeProbeLoad, "URT_RE_AllowUnsafeProbeLoad", "0");
 SETTING(bool, enableInDevelopmentFeatures, "EnableInDevelopmentFeatures", "0");
 SETTING(bool, enableRankedListConnectionFilter, "EnableRankedListConnectionFilter", "0");
 SETTING(bool, showRankedListFilterWindow, "ShowRankedListFilterWindow", "1");
+SETTING(bool, showRankedListHiddenPopup, "ShowRankedListHiddenPopup", "0");
 SETTING(int, rankedListSortMode, "RankedListSortMode", "0");
 SETTING(int, rankedListNetworkFilter, "RankedListNetworkFilter", "0");
 SETTING(bool, hideUnmetRequirementRooms, "HideUnmetRequirementRooms", "0");

@@ -135,6 +135,9 @@ public:
 		uint64_t steamId = 0;
 		std::string name;
 		HiddenReason reason = HiddenReason::Unreachable;
+		uint8_t netColor = 0xFF;    // entry+0x74, the row's native square icon color; 0xFF = unknown
+		int rank = -1;              // internalRankLevel (visible level - 1); -1 = unknown
+		int delayDigit = -1;        // 0-4 Delay/connection tag; -1 = unresolved
 	};
 	void GetHiddenPeers(std::vector<HiddenPeerInfo>* outPeers) const;
 	void RestorePeer(uint64_t steamId);
@@ -277,6 +280,10 @@ private:
 	// logOrder=false suppresses the per-call "sort order" log line (used by the
 	// high-frequency live path, which logs only when the order actually changes).
 	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown, bool logOrder = true) const;
+	// Orders the hidden-players list (served to the UI) using the same
+	// Settings::settingsIni.rankedListSortMode the visible list uses, so the
+	// two stay consistent - "whatever order you pick" applies everywhere.
+	void SortHiddenPeers(std::vector<HiddenPeerInfo>* peers) const;
 	// While a join attempt is pending, watches for the target appearing as a
 	// member of the game's own room struct (which happens on the confirmation
 	// screen). That proves the connection worked, so a subsequent LeaveLobby -
@@ -295,7 +302,6 @@ private:
 	std::unordered_map<uint64_t, PeerVerdict> m_verdicts;
 	// steamId -> probe start tick, for measuring establishment time.
 	std::unordered_map<uint64_t, unsigned long long> m_probesInFlight;
-	std::unordered_set<uint64_t> m_announcedHidden;
 	std::vector<LobbyCandidate> m_candidates;
 	std::vector<uint64_t> m_reachableLobbies;
 	bool m_hasRemapResult = false;

@@ -296,6 +296,28 @@ poll may simply have missed the run).
     So a week of unattended play yields: one cumulative incidents log,
     plus a full-log snapshot and a payload .bin per failure.
 
+2026-07-13 addition: `DCodeForceFailureOnce=1` (settings.ini, default 0)
+sabotages the first in-flight fetch of the session by writing 16 bytes of
+0xA5 at row+0x1000 while state==2, so the game's own checksum rejects the
+payload — an authentic on-demand state-6 wedge (local memory only, nothing
+reaches the peer; fires once per launch). Used to verify the
+detection/dump/auto-recovery pipeline without waiting for a natural repro.
+Two days of healthy `DCodeIncidents.log` data (2026-07-12/13) confirm the
+hook and both sinks work: 17 accepted fetches, all checksum 0xFFFF, fetch
+completion consistently ~1.4s.
+
+**2026-07-13: forced-failure test PASSED end-to-end** (DCodeIncidents.log,
+17:22 session): sabotaged fetch rejected by the game (full 0x6800 received,
+checksum 0x2D2D != 0xFFFF, state 2->6), evidence pipeline fired (ctx dump,
+hexdump, .bin payload dump, DEBUG.txt snapshot), auto-recover forced state
+0, and the game re-queued the fetch on its own **15ms later** (no screen
+change needed), completing with a valid checksum ~2.9s after the rejection.
+Conclusion: recovery from state 6 is fully self-healing via the game's own
+retry path; a natural repro should now recover in ~3s instead of wedging.
+Remaining open question is only whether the natural failure is transient
+like the test (retry succeeds) or persistent (would exhaust the 3-retry
+cap), and whether recovery also prevents the ranked-progress rollback.
+
 Next capture should tell us: whether the rejected payload was all-zero
 (transport error), truncated (recvSize != 0x6800), or genuinely corrupt
 (full-size, bad checksum) — and whether a forced retry succeeds, which

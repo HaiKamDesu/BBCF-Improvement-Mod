@@ -5,7 +5,6 @@
 #include "Core/logger.h"
 #include "Game/gamestates.h"
 #include "Network/RoomManager.h"
-#include "Overlay/NotificationBar/NotificationBar.h"
 #include "Overlay/Window/Ranked/RankedProgressWindow.h"
 #include "SteamApiWrapper/SteamMatchmakingWrapper.h"
 
@@ -821,6 +820,7 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		int32_t rttMs = -1;        // entry+0x78, -1 until the game resolves it
 		int16_t rttFilter = 0;     // entry+0x10a, RANK_RTT_FILTER (host requirement)
 		int16_t areaFilter = 0;    // entry+0x5e, RANK_AREA_FILTER (secondary requirement)
+		uint8_t netColor = 0xFF;   // entry+0x74, HOST_NETCOLOR - the row's native square icon
 	};
 	std::vector<LiveRow> rows(static_cast<size_t>(orig));
 	for (int32_t logical = 0; logical < orig; ++logical)
@@ -845,6 +845,7 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		row.rttMs = *reinterpret_cast<const int32_t*>(row.node + 0x78);
 		row.rttFilter = *reinterpret_cast<const int16_t*>(row.node + 0x10a);
 		row.areaFilter = *reinterpret_cast<const int16_t*>(row.node + 0x5e);
+		row.netColor = *reinterpret_cast<const uint8_t*>(row.node + 0x74);
 
 		if (row.steamId != 0)
 		{
@@ -930,9 +931,7 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	// (digit unknown) rows are shown - the game itself waits in
 	// "RMSR_CheckingRTT" rather than rejecting in that state.
 	const bool hideUnmet = Settings::settingsIni.hideUnmetRequirementRooms;
-	std::unordered_set<uint64_t> newlyHiddenUnreachable;
 	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
-	std::unordered_set<uint64_t> hiddenThisPass;
 	m_liveHiddenPeers.clear();
 	for (int32_t logical = 0; logical < orig; ++logical)
 	{
@@ -950,13 +949,6 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			const auto verdictIt = m_verdicts.find(row.steamId);
 			reason = (verdictIt != m_verdicts.end() && verdictIt->second.reactiveFailCount > 0)
 				? HiddenReason::ConnectionFailed : HiddenReason::Unreachable;
-			// Notify (once per hide episode) only for reputation hides -
-			// tier/requirement hides are rule-driven and would be spam.
-			if (m_announcedHidden.find(row.steamId) == m_announcedHidden.end())
-			{
-				m_announcedHidden.insert(row.steamId);
-				newlyHiddenUnreachable.insert(row.steamId);
-			}
 		}
 		const int delayDigit = GameDelayDigitFromRtt(row.rttMs);
 		if (!hide && !restoreExempt && networkFloor > 0 && delayDigit >= 0 && delayDigit < networkFloor)
@@ -989,59 +981,31 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		hiddenAt[static_cast<size_t>(logical)] = hide;
 		if (hide && row.steamId != 0)
 		{
-			hiddenThisPass.insert(row.steamId);
 			HiddenPeerInfo info;
 			info.steamId = row.steamId;
 			info.reason = reason;
+			info.netColor = row.netColor;
+			info.delayDigit = delayDigit;
 			const auto verdictIt = m_verdicts.find(row.steamId);
 			if (verdictIt != m_verdicts.end() && !verdictIt->second.lastKnownName.empty())
 			{
 				info.name = verdictIt->second.lastKnownName;
 			}
-			else
+			for (const LobbyCandidate& candidate : m_candidates)
 			{
-				for (const LobbyCandidate& candidate : m_candidates)
+				if (candidate.ownerSteamId == row.steamId)
 				{
-					if (candidate.ownerSteamId == row.steamId && !candidate.ownerName.empty())
+					if (info.name.empty() && !candidate.ownerName.empty())
 					{
 						info.name = candidate.ownerName;
-						break;
 					}
+					info.rank = candidate.internalRankLevel;
+					break;
 				}
 			}
 			m_liveHiddenPeers[row.steamId] = info;
 		}
 	}
-	// Forget announced players who are no longer hidden, so a later re-hide
-	// (after a live restore) announces again.
-	for (auto it = m_announcedHidden.begin(); it != m_announcedHidden.end();)
-	{
-		if (hiddenThisPass.find(*it) == hiddenThisPass.end())
-		{
-			it = m_announcedHidden.erase(it);
-		}
-		else
-		{
-			++it;
-		}
-	}
-	if (!newlyHiddenUnreachable.empty() && g_notificationBar != nullptr)
-	{
-		std::string names;
-		for (const uint64_t steamId : newlyHiddenUnreachable)
-		{
-			if (!names.empty())
-			{
-				names += ", ";
-			}
-			const auto it = m_verdicts.find(steamId);
-			names += (it != m_verdicts.end() && !it->second.lastKnownName.empty())
-				? it->second.lastKnownName : "<unknown>";
-		}
-		g_notificationBar->AddNotification("Ranked list filter: hiding %zu unreachable player%s (%s)",
-			newlyHiddenUnreachable.size(), newlyHiddenUnreachable.size() == 1 ? "" : "s", names.c_str());
-	}
-
 	// newPosOf[preMoveLogical] = position after the partition.
 	std::vector<int32_t> newPosOf(static_cast<size_t>(orig));
 	std::vector<int32_t> preAt(static_cast<size_t>(orig)); // position -> pre-move logical
@@ -1539,6 +1503,125 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 	LOG(1, "[RankedListFilter] sort order (mode=%d):%s\n", mode, orderDump.c_str());
 }
 
+void RankedListConnectionFilter::SortHiddenPeers(std::vector<HiddenPeerInfo>* peers) const
+{
+	const int mode = Settings::settingsIni.rankedListSortMode;
+	if (peers == nullptr || peers->size() < 2 ||
+		mode <= RankedListSortMode_Default || mode >= RankedListSortMode_COUNT)
+	{
+		return;
+	}
+
+	uint32_t myVisibleRank = 0;
+	bool haveMyRank = false;
+	if (mode == RankedListSortMode_ClosestLevel || mode == RankedListSortMode_FurthestLevel)
+	{
+		RankedProgressOverlaySnapshot snapshot;
+		if (CaptureRankedProgressOverlaySnapshot(&snapshot) && snapshot.active && !snapshot.isUnranked)
+		{
+			myVisibleRank = snapshot.currentRank;
+			haveMyRank = true;
+		}
+		if (!haveMyRank)
+		{
+			return;
+		}
+	}
+
+	struct SortEntry
+	{
+		HiddenPeerInfo peer;
+		bool keyKnown = false;
+		long long numericKey = 0;
+		std::string textKey;
+	};
+
+	std::vector<SortEntry> entries;
+	entries.reserve(peers->size());
+	for (const HiddenPeerInfo& peer : *peers)
+	{
+		SortEntry entry;
+		entry.peer = peer;
+
+		switch (mode)
+		{
+		case RankedListSortMode_BestConnection:
+		case RankedListSortMode_WorstConnection:
+			if (peer.delayDigit >= 0)
+			{
+				const bool worst = mode == RankedListSortMode_WorstConnection;
+				entry.numericKey = worst ? -peer.delayDigit : peer.delayDigit;
+				entry.keyKnown = true;
+			}
+			break;
+		case RankedListSortMode_ClosestLevel:
+		case RankedListSortMode_FurthestLevel:
+			if (peer.rank >= 0)
+			{
+				const long long theirVisible = peer.rank + 1;
+				const long long diff = theirVisible - static_cast<long long>(myVisibleRank);
+				entry.numericKey = diff >= 0 ? diff : -diff;
+				entry.keyKnown = true;
+			}
+			break;
+		case RankedListSortMode_HighestLevel:
+		case RankedListSortMode_LowestLevel:
+			if (peer.rank >= 0)
+			{
+				entry.numericKey = peer.rank;
+				entry.keyKnown = true;
+			}
+			break;
+		case RankedListSortMode_NameAZ:
+		case RankedListSortMode_NameZA:
+			if (!peer.name.empty())
+			{
+				entry.textKey = peer.name;
+				std::transform(entry.textKey.begin(), entry.textKey.end(), entry.textKey.begin(),
+					[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+				entry.keyKnown = true;
+			}
+			break;
+		default:
+			break;
+		}
+
+		entries.push_back(entry);
+	}
+
+	// WorstConnection excluded here for the same reason as SortShownCandidates:
+	// its direction is baked directly into numericKey above.
+	const bool descending =
+		mode == RankedListSortMode_FurthestLevel ||
+		mode == RankedListSortMode_HighestLevel ||
+		mode == RankedListSortMode_NameZA;
+	const bool textual = mode == RankedListSortMode_NameAZ || mode == RankedListSortMode_NameZA;
+
+	std::stable_sort(entries.begin(), entries.end(),
+		[descending, textual](const SortEntry& a, const SortEntry& b)
+		{
+			if (a.keyKnown != b.keyKnown)
+			{
+				return a.keyKnown;
+			}
+			if (!a.keyKnown)
+			{
+				return false;
+			}
+			if (textual)
+			{
+				return descending ? (b.textKey < a.textKey) : (a.textKey < b.textKey);
+			}
+			return descending ? (b.numericKey < a.numericKey) : (a.numericKey < b.numericKey);
+		});
+
+	peers->clear();
+	for (const SortEntry& entry : entries)
+	{
+		peers->push_back(entry.peer);
+	}
+}
+
 void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason)
 {
 	m_reachableLobbies.clear();
@@ -1803,6 +1886,8 @@ void RankedListConnectionFilter::GetHiddenPeers(std::vector<HiddenPeerInfo>* out
 		}
 		outPeers->push_back(entry.second);
 	}
+
+	SortHiddenPeers(outPeers);
 }
 
 void RankedListConnectionFilter::RestorePeer(uint64_t steamId)
@@ -1812,7 +1897,6 @@ void RankedListConnectionFilter::RestorePeer(uint64_t steamId)
 	// the row returns within ~400ms either way, and may legitimately re-hide
 	// once fresh data says so again.
 	m_verdicts.erase(steamId);
-	m_announcedHidden.erase(steamId);
 	m_restoreExemptions.insert(steamId);
 	LOG(1, "[RankedListFilter] user restored steamId=%llu - verdict cleared, filters exempted until next recheck\n",
 		static_cast<unsigned long long>(steamId));
@@ -1824,7 +1908,6 @@ void RankedListConnectionFilter::RestoreAllPeers()
 	for (const auto& entry : m_liveHiddenPeers)
 	{
 		m_verdicts.erase(entry.first);
-		m_announcedHidden.erase(entry.first);
 		m_restoreExemptions.insert(entry.first);
 		++restored;
 	}

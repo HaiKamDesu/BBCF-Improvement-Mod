@@ -592,16 +592,6 @@ namespace
 		state->valid = true;
 	}
 
-	uint32_t InternalRankToVisibleRank(uint32_t internalRank, bool isUnranked)
-	{
-		if (isUnranked)
-		{
-			return 0;
-		}
-
-		return internalRank + 1u;
-	}
-
 	uint32_t VisibleRankToInternalRank(uint32_t visibleRank)
 	{
 		return visibleRank > 0 ? (visibleRank - 1u) : 0u;
@@ -628,51 +618,6 @@ namespace
 		}
 
 		return nullptr;
-	}
-
-	std::string FormatVisibleRankLabel(uint32_t visibleRank, bool isUnranked)
-	{
-		const char* const specialName = GetRankDisplayName(visibleRank, isUnranked);
-		if (specialName)
-		{
-			return specialName;
-		}
-
-		if (visibleRank >= 1u && visibleRank <= 35u)
-		{
-			char buffer[32] = {};
-			std::snprintf(buffer, sizeof(buffer), "LV%u", static_cast<unsigned int>(visibleRank));
-			return std::string(buffer);
-		}
-
-		char buffer[32] = {};
-		std::snprintf(buffer, sizeof(buffer), "SkillRank_%u", static_cast<unsigned int>(visibleRank));
-		return std::string(buffer);
-	}
-
-	ImVec4 GetVisibleRankColor(uint32_t visibleRank, bool isUnranked)
-	{
-		if (isUnranked || visibleRank == 0u)
-		{
-			return g_rankedOverlayTuning.authColor;
-		}
-
-		if (visibleRank <= 19u)
-		{
-			return g_rankedOverlayTuning.lowRankColor;
-		}
-
-		if (visibleRank <= 29u)
-		{
-			return g_rankedOverlayTuning.midRankColor;
-		}
-
-		if (visibleRank <= 35u)
-		{
-			return g_rankedOverlayTuning.highRankColor;
-		}
-
-		return g_rankedOverlayTuning.leaderRankColor;
 	}
 
 	int32_t HalvedRankedLpDelta(uint32_t rankGap)
@@ -4743,6 +4688,61 @@ namespace
 		g_rankedProgressOverlaySnapshot.networkState1 = -1;
 		g_rankedProgressOverlaySnapshot.isUnranked = true;
 	}
+}
+
+uint32_t InternalRankToVisibleRank(uint32_t internalRank, bool isUnranked)
+{
+	if (isUnranked)
+	{
+		return 0;
+	}
+
+	return internalRank + 1u;
+}
+
+std::string FormatVisibleRankLabel(uint32_t visibleRank, bool isUnranked)
+{
+	const char* const specialName = GetRankDisplayName(visibleRank, isUnranked);
+	if (specialName)
+	{
+		return specialName;
+	}
+
+	if (visibleRank >= 1u && visibleRank <= 35u)
+	{
+		char buffer[32] = {};
+		std::snprintf(buffer, sizeof(buffer), "LV%u", static_cast<unsigned int>(visibleRank));
+		return std::string(buffer);
+	}
+
+	char buffer[32] = {};
+	std::snprintf(buffer, sizeof(buffer), "SkillRank_%u", static_cast<unsigned int>(visibleRank));
+	return std::string(buffer);
+}
+
+ImVec4 GetVisibleRankColor(uint32_t visibleRank, bool isUnranked)
+{
+	if (isUnranked || visibleRank == 0u)
+	{
+		return g_rankedOverlayTuning.authColor;
+	}
+
+	if (visibleRank <= 19u)
+	{
+		return g_rankedOverlayTuning.lowRankColor;
+	}
+
+	if (visibleRank <= 29u)
+	{
+		return g_rankedOverlayTuning.midRankColor;
+	}
+
+	if (visibleRank <= 35u)
+	{
+		return g_rankedOverlayTuning.highRankColor;
+	}
+
+	return g_rankedOverlayTuning.leaderRankColor;
 }
 
 void NoteRankedUploadAttempt(int32_t characterId, int32_t score, const char* leaderboardName)

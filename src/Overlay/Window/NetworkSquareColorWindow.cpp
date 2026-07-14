@@ -572,12 +572,6 @@ namespace
 		ImGui::TextDisabled("%s", L("Unavailable").c_str());
 	}
 
-	ImVec4 GetNetColorVec4(uint8_t value)
-	{
-		const NetColorDefinition* const color = FindNetColor(value);
-		return color ? color->color : ImVec4(0.48f, 0.48f, 0.50f, 1.0f);
-	}
-
 	uint8_t GetPreviousNetColor(uint8_t value)
 	{
 		return value < 7 ? static_cast<uint8_t>(value + 1) : value;
@@ -961,6 +955,12 @@ namespace
 		LogNetworkSquareColorDiagnostics(state);
 		DrawNetworkSquareColorContentForState(state, alpha);
 	}
+}
+
+ImVec4 GetNetColorVec4(uint8_t value)
+{
+	const NetColorDefinition* const color = FindNetColor(value);
+	return color ? color->color : ImVec4(0.48f, 0.48f, 0.50f, 1.0f);
 }
 
 void NetworkSquareColorWindow::BeforeDraw()

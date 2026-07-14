@@ -108,6 +108,14 @@ namespace
 	int g_debugSnapshotsThisSession = 0;
 	constexpr int kMaxDebugSnapshotsPerSession = 5;
 
+	// ---- Forced-failure test mode (DCodeForceFailureOnce) ----
+	// Offset chosen inside the per-character entry array (row+0xD4..), away from
+	// the +0x8 magic and +0xC0 header fields the validator also touches.
+	constexpr uintptr_t kForcedCorruptionOffset = 0x1000;
+	constexpr size_t kForcedCorruptionBytes = 16;
+	int g_forcedFailureSlot = -1;
+	bool g_forcedFailureDone = false;
+
 	void AppendToIncidentFile(const char* message)
 	{
 		const HANDLE hFile = CreateFileW(L"BBCF_IM\\DCodeIncidents.log", FILE_APPEND_DATA,
@@ -327,6 +335,36 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 	SlotTrack& track = g_slotTracks[slot];
 	const int32_t state = *reinterpret_cast<const int32_t*>(subObject + kSubObjectFetchStateOffset);
 	const ULONGLONG now = GetTickCount64();
+
+	// TEST ONLY (DCodeForceFailureOnce=1): sabotage the first in-flight fetch of
+	// the session by corrupting the receive buffer, so the game's own checksum
+	// validation rejects it -- an authentic state-6 wedge on demand, to verify
+	// detection + auto-recovery end-to-end. Corrupts local memory only; nothing
+	// is sent to the peer. Fires once per launch.
+	if (Settings::settingsIni.dcodeForceFailureOnce && !g_forcedFailureDone)
+	{
+		if (g_forcedFailureSlot == -1 && state == 2)
+		{
+			g_forcedFailureSlot = slot;
+			IncidentPrintf("[DCodeTick] TEST: DCodeForceFailureOnce armed, corrupting in-flight payload on slot %d\n", slot);
+		}
+		if (g_forcedFailureSlot == slot)
+		{
+			if (state == 2)
+			{
+				if (!IsBadWritePtr(row + kForcedCorruptionOffset, kForcedCorruptionBytes))
+				{
+					memset(row + kForcedCorruptionOffset, 0xA5, kForcedCorruptionBytes);
+				}
+			}
+			else
+			{
+				g_forcedFailureDone = true;
+				IncidentPrintf("[DCodeTick] TEST: slot %d left state 2 (now %d), sabotage disarmed for this launch\n",
+					slot, state);
+			}
+		}
+	}
 
 	// While a request is in flight the row buffer already contains whatever the
 	// transport has written; the tick that completes the exchange validates and,

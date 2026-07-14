@@ -5,12 +5,40 @@
 #include "Core/Settings.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "Overlay/imgui_utils.h"
+#include "Overlay/Window/NetworkSquareColorWindow.h"
+#include "Overlay/Window/Ranked/RankedProgressWindow.h"
 
 #include <imgui.h>
 
 #include <cstdio>
 #include <string>
 #include <vector>
+
+namespace
+{
+	// 0-4 Delay/connection tag color, as specified for this list: worst (0) to
+	// best (4). Distinct from the native netcolor square (0-8), which already
+	// has its own palette in NetworkSquareColorWindow.
+	ImVec4 GetConnectionTagColor(int delayDigit)
+	{
+		switch (delayDigit)
+		{
+		case 0: return ImVec4(0.90f, 0.20f, 0.20f, 1.0f); // red
+		case 1: return ImVec4(0.62f, 0.32f, 0.90f, 1.0f); // purple
+		case 2: return ImVec4(0.95f, 0.55f, 0.10f, 1.0f); // orange
+		case 3: return ImVec4(0.30f, 0.85f, 0.30f, 1.0f); // green
+		case 4: return ImVec4(0.92f, 0.92f, 0.92f, 1.0f); // white
+		default: return ImVec4(0.55f, 0.55f, 0.55f, 1.0f); // unresolved
+		}
+	}
+
+	void DrawSquare(ImDrawList* drawList, const ImVec2& p0, float size, const ImVec4& fill)
+	{
+		const ImVec2 p1 = ImVec2(p0.x + size, p0.y + size);
+		drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(fill), 3.0f);
+		drawList->AddRect(p0, p1, ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.08f, 1.0f)), 3.0f);
+	}
+}
 
 void RankedListFilterWindow::UpdateAutoVisibility()
 {
@@ -167,11 +195,26 @@ void RankedListFilterWindow::Draw()
 	if (ImGui::IsItemClicked())
 	{
 		m_showHiddenPopup = !m_showHiddenPopup;
+		Settings::settingsIni.showRankedListHiddenPopup = m_showHiddenPopup;
+		Settings::changeSetting("ShowRankedListHiddenPopup", m_showHiddenPopup ? "1" : "0");
+	}
+	else if (!m_showHiddenPopup && Settings::settingsIni.showRankedListHiddenPopup)
+	{
+		// Reopen automatically - the setting says the user wants this
+		// visible whenever there are hidden players to show.
+		m_showHiddenPopup = true;
 	}
 
 	if (m_showHiddenPopup)
 	{
 		DrawHiddenPlayersPopup();
+		if (!m_showHiddenPopup && Settings::settingsIni.showRankedListHiddenPopup)
+		{
+			// Closed via the popup's own X - persist so it stays closed
+			// until manually reopened.
+			Settings::settingsIni.showRankedListHiddenPopup = false;
+			Settings::changeSetting("ShowRankedListHiddenPopup", "0");
+		}
 	}
 }
 
@@ -208,6 +251,7 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 	// Scrollable region so a long list never grows the window off screen.
 	if (ImGui::BeginChild("hidden_players_scroll", ImVec2(0.0f, 0.0f), false))
 	{
+		const float squareSize = 16.0f;
 		for (const RankedListConnectionFilter::HiddenPeerInfo& peer : hiddenPeers)
 		{
 			std::string reasonText;
@@ -228,13 +272,48 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 			}
 
 			ImGui::PushID(static_cast<int>(peer.steamId & 0xFFFFFFFFu));
+
+			// Square color (native row icon).
+			ImDrawList* const drawList = ImGui::GetWindowDrawList();
+			ImVec2 p0 = ImGui::GetCursorScreenPos();
+			p0.y += (ImGui::GetTextLineHeight() - squareSize) * 0.5f;
+			DrawSquare(drawList, p0, squareSize, GetNetColorVec4(peer.netColor));
+			ImGui::Dummy(ImVec2(squareSize, squareSize));
+			ImGui::SameLine();
+
+			// Name.
+			ImGui::TextUnformatted(peer.name.empty() ? "???" : peer.name.c_str());
+			ImGui::SameLine();
+
+			// Rank, colored the same way as the ranked progress overlay.
+			if (peer.rank >= 0)
+			{
+				const uint32_t visibleRank = InternalRankToVisibleRank(static_cast<uint32_t>(peer.rank), false);
+				const std::string rankLabel = FormatVisibleRankLabel(visibleRank, false);
+				ImGui::TextColored(GetVisibleRankColor(visibleRank, false), "%s", rankLabel.c_str());
+				ImGui::SameLine();
+			}
+
+			// Connection tag (0-4 Delay digit), colored per spec.
+			if (peer.delayDigit >= 0)
+			{
+				char connLabel[4];
+				snprintf(connLabel, sizeof(connLabel), "%d", peer.delayDigit);
+				ImGui::TextColored(GetConnectionTagColor(peer.delayDigit), "%s", connLabel);
+				ImGui::SameLine();
+			}
+
+			// Reason + restore, on their own trailing line so the header row
+			// above stays uncluttered.
+			ImGui::TextDisabled("- %s", reasonText.c_str());
+			ImGui::SameLine();
 			if (ImGui::SmallButton(L("Restore").c_str()))
 			{
 				filter.RestorePeer(peer.steamId);
 			}
-			ImGui::SameLine();
-			ImGui::Text("%s - %s", peer.name.empty() ? "???" : peer.name.c_str(), reasonText.c_str());
+
 			ImGui::PopID();
+			ImGui::Separator();
 		}
 	}
 	ImGui::EndChild();

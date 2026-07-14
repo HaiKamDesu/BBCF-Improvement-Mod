@@ -33,6 +33,9 @@ private:
 	// "N hidden" status text) with its scrollable restore list.
 	void DrawHiddenPlayersPopup();
 
-	// True while the hidden-players modal is open.
+	// True while the hidden-players modal is open. Seeded from and kept in
+	// sync with ShowRankedListHiddenPopup: opening/closing it (by click or by
+	// its own X) persists the new state, so it reopens on its own next time
+	// unless the user closed it last.
 	bool m_showHiddenPopup = false;
 };

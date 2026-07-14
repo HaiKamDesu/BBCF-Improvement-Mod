@@ -2,7 +2,10 @@
 
 #include "Overlay/Window/RankedProgressOverlayState.h"
 
+#include <imgui.h>
+
 #include <cstdint>
+#include <string>
 
 struct RankedProgressOverlaySnapshot
 {
@@ -52,3 +55,10 @@ void DrawRankedMatchesMainMenuSection();
 bool CaptureRankedProgressOverlaySnapshot(RankedProgressOverlaySnapshot* outSnapshot);
 void DrawRankedProgressOverlayStandalone();
 bool TriggerRankedProgressAutomationAnimation(uint32_t characterId, int32_t lpDelta);
+
+// Shared rank display helpers (internal rank -> visible rank -> label/color),
+// reused by other windows that need to show a player's rank consistently
+// with the ranked progress overlay.
+uint32_t InternalRankToVisibleRank(uint32_t internalRank, bool isUnranked);
+std::string FormatVisibleRankLabel(uint32_t visibleRank, bool isUnranked);
+ImVec4 GetVisibleRankColor(uint32_t visibleRank, bool isUnranked);
