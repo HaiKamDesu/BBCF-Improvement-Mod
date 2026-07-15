@@ -14,9 +14,10 @@ public:
 private:
 	struct PaletteRow
 	{
-		int palIndex = 0;     // index into the character's custom palette vector
-		std::string name;
+		int palIndex = 0;     // index into the character's custom palette vector; negative for special rows
+		std::string name;     // palette name, or the raw palettes.ini value for special rows
 		int assignedSlot = 0; // 0 = not assigned, otherwise 1..24 (in-game color number)
+		bool isSpecial = false; // "Random" / "Random_Exclude_Default" pseudo-entries (no file behind them)
 	};
 
 	struct CharacterGroup

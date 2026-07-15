@@ -1,6 +1,7 @@
 #include "PalettesConfigWindow.h"
 
 #include "Core/interfaces.h"
+#include "Core/Localization.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/characters.h"
@@ -28,6 +29,20 @@ namespace
 	bool NamesEqual(const std::string& a, const std::string& b)
 	{
 		return _stricmp(a.c_str(), b.c_str()) == 0;
+	}
+
+	// palettes.ini values resolved by PaletteManager::ApplyDefaultCustomPalette
+	// at color-select time; they have no palette file behind them.
+	const char* kRandomIniValue = "Random";
+	const char* kRandomExcludeDefaultIniValue = "Random_Exclude_Default";
+
+	std::string DisplayNameForSlotValue(const std::string& value)
+	{
+		if (NamesEqual(value, kRandomIniValue))
+			return Messages.Palette_random_label();
+		if (NamesEqual(value, kRandomExcludeDefaultIniValue))
+			return Messages.Palette_random_exclude_label();
+		return value;
 	}
 
 	std::string FileNameFromPath(const std::string& path)
@@ -228,11 +243,12 @@ namespace
 
 void PalettesConfigWindow::DrawOpenButton()
 {
-	if (!ImGui::Button("Palettes"))
+	if (!ImGui::Button(Messages.Palettes()))
 		return;
 
 	BuildRows();
-	ImGui::OpenPopup("Palettes##modal");
+	// "###" keeps the popup ID stable regardless of the UI language.
+	ImGui::OpenPopup("###palettes_modal");
 }
 
 void PalettesConfigWindow::BuildRows()
@@ -277,6 +293,28 @@ void PalettesConfigWindow::RebuildGroupsFromDraft()
 		CharacterGroup group;
 		group.charIndex = i;
 		group.charName = getCharacterNameByIndexA(i);
+
+		// The two Random pseudo-entries lead the list so they can be assigned
+		// to a color like any palette; the engine resolves them on selection.
+		const char* specialValues[] = { kRandomIniValue, kRandomExcludeDefaultIniValue };
+		for (int s = 0; s < 2; s++)
+		{
+			PaletteRow row;
+			row.palIndex = -1 - s;
+			row.isSpecial = true;
+			row.name = specialValues[s];
+
+			for (int slot = 1; slot <= kPaletteSlotCount; slot++)
+			{
+				if (NamesEqual(m_draftSlots[i][slot - 1], row.name))
+				{
+					row.assignedSlot = slot;
+					break;
+				}
+			}
+
+			group.rows.push_back(row);
+		}
 
 		for (int palIndex = 1; palIndex < localPalCount; palIndex++)
 		{
@@ -396,27 +434,27 @@ void PalettesConfigWindow::DrawDeleteConfirmModal()
 {
 	if (m_openDeleteConfirm)
 	{
-		ImGui::OpenPopup("Delete palette##confirm");
+		ImGui::OpenPopup("###palettes_delete_confirm");
 		m_openDeleteConfirm = false;
 	}
 
+	const std::string deleteTitle = std::string(Messages.Delete_palette()) + "###palettes_delete_confirm";
 	ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Always);
-	if (!ImGui::BeginPopupModal("Delete palette##confirm", nullptr,
+	if (!ImGui::BeginPopupModal(deleteTitle.c_str(), nullptr,
 		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 		return;
 
-	ImGui::TextWrapped("Delete \"%s\" (%s)?", m_pendingDeletePalName.c_str(),
+	ImGui::TextWrapped(Messages.Palette_delete_confirm(), m_pendingDeletePalName.c_str(),
 		getCharacterNameByIndexA(m_pendingDeleteCharIndex).c_str());
 	ImGui::Spacing();
-	ImGui::TextWrapped("This removes the palette file (and any effect/bloom companion files) "
-		"from BBCF_IM\\Palettes on disk. This cannot be undone.");
+	ImGui::TextWrapped("%s", Messages.Palette_delete_details());
 	ImGui::Spacing();
 
 	const float buttonsWidth = 120.0f * 2.0f + ImGui::GetStyle().ItemSpacing.x;
 	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
 		(ImGui::GetWindowWidth() - buttonsWidth) * 0.5f));
 
-	if (ImGui::Button("Cancel", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Cancel(), ImVec2(120, 0)))
 	{
 		m_pendingDeletePalName.clear();
 		ImGui::CloseCurrentPopup();
@@ -427,7 +465,7 @@ void PalettesConfigWindow::DrawDeleteConfirmModal()
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.72f, 0.18f, 0.18f, 1.0f));
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.25f, 0.25f, 1.0f));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.60f, 0.12f, 0.12f, 1.0f));
-	if (ImGui::Button("Delete", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Delete(), ImVec2(120, 0)))
 	{
 		DeletePalette(m_pendingDeleteCharIndex, m_pendingDeletePalName);
 		m_pendingDeletePalName.clear();
@@ -514,19 +552,20 @@ void PalettesConfigWindow::DrawImportCharSelectModal()
 {
 	if (m_openImportCharSelect)
 	{
-		ImGui::OpenPopup("Import palette##charselect");
+		ImGui::OpenPopup("###palettes_import_charselect");
 		m_openImportCharSelect = false;
 	}
 
+	const std::string importTitle = std::string(Messages.Import_palette_title()) + "###palettes_import_charselect";
 	ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_Always);
-	if (!ImGui::BeginPopupModal("Import palette##charselect", nullptr,
+	if (!ImGui::BeginPopupModal(importTitle.c_str(), nullptr,
 		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 		return;
 
-	ImGui::TextWrapped("\"%s\" is a legacy palette file that doesn't say which character it belongs to.",
+	ImGui::TextWrapped(Messages.Palette_import_legacy_prompt(),
 		FileNameFromPath(m_pendingImportPath).c_str());
 	ImGui::Spacing();
-	ImGui::TextUnformatted("Import it for:");
+	ImGui::TextUnformatted(Messages.Import_it_for());
 
 	ImGui::PushItemWidth(-1);
 	if (ImGui::BeginCombo("##import_char", getCharacterNameByIndexA(m_pendingImportCharIndex).c_str()))
@@ -546,7 +585,7 @@ void PalettesConfigWindow::DrawImportCharSelectModal()
 	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
 		(ImGui::GetWindowWidth() - buttonsWidth) * 0.5f));
 
-	if (ImGui::Button("Cancel", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Cancel(), ImVec2(120, 0)))
 	{
 		m_pendingImportPath.clear();
 		ImGui::CloseCurrentPopup();
@@ -554,7 +593,7 @@ void PalettesConfigWindow::DrawImportCharSelectModal()
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Import", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Import(), ImVec2(120, 0)))
 	{
 		ImportPaletteFile(m_pendingImportPath, m_pendingImportCharIndex);
 		m_pendingImportPath.clear();
@@ -577,7 +616,7 @@ void PalettesConfigWindow::DrawImportButton()
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 	}
 
-	if (ImGui::Button("Import palette...", ImVec2(buttonWidth, 0)) && !dialogBusy)
+	if (ImGui::Button(Messages.Import_palette_button(), ImVec2(buttonWidth, 0)) && !dialogBusy)
 		StartImportPaletteDialogAsync();
 
 	if (dialogBusy)
@@ -586,8 +625,7 @@ void PalettesConfigWindow::DrawImportButton()
 		ImGui::PopItemFlag();
 	}
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Copies a .cfpl or legacy .hpl palette file into the matching character's "
-		"folder under BBCF_IM\\Palettes and loads it immediately.");
+	ImGui::ShowHelpMarker(Messages.Palette_import_help());
 }
 
 void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
@@ -596,14 +634,25 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 	std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
 
 	int assignedCount = 0;
+	int paletteCount = 0;
 	for (const PaletteRow& row : group.rows)
+	{
 		if (row.assignedSlot > 0)
 			++assignedCount;
+		if (!row.isSpecial)
+			++paletteCount;
+	}
 
-	char header[128];
-	snprintf(header, sizeof(header), "%s  (%d palette%s, %d assigned)###palcfg_%d",
-		group.charName.c_str(), (int)group.rows.size(),
-		group.rows.size() == 1 ? "" : "s", assignedCount, group.charIndex);
+	char headerText[160];
+	if (paletteCount == 1)
+		snprintf(headerText, sizeof(headerText), Messages.Palette_group_header_single(),
+			group.charName.c_str(), assignedCount);
+	else
+		snprintf(headerText, sizeof(headerText), Messages.Palette_group_header_plural(),
+			group.charName.c_str(), paletteCount, assignedCount);
+
+	char header[192];
+	snprintf(header, sizeof(header), "%s###palcfg_%d", headerText, group.charIndex);
 
 	if (!ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
 		return;
@@ -614,34 +663,48 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 
 	for (PaletteRow& row : group.rows)
 	{
-		if (!m_filter.PassFilter(row.name.c_str()) && !m_filter.PassFilter(group.charName.c_str()))
+		const std::string displayName = row.isSpecial ? DisplayNameForSlotValue(row.name) : row.name;
+
+		if (!m_filter.PassFilter(displayName.c_str()) && !m_filter.PassFilter(group.charName.c_str()))
 			continue;
 
 		ImGui::PushID(row.palIndex);
 
-		// Color strip preview taken straight from the palette's character colors
-		ImGui::AlignTextToFramePadding();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, 1.0f));
-		for (int colorIdx = 1; colorIdx <= kSwatchColorCount; colorIdx++)
+		if (row.isSpecial)
 		{
-			unsigned char* colorBytes =
-				(unsigned char*)customPalettes[group.charIndex][row.palIndex].file0 + colorIdx * 4;
-			char swatchId[32];
-			snprintf(swatchId, sizeof(swatchId), "##swatch_%d", colorIdx);
-			ImGui::ColorButtonOn32Bit(swatchId, colorIdx, colorBytes,
-				ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip, ImVec2(10.0f, 17.0f));
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(displayName.c_str());
 			ImGui::SameLine();
+			ImGui::ShowHelpMarker(NamesEqual(row.name, kRandomIniValue)
+				? Messages.Palette_random_tooltip()
+				: Messages.Palette_random_exclude_tooltip());
 		}
-		ImGui::PopStyleVar();
+		else
+		{
+			// Color strip preview taken straight from the palette's character colors
+			ImGui::AlignTextToFramePadding();
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, 1.0f));
+			for (int colorIdx = 1; colorIdx <= kSwatchColorCount; colorIdx++)
+			{
+				unsigned char* colorBytes =
+					(unsigned char*)customPalettes[group.charIndex][row.palIndex].file0 + colorIdx * 4;
+				char swatchId[32];
+				snprintf(swatchId, sizeof(swatchId), "##swatch_%d", colorIdx);
+				ImGui::ColorButtonOn32Bit(swatchId, colorIdx, colorBytes,
+					ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip, ImVec2(10.0f, 17.0f));
+				ImGui::SameLine();
+			}
+			ImGui::PopStyleVar();
 
-		ImGui::TextUnformatted(row.name.c_str());
+			ImGui::TextUnformatted(displayName.c_str());
+		}
 		ImGui::NextColumn();
 
 		char preview[64];
 		if (row.assignedSlot > 0)
-			snprintf(preview, sizeof(preview), "Color %d", row.assignedSlot);
+			snprintf(preview, sizeof(preview), Messages.Color_d(), row.assignedSlot);
 		else
-			snprintf(preview, sizeof(preview), "Not assigned");
+			snprintf(preview, sizeof(preview), "%s", Messages.Not_assigned());
 
 		if (row.assignedSlot > 0)
 			ImGui::PushStyleColor(ImGuiCol_Text, kAssignedColor);
@@ -653,7 +716,7 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 
 		if (comboOpen)
 		{
-			if (ImGui::Selectable("Not assigned", row.assignedSlot == 0))
+			if (ImGui::Selectable(Messages.Not_assigned(), row.assignedSlot == 0))
 				AssignSlot(group, row, 0);
 
 			for (int slot = 1; slot <= kPaletteSlotCount; slot++)
@@ -661,9 +724,10 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 				const std::string& occupant = charSlots[slot - 1];
 				char label[128];
 				if (!occupant.empty() && !NamesEqual(occupant, row.name))
-					snprintf(label, sizeof(label), "Color %d  (used by %s)", slot, occupant.c_str());
+					snprintf(label, sizeof(label), Messages.Color_used_by(),
+						slot, DisplayNameForSlotValue(occupant).c_str());
 				else
-					snprintf(label, sizeof(label), "Color %d", slot);
+					snprintf(label, sizeof(label), Messages.Color_d(), slot);
 
 				if (ImGui::Selectable(label, row.assignedSlot == slot))
 					AssignSlot(group, row, slot);
@@ -672,28 +736,31 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 		}
 		ImGui::PopItemWidth();
 
-		ImGui::SameLine();
-		if (ImGui::Button("Export") && !IsFileDialogActive())
+		if (!row.isSpecial)
 		{
-			IMPL_t paletteFile{};
-			paletteFile.header.headerLen = sizeof(IMPL_header_t);
-			paletteFile.header.dataLen = sizeof(IMPL_data_t);
-			paletteFile.header.charIndex = (short)group.charIndex;
-			paletteFile.palData = customPalettes[group.charIndex][row.palIndex];
-			StartExportPaletteDialogAsync(paletteFile, row.name);
-		}
-		ImGui::HoverTooltip("Save a copy of this palette as a .cfpl file anywhere you like.");
+			ImGui::SameLine();
+			if (ImGui::Button(Messages.Export()) && !IsFileDialogActive())
+			{
+				IMPL_t paletteFile{};
+				paletteFile.header.headerLen = sizeof(IMPL_header_t);
+				paletteFile.header.dataLen = sizeof(IMPL_data_t);
+				paletteFile.header.charIndex = (short)group.charIndex;
+				paletteFile.palData = customPalettes[group.charIndex][row.palIndex];
+				StartExportPaletteDialogAsync(paletteFile, row.name);
+			}
+			ImGui::HoverTooltip(Messages.Palette_export_tooltip());
 
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
-		if (ImGui::Button("X"))
-		{
-			m_pendingDeleteCharIndex = group.charIndex;
-			m_pendingDeletePalName = row.name;
-			m_openDeleteConfirm = true;
+			ImGui::SameLine();
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
+			if (ImGui::Button("X"))
+			{
+				m_pendingDeleteCharIndex = group.charIndex;
+				m_pendingDeletePalName = row.name;
+				m_openDeleteConfirm = true;
+			}
+			ImGui::PopStyleColor();
+			ImGui::HoverTooltip(Messages.Palette_delete_tooltip());
 		}
-		ImGui::PopStyleColor();
-		ImGui::HoverTooltip("Delete this palette's file from disk (asks for confirmation).");
 
 		ImGui::NextColumn();
 		ImGui::PopID();
@@ -701,9 +768,10 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 
 	ImGui::Columns(1);
 
-	// Entries written by hand into palettes.ini ("Random", comma lists, missing
-	// files) have no matching palette row; keep them visible so saving is not a
-	// surprise. Assigning a palette to that color replaces the manual entry.
+	// Entries written by hand into palettes.ini (comma lists, missing files,
+	// duplicated names) have no matching palette row; keep them visible so
+	// saving is not a surprise. Assigning a palette to that color replaces the
+	// manual entry.
 	for (int slot = 1; slot <= kPaletteSlotCount; slot++)
 	{
 		const std::string& value = charSlots[slot - 1];
@@ -712,14 +780,14 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 
 		bool matchesRow = false;
 		for (const PaletteRow& row : group.rows)
-			if (NamesEqual(value, row.name))
+			if (NamesEqual(value, row.name) && row.assignedSlot == slot)
 			{
 				matchesRow = true;
 				break;
 			}
 
 		if (!matchesRow)
-			ImGui::TextDisabled("Color %d keeps its manual palettes.ini entry: \"%s\"", slot, value.c_str());
+			ImGui::TextDisabled(Messages.Palette_manual_entry(), slot, value.c_str());
 	}
 
 	ImGui::Spacing();
@@ -728,14 +796,15 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 
 void PalettesConfigWindow::DrawModal()
 {
+	const std::string modalTitle = std::string(Messages.Palettes()) + "###palettes_modal";
 	ImGui::SetNextWindowSize(ImVec2(640, 560), ImGuiCond_Always);
-	if (!ImGui::BeginPopupModal("Palettes##modal", nullptr, ImGuiWindowFlags_NoResize))
+	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, ImGuiWindowFlags_NoResize))
 		return;
 
 	if (!g_interfaces.pPaletteManager)
 	{
-		ImGui::TextUnformatted("Palettes are not loaded yet.");
-		if (ImGui::Button("Close", ImVec2(120, 0)))
+		ImGui::TextUnformatted(Messages.Palettes_not_loaded());
+		if (ImGui::Button(Messages.Close(), ImVec2(120, 0)))
 			ImGui::CloseCurrentPopup();
 		ImGui::EndPopup();
 		return;
@@ -743,10 +812,11 @@ void PalettesConfigWindow::DrawModal()
 
 	ConsumeFinishedFileDialog();
 
-	ImGui::TextUnformatted("Palette assignments");
+	ImGui::TextUnformatted(Messages.Palette_assignments());
 	ImGui::SameLine();
-	ImGui::TextDisabled("Picking that color in-game loads the assigned palette automatically.");
-	m_filter.Draw("Search by palette or character name##palettes_filter", -1.0f);
+	ImGui::TextDisabled("%s", Messages.Palette_assignments_hint());
+	const std::string filterLabel = std::string(Messages.Palettes_search_hint()) + "###palettes_filter";
+	m_filter.Draw(filterLabel.c_str(), -1.0f);
 
 	DrawImportButton();
 
@@ -754,11 +824,9 @@ void PalettesConfigWindow::DrawModal()
 
 	if (m_groups.empty())
 	{
-		ImGui::TextWrapped("No custom palettes were found.");
+		ImGui::TextWrapped("%s", Messages.Palettes_none_found());
 		ImGui::Spacing();
-		ImGui::TextWrapped("Use \"Import palette...\" above, or place palette files in "
-			"BBCF_IM\\Palettes\\<Character>\\ next to BBCF.exe and use \"Reload custom palettes\" "
-			"in the Custom palettes section, then reopen this window.");
+		ImGui::TextWrapped("%s", Messages.Palettes_none_found_help());
 	}
 	else
 	{
@@ -769,22 +837,21 @@ void PalettesConfigWindow::DrawModal()
 	ImGui::EndChild();
 
 	bool allowDownloadsChecked = (m_draftAllowDownloads == 1);
-	if (ImGui::Checkbox("Allow opponents to download your palettes", &allowDownloadsChecked))
+	if (ImGui::Checkbox(Messages.Palette_allow_downloads(), &allowDownloadsChecked))
 		m_draftAllowDownloads = allowDownloadsChecked ? 1 : 0;
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Allows opponents to save your visible custom palette from the match UI. "
-		"Applied when you hit Save.");
+	ImGui::ShowHelpMarker(Messages.Palette_allow_downloads_help());
 
 	const float footerWidth = 120.0f * 2.0f + ImGui::GetStyle().ItemSpacing.x;
 	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
 		(ImGui::GetWindowWidth() - footerWidth) * 0.5f));
 
-	if (ImGui::Button("Cancel", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Cancel(), ImVec2(120, 0)))
 		ImGui::CloseCurrentPopup();
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Save", ImVec2(120, 0)))
+	if (ImGui::Button(Messages.Save(), ImVec2(120, 0)))
 	{
 		if (g_interfaces.pPaletteManager->SavePaletteSettingsFile(m_draftSlots))
 			g_imGuiLogger->Log("[system] Palette assignments saved to 'palettes.ini'\n");

@@ -1859,6 +1859,99 @@ struct LocalizationKeysAccessor
 
         // Palette_download_unsupported_tooltip
         inline const char* Palette_download_unsupported_tooltip() const { return Get("Palette_download_unsupported_tooltip"); }
+
+        // Palettes
+        inline const char* Palettes() const { return Get("Palettes"); }
+
+        // Palettes_not_loaded
+        inline const char* Palettes_not_loaded() const { return Get("Palettes_not_loaded"); }
+
+        // Palette assignments
+        inline const char* Palette_assignments() const { return Get("Palette assignments"); }
+
+        // Palette_assignments_hint
+        inline const char* Palette_assignments_hint() const { return Get("Palette_assignments_hint"); }
+
+        // Palettes_search_hint
+        inline const char* Palettes_search_hint() const { return Get("Palettes_search_hint"); }
+
+        // Import_palette_button
+        inline const char* Import_palette_button() const { return Get("Import_palette_button"); }
+
+        // Palette_import_help
+        inline const char* Palette_import_help() const { return Get("Palette_import_help"); }
+
+        // Palettes_none_found
+        inline const char* Palettes_none_found() const { return Get("Palettes_none_found"); }
+
+        // Palettes_none_found_help
+        inline const char* Palettes_none_found_help() const { return Get("Palettes_none_found_help"); }
+
+        // Palette_allow_downloads
+        inline const char* Palette_allow_downloads() const { return Get("Palette_allow_downloads"); }
+
+        // Palette_allow_downloads_help
+        inline const char* Palette_allow_downloads_help() const { return Get("Palette_allow_downloads_help"); }
+
+        // Palette_group_header_single
+        inline const char* Palette_group_header_single() const { return Get("Palette_group_header_single"); }
+
+        // Palette_group_header_plural
+        inline const char* Palette_group_header_plural() const { return Get("Palette_group_header_plural"); }
+
+        // Color %d
+        inline const char* Color_d() const { return Get("Color %d"); }
+
+        // Not assigned
+        inline const char* Not_assigned() const { return Get("Not assigned"); }
+
+        // Color_used_by
+        inline const char* Color_used_by() const { return Get("Color_used_by"); }
+
+        // Export
+        inline const char* Export() const { return Get("Export"); }
+
+        // Palette_export_tooltip
+        inline const char* Palette_export_tooltip() const { return Get("Palette_export_tooltip"); }
+
+        // Palette_delete_tooltip
+        inline const char* Palette_delete_tooltip() const { return Get("Palette_delete_tooltip"); }
+
+        // Delete palette
+        inline const char* Delete_palette() const { return Get("Delete palette"); }
+
+        // Palette_delete_confirm
+        inline const char* Palette_delete_confirm() const { return Get("Palette_delete_confirm"); }
+
+        // Palette_delete_details
+        inline const char* Palette_delete_details() const { return Get("Palette_delete_details"); }
+
+        // Import_palette_title
+        inline const char* Import_palette_title() const { return Get("Import_palette_title"); }
+
+        // Palette_import_legacy_prompt
+        inline const char* Palette_import_legacy_prompt() const { return Get("Palette_import_legacy_prompt"); }
+
+        // Import it for:
+        inline const char* Import_it_for() const { return Get("Import it for:"); }
+
+        // Import
+        inline const char* Import() const { return Get("Import"); }
+
+        // Palette_manual_entry
+        inline const char* Palette_manual_entry() const { return Get("Palette_manual_entry"); }
+
+        // Palette_random_label
+        inline const char* Palette_random_label() const { return Get("Palette_random_label"); }
+
+        // Palette_random_exclude_label
+        inline const char* Palette_random_exclude_label() const { return Get("Palette_random_exclude_label"); }
+
+        // Palette_random_tooltip
+        inline const char* Palette_random_tooltip() const { return Get("Palette_random_tooltip"); }
+
+        // Palette_random_exclude_tooltip
+        inline const char* Palette_random_exclude_tooltip() const { return Get("Palette_random_exclude_tooltip"); }
 };
 
 

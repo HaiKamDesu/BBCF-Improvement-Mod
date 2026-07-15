@@ -796,3 +796,34 @@ No_dont_share,"No, don't share",No compartir
 Download_palette,Download palette,Descargar paleta
 Palette_download_denied_tooltip,This player hasn't allowed their palettes to be downloaded.,Este jugador no ha permitido que se descarguen sus paletas.
 Palette_download_unsupported_tooltip,This player's mod version doesn't support palette downloads.,La versión del mod de este jugador no permite descargar paletas.
+Palettes,Palettes,Paletas
+Palettes_not_loaded,Palettes are not loaded yet.,Las paletas aún no se han cargado.
+Palette assignments,Palette assignments,Asignación de paletas
+Palette_assignments_hint,Picking that color in-game loads the assigned palette automatically.,Elegir ese color dentro del juego carga la paleta asignada automáticamente.
+Palettes_search_hint,Search by palette or character name,Buscar por nombre de paleta o personaje
+Import_palette_button,Import palette...,Importar paleta...
+Palette_import_help,Copies a .cfpl or legacy .hpl palette file into the matching character's folder under BBCF_IM\Palettes and loads it immediately.,Copia un archivo de paleta .cfpl o .hpl (formato antiguo) a la carpeta del personaje correspondiente en BBCF_IM\Palettes y la carga inmediatamente.
+Palettes_none_found,No custom palettes were found.,No se encontraron paletas personalizadas.
+Palettes_none_found_help,"Use ""Import palette..."" above, or place palette files in BBCF_IM\Palettes\<Character>\ next to BBCF.exe and use ""Reload custom palettes"" in the Custom palettes section, then reopen this window.","Usa ""Importar paleta..."" arriba, o coloca archivos de paleta en BBCF_IM\Palettes\<Personaje>\ junto a BBCF.exe y usa ""Actualizar paletas personalizadas"" en la sección de Paletas personalizadas; luego vuelve a abrir esta ventana."
+Palette_allow_downloads,Allow opponents to download your palettes,Permitir que los oponentes descarguen tus paletas
+Palette_allow_downloads_help,Allows opponents to save your visible custom palette from the match UI. Applied when you hit Save.,Permite que los oponentes guarden tu paleta personalizada visible desde la interfaz de la partida. Se aplica al pulsar Guardar.
+Palette_group_header_single,"%s  (1 palette, %d assigned)","%s  (1 paleta, %d asignadas)"
+Palette_group_header_plural,"%s  (%d palettes, %d assigned)","%s  (%d paletas, %d asignadas)"
+Color %d,Color %d,Color %d
+Not assigned,Not assigned,Sin asignar
+Color_used_by,Color %d  (used by %s),Color %d  (usado por %s)
+Export,Export,Exportar
+Palette_export_tooltip,Save a copy of this palette as a .cfpl file anywhere you like.,Guarda una copia de esta paleta como archivo .cfpl donde quieras.
+Palette_delete_tooltip,Delete this palette's file from disk (asks for confirmation).,Elimina el archivo de esta paleta del disco (pide confirmación).
+Delete palette,Delete palette,Eliminar paleta
+Palette_delete_confirm,"Delete ""%s"" (%s)?","¿Eliminar ""%s"" (%s)?"
+Palette_delete_details,This removes the palette file (and any effect/bloom companion files) from BBCF_IM\Palettes on disk. This cannot be undone.,Elimina el archivo de la paleta (y sus archivos de efecto/bloom asociados) de BBCF_IM\Palettes en el disco. Esto no se puede deshacer.
+Import_palette_title,Import palette,Importar paleta
+Palette_import_legacy_prompt,"""%s"" is a legacy palette file that doesn't say which character it belongs to.","""%s"" es un archivo de paleta en formato antiguo que no indica a qué personaje pertenece."
+Import it for:,Import it for:,Importar para:
+Import,Import,Importar
+Palette_manual_entry,"Color %d keeps its manual palettes.ini entry: ""%s""","El Color %d mantiene su entrada manual de palettes.ini: ""%s"""
+Palette_random_label,Random,Aleatoria
+Palette_random_exclude_label,Random (exclude default),Aleatoria (sin la predeterminada)
+Palette_random_tooltip,"Assign this to a color to get a random custom palette (the default look included) every time you pick that color in-game. Saved to palettes.ini as ""Random"".","Asígnalo a un color para obtener una paleta personalizada al azar (incluida la apariencia predeterminada) cada vez que elijas ese color dentro del juego. Se guarda en palettes.ini como ""Random""."
+Palette_random_exclude_tooltip,"Same as Random, but the character's default look is never picked.","Igual que Aleatoria, pero nunca se elige la apariencia predeterminada del personaje."
