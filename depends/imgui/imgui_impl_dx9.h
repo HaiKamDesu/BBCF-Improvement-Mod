@@ -12,6 +12,11 @@ IMGUI_API bool        ImGui_ImplDX9_Init(void* hwnd, IDirect3DDevice9* device);
 IMGUI_API void        ImGui_ImplDX9_Shutdown();
 IMGUI_API void        ImGui_ImplDX9_NewFrame();
 
+// Renders ImGui in a fixed coordinate space (e.g. the mod's custom viewport resolution)
+// instead of the window client size, and rescales mouse input to match.
+// Pass (0, 0) to disable and use the window client size again.
+IMGUI_API void        ImGui_ImplDX9_SetDisplaySizeOverride(float width, float height);
+
 // Use if you want to reset your rendering device without losing ImGui state.
 IMGUI_API void        ImGui_ImplDX9_InvalidateDeviceObjects();
 IMGUI_API bool        ImGui_ImplDX9_CreateDeviceObjects();

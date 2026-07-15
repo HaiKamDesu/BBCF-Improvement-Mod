@@ -23,6 +23,32 @@ static LPDIRECT3DVERTEXBUFFER9  g_pVB = NULL;
 static LPDIRECT3DINDEXBUFFER9   g_pIB = NULL;
 static LPDIRECT3DTEXTURE9       g_FontTexture = NULL;
 static int                      g_VertexBufferSize = 5000, g_IndexBufferSize = 10000;
+static ImVec2                   g_DisplaySizeOverride = ImVec2(0.0f, 0.0f);
+
+void ImGui_ImplDX9_SetDisplaySizeOverride(float width, float height)
+{
+    g_DisplaySizeOverride = ImVec2(width, height);
+}
+
+// Ratio between the overridden ImGui coordinate space and the window client area.
+// Mouse input arrives in client pixels and must be mapped into the overridden space,
+// otherwise hitboxes drift away from the rendered widgets (worse further from top-left).
+static ImVec2 ImGui_ImplDX9_GetMouseScale()
+{
+    if (g_DisplaySizeOverride.x <= 0.0f || g_DisplaySizeOverride.y <= 0.0f)
+        return ImVec2(1.0f, 1.0f);
+
+    RECT rect;
+    if (!GetClientRect(g_hWnd, &rect))
+        return ImVec2(1.0f, 1.0f);
+
+    const float clientWidth = (float)(rect.right - rect.left);
+    const float clientHeight = (float)(rect.bottom - rect.top);
+    if (clientWidth <= 0.0f || clientHeight <= 0.0f)
+        return ImVec2(1.0f, 1.0f);
+
+    return ImVec2(g_DisplaySizeOverride.x / clientWidth, g_DisplaySizeOverride.y / clientHeight);
+}
 
 struct CUSTOMVERTEX
 {
@@ -221,9 +247,12 @@ IMGUI_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wPa
         io.MouseWheel += GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? +1.0f : -1.0f;
         return 0;
     case WM_MOUSEMOVE:
-        io.MousePos.x = (signed short)(lParam);
-        io.MousePos.y = (signed short)(lParam >> 16);
+    {
+        const ImVec2 mouseScale = ImGui_ImplDX9_GetMouseScale();
+        io.MousePos.x = (float)(signed short)(lParam)* mouseScale.x;
+        io.MousePos.y = (float)(signed short)(lParam >> 16) * mouseScale.y;
         return 0;
+    }
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
         if (wParam < 256)
@@ -354,9 +383,16 @@ void ImGui_ImplDX9_NewFrame()
     ImGuiIO& io = ImGui::GetIO();
 
     // Setup display size (every frame to accommodate for window resizing)
-    RECT rect;
-    GetClientRect(g_hWnd, &rect);
-    io.DisplaySize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
+    if (g_DisplaySizeOverride.x > 0.0f && g_DisplaySizeOverride.y > 0.0f)
+    {
+        io.DisplaySize = g_DisplaySizeOverride;
+    }
+    else
+    {
+        RECT rect;
+        GetClientRect(g_hWnd, &rect);
+        io.DisplaySize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
+    }
 
     // Setup time step
     INT64 current_time;
@@ -377,7 +413,8 @@ void ImGui_ImplDX9_NewFrame()
     // Set OS mouse position if requested last frame by io.WantMoveMouse flag (used when io.NavMovesTrue is enabled by user and using directional navigation)
     if (io.WantMoveMouse)
     {
-        POINT pos = { (int)io.MousePos.x, (int)io.MousePos.y };
+        const ImVec2 mouseScale = ImGui_ImplDX9_GetMouseScale();
+        POINT pos = { (int)(io.MousePos.x / mouseScale.x), (int)(io.MousePos.y / mouseScale.y) };
         ClientToScreen(g_hWnd, &pos);
         SetCursorPos(pos.x, pos.y);
     }

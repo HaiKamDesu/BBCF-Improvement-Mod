@@ -268,6 +268,21 @@ void WindowManager::Render()
 
 	HandleButtons();
 
+	// Must be set before NewFrame so hit-testing and rendering share the same
+	// coordinate space; overriding DisplaySize after NewFrame offsets mouse hitboxes
+	if (Settings::settingsIni.viewport == 2)
+	{
+		ImGui_ImplDX9_SetDisplaySizeOverride((float)Settings::settingsIni.renderwidth, (float)Settings::settingsIni.renderheight);
+	}
+	else if (Settings::settingsIni.viewport == 3)
+	{
+		ImGui_ImplDX9_SetDisplaySizeOverride(1280.0f, 768.0f);
+	}
+	else
+	{
+		ImGui_ImplDX9_SetDisplaySizeOverride(0.0f, 0.0f);
+	}
+
 	ImGui_ImplDX9_NewFrame();
 
 	ImGui::GetIO().MouseDrawCursor = false;
@@ -280,15 +295,6 @@ void WindowManager::Render()
 		}
 	}
 
-
-	if (Settings::settingsIni.viewport == 2)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(Settings::settingsIni.renderwidth, Settings::settingsIni.renderheight);
-	}
-	else if (Settings::settingsIni.viewport == 3)
-	{
-		ImGui::GetIO().DisplaySize = ImVec2(1280, 768);
-	}
 
 	DrawAllWindows();
 	DrawRankedProgressOverlayStandalone();
