@@ -6,6 +6,7 @@
 #include "Core/utils.h"
 #include "Game/MatchState.h"
 #include "Game/NetworkStallDiagnostics.h"
+#include "Game/SpectatorSyncDiagnostics.h"
 #include "Game/gamestates.h"
 #include "Game/stages.h"
 #include "Hooks/HookManager.h"
@@ -8746,6 +8747,70 @@ void __declspec(naked)DCodeFetchTickHookFunc()
 	}
 }
 
+// Spectator SyncInput entry (SteamSpectatorBackend::SyncInput, VA 0x77E340).
+// Only ever runs in spectator mode; captures the backend pointer (ecx) so the
+// error thunk below can read its input-cursor fields. See
+// docs/Research/SpectatorDesyncInvestigation.md.
+DWORD SpectatorSyncInputEntryJmpBackAddr = 0;
+void __declspec(naked)SpectatorSyncInputEntryHookFunc()
+{
+	__asm
+	{
+		mov g_spectatorBackendPtrRaw, ecx
+		// TEST ONLY fault injection: report starvation (error 4) without
+		// running the real SyncInput, mimicking a not-yet-received input.
+		// The function is __thiscall with 3 stack args (real exit: ret 0Ch).
+		cmp g_spectatorSyncInjectFramesRemaining, 0
+		je NO_INJECT
+		mov eax, 4
+		ret 0Ch
+	NO_INJECT:
+		// original 9 bytes replaced by the JMP patch
+		push ebp
+		mov ebp, esp
+		sub esp, 414h
+		jmp[SpectatorSyncInputEntryJmpBackAddr]
+	}
+}
+
+// Error branch of the in-match SynchronizeInput call site (VA 0x4E60F1). The
+// replaced 5 bytes are `call FUN_0055C540` (battle-scene getter); the code at
+// the jmp-back address feeds its eax into FUN_0055EDB0, whose nonzero return
+// makes the game ADVANCE THE FRAME WITH ZERO INPUTS despite the sync failure
+// (the spectator-desync mechanism). The thunk logs the event and returns
+// nonzero to force the stall path at VA 0x4E6110 instead (candidate fix,
+// gated on Settings::settingsIni.spectatorSyncFailStall).
+DWORD SpectatorSyncInputErrorJmpBackAddr = 0;
+DWORD SpectatorSyncInputErrorStallAddr = 0;   // = jmp-back + 0x1A (VA 0x4E6110)
+DWORD SpectatorSyncInputErrorAdvanceAddr = 0; // = jmp-back + 0x0F (VA 0x4E6105)
+DWORD SpectatorSyncInputErrorSceneGetterAddr = 0; // FUN_0055C540, from the replaced call's rel32
+static DWORD g_spectatorForceStallDecision = 0;
+static int(__cdecl* const g_pSpectatorSyncErrorThunk)() = SpectatorSyncErrorThunk;
+void __declspec(naked)SpectatorSyncInputErrorHookFunc()
+{
+	__asm
+	{
+		pushfd
+		pushad
+		call g_pSpectatorSyncErrorThunk
+		mov g_spectatorForceStallDecision, eax
+		popad
+		popfd
+		cmp g_spectatorForceStallDecision, 2
+		je FORCE_ADVANCE
+		cmp g_spectatorForceStallDecision, 0
+		jne FORCE_STALL
+		call[SpectatorSyncInputErrorSceneGetterAddr]
+		jmp[SpectatorSyncInputErrorJmpBackAddr]
+	FORCE_STALL:
+		jmp[SpectatorSyncInputErrorStallAddr]
+	FORCE_ADVANCE:
+		// TEST ONLY (fault injection): take the zero-input advance path the
+		// scene-state gate would take, desyncing the spectator on purpose.
+		jmp[SpectatorSyncInputErrorAdvanceAddr]
+	}
+}
+
 DWORD GetStageSelectAddrJmpBackAddr = 0;
 void __declspec(naked)GetStageSelectAddr()
 {
@@ -9226,6 +9291,29 @@ bool placeHooks_bbcf()
 	DCodeFetchTickJmpBackAddr = HookManager::SetHook("DCodeFetchTick",
 		"\x56\x8B\xF1\x57\x8B\xBE\xA0\x68\x00\x00\x83\xBF\xCC\x00\x00\x00\x01",
 		"xxxxxxxxxxxxxxxxx", 10, DCodeFetchTickHookFunc);
+
+	// Spectator SyncInput prologue (VA 0x77E340): push ebp / mov ebp,esp /
+	// sub esp,414h / mov eax,[security_cookie] / ... / cmp byte ptr [esi+5CC8h],0.
+	// The 0x414 frame plus the +0x5CC8 _synchronizing test is unique in the exe.
+	SpectatorSyncInputEntryJmpBackAddr = HookManager::SetHook("SpectatorSyncInputEntry",
+		"\x55\x8B\xEC\x81\xEC\x14\x04\x00\x00\xA1\x00\x00\x00\x00\x33\xC5\x89\x45\xFC\x53\x8B\x5D\x08\x56\x8B\xF1\x57\x80\xBE\xC8\x5C\x00\x00\x00",
+		"xxxxxxxxxx????xxxxxxxxxxxxxxxxxxxx", 9, SpectatorSyncInputEntryHookFunc);
+
+	// SynchronizeInput error branch (VA 0x4E60F1): call FUN_0055C540 /
+	// lea ecx,[eax+62B7Ch] / call FUN_0055EDB0 / test eax,eax / je +0Bh.
+	// We replace the first call; its rel32 gives us the scene getter's address.
+	SpectatorSyncInputErrorJmpBackAddr = HookManager::SetHook("SpectatorSyncInputError",
+		"\xE8\x00\x00\x00\x00\x8D\x88\x7C\x2B\x06\x00\xE8\x00\x00\x00\x00\x85\xC0\x74\x0B",
+		"x????xxxxxxx????xxxx", 5, SpectatorSyncInputErrorHookFunc);
+	if (SpectatorSyncInputErrorJmpBackAddr)
+	{
+		// Stall path (VA 0x4E6110) skips the frame-advance call entirely;
+		// advance path (VA 0x4E6105) runs the frame with the zeroed buffer.
+		SpectatorSyncInputErrorStallAddr = SpectatorSyncInputErrorJmpBackAddr + 0x1A;
+		SpectatorSyncInputErrorAdvanceAddr = SpectatorSyncInputErrorJmpBackAddr + 0x0F;
+		SpectatorSyncInputErrorSceneGetterAddr = SpectatorSyncInputErrorJmpBackAddr
+			+ HookManager::GetOriginalBytes("SpectatorSyncInputError", 1, 4);
+	}
 
 	GetStageSelectAddrJmpBackAddr = HookManager::SetHook("GetStageSelectAddr", "\xc7\x81\x54\x0f\x00\x00\x00\x00\x00\x00\x8d\x41\x0c",
 		"xxxxxxxxxxxxx", 10, GetStageSelectAddr);

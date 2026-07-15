@@ -150,7 +150,17 @@
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /nologo /v:m)",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /nologo /v:q)",
       "Bash(echo \"exit: $?\")",
-      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /v:m /nologo)"
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143 /v:m /nologo)",
+      "Bash(command grep -aoE '\\\\b[A-Za-z_]{4,}\\\\b' bbcf_disasm_ascii.txt)",
+      "WebSearch",
+      "WebFetch(domain:steamcommunity.com)",
+      "Bash(command grep -n '],9$\\\\|],0Ah$\\\\|],0Ch$\\\\|],0Dh$')",
+      "WebFetch(domain:store.steampowered.com)",
+      "Bash(command grep -n '],9\\\\r*$\\\\|],0Ah\\\\r*$\\\\|],0Ch\\\\r*$\\\\|],0Dh\\\\r*$')",
+      "WebFetch(domain:web.archive.org)",
+      "WebFetch(domain:gamingbolt.com)",
+      "Bash(curl -s \"https://api.github.com/repos/libreofficecalc/BBCF-Improvement-Mod/releases?per_page=100\")",
+      "Bash(grep -iE \" error |dinput8.dll$|Build succeeded|Build FAILED\")"
     ]
   }
 }

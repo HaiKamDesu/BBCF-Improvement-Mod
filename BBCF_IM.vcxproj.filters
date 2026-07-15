@@ -153,6 +153,7 @@
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\MatchState.cpp" />
     <ClCompile Include="src\Game\NetworkStallDiagnostics.cpp" />
+    <ClCompile Include="src\Game\SpectatorSyncDiagnostics.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Overlay\Logger\ImGuiLogger.cpp" />
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
@@ -359,6 +360,7 @@
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\MatchState.h" />
     <ClInclude Include="src\Game\NetworkStallDiagnostics.h" />
+    <ClInclude Include="src\Game\SpectatorSyncDiagnostics.h" />
     <ClInclude Include="src\Network\NetworkManager.h" />
     <ClInclude Include="src\Network\Packet.h" />
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />

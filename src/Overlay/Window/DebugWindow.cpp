@@ -12,6 +12,7 @@
 #include "Web/url_downloader.h"
 //#include "Game/GhidraDefs.h"
 #include "Game/SnapshotApparatus/SnapshotApparatus.h"
+#include "Game/SpectatorSyncDiagnostics.h"
 #include "Game/ReplayFiles/ReplayFileManager.h"
 #define STB_IMAGE_IMPLEMENTATION
 //#include "stb_image.h"
@@ -87,6 +88,8 @@ void DebugWindow::Draw()
 	DrawGameValuesSection();
 
 	DrawRoomSection();
+
+	DrawSpectatorSyncSection();
 
 	DrawSettingsSection();
 
@@ -620,6 +623,46 @@ void DebugWindow::DrawGameValuesSection()
 
 		ImGui::TreePop();
 	}
+}
+
+// Fault-injection panel for the spectator desync theory. Only meaningful
+// while spectating a network match. See docs/Research/SpectatorDesyncInvestigation.md.
+void DebugWindow::DrawSpectatorSyncSection()
+{
+	if (!ImGui::CollapsingHeader("Spectator sync"))
+		return;
+
+	const SpectatorSyncDiagnostics::Status status = SpectatorSyncDiagnostics::GetStatus();
+
+	ImGui::Text("Spectator backend: 0x%08lX %s", status.backendPtr,
+		status.backendPtr ? "" : "(not spectating yet this session)");
+	ImGui::Text("Input cursor: %d / newest received: %d (lag %d)",
+		status.nextInputToSend, status.maxReceivedFrame,
+		(status.nextInputToSend >= 0 && status.maxReceivedFrame >= 0)
+			? status.maxReceivedFrame - status.nextInputToSend : -1);
+	ImGui::Text("Sync failures: %d | zero-input advances: %d | forced stalls: %d",
+		status.spectatorErrors, status.zeroInputAdvances, status.forcedStalls);
+
+	ImGui::Checkbox("SpectatorSyncFailStall (the fix)", &Settings::settingsIni.spectatorSyncFailStall);
+
+	static int injectFrames = 10;
+	ImGui::PushItemWidth(120.0f);
+	ImGui::InputInt("frames", &injectFrames);
+	ImGui::PopItemWidth();
+	if (injectFrames < 1) injectFrames = 1;
+	if (injectFrames > 600) injectFrames = 600;
+	ImGui::SameLine();
+	if (ImGui::Button("Inject desync"))
+	{
+		SpectatorSyncDiagnostics::InjectDesync(injectFrames);
+	}
+	if (status.injectRemaining > 0)
+	{
+		ImGui::SameLine();
+		ImGui::Text("injecting... %d left", status.injectRemaining);
+	}
+	ImGui::TextUnformatted("Fix OFF: expect the spectated match to visibly desync.");
+	ImGui::TextUnformatted("Fix ON: expect only a brief pause, match stays correct.");
 }
 
 void DebugWindow::DrawRoomSection()

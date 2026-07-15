@@ -41,6 +41,12 @@ SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
 // the receive buffer so the game's checksum rejects it) to exercise the state-6
 // wedge + auto-recovery end-to-end. Fires once per launch while set to 1.
 SETTING(bool, dcodeForceFailureOnce, "DCodeForceFailureOnce", "0");
+// Spectator desync candidate fix: when the spectator's SynchronizeInput fails
+// (input not yet received), always stall the frame instead of letting the game
+// advance the simulation with zeroed inputs (the desync mechanism at VA
+// 0x4E60D5). Log-only diagnostics run regardless; this flips the actual fix.
+// See docs/Research/SpectatorDesyncInvestigation.md.
+SETTING(bool, spectatorSyncFailStall, "SpectatorSyncFailStall", "0");
 // Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
 // launch). 0 = old behavior, DEBUG.txt is overwritten every launch.
 SETTING(int, debugLogSessionHistory, "DebugLogSessionHistory", "10");
