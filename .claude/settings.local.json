@@ -160,7 +160,8 @@
       "WebFetch(domain:web.archive.org)",
       "WebFetch(domain:gamingbolt.com)",
       "Bash(curl -s \"https://api.github.com/repos/libreofficecalc/BBCF-Improvement-Mod/releases?per_page=100\")",
-      "Bash(grep -iE \" error |dinput8.dll$|Build succeeded|Build FAILED\")"
+      "Bash(grep -iE \" error |dinput8.dll$|Build succeeded|Build FAILED\")",
+      "Bash(echo \"exit:$?\")"
     ]
   }
 }

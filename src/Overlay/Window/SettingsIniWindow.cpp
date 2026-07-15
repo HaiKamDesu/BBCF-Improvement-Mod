@@ -97,6 +97,7 @@ namespace {
 		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop ending seconds", "Unlimited Playback", "Seconds near loop end reserved before restart." },
 		{ "UnlimitedPlaybackLoopRestartLabState", "Restart lab state on loop", "Unlimited Playback", "Reloads lab state when an unlimited playback loop restarts." },
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop restart mode", "Unlimited Playback", "Selects how unlimited playback restarts when looping." },
+		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Forces Platinum's random personality/voice pick (Sena or Luna) instead of leaving it to the game's own RNG. Local override only - not confirmed to sync with the opponent online." },
 	};
 
 	static const SettingMetadata* GetSettingMetadata(const char* iniKey)
@@ -125,17 +126,101 @@ namespace {
 		nullptr
 	};
 
+	// Named-option metadata for int settings that should render as a dropdown instead of
+	// a raw number box. Register a setting here (by ini key) to make it an enum in the
+	// Settings window; the underlying storage is still a plain `int` (settings.def is
+	// unchanged), only the UI widget and the reset/default label change.
+	struct SettingEnumOption
+	{
+		int value;
+		const char* label;
+	};
+
+	struct SettingEnumMetadata
+	{
+		const char* iniKey;
+		const SettingEnumOption* options;
+		int optionCount;
+	};
+
+	static const SettingEnumOption kPlatinumVoiceChoiceOptions[] = {
+		{ 0, "Default (random)" },
+		{ 1, "Luna" },
+		{ 2, "Sena" },
+	};
+
+	static const SettingEnumMetadata kSettingEnumMetadata[] = {
+		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
+	};
+
+	static const SettingEnumMetadata* GetSettingEnumMetadata(const char* iniKey)
+	{
+		for (const SettingEnumMetadata& metadata : kSettingEnumMetadata)
+			if (_stricmp(metadata.iniKey, iniKey) == 0)
+				return &metadata;
+		return nullptr;
+	}
+
+	static const char* SettingEnumLabelForValue(const SettingEnumMetadata& metadata, int value)
+	{
+		for (int i = 0; i < metadata.optionCount; ++i)
+			if (metadata.options[i].value == value)
+				return metadata.options[i].label;
+		return "Unknown";
+	}
+
 	static bool DrawValueWidget(const char* id, bool& val)
 	{
 		return ImGui::Checkbox(id, &val);
 	}
 
+	// Plain int widget. Settings with enum metadata are routed to DrawEnumValueWidget
+	// instead (see DrawValueWidgetForSetting) - this overload stays the fallback for
+	// ordinary numeric int settings.
 	static bool DrawValueWidget(const char* id, int& val)
 	{
 		ImGui::PushItemWidth(-1);
 		const bool changed = ImGui::InputInt(id, &val);
 		ImGui::PopItemWidth();
 		return changed;
+	}
+
+	static bool DrawEnumValueWidget(const char* id, int& val, const SettingEnumMetadata& metadata)
+	{
+		bool changed = false;
+		ImGui::PushItemWidth(-1);
+		if (ImGui::BeginCombo(id, SettingEnumLabelForValue(metadata, val)))
+		{
+			for (int i = 0; i < metadata.optionCount; ++i)
+			{
+				const bool selected = metadata.options[i].value == val;
+				if (ImGui::Selectable(metadata.options[i].label, selected))
+				{
+					val = metadata.options[i].value;
+					changed = true;
+				}
+				if (selected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::PopItemWidth();
+		return changed;
+	}
+
+	// Dispatch used by the settings.def X-macro: int settings with registered enum
+	// metadata render as a combo box; everything else falls back to DrawValueWidget.
+	template <typename T>
+	static bool DrawValueWidgetForSetting(const char*, const char* id, T& val)
+	{
+		return DrawValueWidget(id, val);
+	}
+
+	static bool DrawValueWidgetForSetting(const char* iniKey, const char* id, int& val)
+	{
+		if (const SettingEnumMetadata* enumMetadata = GetSettingEnumMetadata(iniKey))
+			return DrawEnumValueWidget(id, val, *enumMetadata);
+		return DrawValueWidget(id, val);
 	}
 
 	static bool DrawValueWidget(const char* id, float& val)
@@ -229,7 +314,7 @@ void SettingsIniWindow::BuildRows()
 		[this]() -> bool { \
 			char buf[128] = "##"; \
 			strncat_s(buf, sizeof(buf), _inistring, _TRUNCATE); \
-			return DrawValueWidget(buf, m_settingsDraft._var); \
+			return DrawValueWidgetForSetting(_inistring, buf, m_settingsDraft._var); \
 		}, \
 		[this]() -> bool { return m_settingsDraft._var != Settings::settingsIni._var; }, \
 		[this]() { SettingAssignFromString(m_settingsDraft._var, _defaultval); }, \
@@ -314,8 +399,11 @@ void SettingsIniWindow::DrawModal()
 			if (ImGui::BeginPopupContextItem("##reset_ctx"))
 			{
 				char resetLabel[192];
-				snprintf(resetLabel, sizeof(resetLabel), "Reset to default (%s)",
-					row.defaultValue.empty() ? "empty" : row.defaultValue.c_str());
+				const SettingEnumMetadata* enumMetadata = GetSettingEnumMetadata(row.name.c_str());
+				const char* defaultLabel = row.defaultValue.empty() ? "empty" : row.defaultValue.c_str();
+				if (enumMetadata)
+					defaultLabel = SettingEnumLabelForValue(*enumMetadata, atoi(row.defaultValue.c_str()));
+				snprintf(resetLabel, sizeof(resetLabel), "Reset to default (%s)", defaultLabel);
 				if (ImGui::MenuItem(resetLabel))
 				{
 					row.resetToDefault();

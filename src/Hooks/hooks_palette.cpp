@@ -5,6 +5,8 @@
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Game/gamestates.h"
+#include "Game/characters.h"
+#include "Core/Settings.h"
 
 DWORD GetCharObjPointersJmpBackAddr = 0;
 void __declspec(naked)GetCharObjPointers()
@@ -137,22 +139,48 @@ void __declspec(naked) GetPalBaseAddresses()
 	}
 }
 
+// The per-player select-struct (base = esi at this hook, before the +8 that yields the
+// palette index) holds the character index at +0x0 and, right next to it, the
+// personality/voice roll at +0x4 (1 = Sena, 0 = Luna, Platinum-specific). Confirmed both
+// empirically (byte-diffing DEBUG.txt captures across labeled Sena/Luna training
+// sessions - see docs/Research) and via static analysis of the native RNG write site
+// (rand()%2 via a per-stream RNG, gated behind a mode check). This hook fires right as
+// the game is about to copy this struct (base+0x1648..+0x1668, 0x20 bytes/player) into
+// its "committed" battle-time copy (base+0x24D8/+0x24F8), so overwriting +0x4 here,
+// before the jmp-back runs the copy, propagates cleanly into both.
+static void ForcePlatinumVoiceChoice(char* selectBase)
+{
+	int choice = Settings::settingsIni.platinumVoiceChoice;
+	if (choice == 0)
+		return;
+
+	int* asInts = reinterpret_cast<int*>(selectBase);
+	if (asInts[0] != CharIndex_Platinum)
+		return;
+
+	asInts[1] = (choice == 2) ? 1 : 0; // enum: 0 = Default (unreachable here), 1 = Luna, 2 = Sena
+	LOG(3, "ForcePlatinumVoiceChoice: forced personality flag to %d\n", asInts[1]);
+}
+
 DWORD GetPaletteIndexPointersJmpBackAddr = 0;
 void __declspec(naked) GetPaletteIndexPointers()
 {
 	static int* pPalIndex = nullptr;
+	static char* pSelectBase = nullptr;
 
 	LOG_ASM(2, "GetPaletteIndexPointers\n");
 
 	__asm
 	{
 		pushad
+		mov pSelectBase, esi
 		add esi, 8h
 		mov pPalIndex, esi
 	}
 
 	LOG_ASM(2, "\t- P1 palIndex: 0x%p\n", pPalIndex);
 	g_interfaces.player1.GetPalHandle().SetPointerPalIndex(pPalIndex);
+	ForcePlatinumVoiceChoice(pSelectBase);
 
 	__asm
 	{
@@ -162,6 +190,7 @@ void __declspec(naked) GetPaletteIndexPointers()
 
 	LOG_ASM(2, "\t- P2 palIndex: 0x%p\n", pPalIndex);
 	g_interfaces.player2.GetPalHandle().SetPointerPalIndex(pPalIndex);
+	ForcePlatinumVoiceChoice(pSelectBase + 0x20);
 
 	__asm
 	{
