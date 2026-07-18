@@ -1,0 +1,187 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 00422410 containing 00422410 -----
+Function: FUN_00422410
+
+undefined4 * __fastcall FUN_00422410(undefined4 *param_1)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00823a6d;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  *param_1 = AASTEAM_CAsyncTaskInterface::vftable;
+  InitializeCriticalSection((LPCRITICAL_SECTION)(param_1 + 1));
+  local_8 = 0;
+  *(undefined2 *)(param_1 + 7) = 0;
+  FUN_00420850("ReplayUploader");
+  local_8 = 1;
+  *param_1 = AASTEAM_CUMSTask::vftable;
+  InitializeCriticalSection((LPCRITICAL_SECTION)(param_1 + 0x27));
+  *(undefined1 *)(param_1 + 0x35) = 0;
+  param_1[0x34] = CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable
+  ;
+  param_1[0x38] = 0;
+  param_1[0x39] = 0;
+  param_1[0x3a] = 0;
+  param_1[0x3b] = 0;
+  param_1[0x36] = 0x51b;
+  *(undefined1 *)(param_1 + 0x3d) = 0;
+  param_1[0x3c] =
+       CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable;
+  param_1[0x40] = 0;
+  param_1[0x41] = 0;
+  param_1[0x42] = 0;
+  param_1[0x43] = 0;
+  param_1[0x3e] = 0x525;
+  param_1[0x30] = param_1[0x30] & 0xfffffffc;
+  param_1[0x2e] = 0;
+  param_1[0x31] = 0;
+  param_1[0x32] = 0xffffffff;
+  param_1[0x33] = 0xffffffff;
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 0041fb80 containing 0041fb80 -----
+Function: FUN_0041fb80
+
+undefined4 * FUN_0041fb80(void)
+
+{
+  undefined4 *puVar1;
+  undefined4 *puVar2;
+  uint uVar3;
+  void *pvVar4;
+  undefined4 *puVar5;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008234e3;
+  local_10 = ExceptionList;
+  uVar3 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  puVar5 = DAT_00a29e04;
+  if (DAT_00a29e04 == (undefined4 *)0x0) {
+    pvVar4 = operator_new(0xc);
+    local_8 = 0;
+    if (pvVar4 == (void *)0x0) {
+      puVar5 = (undefined4 *)0x0;
+    }
+    else {
+      puVar5 = (undefined4 *)FUN_0041f9d0(uVar3,pvVar4);
+    }
+    puVar2 = DAT_00a29e04;
+    local_8 = 0xffffffff;
+    if (DAT_00a29e04 != (undefined4 *)0x0) {
+      puVar1 = (undefined4 *)*DAT_00a29e04;
+      DAT_00a29e04 = puVar5;
+      (*(code *)*puVar1)(1,uVar3,puVar2);
+      puVar5 = DAT_00a29e04;
+    }
+  }
+  ExceptionList = local_10;
+  DAT_00a29e04 = puVar5;
+  return puVar5;
+}
+
+
+
+----- DECOMPILE 0041fc20 containing 0041fc20 -----
+Function: FUN_0041fc20
+
+undefined4 __thiscall FUN_0041fc20(int param_1,int param_2)
+
+{
+  return *(undefined4 *)(param_1 + 4 + param_2 * 4);
+}
+
+
+
+----- DECOMPILE 0041ab10 containing 0041ab10 -----
+Function: FUN_0041ab10
+
+void __thiscall FUN_0041ab10(int param_1,int param_2)
+
+{
+  LPCRITICAL_SECTION lpCriticalSection;
+  HANDLE hEvent;
+  int iVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00822ce8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  EnterCriticalSection((LPCRITICAL_SECTION)(param_1 + 0x10));
+  iVar1 = param_2;
+  local_8 = 0;
+  lpCriticalSection = (LPCRITICAL_SECTION)(param_2 + 4);
+  EnterCriticalSection(lpCriticalSection);
+  *(undefined1 *)(iVar1 + 0x1d) = 1;
+  local_8 = local_8 & 0xffffff00;
+  LeaveCriticalSection(lpCriticalSection);
+  EnterCriticalSection(lpCriticalSection);
+  *(undefined1 *)(iVar1 + 0x1c) = 0;
+  local_8 = local_8 & 0xffffff00;
+  LeaveCriticalSection(lpCriticalSection);
+  FUN_0043e2d0(&param_2);
+  hEvent = *(HANDLE *)(param_1 + 0x38);
+  Sleep(0);
+  PulseEvent(hEvent);
+  local_8 = 0xffffffff;
+  LeaveCriticalSection((LPCRITICAL_SECTION)(param_1 + 0x10));
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+===== CALLEES =====
+--- callees of 00422410 (FUN_00422410) ---
+  00420850 FUN_00420850
+  EXTERNAL:0000007b InitializeCriticalSection
+
+--- callees of 0041fb80 (FUN_0041fb80) ---
+  0079e086 operator_new
+  0041f9d0 FUN_0041f9d0
+
+--- callees of 0041fc20 (FUN_0041fc20) ---
+
+--- callees of 0041ab10 (FUN_0041ab10) ---
+  EXTERNAL:0000007a EnterCriticalSection
+  EXTERNAL:00000075 Sleep
+  0043e2d0 FUN_0043e2d0
+  EXTERNAL:00000049 PulseEvent
+  EXTERNAL:00000079 LeaveCriticalSection
+
+===== CALLERS =====
+--- callers of 0041fb80 (FUN_0041fb80) ---
+  00421de0 FUN_00421de0
+  00423490 FUN_00423490
+  004214e0 FUN_004214e0
+  00422a10 FUN_00422a10
+  00423130 FUN_00423130
+  004232d0 FUN_004232d0
+  00423950 FUN_00423950
+
+--- callers of 0041ab10 (FUN_0041ab10) ---
+  00421de0 FUN_00421de0
+  00423490 FUN_00423490
+  004214e0 FUN_004214e0
+  00422a10 FUN_00422a10
+  00423130 FUN_00423130
+  004232d0 FUN_004232d0
+  00423950 FUN_00423950
+

@@ -1,0 +1,434 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== SYMBOLS matching UserManagedStorage =====
+  0084f9b0 AA_CUserManagedStorage::vftable_meta_ptr (Label)
+  0084f9b4 AA_CUserManagedStorage::vftable (Label)
+  00850170 AASTEAM_CUserManagedStorage::vftable_meta_ptr (Label)
+  00850174 AASTEAM_CUserManagedStorage::vftable (Label)
+  009a696c AA_CUserManagedStorage::RTTI_Complete_Object_Locator (Label)
+  009a6980 AA_CUserManagedStorage::RTTI_Class_Hierarchy_Descriptor (Label)
+  009a6990 AA_CUserManagedStorage::RTTI_Base_Class_Array (Label)
+  009a6998 AA_CUserManagedStorage::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009a7600 AASTEAM_CUserManagedStorage::RTTI_Complete_Object_Locator (Label)
+  009a7614 AASTEAM_CUserManagedStorage::RTTI_Class_Hierarchy_Descriptor (Label)
+  009a7624 AASTEAM_CUserManagedStorage::RTTI_Base_Class_Array (Label)
+  009a7630 AASTEAM_CUserManagedStorage::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009d394c AA_CUserManagedStorage::RTTI_Type_Descriptor (Label)
+  009d440c AASTEAM_CUserManagedStorage::RTTI_Type_Descriptor (Label)
+
+===== VTABLE at 0084f9b0 =====
+  +0x00 -> 009A696C (not a function entry, stop)
+
+===== VTABLE at 0084f9b4 =====
+  +0x00 -> 00414910 FUN_00414910
+  +0x04 -> 0079E05C __purecall
+  +0x08 -> 0079E05C __purecall
+  +0x0C -> 0079E05C __purecall
+  +0x10 -> 0079E05C __purecall
+  +0x14 -> 0079E05C __purecall
+  +0x18 -> 0079E05C __purecall
+  +0x1C -> 0079E05C __purecall
+  +0x20 -> EA1EA135 (not a function entry, stop)
+
+----- DECOMPILE 00414910 (vtbl+0x00 of 0084f9b4) -----
+Function: FUN_00414910
+
+undefined4 * __thiscall FUN_00414910(undefined4 *param_1,byte param_2)
+
+{
+  *param_1 = AA_CUserManagedStorage::vftable;
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  return param_1;
+}
+
+
+
+----- DECOMPILE 0079e05c (vtbl+0x04 of 0084f9b4) -----
+Function: __purecall
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+
+===== VTABLE at 00850170 =====
+  +0x00 -> 009A7600 (not a function entry, stop)
+
+===== VTABLE at 00850174 =====
+  +0x00 -> 004227B0 FUN_004227b0
+  +0x04 -> 00422DD0 FUN_00422dd0
+  +0x08 -> 006A9DA0 FUN_006a9da0
+  +0x0C -> 00423950 FUN_00423950
+  +0x10 -> 00422A10 FUN_00422a10
+  +0x14 -> 00422F80 FUN_00422f80
+  +0x18 -> 00422E70 FUN_00422e70
+  +0x1C -> 00422CC0 FUN_00422cc0
+  +0x20 -> 009A764C (not a function entry, stop)
+
+----- DECOMPILE 004227b0 (vtbl+0x00 of 00850174) -----
+Function: FUN_004227b0
+
+undefined4 * __thiscall FUN_004227b0(undefined4 *param_1,byte param_2)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00823b33;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = AASTEAM_CUserManagedStorage::vftable;
+  local_8 = 0;
+  if ((int *)param_1[1] != (int *)0x0) {
+    (**(code **)(*(int *)param_1[1] + 4))(1,uVar1);
+    param_1[1] = 0;
+  }
+  local_8 = 0xffffffff;
+  FUN_00414900();
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 00422dd0 (vtbl+0x04 of 00850174) -----
+Function: FUN_00422dd0
+
+undefined4 __fastcall FUN_00422dd0(int param_1)
+
+{
+  int *piVar1;
+  uint uVar2;
+  void *pvVar3;
+  undefined4 uVar4;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00823813;
+  local_10 = ExceptionList;
+  uVar2 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  if (*(int *)(param_1 + 4) == 0) {
+    pvVar3 = operator_new(0x110);
+    local_8 = 0;
+    if (pvVar3 == (void *)0x0) {
+      uVar4 = 0;
+    }
+    else {
+      uVar4 = FUN_00422410(uVar2);
+    }
+    piVar1 = *(int **)(param_1 + 4);
+    *(undefined4 *)(param_1 + 4) = uVar4;
+    local_8 = 0xffffffff;
+    if (piVar1 != (int *)0x0) {
+      (**(code **)(*piVar1 + 4))(1);
+    }
+  }
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+----- DECOMPILE 006a9da0 (vtbl+0x08 of 00850174) -----
+Function: FUN_006a9da0
+
+undefined4 FUN_006a9da0(void)
+
+{
+  return 0;
+}
+
+
+
+----- DECOMPILE 00423950 (vtbl+0x0C of 00850174) -----
+Function: FUN_00423950
+
+undefined4 __thiscall FUN_00423950(int *param_1,undefined4 *param_2,undefined4 param_3,int param_4)
+
+{
+  LPCRITICAL_SECTION lpCriticalSection;
+  char cVar1;
+  int iVar2;
+  undefined4 *puVar3;
+  undefined4 uVar4;
+  int iVar5;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00823838;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if (param_1[1] == 0) {
+    (**(code **)(*param_1 + 4))(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  }
+  iVar5 = param_1[1];
+  lpCriticalSection = (LPCRITICAL_SECTION)(iVar5 + 4);
+  EnterCriticalSection(lpCriticalSection);
+  cVar1 = *(char *)(iVar5 + 0x1d);
+  local_8 = 0xffffffff;
+  LeaveCriticalSection(lpCriticalSection);
+  if (cVar1 != '\0') {
+    ExceptionList = local_10;
+    return 0xffffff9c;
+  }
+  iVar5 = param_1[1];
+  puVar3 = (undefined4 *)(iVar5 + 0x30);
+  for (iVar2 = 0x18; iVar2 != 0; iVar2 = iVar2 + -1) {
+    *puVar3 = *param_2;
+    param_2 = param_2 + 1;
+    puVar3 = puVar3 + 1;
+  }
+  *(undefined4 *)(iVar5 + 0x94) = 0;
+  if (param_4 == 0) {
+    *(undefined4 *)(iVar5 + 0x90) = 1;
+    *(undefined4 *)(iVar5 + 0x98) = 0;
+  }
+  else {
+    *(undefined4 *)(iVar5 + 0x90) = param_3;
+    *(int *)(iVar5 + 0x98) = param_4;
+  }
+  *(undefined4 *)(iVar5 + 0xbc) = 0;
+  iVar5 = param_1[1];
+  uVar4 = 0;
+  FUN_0041fb80(0,iVar5);
+  FUN_0041fc20(uVar4);
+  FUN_0041ab10(iVar5);
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+----- DECOMPILE 00422a10 (vtbl+0x10 of 00850174) -----
+Function: FUN_00422a10
+
+undefined4 __thiscall
+FUN_00422a10(int *param_1,undefined4 *param_2,undefined4 param_3,undefined4 param_4,
+            undefined4 param_5)
+
+{
+  LPCRITICAL_SECTION lpCriticalSection;
+  char cVar1;
+  int iVar2;
+  undefined4 *puVar3;
+  undefined4 uVar4;
+  int iVar5;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00823838;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if (param_1[1] == 0) {
+    (**(code **)(*param_1 + 4))(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  }
+  iVar5 = param_1[1];
+  lpCriticalSection = (LPCRITICAL_SECTION)(iVar5 + 4);
+  EnterCriticalSection(lpCriticalSection);
+  cVar1 = *(char *)(iVar5 + 0x1d);
+  local_8 = 0xffffffff;
+  LeaveCriticalSection(lpCriticalSection);
+  if (cVar1 != '\0') {
+    ExceptionList = local_10;
+    return 0xffffff9c;
+  }
+  iVar5 = param_1[1];
+  puVar3 = (undefined4 *)(iVar5 + 0x30);
+  for (iVar2 = 0x18; iVar2 != 0; iVar2 = iVar2 + -1) {
+    *puVar3 = *param_2;
+    param_2 = param_2 + 1;
+    puVar3 = puVar3 + 1;
+  }
+  *(undefined4 *)(iVar5 + 0x94) = param_3;
+  *(undefined4 *)(iVar5 + 0x98) = param_4;
+  *(undefined4 *)(iVar5 + 0x90) = 0;
+  *(undefined4 *)(iVar5 + 0xb8) = 0;
+  *(undefined4 *)(iVar5 + 0xbc) = param_5;
+  iVar5 = param_1[1];
+  uVar4 = 0;
+  FUN_0041fb80(0,iVar5);
+  FUN_0041fc20(uVar4);
+  FUN_0041ab10(iVar5);
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+----- DECOMPILE 00422f80 (vtbl+0x14 of 00850174) -----
+Function: FUN_00422f80
+
+undefined1 __fastcall FUN_00422f80(int param_1)
+
+{
+  undefined1 uVar1;
+  int iVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008239c8;
+  local_10 = ExceptionList;
+  iVar2 = *(int *)(param_1 + 4);
+  if (iVar2 == 0) {
+    return 0;
+  }
+  ExceptionList = &local_10;
+  EnterCriticalSection((LPCRITICAL_SECTION)(iVar2 + 4));
+  uVar1 = *(undefined1 *)(iVar2 + 0x1d);
+  local_8 = 0xffffffff;
+  LeaveCriticalSection((LPCRITICAL_SECTION)(iVar2 + 4));
+  ExceptionList = local_10;
+  return uVar1;
+}
+
+
+
+----- DECOMPILE 00422e70 (vtbl+0x18 of 00850174) -----
+Function: FUN_00422e70
+
+undefined4 __thiscall FUN_00422e70(int param_1,int param_2)
+
+{
+  char cVar1;
+  int iVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00823bd8;
+  local_10 = ExceptionList;
+  iVar2 = *(int *)(param_1 + 4);
+  if (iVar2 == 0) {
+    return 0xffffffff;
+  }
+  if (((param_2 == 0) || (param_2 == *(int *)(iVar2 + 0x90))) || (param_2 == *(int *)(iVar2 + 0x94))
+     ) {
+    ExceptionList = &local_10;
+    EnterCriticalSection((LPCRITICAL_SECTION)(iVar2 + 4));
+    cVar1 = *(char *)(iVar2 + 0x1c);
+    local_8 = 0xffffffff;
+    LeaveCriticalSection((LPCRITICAL_SECTION)(iVar2 + 4));
+    if (cVar1 == '\0') {
+      ExceptionList = local_10;
+      return 0xffffff9c;
+    }
+    iVar2 = *(int *)(param_1 + 4);
+    if ((*(byte *)(iVar2 + 0xc0) & 1) != 0) {
+      ExceptionList = local_10;
+      return 100;
+    }
+    *(undefined4 *)(param_1 + 8) = *(undefined4 *)(iVar2 + 200);
+    *(undefined4 *)(param_1 + 0xc) = *(undefined4 *)(iVar2 + 0xcc);
+  }
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+----- DECOMPILE 00422cc0 (vtbl+0x1C of 00850174) -----
+Function: FUN_00422cc0
+
+int __fastcall FUN_00422cc0(int param_1)
+
+{
+  int iVar1;
+  
+  iVar1 = *(int *)(param_1 + 4);
+  if (iVar1 == 0) {
+    return iVar1;
+  }
+  return *(int *)(iVar1 + 0xb8);
+}
+
+
+
+----- DECOMPILE 004148f0  -----
+Function: FUN_004148f0
+
+undefined4 * __fastcall FUN_004148f0(undefined4 *param_1)
+
+{
+  *param_1 = AA_CUserManagedStorage::vftable;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 004b8b90  -----
+Function: FUN_004b8b90
+
+undefined4 * __fastcall FUN_004b8b90(undefined4 *param_1)
+
+{
+  undefined4 *puVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082b5cb;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  *param_1 = GAME_COnlineStorageTransfer::vftable;
+  param_1[2] = 0;
+  param_1[3] = 0;
+  param_1[4] = 0;
+  puVar1 = (undefined4 *)operator_new(4);
+  if (puVar1 == (undefined4 *)0x0) {
+    puVar1 = (undefined4 *)0x0;
+  }
+  else {
+    *puVar1 = 0;
+  }
+  param_1[5] = puVar1;
+  *puVar1 = 0;
+  param_1[6] = 0;
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+===== STRING TABLE at 009DF4BC =====
+  [0] 008501C8 "b"
+  [1] 008AA0F8 "b"
+  [2] 008AA108 "b"
+  [3] 008AA11C "d"
+  [4] <unreadable>

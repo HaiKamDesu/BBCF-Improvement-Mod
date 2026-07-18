@@ -1,0 +1,478 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== SYMBOLS matching OnlineStorage =====
+  0089da5c GAMESTEAM_COnlineStorageTransfer::vftable_meta_ptr (Label)
+  0089da60 GAMESTEAM_COnlineStorageTransfer::vftable (Label)
+  008aa130 GAME_COnlineStorageTransfer::vftable_meta_ptr (Label)
+  008aa134 GAME_COnlineStorageTransfer::vftable (Label)
+  009ac088 GAMESTEAM_COnlineStorageTransfer::RTTI_Complete_Object_Locator (Label)
+  009ac09c GAMESTEAM_COnlineStorageTransfer::RTTI_Class_Hierarchy_Descriptor (Label)
+  009ac0ac GAMESTEAM_COnlineStorageTransfer::RTTI_Base_Class_Array (Label)
+  009ac0b8 GAMESTEAM_COnlineStorageTransfer::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009ac0d4 GAME_COnlineStorageTransfer::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009ac0f0 GAME_COnlineStorageTransfer::RTTI_Class_Hierarchy_Descriptor (Label)
+  009ac100 GAME_COnlineStorageTransfer::RTTI_Base_Class_Array (Label)
+  009ae8b8 GAME_COnlineStorageTransfer::RTTI_Complete_Object_Locator (Label)
+  009d9d80 GAMESTEAM_COnlineStorageTransfer::RTTI_Type_Descriptor (Label)
+  009d9db0 GAME_COnlineStorageTransfer::RTTI_Type_Descriptor (Label)
+
+===== VTABLE at 0089da5c =====
+  +0x00 -> 009AC088 (not a function entry, stop)
+
+===== VTABLE at 0089da60 =====
+  +0x00 -> 00414700 thunk_FUN_00421970
+  +0x04 -> 00471880 thunk_FUN_00421040
+  +0x08 -> 004718A0 thunk_FUN_00422cd0
+  +0x0C -> 00471890 thunk_FUN_004147c0
+  +0x10 -> 00471940 FUN_00471940
+  +0x14 -> 004718B0 FUN_004718b0
+  +0x18 -> 004719B0 FUN_004719b0
+  +0x1C -> 004719A0 FUN_004719a0
+  +0x20 -> 00471820 FUN_00471820
+  +0x24 -> 00000000 (not a function entry, stop)
+
+----- DECOMPILE 00414700 (vtbl+0x00 of 0089da60) -----
+Function: thunk_FUN_00421970
+
+undefined4 * thunk_FUN_00421970(void)
+
+{
+  undefined4 *puVar1;
+  uint uVar2;
+  undefined4 *puVar3;
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  puStack_c = &LAB_008239a4;
+  pvStack_10 = ExceptionList;
+  uVar2 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &pvStack_10;
+  if ((DAT_00a29e24 & 1) == 0) {
+    DAT_00a29e24 = DAT_00a29e24 | 1;
+    uStack_8 = 0;
+    DAT_00a29e20 = (undefined4 *)0x0;
+    _atexit((_func_4879 *)&LAB_00848220);
+  }
+  uStack_8 = 0xffffffff;
+  puVar3 = DAT_00a29e20;
+  if (DAT_00a29e20 == (undefined4 *)0x0) {
+    puVar3 = (undefined4 *)operator_new(8);
+    uStack_8 = 1;
+    if (puVar3 == (undefined4 *)0x0) {
+      puVar3 = (undefined4 *)0x0;
+    }
+    else {
+      FUN_004146b0(uVar2);
+      *puVar3 = AASTEAM_CReplayUploader::vftable;
+      puVar3[1] = 0;
+    }
+    uStack_8 = 0xffffffff;
+    if (DAT_00a29e20 != (undefined4 *)0x0) {
+      puVar1 = (undefined4 *)*DAT_00a29e20;
+      DAT_00a29e20 = puVar3;
+      (*(code *)*puVar1)(1);
+      puVar3 = DAT_00a29e20;
+    }
+  }
+  DAT_00a29e20 = puVar3;
+  ExceptionList = pvStack_10;
+  return DAT_00a29e20;
+}
+
+
+
+----- DECOMPILE 00471880 (vtbl+0x04 of 0089da60) -----
+Function: thunk_FUN_00421040
+
+undefined4 * thunk_FUN_00421040(void)
+
+{
+  undefined4 *puVar1;
+  uint uVar2;
+  undefined4 *puVar3;
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  uStack_8 = 0xffffffff;
+  puStack_c = &LAB_008237a6;
+  pvStack_10 = ExceptionList;
+  uVar2 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &pvStack_10;
+  puVar3 = DAT_00a29e18;
+  if (DAT_00a29e18 == (undefined4 *)0x0) {
+    puVar3 = (undefined4 *)operator_new(8);
+    uStack_8 = 0;
+    if (puVar3 == (undefined4 *)0x0) {
+      puVar3 = (undefined4 *)0x0;
+    }
+    else {
+      FUN_00414660(uVar2);
+      *puVar3 = AASTEAM_CReplayDownloader::vftable;
+      puVar3[1] = 0;
+    }
+    uStack_8 = 0xffffffff;
+    if (DAT_00a29e18 != (undefined4 *)0x0) {
+      puVar1 = (undefined4 *)*DAT_00a29e18;
+      DAT_00a29e18 = puVar3;
+      (*(code *)*puVar1)(1);
+      puVar3 = DAT_00a29e18;
+    }
+  }
+  ExceptionList = pvStack_10;
+  DAT_00a29e18 = puVar3;
+  return puVar3;
+}
+
+
+
+----- DECOMPILE 004718a0 (vtbl+0x08 of 0089da60) -----
+Function: thunk_FUN_00422cd0
+
+undefined4 * thunk_FUN_00422cd0(void)
+
+{
+  undefined4 *puVar1;
+  uint uVar2;
+  undefined4 *puVar3;
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  puStack_c = &LAB_00823bb4;
+  pvStack_10 = ExceptionList;
+  uVar2 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &pvStack_10;
+  if ((DAT_00a29e34 & 1) == 0) {
+    DAT_00a29e34 = DAT_00a29e34 | 1;
+    uStack_8 = 0;
+    DAT_00a29e30 = (undefined4 *)0x0;
+    _atexit((_func_4879 *)&LAB_00848290);
+  }
+  uStack_8 = 0xffffffff;
+  puVar3 = DAT_00a29e30;
+  if (DAT_00a29e30 == (undefined4 *)0x0) {
+    puVar3 = (undefined4 *)operator_new(0x10);
+    uStack_8 = 1;
+    if (puVar3 == (undefined4 *)0x0) {
+      puVar3 = (undefined4 *)0x0;
+    }
+    else {
+      FUN_004148f0(uVar2);
+      *puVar3 = AASTEAM_CUserManagedStorage::vftable;
+      puVar3[1] = 0;
+      puVar3[2] = 0xffffffff;
+      puVar3[3] = 0xffffffff;
+    }
+    uStack_8 = 0xffffffff;
+    if (DAT_00a29e30 != (undefined4 *)0x0) {
+      puVar1 = (undefined4 *)*DAT_00a29e30;
+      DAT_00a29e30 = puVar3;
+      (*(code *)*puVar1)(1);
+      puVar3 = DAT_00a29e30;
+    }
+  }
+  DAT_00a29e30 = puVar3;
+  ExceptionList = pvStack_10;
+  return DAT_00a29e30;
+}
+
+
+
+----- DECOMPILE 00471890 (vtbl+0x0C of 0089da60) -----
+Function: thunk_FUN_004147c0
+
+undefined4 * thunk_FUN_004147c0(void)
+
+{
+  undefined4 *puVar1;
+  undefined4 *puVar2;
+  uint uVar3;
+  undefined4 *puVar4;
+  void *pvStack_10;
+  undefined1 *puStack_c;
+  undefined4 uStack_8;
+  
+  puStack_c = &LAB_00822a39;
+  pvStack_10 = ExceptionList;
+  uVar3 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &pvStack_10;
+  if ((DAT_00a2375c & 1) == 0) {
+    DAT_00a2375c = DAT_00a2375c | 1;
+    uStack_8 = 0;
+    DAT_00a23758 = (undefined4 *)0x0;
+    _atexit((_func_4879 *)&LAB_00848020);
+  }
+  uStack_8 = 0xffffffff;
+  puVar4 = DAT_00a23758;
+  if (DAT_00a23758 == (undefined4 *)0x0) {
+    puVar4 = (undefined4 *)operator_new(0xc);
+    if (puVar4 == (undefined4 *)0x0) {
+      puVar4 = (undefined4 *)0x0;
+    }
+    else {
+      *puVar4 = AA_CTitleManagedStorage::vftable;
+      puVar4[1] = 0;
+      *puVar4 = AA_CTitleManagedStorageNULL::vftable;
+    }
+    puVar2 = DAT_00a23758;
+    uStack_8 = 0xffffffff;
+    if (DAT_00a23758 != (undefined4 *)0x0) {
+      puVar1 = (undefined4 *)*DAT_00a23758;
+      DAT_00a23758 = puVar4;
+      (*(code *)*puVar1)(1,uVar3,puVar2);
+      puVar4 = DAT_00a23758;
+    }
+  }
+  DAT_00a23758 = puVar4;
+  ExceptionList = pvStack_10;
+  return DAT_00a23758;
+}
+
+
+
+----- DECOMPILE 00471940 (vtbl+0x10 of 0089da60) -----
+Function: FUN_00471940
+
+void FUN_00471940(undefined4 param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  undefined4 local_18;
+  undefined4 local_14;
+  undefined4 local_10;
+  undefined4 local_c;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  FUN_00406d90(&local_18,0x10);
+  local_18 = param_2;
+  local_10 = param_3;
+  local_c = param_4;
+  local_14 = 0x3c;
+  FUN_00421c40(param_1,&local_18);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004718b0 (vtbl+0x14 of 0089da60) -----
+Function: FUN_004718b0
+
+void FUN_004718b0(undefined4 param_1,undefined4 param_2,int param_3,undefined4 param_4)
+
+{
+  undefined4 *puVar1;
+  undefined4 extraout_EDX;
+  undefined4 uVar2;
+  undefined4 uVar3;
+  undefined4 local_28;
+  undefined4 local_24;
+  undefined4 local_20;
+  undefined4 local_1c;
+  undefined4 local_18;
+  undefined4 local_10;
+  undefined4 local_c;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  FUN_00406d90(&local_28,0x20);
+  local_20 = param_2;
+  local_1c = 0x3c;
+  puVar1 = (undefined4 *)FUN_00407a60();
+  local_28 = *puVar1;
+  local_24 = puVar1[1];
+  local_c = *(undefined4 *)(param_3 + 0x56);
+  local_18 = param_4;
+  uVar2 = *(undefined4 *)(param_3 + 0x4a);
+  uVar3 = *(undefined4 *)(param_3 + 0x4e);
+  local_10 = *(undefined4 *)(param_3 + 0x52);
+  FUN_004213c0(param_1,&local_28);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc,extraout_EDX,uVar2,uVar3);
+  return;
+}
+
+
+
+----- DECOMPILE 004719b0 (vtbl+0x18 of 0089da60) -----
+Function: FUN_004719b0
+
+void FUN_004719b0(undefined4 param_1,undefined4 param_2,int param_3,wchar_t *param_4)
+
+{
+  char cVar1;
+  undefined4 *puVar2;
+  undefined4 uVar3;
+  int iVar4;
+  undefined1 local_134 [212];
+  undefined4 local_60;
+  undefined4 local_5c;
+  undefined4 local_58;
+  wchar_t local_54 [34];
+  undefined4 local_10;
+  undefined4 local_c;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  FUN_00406d90(&local_60,0x58);
+  local_58 = param_2;
+  puVar2 = (undefined4 *)FUN_00407a60();
+  local_60 = *puVar2;
+  local_5c = puVar2[1];
+  _wcscpy_s(local_54,0x20,param_4);
+  local_10 = *(undefined4 *)(param_3 + 0x4a);
+  local_c = *(undefined4 *)(param_3 + 0x4e);
+  uVar3 = FUN_00407940();
+  cVar1 = FUN_004079b0(uVar3);
+  if (cVar1 != '\0') {
+    iVar4 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+    puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar4 + 4) + 8))(local_134);
+    local_60 = *puVar2;
+    local_5c = puVar2[1];
+    local_10 = 0xffffffff;
+    local_c = 0xffffffff;
+  }
+  FUN_00423080(param_1,&local_60);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004719a0 (vtbl+0x1C of 0089da60) -----
+Function: FUN_004719a0
+
+undefined4 FUN_004719a0(undefined4 param_1)
+
+{
+  return param_1;
+}
+
+
+
+----- DECOMPILE 00471820 (vtbl+0x20 of 0089da60) -----
+Function: FUN_00471820
+
+undefined4 * __thiscall FUN_00471820(undefined4 *param_1,byte param_2)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00828fa8;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = GAMESTEAM_COnlineStorageTransfer::vftable;
+  local_8 = 0xffffffff;
+  FUN_004b8c40(uVar1);
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+===== VTABLE at 008aa130 =====
+  +0x00 -> 009AE8B8 (not a function entry, stop)
+
+===== VTABLE at 008aa134 =====
+  +0x00 -> 0079E05C __purecall
+  +0x04 -> 0079E05C __purecall
+  +0x08 -> 0079E05C __purecall
+  +0x0C -> 0079E05C __purecall
+  +0x10 -> 0079E05C __purecall
+  +0x14 -> 0079E05C __purecall
+  +0x18 -> 0079E05C __purecall
+  +0x1C -> 0079E05C __purecall
+  +0x20 -> 004B8C50 FUN_004b8c50
+  +0x24 -> 009AE8CC (not a function entry, stop)
+
+----- DECOMPILE 0079e05c (vtbl+0x00 of 008aa134) -----
+Function: __purecall
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+
+----- DECOMPILE 004b8c50 (vtbl+0x20 of 008aa134) -----
+Function: FUN_004b8c50
+
+undefined4 * __thiscall FUN_004b8c50(undefined4 *param_1,byte param_2)
+
+{
+  *param_1 = GAME_COnlineStorageTransfer::vftable;
+  FID_conflict__free((void *)param_1[5]);
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  return param_1;
+}
+
+
+
+----- DECOMPILE 004b8b90  -----
+Function: FUN_004b8b90
+
+undefined4 * __fastcall FUN_004b8b90(undefined4 *param_1)
+
+{
+  undefined4 *puVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082b5cb;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  *param_1 = GAME_COnlineStorageTransfer::vftable;
+  param_1[2] = 0;
+  param_1[3] = 0;
+  param_1[4] = 0;
+  puVar1 = (undefined4 *)operator_new(4);
+  if (puVar1 == (undefined4 *)0x0) {
+    puVar1 = (undefined4 *)0x0;
+  }
+  else {
+    *puVar1 = 0;
+  }
+  param_1[5] = puVar1;
+  *puVar1 = 0;
+  param_1[6] = 0;
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+===== STRING TABLE at 009DF4BC =====
+  [0] 008501C8 "b"
+  [1] 008AA0F8 "b"
+  [2] 008AA108 "b"
+  [3] 008AA11C "d"
+  [4] <unreadable>

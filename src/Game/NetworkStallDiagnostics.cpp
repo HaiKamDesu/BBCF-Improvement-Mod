@@ -263,6 +263,60 @@ namespace
 			tag, slot, ctx[0], ctx[1], ctx[2], ctx[3], ctx[4], ctx[5], ctx[6]);
 	}
 
+	// AASTEAM_CUserManagedStorage singleton (DAT_00A29E30, created by
+	// thunk_FUN_00422cd0). Its +4 points to the AASTEAM_CUMSTask worker (0x110
+	// bytes, ctor FUN_00422410) that performs the actual Steam RemoteStorage
+	// FileShare / UGCDownload for the D-Code profile blobs. Field map from
+	// FUN_00422E70 (poll) / FUN_00422A10 (submit) / FUN_00422CC0 (result getter),
+	// DCodeBug12/13GhidraReport.txt:
+	//   +0x1C done flag, +0x1D busy flag, +0x30..0x8F request block (0x60 bytes,
+	//   includes UGC handle / steamID), +0x90/+0x94 request ids, +0xB8 Steam
+	//   EResult, +0xC0 bit0 = error latch (poll returns 100 -> state 6).
+	constexpr uintptr_t kUserManagedStorageSingletonRva = 0x00629E30;
+	constexpr uintptr_t kUMSWorkerRequestBlockOffset = 0x30;
+	constexpr size_t kUMSWorkerRequestBlockSize = 0x60;
+
+	void LogUMSWorkerState(uintptr_t moduleBase)
+	{
+		const uint8_t* const* const singletonPtr =
+			reinterpret_cast<const uint8_t* const*>(moduleBase + kUserManagedStorageSingletonRva);
+		if (IsBadReadPtr(singletonPtr, sizeof(void*)) || *singletonPtr == nullptr)
+		{
+			IncidentPrintf("[DCodeTick] UMS singleton unreadable\n");
+			return;
+		}
+		const uint8_t* const ums = *singletonPtr;
+		if (IsBadReadPtr(ums + 4, sizeof(void*)))
+		{
+			IncidentPrintf("[DCodeTick] UMS worker pointer unreadable\n");
+			return;
+		}
+		const uint8_t* const worker = *reinterpret_cast<const uint8_t* const*>(ums + 4);
+		if (worker == nullptr || IsBadReadPtr(worker, 0x110))
+		{
+			IncidentPrintf("[DCodeTick] UMS worker null/unreadable (%p)\n", worker);
+			return;
+		}
+
+		IncidentPrintf("[DCodeTick] UMS worker: done=%u busy=%u reqIds=%08X/%08X steamEResult=%d resultAux=%08X errFlags=%02X recv=%08X/%08X\n",
+			worker[0x1C], worker[0x1D],
+			*reinterpret_cast<const uint32_t*>(worker + 0x90),
+			*reinterpret_cast<const uint32_t*>(worker + 0x94),
+			*reinterpret_cast<const int32_t*>(worker + 0xB8),
+			*reinterpret_cast<const uint32_t*>(worker + 0xBC),
+			worker[0xC0],
+			*reinterpret_cast<const uint32_t*>(worker + 0xC8),
+			*reinterpret_cast<const uint32_t*>(worker + 0xCC));
+
+		char hex[3 * kUMSWorkerRequestBlockSize + 1];
+		char* p = hex;
+		for (size_t i = 0; i < kUMSWorkerRequestBlockSize; ++i)
+		{
+			p += sprintf_s(p, 4, "%02X ", worker[kUMSWorkerRequestBlockOffset + i]);
+		}
+		IncidentPrintf("[DCodeTick] UMS request block +0x30: %s\n", hex);
+	}
+
 	// Handles both failure shapes with the same evidence dump + optional recovery.
 	void HandleSlotFailure(const char* kind, int slot, SlotTrack& track, uint8_t* subObject)
 	{
@@ -274,6 +328,14 @@ namespace
 
 		IncidentPrintf("[DCodeTick] !!! %s on slot %d (autoRecoveries so far %d)\n", kind, slot, track.autoRecoveries);
 		LogSubObjectContext("[DCodeTick] live", slot, liveCtx);
+
+		// Steam-level ground truth: the CUMSTask worker's EResult tells us WHY
+		// the transfer failed (stale UGC handle, rate limit, IO failure, ...).
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (moduleBase != 0)
+		{
+			LogUMSWorkerState(moduleBase);
+		}
 
 		if (track.haveSnapshot)
 		{

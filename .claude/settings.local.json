@@ -161,7 +161,13 @@
       "WebFetch(domain:gamingbolt.com)",
       "Bash(curl -s \"https://api.github.com/repos/libreofficecalc/BBCF-Improvement-Mod/releases?per_page=100\")",
       "Bash(grep -iE \" error |dinput8.dll$|Build succeeded|Build FAILED\")",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(sort -k6,7)",
+      "Bash(cp run_ghidra_dcode_bug10.cmd run_ghidra_dcode_bug11.cmd)",
+      "Bash(sed -i 's/Bug10/Bug11/g; s/bug10/bug11/g' run_ghidra_dcode_bug11.cmd)",
+      "Bash(cmd.exe /c run_ghidra_dcode_bug11.cmd)",
+      "Bash(mkdir -p .claude/skills/bbcf-crash-triage .codex/skills/bbcf-crash-triage)",
+      "Bash(cp .agents/skills/bbcf-crash-triage/SKILL.md .claude/skills/bbcf-crash-triage/SKILL.md)"
     ]
   }
 }

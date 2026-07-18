@@ -367,6 +367,54 @@ input flags), and if it was written, did the netcolor values in [SaveWatch]
 lines at write time already show stale data (if so: the serialization source
 is stale — trace what buffer action-2 serializes).
 
+## 2026-07-16: NATURAL CAPTURE — transport-level, session-wide, Steam UGC layer
+
+Session 2026-07-15 22:07 (opponent "Kamui Thanatos", user observed opponent's
+D-Code missing). DCodeIncidents.log + 14 blob dumps + 5 DEBUG snapshots:
+
+- Failure signature: **recvSize=0x0 every time** — the transport completed
+  with an error and wrote nothing; the "payload" is just the freshly-reset
+  buffer (checksum 0x000C, all zeros + 0x10001 magic). NOT corruption.
+- **Session-wide breakage**: slots 1/2 fetched fine at 22:08:07; from
+  22:08:23 onward EVERY fetch failed (slot 0 six times, slots 4/5 four times
+  each) until all auto-recover budgets exhausted. First failure took 9.4s
+  (timeout-shaped), subsequent ones 0.7–4s (fast-fail). Retrying at the
+  fetch-state layer cannot heal this — the layer below is wedged.
+- **Rollback mechanism confirmed by [SaveWatch]**: bbsave.dat kept being
+  written all session (9+ writes 22:08–22:38) but `netcolor=2 counter=51`
+  NEVER changed across ~30 min of matches. The game doesn't stop saving —
+  it stops APPLYING results to the profile once the transport is wedged
+  (consistent with the commit path checking FUN_004A0B80's hard-error 100).
+  Restart "rollback" = progress was never granted in the persisted profile.
+
+Transport architecture (phases 11–13, DCodeBug11/12/13GhidraReport.txt):
+
+- `GAMESTEAM_COnlineStorageTransfer` (vtable 0089DA60) is a facade; its
+  vtbl+0x08 getter returns the **`AASTEAM_CUserManagedStorage`** singleton
+  (DAT_00A29E30, RVA 0x629E30), whose +4 is the **`AASTEAM_CUMSTask`**
+  worker (0x110 bytes, ctor FUN_00422410).
+- CUMSTask registers `CCallResult<RemoteStorageFileShareResult_t>` (0x51B)
+  and `CCallResult<RemoteStorageDownloadUGCResult_t>` (0x525): **the D-Code
+  profile blob is FileShare()'d to Steam Cloud UGC and downloaded by UGC
+  handle** — not direct P2P. The async queue (DAT_00A29E04, thread name
+  "ReplayUploader") is shared with the replay uploader/downloader.
+- Poll FUN_00422E70: worker+0x1C done flag; **worker+0xC0 bit0 = error latch
+  → returns 100 → state 6**. worker+0xB8 = **Steam EResult** (getter
+  FUN_00422CC0). Request block (0x60 bytes incl. UGC handle/steamID) at
+  worker+0x30.
+- Root-cause candidates for "everything fails from moment X": stale cached
+  UGC handle (peer re-shared, old handle now invalid — retry with same
+  handle fails forever), Steam UGC rate limit, or Steam remote-storage
+  session failure (cf. RankedProgress.md #221/222 Steam-side wedge).
+
+Instrumentation added 2026-07-16 (deployed): on every failure,
+`LogUMSWorkerState` dumps the CUMSTask worker — done/busy flags, request
+ids, **steamEResult** (+0xB8), error flags, recv fields, and the 0x60-byte
+request block hex. The EResult value on the next occurrence should decide
+between stale-handle (FileNotFound=9), rate limit (LimitExceeded=25), and
+generic IO failure — which in turn decides the fix (refresh handle & resub
+vs backoff vs unfixable client-side).
+
 Next capture should tell us: whether the rejected payload was all-zero
 (transport error), truncated (recvSize != 0x6800), or genuinely corrupt
 (full-size, bad checksum) — and whether a forced retry succeeds, which
