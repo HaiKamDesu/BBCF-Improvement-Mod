@@ -827,3 +827,88 @@ Palette_random_label,Random,Aleatoria
 Palette_random_exclude_label,Random (exclude default),Aleatoria (sin la predeterminada)
 Palette_random_tooltip,"Assign this to a color to get a random custom palette (the default look included) every time you pick that color in-game. Saved to palettes.ini as ""Random"".","Asígnalo a un color para obtener una paleta personalizada al azar (incluida la apariencia predeterminada) cada vez que elijas ese color dentro del juego. Se guarda en palettes.ini como ""Random""."
 Palette_random_exclude_tooltip,"Same as Random, but the character's default look is never picked.","Igual que Aleatoria, pero nunca se elige la apariencia predeterminada del personaje."
+Always swap coordinates help,"When enabled, automatically swaps P1 and P2 positions and facing every round (at frame 5). Holding Up while resetting the lab (even with this menu closed) toggles this on/off, so you can quickly flip into P2-side positioning and back.","Cuando está activado, intercambia automáticamente las posiciones y direcciones de P1 y P2 cada round (en el frame 5). Mantener Arriba mientras reinicias el entrenamiento (incluso con este menú cerrado) activa/desactiva esta opción, para poder colocarte del lado de P2 y volver rápidamente."
+Player_money_tooltip,Directly edits the player's in-game money.,Edita directamente el dinero del jugador en el juego.
+Debug_window_tooltip,Opens the debug window.,Abre la ventana de depuración.
+Log_window_tooltip,Opens the mod's log window.,Abre la ventana de registro (log) del mod.
+States_window_tooltip,"Opens the States Library window (frame data, playback, save states, replay theater, room settings).","Abre la ventana de la Biblioteca de Estados (datos de frames, grabaciones, guardados de estado, teatro de repeticiones, ajustes de sala)."
+Avatar_icon_tooltip,Sets your online lobby avatar icon.,Establece el ícono de tu avatar en el lobby en línea.
+Avatar_color_tooltip,Sets your avatar's background color.,Establece el color de fondo de tu avatar.
+Avatar_accessory1_tooltip,Sets your avatar's first accessory slot.,Establece el primer accesorio de tu avatar.
+Avatar_accessory2_tooltip,Sets your avatar's second accessory slot.,Establece el segundo accesorio de tu avatar.
+Enable_framedata_tooltip,Opens a HUD window showing real-time frame advantage.,Abre una ventana HUD que muestra la ventaja de frames en tiempo real.
+Advantage_stagger_hit_tooltip,Also counts stagger/ukemi hit states in the frame advantage calculation.,También cuenta los estados de tambaleo/ukemi al golpear en el cálculo de la ventaja de frames.
+Palette_editor_tooltip,Opens the palette editor to customize character colors.,Abre el editor de paletas para personalizar los colores del personaje.
+Enable_hitbox_overlay_tooltip,Draws hitboxes/hurtboxes over the characters.,Dibuja las cajas de golpe/impacto sobre los personajes.
+Draw_hitbox_hurtbox_tooltip,"Toggles drawing hit/hurt boxes specifically (vs just the overlay window).","Activa o desactiva el dibujo de las cajas de golpe/impacto específicamente (en vez de solo la ventana de superposición)."
+Freeze_frame_tooltip,Pauses the game's frame progression. Also bound to a hotkey.,Pausa el avance de frames del juego. También está asignado a una tecla rápida.
+Reset_frame_counter_tooltip,Resets the frame counter to 0.,Reinicia el contador de frames a 0.
+Step_frames_tooltip,"While frame-frozen, advances the game by the configured number of frames.","Mientras los frames están congelados, avanza el juego la cantidad de frames configurada."
+Step_frames_count_tooltip,"Number of frames ""Step Frames"" advances at a time.","Cantidad de frames que avanza ""Step Frames"" cada vez."
+Hide_HUD_tooltip,Hides the in-game HUD.,Oculta el HUD dentro del juego.
+Releases_checker_tooltip,Opens the release/update checker window.,Abre la ventana de verificación de actualizaciones/lanzamientos.
+Swap_coordinates_tooltip,"Immediately swaps P1 and P2 positions and facing (training mode only).","Intercambia inmediatamente las posiciones y direcciones de P1 y P2 (solo en modo entrenamiento)."
+Enable_wakeup_delay_override_tooltip,Lets you override P2's wakeup timing/type below.,Permite anular el tiempo/tipo de recuperación (wakeup) de P2 abajo.
+Force_load_p2_script_tooltip,"Re-parses P2's state script data from memory, refreshing the states list.","Vuelve a analizar los datos del script de estados de P2 desde la memoria, actualizando la lista de estados."
+Naoto_EN_specials_tooltip,Force-enables Naoto's EN (Drive) specials on P2.,Fuerza la activación de los especiales EN (Drive) de Naoto en P2.
+Burst_on_hit_tooltip,"Auto-forces P2 into Burst (or Air Burst) a set number of frames after being hit, subject to a cooldown.","Fuerza automáticamente a P2 a hacer Burst (o Air Burst) una cantidad determinada de frames después de recibir un golpe, sujeto a un enfriamiento."
+Burst_onhit_delay_tooltip,Frame delay before the forced burst triggers after a hit.,Retraso en frames antes de que se active el burst forzado tras un golpe.
+Burst_onhit_cooldown_tooltip,Minimum frame cooldown between forced auto-bursts.,Enfriamiento mínimo en frames entre bursts forzados automáticos.
+Add_delays_to_actions_tooltip,Enables the Wakeup/Gap/Tech delay fields below.,Habilita los campos de retraso de Wakeup/Gap/Tech de abajo.
+State_wakeup_delay_tooltip,Frame delay before the registered wakeup action executes.,Retraso en frames antes de que se ejecute la acción de wakeup registrada.
+State_gap_delay_tooltip,Frame delay before the registered gap action triggers on block.,Retraso en frames antes de que se active la acción de gap registrada al bloquear.
+State_throwtech_delay_tooltip,Frame delay before the registered tech action triggers after a throw tech.,Retraso en frames antes de que se active la acción de tech registrada tras escapar de un agarre.
+Set_onhit_action_tooltip,Registers the selected state as P2's forced action 1 frame after being hit.,Registra el estado seleccionado como la acción forzada de P2 1 frame después de recibir un golpe.
+Set_wakeup_action_tooltip,Registers the selected state as P2's forced wakeup action.,Registra el estado seleccionado como la acción de wakeup forzada de P2.
+Set_gap_action_tooltip,Registers the selected state as P2's forced action the instant blockstun ends.,Registra el estado seleccionado como la acción forzada de P2 en el instante en que termina el blockstun.
+Set_tech_action_tooltip,Registers the selected state as P2's forced action after a successful throw tech.,Registra el estado seleccionado como la acción forzada de P2 tras escapar exitosamente de un agarre.
+Use_state_tooltip,Immediately forces P2 into the currently selected state.,Fuerza inmediatamente a P2 al estado actualmente seleccionado.
+Reset_states_tooltip,"Reverts any patched state scripts and clears all gap/wakeup/onhit/tech registers.","Revierte cualquier script de estado modificado y borra todos los registros de gap/wakeup/onhit/tech."
+Add_wakeup_action_tooltip,Adds the selected state to the wakeup action's random pool.,Agrega el estado seleccionado al grupo aleatorio de la acción de wakeup.
+Add_gap_action_tooltip,Adds the selected state to the gap action's random pool.,Agrega el estado seleccionado al grupo aleatorio de la acción de gap.
+Save_playback_tooltip,Saves the current recorded playback to the file path below.,Guarda la grabación actual en la ruta de archivo de abajo.
+Load_playback_tooltip,Loads a .playback file from the path below into this slot.,Carga un archivo .playback desde la ruta de abajo en esta ranura.
+Trim_playback_tooltip,Trims empty leading/trailing input frames from the recording.,Recorta los frames de entrada vacíos al inicio/final de la grabación.
+Playback_file_path_tooltip,Path used by Save/Load/Trim for this slot.,Ruta usada por Guardar/Cargar/Recortar para esta ranura.
+Playback_set_gap_tooltip,Registers this playback slot as the gap action.,Registra esta ranura de grabación como la acción de gap.
+Playback_set_wakeup_tooltip,Registers this playback slot as the wakeup action.,Registra esta ranura de grabación como la acción de wakeup.
+Playback_set_onblock_tooltip,Registers this playback slot as the on-block action.,Registra esta ranura de grabación como la acción al bloquear.
+Playback_set_onhit_tooltip,Registers this playback slot as the (experimental) on-hit action.,Registra esta ranura de grabación como la acción (experimental) al golpear.
+Playback_set_tech_tooltip,Registers this playback slot as the throw-tech action.,Registra esta ranura de grabación como la acción de tech de agarre.
+Playback_reset_tooltip,Clears this slot's gap/wakeup/onblock/onhit/tech role assignments.,Borra las asignaciones de rol gap/wakeup/onblock/onhit/tech de esta ranura.
+Playback_buffer_frames_tooltip,"Input-buffer window in frames for this slot (currently only affects wakeup actions).","Ventana de buffer de entradas en frames para esta ranura (actualmente solo afecta las acciones de wakeup)."
+Open_playback_editor_tooltip,Opens the frame-by-frame playback editor.,Abre el editor de grabaciones cuadro por cuadro.
+Gap_random_slots_tooltip,"Picks a random slot (from the ones checked below) as the gap action each time.","Elige una ranura aleatoria (entre las marcadas abajo) como la acción de gap cada vez."
+Gap_random_slot_include_tooltip,Includes this slot in the random gap-action pool.,Incluye esta ranura en el grupo aleatorio de la acción de gap.
+Wakeup_random_slots_tooltip,"Picks a random slot (from the ones checked below) as the wakeup action each time.","Elige una ranura aleatoria (entre las marcadas abajo) como la acción de wakeup cada vez."
+Wakeup_random_slot_include_tooltip,Includes this slot in the random wakeup-action pool.,Incluye esta ranura en el grupo aleatorio de la acción de wakeup.
+Save_snapshot_tooltip,"Saves a full game-state snapshot (positions, health, meter, etc).","Guarda una instantánea completa del estado del juego (posiciones, vida, meter, etc)."
+Load_snapshot_tooltip,Restores the previously saved snapshot.,Restaura la instantánea guardada previamente.
+Auto_archive_replays_tooltip,Automatically archives replays after they're saved.,Archiva automáticamente las repeticiones después de guardarse.
+Recent_replays_tooltip,Shows the game's own recent replay list.,Muestra la lista de repeticiones recientes propia del juego.
+Repair_replay_list_tooltip,Repairs/rebuilds the default replay list if it's corrupted.,Repara/reconstruye la lista de repeticiones predeterminada si está corrupta.
+Replay_archive_tooltip,Browses your local archived replay folder.,Explora tu carpeta local de repeticiones archivadas.
+Replay_db_tooltip,Searches the online replay database.,Busca en la base de datos de repeticiones en línea.
+Replay_list_page_tooltip,Page number for browsing results.,Número de página para explorar resultados.
+Replay_db_character_filter_tooltip,Filters database search results by character.,Filtra los resultados de la búsqueda en la base de datos por personaje.
+Replay_db_player_filter_tooltip,Filters database search results by player name.,Filtra los resultados de la búsqueda en la base de datos por nombre de jugador.
+Replay_db_search_tooltip,Runs the database search with the filters above.,Ejecuta la búsqueda en la base de datos con los filtros de arriba.
+Replay_list_prev_tooltip,Selects the previous replay in the list.,Selecciona la repetición anterior de la lista.
+Replay_list_next_tooltip,Selects the next replay in the list.,Selecciona la siguiente repetición de la lista.
+Replay_list_load_tooltip,Loads the selected replay.,Carga la repetición seleccionada.
+Replay_db_save_archive_tooltip,Downloads the selected database replay into your local archive.,Descarga la repetición seleccionada de la base de datos a tu archivo local.
+Replay_filename_path_tooltip,Path or URL of a replay file to load.,Ruta o URL de un archivo de repetición para cargar.
+Replay_filename_load_tooltip,Loads (or downloads) the replay file specified above.,Carga (o descarga) el archivo de repetición especificado arriba.
+Replay_play_restart_tooltip,Plays or restarts the loaded replay.,Reproduce o reinicia la repetición cargada.
+Replay_autoplay_tooltip,"Automatically plays the next replay in the list once the current one finishes.","Reproduce automáticamente la siguiente repetición de la lista cuando termina la actual."
+Unlimited_replay_takeover_tooltip,Opens the unlimited replay takeover window (experimental).,Abre la ventana de toma de control ilimitada de repeticiones (experimental).
+Takeover_as_p1_tooltip,"Switches to training mode and lets you take control of P1's recorded inputs mid-replay.","Cambia a modo entrenamiento y te permite tomar control de las entradas grabadas de P1 en medio de la repetición."
+Takeover_as_p2_tooltip,Same as Takeover as P1 but for P2.,Igual que Tomar control como P1 pero para P2.
+Load_replay_state_tooltip,Restores the pre-takeover snapshot and re-arms the loaded playback.,Restaura la instantánea previa a la toma de control y rearma la grabación cargada.
+Return_to_replay_tooltip,Stops the takeover and returns to Replay Theater mode.,Detiene la toma de control y vuelve al modo Teatro de Repeticiones.
+Rematch_settings_tooltip,Sets the online room's rematch count rule.,Establece la regla de cantidad de revanchas de la sala en línea.
+Combo_data_button_tooltip,Opens the combo data window.,Abre la ventana de datos de combos.
+Input_buffer_button_tooltip,Opens the input buffer display for this player.,Abre la visualización del buffer de entradas para este jugador.
+Wakeup_control_delay_tooltip,Frame delay added before P2's wakeup timing triggers.,Retraso en frames añadido antes de que se active el tiempo de wakeup de P2.
+Wakeup_control_skew_tooltip,"Random +/- frame variance added on top of the wakeup delay each time.","Variación aleatoria +/- en frames añadida sobre el retraso de wakeup cada vez."
+Wakeup_type_selection_tooltip,"Multi-select which wakeup types P2 can be forced into; one is picked at random among the checked options each time.","Selección múltiple de los tipos de wakeup a los que se puede forzar a P2; se elige uno al azar entre las opciones marcadas cada vez."

@@ -466,3 +466,64 @@ static constexpr uintptr_t ADDR_DCodeBlobReset = 0x000A0D50;
 // Ghidra FUN_004B8F70 - lazy singleton getter for GAMESTEAM_COnlineStorageTransfer
 // (ctor FUN_004717C0, 0x1C bytes) - the transport behind the profile exchange
 static constexpr uintptr_t ADDR_OnlineStorageTransferSingleton = 0x000B8F70;
+
+// ---------------------------------------------------------------------------
+// Logical input action system (training-reset investigation, 2026-07-19).
+// Addresses are base-relative RVAs (Ghidra/dumpbin VAs assume image base
+// 0x00400000). Verified against tools/bbcf_disasm_ascii.txt.
+//
+// Each AA_CInput device object (keyboard / pad; the "controller pointer" the
+// SystemInputWrite hook sees in ESI) keeps three per-frame LOGICAL ACTION
+// bitmask words, one bit per keyconfig action index (1 << actionIndex,
+// actionCount at device+0x38, typically 30):
+//   device+0x28 = actions JUST PRESSED this frame (edge)
+//   device+0x2C = actions RELEASED this frame (edge)
+//   device+0x30 = actions HELD this frame (level)
+// Built by FUN_004963F0 (per-action loop calling vtbl+8 with the action
+// index, i.e. keyconfig-resolved "is physical binding down"). The mod's
+// SystemInputWrite hook at base+0x96408 sits at the loop's zero-init
+// instruction, so EBX there is always 0 - to observe real values read the
+// words AFTER FUN_004963F0 returns (e.g. from a per-frame tick).
+// ---------------------------------------------------------------------------
+// Ghidra FUN_004963F0 - per-frame device action-word build (thiscall, ecx=device)
+static constexpr uintptr_t ADDR_InputDevice_BuildActionWords = 0x000963F0;
+// Ghidra FUN_004968E0 - packs device+0x30 into the 16-bit battle input word
+// (digit 1-9 from bits0-3; A=bit14-mask 0x3404000, B=0x3C08000, C=0x3802000,
+// D=0x2001000, taunt=0x20000, special=0x80000). The packed battle word can
+// NEVER carry more than 0x3FF => training reset does not travel through the
+// BattleInputWrite word.
+static constexpr uintptr_t ADDR_InputDevice_PackBattleWord = 0x000968E0;
+// Action-ID -> action-bit lookup table (31 dwords, .data). ActionIDs are the
+// small ints pushed to the check wrappers below (5=menu confirm 0x4000000,
+// 6=pause/start 0x8000000, 7-10=up/left/down/right 1/4/8/2, 11=B 0x8000,
+// 12=D 0x1000, 13=C 0x2000, 14=A 0x4000, 16=taunt 0x20000, 18=special 0x80000,
+// replay-shortcut ids 0x0B-0x14 map to 0x10000..0x200000 range).
+static constexpr uintptr_t ADDR_ActionIdMaskTable = 0x005DE0B0;
+// Check wrappers (thiscall, ecx = per-controller wrapper from FUN_0047E7B0(id),
+// which fans out to both devices of that controller):
+// FUN_004641B0(actionId) = just-pressed (maskTable[id] & device+0x28)
+static constexpr uintptr_t ADDR_ControllerWrapper_ActionJustPressed = 0x000641B0;
+// FUN_00464170(actionId) = pressed-or-key-repeat (menu navigation variant)
+static constexpr uintptr_t ADDR_ControllerWrapper_ActionRepeatPressed = 0x00064170;
+// FUN_004640E0(rawMask) = just-pressed by raw bitmask (device+0x28 & mask)
+static constexpr uintptr_t ADDR_ControllerWrapper_MaskJustPressed = 0x000640E0;
+// FUN_0047E7B0(controllerId) cdecl - controller wrapper by id;
+// engine+0x25F0 = active controller id, engine+0x25F4/0x25F8 = P1/P2 ids
+// (engine object from FUN_0047E860, the same object whose +0x108 is gameMode)
+static constexpr uintptr_t ADDR_GetControllerWrapperById = 0x0007E7B0;
+
+// Training/round reset execution (verified, binding-agnostic hook points):
+// OBJ_CBase/OBJ_CCharBase script-command vtable slot 1066 (byte offset 0x10A8;
+// vtables at .rdata 0x9509E4 / 0x9565F4). FUN_0058F390 / FUN_0058F4D0 /
+// FUN_0058F610 are three restart variants; each first clears flag bit
+// 0x4000000 in *(battleScene+0x62B7C) (battleScene from FUN_0055C540), then
+// restarts the round-flow task container at 0xEC2F98 (task base class:
+// +0x8=state, +0xC=frame counter - FUN_004D23E0 sets state=2/frame=0, which
+// is why the in-match frame counter jumps back on training reset).
+static constexpr uintptr_t ADDR_RoundRestart_VariantA = 0x0018F390;
+static constexpr uintptr_t ADDR_RoundRestart_VariantB = 0x0018F4D0;
+static constexpr uintptr_t ADDR_RoundRestart_VariantC = 0x0018F610; // vtable slot 1066
+// Round-end/reset fade flag word: *(battleScene+0x62B7C) bit 0x4000000 is set
+// at FUN_0055F780+0x7EA (RVA 0x15FF6A "or [ebx],0x4000000") when the
+// round-transition fade starts, cleared by the restart variants above.
+static constexpr uintptr_t ADDR_BattleScene_FlagsOffset = 0x00062B7C; // offset, not RVA

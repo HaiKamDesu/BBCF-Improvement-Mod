@@ -167,7 +167,13 @@
       "Bash(sed -i 's/Bug10/Bug11/g; s/bug10/bug11/g' run_ghidra_dcode_bug11.cmd)",
       "Bash(cmd.exe /c run_ghidra_dcode_bug11.cmd)",
       "Bash(mkdir -p .claude/skills/bbcf-crash-triage .codex/skills/bbcf-crash-triage)",
-      "Bash(cp .agents/skills/bbcf-crash-triage/SKILL.md .claude/skills/bbcf-crash-triage/SKILL.md)"
+      "Bash(cp .agents/skills/bbcf-crash-triage/SKILL.md .claude/skills/bbcf-crash-triage/SKILL.md)",
+      "Bash(find /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/tools -iname *localiz*)",
+      "Bash(grep -rniE \"control.{0,15}\\(config|setting|load|apply\\)|_load_pad_config|_apply_pad_config\" src/Game/GhidraDefs.h src/Game/notes.h)",
+      "Bash(pwsh tools/generate_localization_bindings.ps1 -CsvPath resource/localization/Localization.csv -OutPath src/Core/LocalizationKeys.autogen.h)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(grep -rniE \"restart.{0,10}round|round.{0,10}restart|practice.{0,10}reset|reset.{0,10}practice\" src/ docs/)",
+      "Bash(echo \"rg exit=$?\")"
     ]
   }
 }

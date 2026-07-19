@@ -1952,6 +1952,261 @@ struct LocalizationKeysAccessor
 
         // Palette_random_exclude_tooltip
         inline const char* Palette_random_exclude_tooltip() const { return Get("Palette_random_exclude_tooltip"); }
+
+        // Always swap coordinates help
+        inline const char* Always_swap_coordinates_help() const { return Get("Always swap coordinates help"); }
+
+        // Player_money_tooltip
+        inline const char* Player_money_tooltip() const { return Get("Player_money_tooltip"); }
+
+        // Debug_window_tooltip
+        inline const char* Debug_window_tooltip() const { return Get("Debug_window_tooltip"); }
+
+        // Log_window_tooltip
+        inline const char* Log_window_tooltip() const { return Get("Log_window_tooltip"); }
+
+        // States_window_tooltip
+        inline const char* States_window_tooltip() const { return Get("States_window_tooltip"); }
+
+        // Avatar_icon_tooltip
+        inline const char* Avatar_icon_tooltip() const { return Get("Avatar_icon_tooltip"); }
+
+        // Avatar_color_tooltip
+        inline const char* Avatar_color_tooltip() const { return Get("Avatar_color_tooltip"); }
+
+        // Avatar_accessory1_tooltip
+        inline const char* Avatar_accessory1_tooltip() const { return Get("Avatar_accessory1_tooltip"); }
+
+        // Avatar_accessory2_tooltip
+        inline const char* Avatar_accessory2_tooltip() const { return Get("Avatar_accessory2_tooltip"); }
+
+        // Enable_framedata_tooltip
+        inline const char* Enable_framedata_tooltip() const { return Get("Enable_framedata_tooltip"); }
+
+        // Advantage_stagger_hit_tooltip
+        inline const char* Advantage_stagger_hit_tooltip() const { return Get("Advantage_stagger_hit_tooltip"); }
+
+        // Palette_editor_tooltip
+        inline const char* Palette_editor_tooltip() const { return Get("Palette_editor_tooltip"); }
+
+        // Enable_hitbox_overlay_tooltip
+        inline const char* Enable_hitbox_overlay_tooltip() const { return Get("Enable_hitbox_overlay_tooltip"); }
+
+        // Draw_hitbox_hurtbox_tooltip
+        inline const char* Draw_hitbox_hurtbox_tooltip() const { return Get("Draw_hitbox_hurtbox_tooltip"); }
+
+        // Freeze_frame_tooltip
+        inline const char* Freeze_frame_tooltip() const { return Get("Freeze_frame_tooltip"); }
+
+        // Reset_frame_counter_tooltip
+        inline const char* Reset_frame_counter_tooltip() const { return Get("Reset_frame_counter_tooltip"); }
+
+        // Step_frames_tooltip
+        inline const char* Step_frames_tooltip() const { return Get("Step_frames_tooltip"); }
+
+        // Step_frames_count_tooltip
+        inline const char* Step_frames_count_tooltip() const { return Get("Step_frames_count_tooltip"); }
+
+        // Hide_HUD_tooltip
+        inline const char* Hide_HUD_tooltip() const { return Get("Hide_HUD_tooltip"); }
+
+        // Releases_checker_tooltip
+        inline const char* Releases_checker_tooltip() const { return Get("Releases_checker_tooltip"); }
+
+        // Swap_coordinates_tooltip
+        inline const char* Swap_coordinates_tooltip() const { return Get("Swap_coordinates_tooltip"); }
+
+        // Enable_wakeup_delay_override_tooltip
+        inline const char* Enable_wakeup_delay_override_tooltip() const { return Get("Enable_wakeup_delay_override_tooltip"); }
+
+        // Force_load_p2_script_tooltip
+        inline const char* Force_load_p2_script_tooltip() const { return Get("Force_load_p2_script_tooltip"); }
+
+        // Naoto_EN_specials_tooltip
+        inline const char* Naoto_EN_specials_tooltip() const { return Get("Naoto_EN_specials_tooltip"); }
+
+        // Burst_on_hit_tooltip
+        inline const char* Burst_on_hit_tooltip() const { return Get("Burst_on_hit_tooltip"); }
+
+        // Burst_onhit_delay_tooltip
+        inline const char* Burst_onhit_delay_tooltip() const { return Get("Burst_onhit_delay_tooltip"); }
+
+        // Burst_onhit_cooldown_tooltip
+        inline const char* Burst_onhit_cooldown_tooltip() const { return Get("Burst_onhit_cooldown_tooltip"); }
+
+        // Add_delays_to_actions_tooltip
+        inline const char* Add_delays_to_actions_tooltip() const { return Get("Add_delays_to_actions_tooltip"); }
+
+        // State_wakeup_delay_tooltip
+        inline const char* State_wakeup_delay_tooltip() const { return Get("State_wakeup_delay_tooltip"); }
+
+        // State_gap_delay_tooltip
+        inline const char* State_gap_delay_tooltip() const { return Get("State_gap_delay_tooltip"); }
+
+        // State_throwtech_delay_tooltip
+        inline const char* State_throwtech_delay_tooltip() const { return Get("State_throwtech_delay_tooltip"); }
+
+        // Set_onhit_action_tooltip
+        inline const char* Set_onhit_action_tooltip() const { return Get("Set_onhit_action_tooltip"); }
+
+        // Set_wakeup_action_tooltip
+        inline const char* Set_wakeup_action_tooltip() const { return Get("Set_wakeup_action_tooltip"); }
+
+        // Set_gap_action_tooltip
+        inline const char* Set_gap_action_tooltip() const { return Get("Set_gap_action_tooltip"); }
+
+        // Set_tech_action_tooltip
+        inline const char* Set_tech_action_tooltip() const { return Get("Set_tech_action_tooltip"); }
+
+        // Use_state_tooltip
+        inline const char* Use_state_tooltip() const { return Get("Use_state_tooltip"); }
+
+        // Reset_states_tooltip
+        inline const char* Reset_states_tooltip() const { return Get("Reset_states_tooltip"); }
+
+        // Add_wakeup_action_tooltip
+        inline const char* Add_wakeup_action_tooltip() const { return Get("Add_wakeup_action_tooltip"); }
+
+        // Add_gap_action_tooltip
+        inline const char* Add_gap_action_tooltip() const { return Get("Add_gap_action_tooltip"); }
+
+        // Save_playback_tooltip
+        inline const char* Save_playback_tooltip() const { return Get("Save_playback_tooltip"); }
+
+        // Load_playback_tooltip
+        inline const char* Load_playback_tooltip() const { return Get("Load_playback_tooltip"); }
+
+        // Trim_playback_tooltip
+        inline const char* Trim_playback_tooltip() const { return Get("Trim_playback_tooltip"); }
+
+        // Playback_file_path_tooltip
+        inline const char* Playback_file_path_tooltip() const { return Get("Playback_file_path_tooltip"); }
+
+        // Playback_set_gap_tooltip
+        inline const char* Playback_set_gap_tooltip() const { return Get("Playback_set_gap_tooltip"); }
+
+        // Playback_set_wakeup_tooltip
+        inline const char* Playback_set_wakeup_tooltip() const { return Get("Playback_set_wakeup_tooltip"); }
+
+        // Playback_set_onblock_tooltip
+        inline const char* Playback_set_onblock_tooltip() const { return Get("Playback_set_onblock_tooltip"); }
+
+        // Playback_set_onhit_tooltip
+        inline const char* Playback_set_onhit_tooltip() const { return Get("Playback_set_onhit_tooltip"); }
+
+        // Playback_set_tech_tooltip
+        inline const char* Playback_set_tech_tooltip() const { return Get("Playback_set_tech_tooltip"); }
+
+        // Playback_reset_tooltip
+        inline const char* Playback_reset_tooltip() const { return Get("Playback_reset_tooltip"); }
+
+        // Playback_buffer_frames_tooltip
+        inline const char* Playback_buffer_frames_tooltip() const { return Get("Playback_buffer_frames_tooltip"); }
+
+        // Open_playback_editor_tooltip
+        inline const char* Open_playback_editor_tooltip() const { return Get("Open_playback_editor_tooltip"); }
+
+        // Gap_random_slots_tooltip
+        inline const char* Gap_random_slots_tooltip() const { return Get("Gap_random_slots_tooltip"); }
+
+        // Gap_random_slot_include_tooltip
+        inline const char* Gap_random_slot_include_tooltip() const { return Get("Gap_random_slot_include_tooltip"); }
+
+        // Wakeup_random_slots_tooltip
+        inline const char* Wakeup_random_slots_tooltip() const { return Get("Wakeup_random_slots_tooltip"); }
+
+        // Wakeup_random_slot_include_tooltip
+        inline const char* Wakeup_random_slot_include_tooltip() const { return Get("Wakeup_random_slot_include_tooltip"); }
+
+        // Save_snapshot_tooltip
+        inline const char* Save_snapshot_tooltip() const { return Get("Save_snapshot_tooltip"); }
+
+        // Load_snapshot_tooltip
+        inline const char* Load_snapshot_tooltip() const { return Get("Load_snapshot_tooltip"); }
+
+        // Auto_archive_replays_tooltip
+        inline const char* Auto_archive_replays_tooltip() const { return Get("Auto_archive_replays_tooltip"); }
+
+        // Recent_replays_tooltip
+        inline const char* Recent_replays_tooltip() const { return Get("Recent_replays_tooltip"); }
+
+        // Repair_replay_list_tooltip
+        inline const char* Repair_replay_list_tooltip() const { return Get("Repair_replay_list_tooltip"); }
+
+        // Replay_archive_tooltip
+        inline const char* Replay_archive_tooltip() const { return Get("Replay_archive_tooltip"); }
+
+        // Replay_db_tooltip
+        inline const char* Replay_db_tooltip() const { return Get("Replay_db_tooltip"); }
+
+        // Replay_list_page_tooltip
+        inline const char* Replay_list_page_tooltip() const { return Get("Replay_list_page_tooltip"); }
+
+        // Replay_db_character_filter_tooltip
+        inline const char* Replay_db_character_filter_tooltip() const { return Get("Replay_db_character_filter_tooltip"); }
+
+        // Replay_db_player_filter_tooltip
+        inline const char* Replay_db_player_filter_tooltip() const { return Get("Replay_db_player_filter_tooltip"); }
+
+        // Replay_db_search_tooltip
+        inline const char* Replay_db_search_tooltip() const { return Get("Replay_db_search_tooltip"); }
+
+        // Replay_list_prev_tooltip
+        inline const char* Replay_list_prev_tooltip() const { return Get("Replay_list_prev_tooltip"); }
+
+        // Replay_list_next_tooltip
+        inline const char* Replay_list_next_tooltip() const { return Get("Replay_list_next_tooltip"); }
+
+        // Replay_list_load_tooltip
+        inline const char* Replay_list_load_tooltip() const { return Get("Replay_list_load_tooltip"); }
+
+        // Replay_db_save_archive_tooltip
+        inline const char* Replay_db_save_archive_tooltip() const { return Get("Replay_db_save_archive_tooltip"); }
+
+        // Replay_filename_path_tooltip
+        inline const char* Replay_filename_path_tooltip() const { return Get("Replay_filename_path_tooltip"); }
+
+        // Replay_filename_load_tooltip
+        inline const char* Replay_filename_load_tooltip() const { return Get("Replay_filename_load_tooltip"); }
+
+        // Replay_play_restart_tooltip
+        inline const char* Replay_play_restart_tooltip() const { return Get("Replay_play_restart_tooltip"); }
+
+        // Replay_autoplay_tooltip
+        inline const char* Replay_autoplay_tooltip() const { return Get("Replay_autoplay_tooltip"); }
+
+        // Unlimited_replay_takeover_tooltip
+        inline const char* Unlimited_replay_takeover_tooltip() const { return Get("Unlimited_replay_takeover_tooltip"); }
+
+        // Takeover_as_p1_tooltip
+        inline const char* Takeover_as_p1_tooltip() const { return Get("Takeover_as_p1_tooltip"); }
+
+        // Takeover_as_p2_tooltip
+        inline const char* Takeover_as_p2_tooltip() const { return Get("Takeover_as_p2_tooltip"); }
+
+        // Load_replay_state_tooltip
+        inline const char* Load_replay_state_tooltip() const { return Get("Load_replay_state_tooltip"); }
+
+        // Return_to_replay_tooltip
+        inline const char* Return_to_replay_tooltip() const { return Get("Return_to_replay_tooltip"); }
+
+        // Rematch_settings_tooltip
+        inline const char* Rematch_settings_tooltip() const { return Get("Rematch_settings_tooltip"); }
+
+        // Combo_data_button_tooltip
+        inline const char* Combo_data_button_tooltip() const { return Get("Combo_data_button_tooltip"); }
+
+        // Input_buffer_button_tooltip
+        inline const char* Input_buffer_button_tooltip() const { return Get("Input_buffer_button_tooltip"); }
+
+        // Wakeup_control_delay_tooltip
+        inline const char* Wakeup_control_delay_tooltip() const { return Get("Wakeup_control_delay_tooltip"); }
+
+        // Wakeup_control_skew_tooltip
+        inline const char* Wakeup_control_skew_tooltip() const { return Get("Wakeup_control_skew_tooltip"); }
+
+        // Wakeup_type_selection_tooltip
+        inline const char* Wakeup_type_selection_tooltip() const { return Get("Wakeup_type_selection_tooltip"); }
 };
 
 

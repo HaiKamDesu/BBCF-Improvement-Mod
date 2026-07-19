@@ -3566,35 +3566,37 @@ bool ControllerOverrideManager::OpenDeviceProperties(const GUID& guid) const
 template <typename T>
 void ControllerOverrideManager::ApplyOrderingImpl(std::vector<T>& devices) const
 {
-        if (!m_overrideEnabled || devices.empty())
-        {
-                return;
-        }
-
-        auto guidForIndex = [this](int idx) {
-                if (idx < 0 || idx > 1)
-                        return GUID_NULL;
-                return m_playerSelections[idx];
-        };
-
-        std::vector<T> filtered;
-        filtered.reserve(devices.size());
-
-        for (const auto& device : devices)
-        {
-                if (IsDeviceAllowed(GetGuidFromInstance(device)))
-                {
-                        filtered.push_back(device);
-                }
-        }
-
-        devices.swap(filtered);
-
         if (devices.empty())
         {
                 return;
         }
 
+        if (m_overrideEnabled)
+        {
+                std::vector<T> filtered;
+                filtered.reserve(devices.size());
+
+                for (const auto& device : devices)
+                {
+                        if (IsDeviceAllowed(GetGuidFromInstance(device)))
+                        {
+                                filtered.push_back(device);
+                        }
+                }
+
+                devices.swap(filtered);
+
+                if (devices.empty())
+                {
+                        return;
+                }
+        }
+
+        // Stabilize enumeration order across refreshes: keep already-known devices in their
+        // previous relative order (so the game keeps treating them as the same P1/P2 slot) and
+        // append newly-appeared devices at the end. Without this, plugging in a new pad mid-session
+        // can shuffle DInput's raw enumeration order and bump an already-bound device out of its
+        // slot (or make the new pad look like "device 0" and steal P1).
         std::vector<bool> consumed(devices.size(), false);
         std::vector<T> ordered;
         ordered.reserve(devices.size());
@@ -3617,18 +3619,34 @@ void ControllerOverrideManager::ApplyOrderingImpl(std::vector<T>& devices) const
                 }
         };
 
-        appendByGuid(guidForIndex(0));
-        appendByGuid(guidForIndex(1));
+        if (m_overrideEnabled)
+        {
+                // Explicit user picks take priority over stable ordering.
+                appendByGuid(m_playerSelections[0]);
+                appendByGuid(m_playerSelections[1]);
+        }
+
+        for (const GUID& guid : m_lastKnownDeviceOrder)
+        {
+                appendByGuid(guid);
+        }
 
         for (size_t i = 0; i < devices.size(); ++i)
         {
-                        if (!consumed[i])
-                        {
-                                ordered.push_back(devices[i]);
-                        }
+                if (!consumed[i])
+                {
+                        ordered.push_back(devices[i]);
+                }
         }
 
         devices.swap(ordered);
+
+        m_lastKnownDeviceOrder.clear();
+        m_lastKnownDeviceOrder.reserve(devices.size());
+        for (const auto& device : devices)
+        {
+                m_lastKnownDeviceOrder.push_back(GetGuidFromInstance(device));
+        }
 }
 
 void ControllerOverrideManager::EnsureSelectionsValid()

@@ -84,6 +84,8 @@ void MainWindow::Draw()
 	if (g_gameVals.pGameMoney)
 	{
 		ImGui::InputInt("##P$", *&g_gameVals.pGameMoney);
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Player_money_tooltip());
 	}
 
 	ImGui::VerticalSpacing(5);
@@ -186,6 +188,8 @@ void MainWindow::DrawUtilButtons() const
 		m_pWindowContainer->GetWindow(WindowType_Debug)->ToggleOpen();
 	}
 	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Debug_window_tooltip());
+	ImGui::SameLine();
 #endif
 
 	if (ImGui::Button(Messages.Log(), BTN_SIZE))
@@ -193,10 +197,14 @@ void MainWindow::DrawUtilButtons() const
 		m_pWindowContainer->GetWindow(WindowType_Log)->ToggleOpen();
 	}
 	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Log_window_tooltip());
+	ImGui::SameLine();
 	if (ImGui::Button(Messages.States(), BTN_SIZE))
 	{
 		m_pWindowContainer->GetWindow(WindowType_Scr)->ToggleOpen();
 	}
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.States_window_tooltip());
 }
 
 void MainWindow::DrawCurrentPlayersCount() const
@@ -221,9 +229,13 @@ void MainWindow::DrawAvatarSection() const
 	else
 	{
 		ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Avatar(), g_gameVals.playerAvatarAddr, 0, 0x2F);
+		ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_icon_tooltip());
 		ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Color(), g_gameVals.playerAvatarColAddr, 0, 0x3);
+		ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_color_tooltip());
 		ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_1(), g_gameVals.playerAvatarAcc1, 0, 0xCF);
+		ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_accessory1_tooltip());
 		ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_2(), g_gameVals.playerAvatarAcc2, 0, 0xCF);
+		ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_accessory2_tooltip());
 	}
 }
 
@@ -324,9 +336,13 @@ void MainWindow::DrawFrameAdvantageSection() const
 	static bool isFrameAdvantageOpen = false;
 	ImGui::HorizontalSpacing();
 	ImGui::Checkbox(Messages.Enable_framedata_section(), &isFrameAdvantageOpen);
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Enable_framedata_tooltip());
 	//ImGui::Checkbox("Enable##framedata_section", &isFrameAdvantageOpen);
 	ImGui::HorizontalSpacing();
 	ImGui::Checkbox(Messages.Advantage_on_stagger_hit(), &idleActionToggles.ukemiStaggerHit);
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Advantage_stagger_hit_tooltip());
 
 	if (isFrameAdvantageOpen)
 	{
@@ -366,6 +382,8 @@ void MainWindow::DrawCustomPalettesSection() const
 
 		if (ImGui::Button(Messages.Palette_editor()))
 			m_pWindowContainer->GetWindow(WindowType_PaletteEditor)->ToggleOpen();
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Palette_editor_tooltip());
 	}
 }
 
@@ -384,7 +402,10 @@ void MainWindow::DrawHitboxOverlaySection() const
 	static bool isOpen = false;
 
 	ImGui::HorizontalSpacing();
-	if (ImGui::Checkbox(Messages.Enable_hitbox_overlay_section(), &isOpen))
+	bool hitboxOverlayToggled = ImGui::Checkbox(Messages.Enable_hitbox_overlay_section(), &isOpen);
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Enable_hitbox_overlay_tooltip());
+	if (hitboxOverlayToggled)
 	{
 		if (isOpen)
 		{
@@ -427,6 +448,8 @@ void MainWindow::DrawHitboxOverlaySection() const
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_hitbox_hurtbox(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawHitboxHurtbox);
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Draw_hitbox_hurtbox_tooltip());
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Draw_origin(),
 			&m_pWindowContainer->GetWindow<HitboxOverlay>(WindowType_HitboxOverlay)->drawOriginLine);
@@ -446,6 +469,8 @@ void MainWindow::DrawHitboxOverlaySection() const
 
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Freeze_frame_tooltip());
 		if (ImGui::IsKeyPressed(g_modVals.freeze_frame_keycode))
 			g_gameVals.isFrameFrozen ^= 1;
 
@@ -459,6 +484,8 @@ void MainWindow::DrawHitboxOverlaySection() const
 				*g_gameVals.pFrameCount = 0;
 				g_gameVals.framesToReach = 0;
 			}
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(Messages.Reset_frame_counter_tooltip());
 		}
 
 		if (g_gameVals.isFrameFrozen)
@@ -469,9 +496,13 @@ void MainWindow::DrawHitboxOverlaySection() const
 			{
 				g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
 			}
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(Messages.Step_frames_tooltip());
 
 			ImGui::SameLine();
 			ImGui::SliderInt("", &framesToStep, 1, 60);
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(Messages.Step_frames_count_tooltip());
 		}
 	}
 }
@@ -521,6 +552,8 @@ void MainWindow::DrawGameplaySettingSection() const
 		ImGui::VerticalSpacing(10);
 		ImGui::HorizontalSpacing();
 		ImGui::Checkbox(Messages.Hide_HUD_checkbox(), (bool*)g_gameVals.pIsHUDHidden);
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Hide_HUD_tooltip());
 	}
 }
 
@@ -561,5 +594,7 @@ void MainWindow::DrawLinkButtons() const
 	ImGui::SameLine();
 	if (ImGui::Button("Releases##checker", BTN_SIZE))
 		m_pWindowContainer->GetWindow(WindowType_ReleaseChecker)->ToggleOpen();
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(Messages.Releases_checker_tooltip());
 
 }

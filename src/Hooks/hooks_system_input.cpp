@@ -14,6 +14,12 @@ namespace
 {
         DWORD systemInputWrite_JmpBack = 0;
 
+        // Distinct controller object pointers captured by the SystemInputWrite hook,
+        // read by PollTrainingResetPressed for the game's logical action words.
+        // Multiple objects can resolve to slot=None, so they're tracked individually.
+        constexpr size_t kProbeMaxControllers = 16;
+        void* volatile s_probeControllers[kProbeMaxControllers] = {};
+
         const char* GetSlotLabel(SystemControllerSlot slot)
         {
             switch (slot)
@@ -66,6 +72,25 @@ namespace
 
             auto& mgr = ControllerOverrideManager::GetInstance();
             const auto slot = mgr.ResolveSystemSlotFromControllerPtr(controllerPtr);
+
+            // Remember each distinct controller object so PollTrainingResetPressed()
+            // can read its logical-action words ([ptr+0x28]/[ptr+0x30]) after the
+            // game's per-frame input builder has finished. (This hook itself fires at
+            // the builder's zero-init, so the words aren't final here - see
+            // GhidraDefs.h input action system block.)
+            for (size_t i = 0; i < kProbeMaxControllers; ++i)
+            {
+                if (s_probeControllers[i] == controllerPtr)
+                {
+                    break;
+                }
+                if (s_probeControllers[i] == nullptr)
+                {
+                    s_probeControllers[i] = controllerPtr;
+                    break;
+                }
+            }
+
             uint32_t automationWord = 0;
             static int logBudget = 40;
             static SystemControllerSlot lastLoggedSlot = SystemControllerSlot::None;
@@ -159,3 +184,43 @@ void RemoveSystemInputHook()
 {
         HookManager::DeactivateHook("SystemInputWrite");
 }
+
+bool PollTrainingResetPressed(bool* outUpHeld)
+{
+        constexpr uint32_t kActionResetPositions = 0x08000000; // just-pressed word bit
+        constexpr uint32_t kActionUp = 0x00000001;             // held word bit
+
+        bool pressed = false;
+        bool upHeld = false;
+
+        for (size_t i = 0; i < kProbeMaxControllers; ++i)
+        {
+                const uint8_t* const ptr = static_cast<const uint8_t*>(s_probeControllers[i]);
+                if (ptr == nullptr)
+                {
+                        break;
+                }
+                if (IsBadReadPtr(ptr + 0x28, 0x0C))
+                {
+                        continue;
+                }
+
+                const uint32_t edges = *reinterpret_cast<const uint32_t*>(ptr + 0x28);
+                const uint32_t held = *reinterpret_cast<const uint32_t*>(ptr + 0x30);
+                if (edges & kActionResetPositions)
+                {
+                        pressed = true;
+                }
+                if (held & kActionUp)
+                {
+                        upHeld = true;
+                }
+        }
+
+        if (outUpHeld != nullptr)
+        {
+                *outUpHeld = upHeld;
+        }
+        return pressed;
+}
+

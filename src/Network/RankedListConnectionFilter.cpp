@@ -709,8 +709,44 @@ void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
 	}
 }
 
+namespace
+{
+	// Mirrors RankedProgressWindow.cpp's IsRankedPredictionMenuState (state==4, state1 in
+	// [43,48]) using this file's own raw network-struct read, so the live row permutation
+	// swaps below can be paused for the exact window the game is resolving a row click into
+	// its confirmation popup. Without this, a swap landing in that ~frame window can move a
+	// different player's data into the row the user actually clicked, so the popup that opens
+	// resolves to the wrong player (reproduced live via DEBUG.txt on 2026-07-18).
+	bool IsRankedConfirmationInProgress()
+	{
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (moduleBase == 0)
+		{
+			return false;
+		}
+
+		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
+		if (IsBadReadPtr(network, 0x08))
+		{
+			return false;
+		}
+
+		const int32_t state = *reinterpret_cast<const int32_t*>(network + 0x00);
+		const int32_t state1 = *reinterpret_cast<const int32_t*>(network + 0x04);
+		return state == 4 && state1 >= 43 && state1 <= 48;
+	}
+}
+
 void RankedListConnectionFilter::PollGameListAndApplyOrder()
 {
+	if (IsRankedConfirmationInProgress())
+	{
+		// The user has clicked a row and the game is resolving it into the connect
+		// confirmation popup - freeze the live permutation/hide swaps untouched until that
+		// resolves, so the row memory the popup reads back matches what was actually clicked.
+		return;
+	}
+
 	if (!m_hasRemapResult || m_candidates.empty() || !IsPipelineActive())
 	{
 		// Features were turned off (or nothing delivered): put everything

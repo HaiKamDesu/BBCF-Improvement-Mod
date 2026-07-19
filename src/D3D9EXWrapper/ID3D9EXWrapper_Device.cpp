@@ -6,7 +6,9 @@
 #include "Hooks/hooks_bbcf.h"
 #include "Hooks/hooks_customGameModes.h"
 #include "Hooks/hooks_palette.h"
+#include "Hooks/hooks_system_input.h"
 #include "Overlay/WindowManager.h"
+#include "Overlay/Window/ScrWindow.h"
 
 #include <steam_api.h>
 
@@ -348,6 +350,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		LOG(1, "[EndSceneProbe] before MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
 	MatchState::OnUpdate();
+	// Runs on every real rendered frame, unlike the battle-frame-counter hook (which
+	// goes idle during the reset fadeout's limbo - see TickTrainingResetSwap's comment).
+	ScrWindow::TickTrainingResetSwap();
 	if (s_endSceneProbeBudget > 0)
 	{
 		LOG(1, "[EndSceneProbe] after MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);

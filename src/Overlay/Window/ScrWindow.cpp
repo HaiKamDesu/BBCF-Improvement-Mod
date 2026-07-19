@@ -26,6 +26,8 @@
 #include "Game/Playbacks/PlaybackManager.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
+#include "Hooks/hooks_system_input.h"
+#include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
 #include <cstdlib>
 #include <ctime>
@@ -63,6 +65,8 @@ void ScrWindow::DrawComboDataButton() {
     {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_ComboData)->ToggleOpen();
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Combo_data_button_tooltip());
 }
 void ScrWindow::DrawInputBufferButton() {
     if (ImGui::Button("Input Buffer P1"))
@@ -70,10 +74,14 @@ void ScrWindow::DrawInputBufferButton() {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_InputBufferP1)->ToggleOpen();
     }
     ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Input_buffer_button_tooltip());
+    ImGui::SameLine();
     if (ImGui::Button("Input Buffer P2"))
     {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_InputBufferP2)->ToggleOpen();
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Input_buffer_button_tooltip());
 }
 void ScrWindow::DrawWakeupDelayControl() {
     //ImGui::BeginChild("zbmjxc");
@@ -85,7 +93,7 @@ void ScrWindow::DrawWakeupDelayControl() {
     ImGui::Text("Delay: ");
     ImGui::SameLine();
     if (ImGui::InputInt("##wakeup_delay", &(ScrWindow::wakeup_delay))) {
-        
+
         if (ScrWindow::wakeup_delay > 39) {
             ScrWindow::wakeup_delay = 39;
         }
@@ -93,6 +101,8 @@ void ScrWindow::DrawWakeupDelayControl() {
             ScrWindow::wakeup_delay = 0;
         }
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Wakeup_control_delay_tooltip());
     ImGui::EndChild();
     ImGui::SameLine();
     ImGui::BeginChild("wakeup_skew_child##wakeup_delay", ImVec2(263, 30));
@@ -107,11 +117,15 @@ void ScrWindow::DrawWakeupDelayControl() {
             ScrWindow::wakeup_delay_skew = -39;
         }
     };
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Wakeup_control_skew_tooltip());
     ImGui::EndChild();
     //ImGui::SameLine(); 
     //ImGui::HorizontalSpacing(30);
     //ImGui::BeginChild("wakeup_type_child##wakeup_delay", ImVec2(190, 30));
     ImGui::Text("Wake-up: ");
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Wakeup_type_selection_tooltip());
     ImGui::SameLine();
     ImGui::BeginChild("tst##wakeup_delay", ImVec2(263, 100));
     static bool selected[6] = {};
@@ -190,12 +204,74 @@ void ScrWindow::DrawGenericOptionsSection() {
     if (*g_gameVals.pGameMode == GameMode_Training && !g_interfaces.player2.IsCharDataNullPtr()) {
         static bool check_enable_wakeup_delay = false;
         ImGui::Checkbox("Enable wakeup delay override", &check_enable_wakeup_delay);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Enable_wakeup_delay_override_tooltip());
         if (check_enable_wakeup_delay) {
             DrawWakeupDelayControl();
             check_wakeup_delay();
         } 
     }
 }
+bool ScrWindow::s_swapCoordsToggle = false;
+
+void ScrWindow::TickTrainingResetSwap() {
+    // "Hold Up while pressing the reset bind" toggles the always-swap ("P2 mode")
+    // checkbox, mirroring how the native reset treats directions: only what's held at
+    // the PRESS moment matters, releasing during the fadeout is fine.
+    //
+    // Detection reads the game's own keyconfig-resolved logical action words on the
+    // battle-key controller objects (PollTrainingResetPressed - reset action edge bit
+    // + Up held bit, identified via the [ResetProbe] runs of 2026-07-19). This fires
+    // on the exact press frame, for any rebound key or controller button.
+    //
+    // The toggle is then applied only when the reset actually executes (frame counter
+    // drops), armed for a few seconds from the press: this keeps the visual change in
+    // sync with the reset, and discards phantom presses (e.g. if some controller
+    // object shares the action bit with pause, pausing never drops the counter, so an
+    // armed press simply expires).
+    //
+    // Driven from EndScene (every rendered frame - the battle-frame-counter hook goes
+    // idle during the reset limbo). EndScene also fires before the game resolves
+    // g_gameVals' pointers (null until then), hence the guards.
+    if (!g_gameVals.pGameMode || !g_gameVals.pFrameCount) {
+        return;
+    }
+
+    if (*g_gameVals.pGameMode != GameMode_Training) {
+        return;
+    }
+
+    static int last_frame_count = -1;
+    static ULONGLONG armed_at_ms = 0;
+    static bool armed_up = false;
+
+    int current_frame_count = *g_gameVals.pFrameCount;
+
+    bool up_held = false;
+    if (PollTrainingResetPressed(&up_held)) {
+        armed_at_ms = GetTickCount64();
+        armed_up = up_held;
+    }
+
+    if (last_frame_count != -1 && current_frame_count < last_frame_count) {
+        // The reset actually executed. Honor the Up state captured at press time.
+        constexpr ULONGLONG kArmWindowMs = 3000;
+        if (armed_at_ms != 0 && GetTickCount64() - armed_at_ms <= kArmWindowMs && armed_up) {
+            s_swapCoordsToggle = !s_swapCoordsToggle;
+            LOG(1, "[ResetSwap] Up+reset detected - always-swap-coordinates toggled %s\n",
+                s_swapCoordsToggle ? "ON" : "OFF");
+        }
+        armed_at_ms = 0;
+        armed_up = false;
+    }
+
+    last_frame_count = current_frame_count;
+
+    if (s_swapCoordsToggle && current_frame_count == 5) {
+        ScrWindow::swap_character_coordinates();
+    }
+}
+
 void ScrWindow::swap_character_coordinates() {
     CharData* p1 = g_interfaces.player1.GetData();
     CharData* p2 = g_interfaces.player2.GetData();
@@ -261,13 +337,11 @@ void ScrWindow::DrawStatesSection()
             ScrWindow::swap_character_coordinates();
         }
         ImGui::SameLine();
-        static bool swap_character_coords_toggle = false;
-        ImGui::Checkbox("Always swap coordinates", &swap_character_coords_toggle);
-        if (swap_character_coords_toggle && *g_gameVals.pFrameCount ==5) {
-            ScrWindow::swap_character_coordinates();
-        }
-
-
+        ImGui::ShowHelpMarker(Messages.Swap_coordinates_tooltip());
+        ImGui::SameLine();
+        ImGui::Checkbox("Always swap coordinates", &s_swapCoordsToggle);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(L("Always swap coordinates help").c_str());
     }
 
 
@@ -314,6 +388,8 @@ void ScrWindow::DrawStatesSection()
         wakeup_register = {};
         selected = 0;
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Force_load_p2_script_tooltip());
     auto states = g_interfaces.player2.states;
     {
         ImGui::BeginChild("left pane", ImVec2(200, 0), true);
@@ -334,6 +410,8 @@ void ScrWindow::DrawStatesSection()
         if (ImGui::Checkbox("Naoto EN specials toggle", &isActive)) {
             memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Naoto_EN_specials_tooltip());
         if (isActive) {
             memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
         }
@@ -510,6 +588,8 @@ void ScrWindow::DrawStatesSection()
 
           
         ImGui::Checkbox("Burst on hit", &burst_onhit_toggle);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Burst_on_hit_tooltip());
         if (burst_onhit_toggle) {
             onhit_register = {};
             std::string lastAction = g_interfaces.player2.GetData()->lastAction;
@@ -564,23 +644,35 @@ void ScrWindow::DrawStatesSection()
             ImGui::Text("Burst delay(+hitstop): ");
             ImGui::SameLine();
             ImGui::InputInt("##state_burst_onhit_delay", &burst_onhit_delay);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Burst_onhit_delay_tooltip());
             ImGui::Text("Burst cooldown: ");
             ImGui::SameLine();
             ImGui::InputInt("##state_burst_onhit_cooldown_frames", &burst_onhit_cooldown_frames);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Burst_onhit_cooldown_tooltip());
             ImGui::EndChild();
         }
         ImGui::Checkbox("Add delays to actions", &action_delays_toggle);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Add_delays_to_actions_tooltip());
         if (action_delays_toggle) {
             ImGui::BeginChild("delay_actions##states", ImVec2(0, 60));
             ImGui::Text("Wakeup: ");
             ImGui::SameLine();
             ImGui::InputInt("##state_wakeup_delay", &wakeup_delay);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.State_wakeup_delay_tooltip());
             ImGui::Text("Gap: ");
             ImGui::SameLine();
             ImGui::InputInt("##state_gap_delay", &gap_delay);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.State_gap_delay_tooltip());
             ImGui::Text("Tech: ");
             ImGui::SameLine();
             ImGui::InputInt("##state_throwtech_delay", &throwtech_delay);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.State_throwtech_delay_tooltip());
             /*ImGui::Text("On Hit Delay: ");
             ImGui::SameLine();
             ImGui::InputInt("##state_onhit_delay", &onhit_delay);*/
@@ -605,6 +697,8 @@ void ScrWindow::DrawStatesSection()
             onhit_register_delays.push_back(onhit_delay);
 
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Set_onhit_action_tooltip());
         //ImGui::InputInt("Burst delay##slot1", &slot_buffer[0]);
         if (ImGui::Button("Set as wakeup action")) {
             wakeup_register = {};
@@ -615,6 +709,8 @@ void ScrWindow::DrawStatesSection()
             wakeup_register_delays.push_back(wakeup_delay);
 
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Set_wakeup_action_tooltip());
         ImGui::SameLine();
         if (ImGui::Button("Set as gap action")) {
             states = g_interfaces.player2.states;
@@ -627,7 +723,9 @@ void ScrWindow::DrawStatesSection()
 
         }
         ImGui::SameLine();
-       
+        ImGui::ShowHelpMarker(Messages.Set_gap_action_tooltip());
+        ImGui::SameLine();
+
         if (ImGui::Button("Set as tech action")) {
             states = g_interfaces.player2.states;
             throwtech_register = {};
@@ -638,6 +736,8 @@ void ScrWindow::DrawStatesSection()
             auto selected_state = states[selected];
 
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Set_tech_action_tooltip());
         if (ImGui::Button("Use")) {
             states = g_interfaces.player2.states;
             auto selected_state = states[selected];
@@ -645,6 +745,8 @@ void ScrWindow::DrawStatesSection()
             memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(selected_state->addr), 4);
             g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Use_state_tooltip());
         ImGui::SameLine();
         if (ImGui::Button("Reset")) {
             states = g_interfaces.player2.states;
@@ -663,6 +765,8 @@ void ScrWindow::DrawStatesSection()
             throwtech_register = {};
             throwtech_register_delays = {};
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Reset_states_tooltip());
 
 
         if (ImGui::CollapsingHeader("Gap/wakeup random actions")) {
@@ -672,6 +776,8 @@ void ScrWindow::DrawStatesSection()
                 wakeup_register.push_back(states[selected]);
                 wakeup_register_delays.push_back(wakeup_delay);
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Add_wakeup_action_tooltip());
             ImGui::BeginChild("wakeup_register_display", ImVec2(0, 80));
             for (auto e : wakeup_register) {
                 ImGui::Text(e->name.c_str());
@@ -683,6 +789,8 @@ void ScrWindow::DrawStatesSection()
                 gap_register.push_back(states[selected]);
                 gap_register_delays.push_back(gap_delay);
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Add_gap_action_tooltip());
 
             ImGui::BeginChild("gap_register_display", ImVec2(0, 80));
             for (auto e : gap_register) {
@@ -995,39 +1103,57 @@ void ScrWindow::draw_playback_slot_section(int slot) {
         playback_manager.save_to_file(slot_recording_frames, facing_direction, fpath);
     }
     ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Save_playback_tooltip());
+    ImGui::SameLine();
     if (ImGui::Button("Load")) {
         playback_manager.load_from_file_into_slot(fpath,slot);
 
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Load_playback_tooltip());
     ImGui::SameLine();
     if (ImGui::Button("Trim Playback")) {
         slot_recording_frames = playback_manager.trim_playback(slot_recording_frames);
         playback_manager.load_into_slot(slot_recording_frames, slot);
         //load_trimmed_playback(slot_recording_frames, selected_slot.frame_len_slot_p, start_of_slot_inputs);
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Trim_playback_tooltip());
 
     ImGui::InputText("File Path", fpath, 1200);// IM_ARRAYSIZE(fpath));
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_file_path_tooltip());
     ImGui::TextWrapped("All input files expect the .playback extension now, please add the extension to your old playback files. You can still load the files with .playback extension without writing the extension in the field.");
     ImGui::TextWrapped("If the field isn't accepting keyboard input, try alt-tabbing out and back in, if that doesn't work copy and paste should still work(or restarting the game)");
     if (ImGui::Button("Set as gap action")) {
         slot_gap = slot;
     }
     ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_set_gap_tooltip());
+    ImGui::SameLine();
     if (ImGui::Button("Set as wakeup action")) {
         slot_wakeup = slot;
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_set_wakeup_tooltip());
     if (ImGui::Button("Set as onblock action")) {
         slot_onblock = slot;
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_set_onblock_tooltip());
 
     ImGui::SameLine();
     if (ImGui::Button("Set as onhit action::experimental")) {
         slot_onhit = slot;
     }
     ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_set_onhit_tooltip());
+    ImGui::SameLine();
     if (ImGui::Button("Set as tech action")) {
         slot_throwtech = slot;
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_set_tech_tooltip());
     if (ImGui::Button("Reset")) {
         slot_gap = 0;
         slot_wakeup = 0;
@@ -1035,7 +1161,11 @@ void ScrWindow::draw_playback_slot_section(int slot) {
         slot_onhit = 0;
         slot_throwtech = 0;
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_reset_tooltip());
     ImGui::InputInt("Buffer frames", &slot_buffer[slot-1]);
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Playback_buffer_frames_tooltip());
     ImGui::TextWrapped("Buffer frames only works currently with wakeup actions");
     ImGui::Separator();
     auto old_val = 0; auto frame_counter = 0;
@@ -1053,6 +1183,8 @@ void ScrWindow::DrawPlaybackEditor() {
     if (ImGui::Button("Open Playback Editor")) {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_PlaybackEditor)->ToggleOpen();
     }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Open_playback_editor_tooltip());
 }
 void ScrWindow::DrawPlaybackSection() {
     char* bbcf_base_adress = GetBbcfBaseAdress();
@@ -1095,45 +1227,65 @@ void ScrWindow::DrawPlaybackSection() {
         static bool random_gap_slot_toggle = false;
         ImGui::Columns(2);
         ImGui::Checkbox("Gap random slots##gap_random_slots", &random_gap_slot_toggle);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Gap_random_slots_tooltip());
         if (random_gap_slot_toggle){
             if (ImGui::Checkbox("Slot1##gap_random_slots", &random_gap_slot1)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot1, 1);
             }
-        
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
+
             if(ImGui::Checkbox("Slot2##gap_random_slots", &random_gap_slot2)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot2, 2);
 
             }
-           
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
+
             if(ImGui::Checkbox("Slot3##gap_random_slots", &random_gap_slot3)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot3, 3);
             }
-           
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
+
             if (ImGui::Checkbox("Slot4##gap_random_slots", &random_gap_slot4)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot4, 4);
             }
-          
-        
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
+
+
         }
         ImGui::NextColumn();
         ImGui::Checkbox("Wakeup random slots##wakeup_random_slots", &random_wakeup_slot_toggle);
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Wakeup_random_slots_tooltip());
         if (random_wakeup_slot_toggle) {
             if (ImGui::Checkbox("Slot1##wakeup_random_slots", &random_wakeup_slot1)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot1, 1);
             }
-           
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
+
             if(ImGui::Checkbox("Slot2##wakeup_random_slots", &random_wakeup_slot2)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot2, 2);
             }
-             
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
+
             if(ImGui::Checkbox("Slot3##wakeup_random_slots", &random_wakeup_slot3)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot3, 3);
             }
-            
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
+
             if(ImGui::Checkbox("Slot4##wakeup_random_slots", &random_wakeup_slot4)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot4, 4);
             }
-            
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
+
         }
         ImGui::Columns(1);
         if (!g_interfaces.player2.IsCharDataNullPtr()) {
@@ -1400,6 +1552,8 @@ void ScrWindow::DrawSaveStates() {
                 }
             }
             ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Save_snapshot_tooltip());
+            ImGui::SameLine();
             ImGui::ShowHelpMarker("You can use a hotkey to activate it, default is F5 but can be changed in settings.ini between F1-9.");
             ImGui::SameLine();
             const bool has_snapshot = snap_apparatus && snap_apparatus->snapshot_count != 0;
@@ -1424,6 +1578,8 @@ void ScrWindow::DrawSaveStates() {
                 ImGui::PopStyleColor();
 
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Load_snapshot_tooltip());
             ImGui::SameLine();
             ImGui::ShowHelpMarker("You can use a hotkey to activate it, default is F9 but can be changed in settings.ini between F1-9.");
 
@@ -1561,6 +1717,8 @@ void ScrWindow::DrawReplayTheaterSection() {
         if (ImGui::Checkbox("Auto archive saved replays", &Settings::settingsIni.autoArchive)) {
             Settings::changeSetting("autoArchive", std::to_string((int)Settings::settingsIni.autoArchive));
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Auto_archive_replays_tooltip());
 
 
 
@@ -1575,12 +1733,16 @@ void ScrWindow::DrawReplayTheaterSection() {
 
             if (ImGui::RadioButton("Recent replays", &view_type, 0))
                 view_changed = true;
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Recent_replays_tooltip());
 
             if (view_type == 0) {
                 ImGui::SameLine();
 
                 if (ImGui::Button("Repair##replay_list"))
                     g_rep_manager.load_replay_list_default_repair();
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Repair_replay_list_tooltip());
 
                 if (view_changed)
                     g_rep_manager.load_replay_list_default();
@@ -1588,8 +1750,12 @@ void ScrWindow::DrawReplayTheaterSection() {
 
             if (ImGui::RadioButton("Replay archive", &view_type, 1))
                 view_changed = true;
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Replay_archive_tooltip());
 
             ImGui::RadioButton("Replay db", &view_type, 2);
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Replay_db_tooltip());
 
 
             if (view_type == 1) { // archive controls
@@ -1599,6 +1765,8 @@ void ScrWindow::DrawReplayTheaterSection() {
 
                 if (ImGui::InputInt("##replay_list_page", &page))
                     view_changed = true;
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_list_page_tooltip());
 
                 // TODO: search?
 
@@ -1619,8 +1787,12 @@ void ScrWindow::DrawReplayTheaterSection() {
 
                     ImGui::EndCombo();
                 }
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_db_character_filter_tooltip());
 
                 ImGui::InputText("player1##replay_db_player", player1, sizeof(player1));
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_db_player_filter_tooltip());
 
 
                 ImGui::TextUnformatted("vs");
@@ -1637,8 +1809,12 @@ void ScrWindow::DrawReplayTheaterSection() {
 
                     ImGui::EndCombo();
                 }
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_db_character_filter_tooltip());
 
                 ImGui::InputText("player2##replay_db_player", player2, sizeof(player2));
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_db_player_filter_tooltip());
 
 
                 ImGui::TextUnformatted("page");
@@ -1646,9 +1822,13 @@ void ScrWindow::DrawReplayTheaterSection() {
                 ImGui::SameLine();
 
                 ImGui::InputInt("##replay_list_page", &page);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_list_page_tooltip());
 
                 if (ImGui::Button("Load##replay_db"))
                     g_rep_manager.load_replay_list_from_db(page, character1, player1, character2, player2);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_db_search_tooltip());
                 // TODO: instead of Load button, we could use view_changed and debounce
             }
 
@@ -1678,18 +1858,24 @@ void ScrWindow::DrawReplayTheaterSection() {
                 if (ImGui::Button("<##replay_list_prev"))
                     g_rep_manager.set_selected_replay_index(selected_order - 1, true);
                 ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_list_prev_tooltip());
+                ImGui::SameLine();
 
                 ImGui::Text("index %3d / %d", selected_order + 1, replay_list->count); // *(int*)(base + 0x8f85d8 + 0x1b1230 + 0x165d8)); // base->static_CSaveDataManager.replay_list.count
                 ImGui::SameLine();
 
                 if (ImGui::Button(">##replay_list_next"))
                     g_rep_manager.set_selected_replay_index(selected_order + 1, true);
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_list_next_tooltip());
 
                 ImGui::SameLine();
                 if (ImGui::Button("Load##replay_list_next")) {
                     g_rep_manager.load_replay(selected_order, NULL);
                     g_rep_manager.unpack_replay_buffer();
                 }
+                ImGui::SameLine();
+                ImGui::ShowHelpMarker(Messages.Replay_list_load_tooltip());
 
 
                 if (view_type == 2) { // if db
@@ -1702,6 +1888,8 @@ void ScrWindow::DrawReplayTheaterSection() {
                         auto new_fname = rep_manager.build_file_name();
                         rep_manager.save_replay(REPLAY_ARCHIVE_FOLDER_PATH + new_fname);
                     }
+                    ImGui::SameLine();
+                    ImGui::ShowHelpMarker(Messages.Replay_db_save_archive_tooltip());
                 }
             }
 
@@ -1714,7 +1902,9 @@ void ScrWindow::DrawReplayTheaterSection() {
             static char filename[256] = "./Save/Replay/replay00.dat";
             ImGui::InputText("##replay_filename", filename, 256);
             ImGui::SameLine();
-            
+            ImGui::ShowHelpMarker(Messages.Replay_filename_path_tooltip());
+            ImGui::SameLine();
+
             if (ImGui::Button("Load")) {
 
                 if(g_rep_manager.validate_url_prefix(filename))
@@ -1726,6 +1916,8 @@ void ScrWindow::DrawReplayTheaterSection() {
                 // TODO: check that replay in buffer is valid, show message otherwise
                 g_rep_manager.unpack_replay_buffer();
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Replay_filename_load_tooltip());
 
             // load take filename from steam url, e.g. steam://run/586140/?load-replay=https%3A%2F%2Fbbreplay.ovh%2Fdownload%3Ffilename%3D082009246cfd79b5a64208ba2.dat
             ISteamApps* apps = *(ISteamApps**)((char*)base + 0x005d3230); // base->static_SteamInterfaces.apps
@@ -1776,9 +1968,13 @@ void ScrWindow::DrawReplayTheaterSection() {
                     if (ImGui::Button(is_playing ? "Restart##replay" : "Play##replay")) {
                         ScenesManager::PlayLoadedReplay();
                     }
+                    ImGui::SameLine();
+                    ImGui::ShowHelpMarker(Messages.Replay_play_restart_tooltip());
 
                     ImGui::SameLine();
                     ImGui::Checkbox("autoplay", &autoplay);
+                    ImGui::SameLine();
+                    ImGui::ShowHelpMarker(Messages.Replay_autoplay_tooltip());
                 }
 
                 if (autoplay) {
@@ -1882,6 +2078,8 @@ void ScrWindow::DrawReplayTakeover() {
             ScrWindow::m_pWindowContainer->GetWindow(WindowType_UnlimitedReplayTakeover)->ToggleOpen();
         }
         ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Unlimited_replay_takeover_tooltip());
+        ImGui::SameLine();
         ImGui::TextDisabled("Capture replay situations into a training library.");
     }
 #endif
@@ -1922,6 +2120,8 @@ void ScrWindow::DrawReplayTakeover() {
 
             }
             ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Takeover_as_p1_tooltip());
+            ImGui::SameLine();
             if (ImGui::Button("Takeover as P2")) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
                     SnapshotApparatus* apparatus = ensure_snapshot_apparatus_takeover();
@@ -1951,6 +2151,8 @@ void ScrWindow::DrawReplayTakeover() {
 
                 }
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Takeover_as_p2_tooltip());
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
             if ((ImGui::Button("Load Replay State") || ImGui::IsKeyPressed(g_modVals.replay_takeover_load_keycode))
@@ -1975,6 +2177,8 @@ void ScrWindow::DrawReplayTakeover() {
                 }
             }
         }
+        ImGui::SameLine();
+        ImGui::ShowHelpMarker(Messages.Load_replay_state_tooltip());
         ImGui::SameLine();
         ImGui::ShowHelpMarker("You can use a hotkey to activate it, default is F4 but can be changed in settings.ini between F1-9.");
 
@@ -2006,6 +2210,8 @@ void ScrWindow::DrawReplayTakeover() {
                 *g_gameVals.pGameMode = GameMode_ReplayTheater;
                 snap_apparatus_takeover->load_snapshot(0);
             }
+            ImGui::SameLine();
+            ImGui::ShowHelpMarker(Messages.Return_to_replay_tooltip());
 
             if (ImGui::Button("FIX PLAYBACK")) {
                 facing_left_replay_takeover = !facing_left_replay_takeover;
@@ -2063,7 +2269,10 @@ void ScrWindow::DrawRoomSection() {
         break;
     }
 
-    if (ImGui::Combo("Rematch Settings##dropdown", &currentItem, items, IM_ARRAYSIZE(items)))
+    bool rematchSettingsChanged = ImGui::Combo("Rematch Settings##dropdown", &currentItem, items, IM_ARRAYSIZE(items));
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Rematch_settings_tooltip());
+    if (rematchSettingsChanged)
     {
         switch (currentItem) {
         case 0:

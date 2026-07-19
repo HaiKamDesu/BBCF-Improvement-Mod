@@ -15,13 +15,18 @@ public:
 		: IWindow(windowTitle, windowClosable,windowFlags), m_pWindowContainer(&windowContainer) {}
 	~ScrWindow() override = default;
 
+	// Runs every game frame regardless of whether this window is open, so the
+	// hold-Up-while-resetting-the-lab shortcut works with the mod menu closed.
+	static void TickTrainingResetSwap();
+
 protected:
 	void Draw() override;
 
-	void swap_character_coordinates();
+	static void swap_character_coordinates();
 	void check_wakeup_delay();
 
 private:
+	static bool s_swapCoordsToggle;
 	void DrawGenericOptionsSection();
 	void DrawStatesSection();
 	void draw_playback_slot_section(int slot);

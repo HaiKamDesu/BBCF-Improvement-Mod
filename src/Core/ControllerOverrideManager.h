@@ -229,6 +229,10 @@ private:
         bool IsP1KeyboardHandleLocked(HANDLE deviceHandle) const;
 
         std::vector<ControllerDeviceInfo> m_devices;
+        // Remembers device enumeration order across refreshes so a newly hotplugged device is
+        // appended after already-known devices instead of shifting their DInput slot indices
+        // (which is what the game uses to decide P1 vs P2 when override is not enabled).
+        mutable std::vector<GUID> m_lastKnownDeviceOrder;
         GUID m_playerSelections[2];
         bool m_overrideEnabled = false;
         bool m_autoRefreshEnabled = true;
