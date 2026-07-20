@@ -771,6 +771,233 @@ namespace
 	}
 }
 
+void RankedListConnectionFilter::OnRankedRowClickLatch(void* screenCtrl)
+{
+	// Called by the JMP hook on the game's row-click latch (FUN_004a89d0, VA
+	// 0x4A89D0) at the exact moment the game is about to read
+	// perm[screenCtrl+0x1EC] as the clicked row. The game keeps that +0x1EC
+	// selection index SEPARATE from the list widget's cursor
+	// (widget+0x15D78): they move together under normal input, but the mod's
+	// widget-cursor writes (the live-shrink clamp and cursor-follow) only
+	// touch the widget copy, so the two drift apart and the click resolves a
+	// different row than the highlighted one (live-proven 2026-07-19
+	// 23:25:07: widget cursor 3 = Honk highlighted, game joined CassetteCase
+	// from display slot 7). Rewriting +0x1EC from the widget cursor here
+	// makes the click always resolve exactly the highlighted row.
+	if (screenCtrl == nullptr)
+	{
+		return;
+	}
+	int32_t* const ctrlCursor =
+		reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(screenCtrl) + 0x1EC);
+	if (IsBadWritePtr(ctrlCursor, sizeof(int32_t)))
+	{
+		return;
+	}
+	uint8_t* const widget = ResolveRankedResultWidget();
+	if (widget == nullptr ||
+		IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)) ||
+		IsBadReadPtr(widget + kWidgetCountOffset, sizeof(int32_t)))
+	{
+		LOG(1, "[RankedListFilter] click latch: widget unresolvable, ctrl cursor %d left as-is\n",
+			*ctrlCursor);
+		return;
+	}
+	const int32_t widgetCursor = *reinterpret_cast<const int32_t*>(widget + kWidgetCursorOffset);
+	const int32_t widgetCount = *reinterpret_cast<const int32_t*>(widget + kWidgetCountOffset);
+	if (widgetCursor < 0 || widgetCursor >= kGamePermSlots ||
+		(widgetCount > 0 && widgetCursor >= widgetCount))
+	{
+		LOG(1, "[RankedListFilter] click latch: widget cursor %d out of range (count=%d), ctrl cursor %d left as-is\n",
+			widgetCursor, widgetCount, *ctrlCursor);
+		return;
+	}
+	if (*ctrlCursor != widgetCursor)
+	{
+		LOG(1, "[RankedListFilter] click latch: ctrl cursor %d -> widget cursor %d (desync corrected)\n",
+			*ctrlCursor, widgetCursor);
+		*ctrlCursor = widgetCursor;
+	}
+	else
+	{
+		LOG(1, "[RankedListFilter] click latch: cursor %d (already in sync)\n", widgetCursor);
+	}
+}
+
+int32_t RankedListConnectionFilter::ResolveClickedLogicalRow(void* screenCtrl)
+{
+	// Vanilla-exact fallback: whatever the game itself would have pushed.
+	int32_t fallback = 0;
+	if (screenCtrl != nullptr)
+	{
+		const int32_t* const ctrlCursor = reinterpret_cast<const int32_t*>(
+			reinterpret_cast<const uint8_t*>(screenCtrl) + 0x1EC);
+		if (!IsBadReadPtr(ctrlCursor, sizeof(int32_t)))
+		{
+			fallback = *ctrlCursor;
+		}
+	}
+
+	// The game frees the list widget within ~30ms of the click leaving the
+	// browsable band, BEFORE this latch runs (live-proven 23:49:43), so live
+	// resolution here usually fails. The cache below is refreshed every live
+	// pass tick and one final time at freeze-engage (the click itself); a
+	// fresh cache is authoritative for which row was highlighted.
+	const auto cachedOrFallback = [this, fallback](const char* why) -> int32_t
+	{
+		const unsigned long long now = GetTickCount64();
+		if (m_pendingClickLogicalRow >= 0 && m_pendingClickCacheTickMs != 0 &&
+			now - m_pendingClickCacheTickMs < 3000)
+		{
+			LOG(1, "[RankedListFilter] click push: %s - using cached logical %d (slot %d, %llums old)%s\n",
+				why, m_pendingClickLogicalRow, m_pendingClickCursorSlot,
+				now - m_pendingClickCacheTickMs,
+				(m_pendingClickLogicalRow == fallback) ? " (no change)" : " (CORRECTED)");
+			return m_pendingClickLogicalRow;
+		}
+		LOG(1, "[RankedListFilter] click push: %s and no fresh cache - keeping game index %d\n",
+			why, fallback);
+		return fallback;
+	};
+
+	uint8_t* const widget = ResolveRankedResultWidget();
+	uint8_t* const listStruct = ResolveGameRowListStruct();
+	if (widget == nullptr || listStruct == nullptr ||
+		IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)) ||
+		IsBadReadPtr(widget + kWidgetCountOffset, sizeof(int32_t)))
+	{
+		return cachedOrFallback("widget/list unresolvable");
+	}
+	const int32_t slot = *reinterpret_cast<const int32_t*>(widget + kWidgetCursorOffset);
+	const int32_t count = *reinterpret_cast<const int32_t*>(widget + kWidgetCountOffset);
+	const int32_t* const perm = reinterpret_cast<const int32_t*>(listStruct + 0xaf4);
+	if (slot < 0 || slot >= kGamePermSlots || (count > 0 && slot >= count) ||
+		IsBadReadPtr(perm, sizeof(int32_t) * kGamePermSlots))
+	{
+		return cachedOrFallback("widget cursor out of range");
+	}
+	const int32_t logical = perm[slot];
+	if (logical < 0 || logical >= kGamePermSlots)
+	{
+		return cachedOrFallback("perm[cursor] invalid");
+	}
+	LOG(1, "[RankedListFilter] click push: game index %d -> logical %d (widget cursor slot %d)%s\n",
+		fallback, logical, slot, (fallback == logical) ? " (no change)" : " (CORRECTED)");
+	return logical;
+}
+
+void RankedListConnectionFilter::LogClickResolutionSnapshot()
+{
+	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+	uint8_t* const listStruct = ResolveGameRowListStruct();
+	if (moduleBase == 0 || listStruct == nullptr)
+	{
+		return;
+	}
+
+	const int32_t count = *reinterpret_cast<const int32_t*>(listStruct + 0xae8);
+
+	// The game's click handler (FUN_004a89d0) latches perm[cursor] as a byte
+	// into the connect-request struct at listStruct+0x3D8: row index at +0x36D
+	// (abs +0x745), request type at +0x374 (abs +0x74C, 1 = row-connect). At
+	// freeze-engage time the latch may or may not have run yet - both reads
+	// are logged so either ordering is attributable.
+	int32_t latchedRow = -1;
+	int32_t requestType = -1;
+	if (!IsBadReadPtr(listStruct + 0x745, 1))
+	{
+		latchedRow = *reinterpret_cast<const uint8_t*>(listStruct + 0x745);
+	}
+	if (!IsBadReadPtr(listStruct + 0x74C, sizeof(int32_t)))
+	{
+		requestType = *reinterpret_cast<const int32_t*>(listStruct + 0x74C);
+	}
+
+	int32_t cursor = -1;
+	int32_t scrollTop = -1;
+	uint8_t* const widget = ResolveRankedResultWidget();
+	if (widget != nullptr && !IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)))
+	{
+		cursor = *reinterpret_cast<const int32_t*>(widget + kWidgetCursorOffset);
+		scrollTop = *reinterpret_cast<const int32_t*>(widget + kWidgetScrollTopOffset);
+	}
+
+	const int32_t* const perm = reinterpret_cast<const int32_t*>(listStruct + 0xaf4);
+	int32_t cursorPhys = -1;
+	if (!IsBadReadPtr(perm, sizeof(int32_t) * kGamePermSlots) &&
+		cursor >= 0 && cursor < kGamePermSlots)
+	{
+		cursorPhys = perm[cursor];
+	}
+
+	// Resolve both the cursor's row and the latched row to steamId+name so a
+	// wrong-player popup can be pinned to either "latch != cursor" (cursor
+	// desync) or "latch == cursor but resolved elsewhere later" (post-latch
+	// mutation / game repopulate).
+	typedef void* (__thiscall * WalkRowListFn)(void*, int32_t);
+	const WalkRowListFn walkRowList = reinterpret_cast<WalkRowListFn>(moduleBase + kWalkRowListRva);
+	uint64_t cursorSteamId = 0;
+	uint64_t latchedSteamId = 0;
+	const auto readRowSteamId = [&](int32_t physical) -> uint64_t
+	{
+		if (physical < 0 || physical >= kGamePermSlots)
+		{
+			return 0;
+		}
+		void* const entry = walkRowList(listStruct, physical);
+		if (entry == nullptr || IsBadReadPtr(entry, 0x118))
+		{
+			return 0;
+		}
+		const void* const idSubObj = *reinterpret_cast<void* const*>(reinterpret_cast<uint8_t*>(entry) + 0x114);
+		if (idSubObj == nullptr ||
+			IsBadReadPtr(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc, sizeof(uint32_t) * 2))
+		{
+			return 0;
+		}
+		const uint32_t lo = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0xc);
+		const uint32_t hi = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(idSubObj) + 0x10);
+		return (static_cast<uint64_t>(hi) << 32) | lo;
+	};
+	cursorSteamId = readRowSteamId(cursorPhys);
+	latchedSteamId = readRowSteamId(latchedRow);
+	const auto nameOf = [this](uint64_t steamId) -> const char*
+	{
+		if (steamId == 0)
+		{
+			return "?";
+		}
+		for (const LobbyCandidate& candidate : m_candidates)
+		{
+			if (candidate.ownerSteamId == steamId && !candidate.ownerName.empty())
+			{
+				return candidate.ownerName.c_str();
+			}
+		}
+		return "?";
+	};
+
+	const unsigned long long now = GetTickCount64();
+	// Final cache refresh at the click itself: the game frees the list widget
+	// within ~30ms of leaving the browsable band (live-proven 23:49:43: this
+	// snapshot resolved cursor=5/perm fine, the push hook 33ms later couldn't
+	// resolve the widget anymore). This is the last moment resolution works,
+	// and the push hook consumes this cache when live resolution fails.
+	if (cursor >= 0 && cursorPhys >= 0 && cursorPhys < kGamePermSlots)
+	{
+		m_pendingClickLogicalRow = cursorPhys;
+		m_pendingClickCursorSlot = cursor;
+		m_pendingClickCacheTickMs = now;
+	}
+	LOG(1, "[RankedListFilter] click snapshot: cursor=%d top=%d count=%d perm[cursor]=%d cursorRow=%llu(%s) latchedRow=%d reqType=%d latchedTarget=%llu(%s) msSinceMutation=%llu msSinceDelivery=%llu\n",
+		cursor, scrollTop, count, cursorPhys,
+		static_cast<unsigned long long>(cursorSteamId), nameOf(cursorSteamId),
+		latchedRow, requestType,
+		static_cast<unsigned long long>(latchedSteamId), nameOf(latchedSteamId),
+		m_lastMutationTickMs != 0 ? now - m_lastMutationTickMs : 0ull,
+		m_lastDeliveryTickMs != 0 ? now - m_lastDeliveryTickMs : 0ull);
+}
+
 void RankedListConnectionFilter::PollGameListAndApplyOrder()
 {
 	const bool safeToMutate = IsRankedListSafeToMutate();
@@ -785,6 +1012,15 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			LOG(1, "[RankedListFilter] live mutations %s (list %s browsable)\n",
 				m_liveOrderFrozen ? "FROZEN" : "resumed",
 				m_liveOrderFrozen ? "not" : "is");
+			if (m_liveOrderFrozen)
+			{
+				// A freeze engage right after the browsable band is (almost
+				// always) a row click - dump everything needed to attribute a
+				// wrong-player report to a specific hole: what the cursor was
+				// on, what the game latched, and how fresh our last mutation
+				// was relative to the click.
+				LogClickResolutionSnapshot();
+			}
 		}
 	}
 	if (!safeToMutate)
@@ -924,7 +1160,20 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		{
 			cursorSlotBefore = cur;
 			cursorPhysBefore = perm[cur];
+			// Keep the click cache tracking the highlighted row every tick
+			// while the list is browsable (the freeze-engage snapshot does
+			// the final refresh at the click itself).
+			m_pendingClickLogicalRow = cursorPhysBefore;
+			m_pendingClickCursorSlot = cursorSlotBefore;
+			m_pendingClickCacheTickMs = now;
 		}
+		// NOTE: an earlier build also deferred all mutations for 1.5s after
+		// any cursor movement ("navigation grace") as a defensive band-aid
+		// while the click path was still mis-resolving. Removed per user
+		// request once the real fix landed (the RankedRowClickPush hook +
+		// click cache resolve the click from the highlighted row directly),
+		// because it made filtering/sorting feel laggy. Cursor-follow plus
+		// the click cache make mutations safe during navigation.
 	}
 
 	std::vector<LiveRow> rows(static_cast<size_t>(orig));
@@ -1083,6 +1332,12 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 				reason = HiddenReason::Requirement;
 			}
 		}
+		// NOTE: an earlier build refused to live-hide the row under the
+		// cursor (deferred until the cursor moved off it). Removed per user
+		// request - it made the filter look broken. Safe now: the click
+		// resolves from whatever row is actually highlighted at click time
+		// (RankedRowClickPush hook + click cache), so the highlight jumping
+		// to a neighbor when its row hides is purely cosmetic.
 		hiddenAt[static_cast<size_t>(logical)] = hide;
 		if (hide && row.steamId != 0)
 		{
@@ -1186,6 +1441,7 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		LOG(1, "[RankedListFilter] live row count %d -> %d (%d hidden of %d, %d payload swaps)\n",
 			*countField, shownCount, hiddenCount, orig, swapsDone);
 		*countField = shownCount;
+		m_lastMutationTickMs = now;
 	}
 	m_gameListLastCountWritten = shownCount;
 	m_lastShownCount = static_cast<size_t>(shownCount);
@@ -1315,6 +1571,7 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		perm[slot] = slot;
 	}
 	m_gamePermCustomized = true;
+	m_lastMutationTickMs = now;
 
 	// Cursor follow, part 2: the on-screen order just changed - move the
 	// widget cursor so it stays on the SAME PLAYER it was on before this

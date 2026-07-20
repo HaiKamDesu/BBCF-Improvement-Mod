@@ -3102,3 +3102,230 @@ changes under the cursor on every insert/remove/re-sort.
 3. The confirmation popup name must match the clicked row every time.
 4. Confirm hidden/restored rows still enter/leave the list live while browsing (the
    freeze must not stick while state1 is 36/38/39).
+
+## Session review of the first post-fix build + click instrumentation (2026-07-20, round 2)
+
+Reviewed the 22:37-22:42 session (new build confirmed live: FROZEN/resumed + cursor follow
+lines present, `cursor follow: slot 0 -> 1` observed working at 22:40:38).
+
+### "Failed to connect to room" — failure classes actually in the log
+
+Every reconstructable JOIN in this session targeted exactly the row under the cursor
+(Omelini click: cursor=4, Omelini displayed at #4). The failures were NOT mis-selection:
+
+1. `LobbyEnter failed response=2` (PK | Omelini): **lobby no longer existed** — clicked 7s
+   after the delivery that listed it. Steam response 2 = DoesntExist. No RTT probe can
+   predict this; vanilla has the same failure. Our sort modes concentrate clicks on
+   attractive hosts (delay 4 / high level), which raises contention for them.
+2. `LeaveLobby before match start` ~500-600ms after JoinLobby (Argos x2, the 101st gec):
+   Steam lobby join SUCCEEDED, then the game's own in-lobby handshake/gates backed out —
+   host already paired/busy, or the game's post-join checks rejected. Also not predictable
+   from a pre-probe.
+
+**Answer to "do our probes match what CF does":** No, and they cannot — different layers.
+Our probe = one Steam P2P session establishment on channel 200 (reachability). CF's own
+signal = per-row RTT over its game protocol (entry+0x78 → the Delay digit — which we
+already read and use for the Network Filter) plus post-join gates (host requirement check
+FUN_004ae6d0 case 0x27 — covered by HideUnmetRequirementRooms — and host-busy/lobby-gone
+conditions that only materialize at join time). The remaining failures are liveness races,
+not connectivity misjudgments. The existing fail-penalty (2min hide) is working as designed
+(`fail #1/#2 (hidden temporarily)` in the log).
+
+### Wrong-player mismatch — remaining holes + this round's fixes
+
+No JoinLobby in the session contradicts its cursor row, but one click at 22:40:26 was
+DECLINED at the popup with no JoinLobby (800ms freeze window) — 280ms after a live pass
+mutated the list (count 11->10 at 22:40:26.454). Popup-declined clicks were invisible in
+the log, and a mutation landing between the user's last-perceived frame and the click
+input remains the suspected mechanism. Three additions:
+
+1. **Click snapshot** (`LogClickResolutionSnapshot`, logged at every freeze-engage): widget
+   cursor/top/count, perm[cursor] + that row's steamId/name, the game's latched connect
+   request (listStruct+0x745 row byte, +0x74C type) + its resolved steamId/name, and
+   ms-since-last-mutation / ms-since-last-delivery. Any future wrong-player popup is now
+   attributable from DEBUG.txt alone (compare `cursorRow` vs `latchedTarget` vs what the
+   user says they clicked).
+2. **Navigation grace**: the live pass defers ALL mutations while the widget cursor moved
+   within the last 1.5s (cursor-follow's own writes excluded via m_lastSeenCursorSlot).
+   The list cannot shift while the user is actively aiming.
+3. **Cursor-row hide deferral**: the row the cursor sits on is never live-hidden (deferred
+   until the cursor moves off it) — the one reorder case cursor-follow can't compensate.
+
+### Verification for next session
+
+Grep `click snapshot` after any wrong-player report: `cursorRow` ≠ `latchedTarget` means
+cursor desync between widget and controller (+0x1EC) — would need the FUN_004a89d0 hook
+next. `cursorRow` == `latchedTarget` == wrong name means the user's perceived frame was
+stale (navigation grace should have prevented it — check msSinceMutation).
+
+## ROOT CAUSE CONFIRMED: dual cursor desync (widget+0x15D78 vs controller+0x1EC) — hook shipped (2026-07-20, round 3)
+
+The click snapshot instrumentation caught the mismatch red-handed in the 22:55-23:25
+session, line 12357:
+
+```
+click snapshot: cursor=3 top=0 count=11 perm[cursor]=9 cursorRow=76561198038524590(Honk)
+                latchedRow=0 reqType=0 latchedTarget=76561198302092702(mitsuyoshi)
+                msSinceMutation=6422 msSinceDelivery=14172
+JoinLobby lobby=... ownerSteamId=76561198979468031  (= CassetteCase, display slot 7)
+```
+
+Widget cursor said Honk (slot 3), the game joined CassetteCase. msSinceMutation=6422 —
+NO recent mod mutation, so this is NOT a timing race. The game latched a row totally
+different from the widget cursor.
+
+**Mechanism:** the game tracks the selected row in TWO places: the list widget's cursor
+(widget+0x15D78 — what the mod reads, clamps, and cursor-follows) and the screen
+controller's own selection index (screenCtrl+0x1EC — what the click handler FUN_004a89d0
+actually reads: `perm[*(ctrl+0x1EC)]`). Normal input moves both together; the mod's
+widget-only cursor writes make them drift. In the failing click the pre-click passes had
+done `cursor follow: slot 5 -> 0` then `slot 1 -> 0` plus multiple clamps — the widget
+copy absorbed all of that, +0x1EC never saw any of it. That also cleanly explains the
+user's "some players work, others don't": rows the user reaches with no intervening
+reorder have both cursors in sync; any reorder/hide since the last game-side cursor write
+leaves +0x1EC stale. (Note the earlier snapshot's latchedRow/latchedTarget fields read the
+PREVIOUS request's latch (stale LordMacoT lines) — the snapshot fires at freeze-engage,
+which precedes FUN_004a89d0's own state-machine tick; only cursor/cursorRow vs the
+subsequent JoinLobby target are load-bearing.)
+
+**Fix (shipped):** JMP hook at FUN_004a89d0's entry (direct-address hook, RVA 0xA89D0,
+5 prologue bytes `55 8B EC 51 53`, ecx = screenCtrl) →
+`RankedListConnectionFilter::OnRankedRowClickLatch(ctrl)`: rewrites ctrl+0x1EC from
+widget+0x15D78 (bounds-checked against widget count / kGamePermSlots) right before the
+game reads it, logging `click latch: ctrl cursor A -> widget cursor B (desync corrected)`
+(or "already in sync"). The click now by construction resolves the highlighted row.
+Registered in hooks_bbcf.cpp next to the spectator hooks; failure to place is logged.
+
+Alternative considered and rejected: also mirroring every widget-cursor write into
++0x1EC from the live pass — the controller object pointer isn't reachable from the poll
+path (only the widget singleton is), whereas at FUN_004a89d0 entry the game hands us the
+controller in ecx at exactly the moment that matters.
+
+### Verification for next session
+
+1. Grep `click latch:` — every ranked row click should produce exactly one line; wrong-
+   player reports should coincide with `desync corrected` lines (i.e. the hook caught and
+   fixed a drift). If a mismatch still occurs WITH the hook in place, compare the
+   JoinLobby steamId against the `click latch` cursor value and the last `live order
+   applied` dump - that would mean perm[] itself changed between latch and resolve
+   (FUN_0046dfa0), which the browsable-band freeze should make impossible.
+2. `click snapshot` lines remain: cursorRow is authoritative for "what was highlighted";
+   ignore latchedRow/latchedTarget at snapshot time (pre-latch, previous request's data).
+
+## Round 3 hook was on the WRONG PATH - real click latch is FUN_004A4110 via raw index push (2026-07-20, round 4)
+
+Session 23:39:58-23:41:22 (round-3 build confirmed deployed: "RankedRowClickLatch found at:
+0x007A89D0 / Hook set"): the user clicked a row at 23:41:07 and got ZERO `click latch:`
+lines. FUN_004a89d0 (request type 1) is NOT the ranked click path. Every click snapshot
+across all sessions shows `reqType=0` - the requests are written by **FUN_004A4110**
+(writes +0x36D from its [ebp+8] arg, +0x374=0), whose ranked-click caller is:
+
+```
+004AEE64: push dword ptr [edi+1ECh]   ; edi = screen controller
+004AEE6A: call 004A40A0
+004AEE6F: mov  ecx,eax
+004AEE71: call 004A4110
+```
+
+**The killer detail: this path pushes ctrl+0x1EC RAW - no perm[] lookup.** The consumer
+(FUN_0046dfa0) feeds the latched byte straight to the node-chain walker FUN_004a5450 as a
+LOGICAL row index. In vanilla, perm is always identity on this screen, so slot == logical
+and pushing the slot index works. Once the mod writes a custom permutation, slot !=
+logical and the click resolves to whatever payload physically sits at node[slot] - a
+different player than the one highlighted, even when both cursor copies agree. This
+retroactively explains every mismatch INCLUDING ones with `msSinceMutation` large (23:25:07:
+no recent mutation, cursor slot 3 = Honk highlighted, click resolved elsewhere - the perm
+was simply non-identity). The round-3 slot-space +0x1EC sync (FUN_004a89d0 hook, type-1
+path) was correct-for-its-path but that path never runs for ranked clicks; left in place,
+harmless.
+
+**Fix (shipped, round 4):** 6-byte JMP hook on the push site itself (RVA 0xAEE64,
+`FF B7 EC 01 00 00`), label "RankedRowClickPush". The naked hook calls
+`ResolveClickedLogicalRow(ctrl)` and pushes its return instead of [edi+1ECh]:
+perm[widget cursor] (the logical row of the highlighted player), with vanilla-exact
+fallback (the game's own ctrl+0x1EC value) whenever widget/list/perm are unresolvable or
+out of range. Logs `click push: game index A -> logical B (widget cursor slot S)
+(CORRECTED|no change)` on every click. Second caller of FUN_004A4110 (004A4F04, pushes
+[esi+44h] - a stored/retry index) is deliberately NOT touched.
+
+Also noted this session: a `GetRoomOne / RoomManager::JoinRoom / SendAnnounce` at
+23:40:35 with NO outgoing click (state1 stayed 39) - an INCOMING challenger connecting
+while the user browses. If a confirmation popup ever appears without any `click push`
+line in the log, it's an incoming challenge, not a mis-click - the popup name SHOULD
+differ from the hovered row in that case. Worth remembering before blaming the click path
+again.
+
+### Verification
+1. Every ranked row click must now log exactly one `click push:` line; mismatches should
+   coincide with `(CORRECTED)` and the popup/JoinLobby must match the hovered name.
+2. If a mismatch happens WITHOUT a `click push` line -> incoming challenger (see above),
+   or a third latch path (would need the FUN_004A4110 entry hooked instead, carefully
+   distinguishing the 004A4F04 retry caller).
+
+## Round 4 hook fired but hit fallback: the game FREES THE WIDGET before the latch (2026-07-20, round 5)
+
+Session 23:48:34-23:50:12 (round-4 build confirmed: "RankedRowClickPush found at 0x007AEE64
+/ Hook set"). Both clicks logged `click push: widget/list unresolvable, keeping game index N`
+- the hook ran on the right path but couldn't compute the correction, so raw indices went
+through and both clicks mis-resolved (23:49:43: cursor=5 = the 101st gec highlighted,
+perm[5]=13, raw 5 pushed -> joined 76561198793540711; 23:50:05: cursor=3 = Xuxuk,
+perm[3]=8, raw 3 pushed -> joined 76561198086024158).
+
+Timing proof: the freeze-engage snapshot at 23:49:43.140 resolved cursor/perm/widget FINE;
+the push hook at .173 (33ms later) couldn't. The game frees/releases the "Rank Match
+Search Result" widget container (or flips its in-use/config fields) immediately on leaving
+the browsable band, BEFORE the state machine reaches the 0x4AEE64 latch. Live resolution
+at the push site is therefore structurally impossible - not a bug in the resolver.
+
+**Fix (shipped, round 5): click cache.** m_pendingClickLogicalRow/CursorSlot/CacheTickMs:
+refreshed every live-pass tick while browsable (in the cursor-capture block, before the
+navigation-grace early-return so it keeps tracking while the user aims) and one final time
+in LogClickResolutionSnapshot at freeze-engage (the click itself - proven still resolvable
+there). ResolveClickedLogicalRow now falls back to the cache when live resolution fails
+(fresh = <3s old, logs "using cached logical N (slot S, Xms old) (CORRECTED)"); only with
+no fresh cache does it keep the raw game index (vanilla-exact).
+
+### Verification
+Each click should now log `click snapshot` -> `click push: ... using cached logical ...`
+(or the live-resolved variant) with the CORRECTED marker whenever perm[slot] != raw, and
+the JoinLobby owner must match the snapshot's cursorRow name. If a mismatch survives THIS,
+compare the push's chosen logical against the snapshot's perm[cursor] - disagreement would
+mean the cursor moved after the last cache refresh (shrink the refresh window), agreement
+would mean the consumer re-resolves later with different state (hook FUN_0046dfa0 next).
+
+## FIX CONFIRMED WORKING; navigation grace removed (2026-07-20, round 6)
+
+Session 23:54:45-00:04+ verified the round-5 click cache end to end: EVERY click's
+JoinLobby owner matched the snapshot's cursorRow steamId, including six `(CORRECTED)`
+cases (e.g. 23:56:11 Reticent slot 5 -> logical 6; 00:03:41 Xuxuk slot 2 -> logical 6;
+00:04:12 "ª Ronin ª" slot 1 -> logical 4) that would each have been a wrong-player join
+before. The widget is indeed unresolvable at push time on every single click (~15-32ms
+after freeze-engage) - the cache path IS the working path, not a rare fallback. User
+confirmed in-game.
+
+Also removed per user request: the 1.5s "navigation grace" (defer all mutations while the
+cursor recently moved) from round 2. It was a defensive band-aid from when the click path
+was still mis-resolving, and it made filtering/sorting feel laggy. With the
+RankedRowClickPush hook + click cache resolving clicks from the highlighted row directly,
+mutations during navigation are safe: cursor-follow keeps the highlight on the same
+player, and the cursor-row hide deferral (KEPT) still prevents the highlighted row from
+vanishing underneath the cursor. m_lastSeenCursorSlot/m_lastCursorMoveTickMs removed.
+
+Current protection stack (all shipped):
+1. Browsable-band freeze (state1 36/38/39 whitelist) - no mutations once a click starts.
+2. Cursor-follow - highlight tracks the same player through reorders.
+3. Cursor-row hide deferral - the highlighted row is never live-hidden.
+4. RankedRowClickPush hook + click cache - the latch always receives the logical index of
+   the highlighted row (this is the actual mismatch fix).
+5. Click snapshot + click push logging - full per-click attribution in DEBUG.txt.
+
+## Cursor-row hide deferral also removed per user request (2026-07-20, round 6b)
+
+The "never hide the row under the cursor" deferral (round 2, item 3 in the protection
+stack) is gone too - it made the filter look broken (a row that should hide stayed while
+hovered). Safe to remove for the same reason the navigation grace was: the click resolves
+from whatever row is highlighted AT CLICK TIME (RankedRowClickPush + click cache), so a
+hidden cursor row just means the highlight lands on a neighbor - cosmetic only, and
+cursor-follow part 2 already no-ops cleanly when the tracked row leaves the shown region
+(newPosOf >= shownCount -> no cursor write; the widget fixup clamp bounds the cursor).
+m_lastDeferredCursorHideSteamId removed. Protection stack is now items 1, 2, 4, 5.

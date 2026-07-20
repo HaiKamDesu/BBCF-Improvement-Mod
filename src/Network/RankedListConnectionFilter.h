@@ -118,6 +118,26 @@ public:
 
 	bool IsSteamIdFiltered(uint64_t steamId) const;
 
+	// Called from the JMP hook on the game's ranked-row click latch
+	// (FUN_004a89d0) with the screen controller ('this' of the state machine,
+	// which holds the game's own selection index at +0x1EC). The game tracks
+	// that index separately from the list widget's cursor (widget+0x15D78);
+	// the mod's widget-cursor writes (live-shrink clamp, cursor-follow) made
+	// the two drift, so the click resolved a different row than the
+	// highlighted one. This rewrites +0x1EC from the widget cursor right
+	// before the game reads it. Safe no-op when the widget is unresolvable.
+	void OnRankedRowClickLatch(void* screenCtrl);
+
+	// Called from the JMP hook on the ranked click's REAL latch path (the
+	// `push [ctrl+0x1EC]` at VA 0x4AEE64 feeding FUN_004A4110, request type
+	// 0). That path pushes the controller index RAW as a LOGICAL row index -
+	// no perm[] lookup - which is only correct while the permutation is
+	// identity (always true in vanilla, never true once the mod reorders).
+	// Returns the logical row the click must resolve to: perm[widget cursor].
+	// Falls back to the game's own ctrl+0x1EC value when anything is
+	// unresolvable, so vanilla behavior is preserved exactly.
+	int32_t ResolveClickedLogicalRow(void* screenCtrl);
+
 	// UI support: snapshot of players currently hidden from the LIVE list
 	// (all hide reasons included), and manual restore. Restoring clears the
 	// peer's bad verdict and exempts them from the rule-based filters until
@@ -278,6 +298,12 @@ private:
 	// per-slot active flags to match the given row count, so scrolling and
 	// selection can never reach past the live-shrunk list. Write-on-change only.
 	void FixupRankedResultWidget(int32_t shownCount);
+	// Diagnostic dump at freeze-engage (i.e. the moment a row click leaves the
+	// browsable-list band): widget cursor + its row's identity, the connect
+	// request's latched row index/type (listStruct+0x745/+0x74C) + its
+	// identity, and how long ago the last mutation/delivery happened. Lets a
+	// wrong-player report be pinned to a specific mechanism from DEBUG.txt.
+	void LogClickResolutionSnapshot();
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.
 	// logOrder=false suppresses the per-call "sort order" log line (used by the
@@ -331,6 +357,19 @@ private:
 	// confirmation flow, the entry menu). Tracked only to log the freeze
 	// engage/release transitions once instead of every 400ms tick.
 	bool m_liveOrderFrozen = false;
+	// GetTickCount64() of the last actual in-place mutation (count write or
+	// permutation write). Logged by the click snapshot so a wrong-player
+	// report can be correlated with how fresh the last mutation was.
+	unsigned long long m_lastMutationTickMs = 0;
+	// Click cache consumed by ResolveClickedLogicalRow: the logical (node-
+	// chain) index of the row under the widget cursor, refreshed every live
+	// pass tick while the list is browsable and one final time at freeze-
+	// engage (the click itself). Needed because the game frees the list
+	// widget within ~30ms of a click, before the latch push runs, so live
+	// resolution at the push site fails exactly when it matters.
+	int32_t m_pendingClickLogicalRow = -1;
+	int32_t m_pendingClickCursorSlot = -1;
+	unsigned long long m_pendingClickCacheTickMs = 0;
 	// Live hide/restore bookkeeping (see PollGameListAndApplyOrder). The
 	// game's row count (+0xae8) is shrunk to hide rows live: hidden rows'
 	// node payloads are swapped to the logical tail first, so positions

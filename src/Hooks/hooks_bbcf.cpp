@@ -11,6 +11,7 @@
 #include "Game/stages.h"
 #include "Hooks/HookManager.h"
 #include "Hooks/RankedAutomationHarness.h"
+#include "Network/RankedListConnectionFilter.h"
 #include "Network/RoomManager.h"
 #include "Overlay/WindowManager.h"
 #include "SteamApiWrapper/steamApiWrappers.h"
@@ -8747,6 +8748,77 @@ void __declspec(naked)DCodeFetchTickHookFunc()
 	}
 }
 
+// Ranked list row-click latch (FUN_004a89d0, VA 0x4A89D0): the confirm state
+// machine's handler that reads perm[screenCtrl+0x1EC] and latches the clicked
+// row into the connect request (listStruct+0x3D8). The game's +0x1EC selection
+// index is tracked separately from the list widget's cursor (widget+0x15D78),
+// and the mod's widget-cursor writes (live-shrink clamp / cursor-follow) made
+// the two drift - the click then resolved a different row than the highlighted
+// one (live-proven 2026-07-19 23:25:07, see RankedListConnectionFilter
+// progress doc). The thunk rewrites +0x1EC from the widget cursor before the
+// game reads it. ecx = screenCtrl ('this') at function entry.
+static void __cdecl RankedRowClickLatchThunk(void* screenCtrl)
+{
+	RankedListConnectionFilter::GetInstance().OnRankedRowClickLatch(screenCtrl);
+}
+
+// Ranked list row-click PUSH site (VA 0x4AEE64, inside the list screen's state
+// machine): `push dword ptr [edi+1ECh]` / call FUN_004A40A0 / mov ecx,eax /
+// call FUN_004A4110 - the request-type-0 latch that live sessions proved is
+// the path real clicks take (every click snapshot shows reqType=0; the type-1
+// FUN_004a89d0 hook below never fired). It pushes the controller's selection
+// index RAW as a LOGICAL row index - no perm[] lookup - which is only correct
+// while the row permutation is identity. Once the mod reorders (perm[slot] !=
+// slot), the click resolves a different row than the highlighted one even
+// when the two cursor copies agree. The thunk returns the correct logical row
+// (perm[widget cursor], vanilla-exact fallback inside) and the hook pushes
+// that instead. edi = screen controller at the patched instruction.
+static int32_t __cdecl RankedRowClickIndexThunk(void* screenCtrl)
+{
+	return RankedListConnectionFilter::GetInstance().ResolveClickedLogicalRow(screenCtrl);
+}
+static int32_t(__cdecl* const g_pRankedRowClickIndexThunk)(void*) = RankedRowClickIndexThunk;
+static DWORD g_rankedRowClickPushValue = 0;
+DWORD RankedRowClickPushJmpBackAddr = 0;
+void __declspec(naked)RankedRowClickPushHookFunc()
+{
+	__asm
+	{
+		pushfd
+		pushad
+		push edi
+		call g_pRankedRowClickIndexThunk
+		add esp, 4
+		mov g_rankedRowClickPushValue, eax
+		popad
+		popfd
+		// replaces the original 6-byte `push dword ptr [edi+1ECh]`
+		push g_rankedRowClickPushValue
+		jmp[RankedRowClickPushJmpBackAddr]
+	}
+}
+static void(__cdecl* const g_pRankedRowClickLatchThunk)(void*) = RankedRowClickLatchThunk;
+DWORD RankedRowClickLatchJmpBackAddr = 0;
+void __declspec(naked)RankedRowClickLatchHookFunc()
+{
+	__asm
+	{
+		pushfd
+		pushad
+		push ecx
+		call g_pRankedRowClickLatchThunk
+		add esp, 4
+		popad
+		popfd
+		// original 5 bytes replaced by the JMP patch
+		push ebp
+		mov ebp, esp
+		push ecx
+		push ebx
+		jmp[RankedRowClickLatchJmpBackAddr]
+	}
+}
+
 // Spectator SyncInput entry (SteamSpectatorBackend::SyncInput, VA 0x77E340).
 // Only ever runs in spectator mode; captures the backend pointer (ecx) so the
 // error thunk below can read its input-cursor fields. See
@@ -9291,6 +9363,27 @@ bool placeHooks_bbcf()
 	DCodeFetchTickJmpBackAddr = HookManager::SetHook("DCodeFetchTick",
 		"\x56\x8B\xF1\x57\x8B\xBE\xA0\x68\x00\x00\x83\xBF\xCC\x00\x00\x00\x01",
 		"xxxxxxxxxxxxxxxxx", 10, DCodeFetchTickHookFunc);
+
+	// Ranked row-click latch (FUN_004a89d0, VA 0x4A89D0). Hooked by direct
+	// address (RVA 0xA89D0) like the other ranked-flow hooks - the prologue
+	// (push ebp / mov ebp,esp / push ecx / push ebx) is too generic for a
+	// unique signature. Replaces exactly those 5 prologue bytes.
+	RankedRowClickLatchJmpBackAddr = HookManager::SetHook("RankedRowClickLatch",
+		(DWORD)(GetBbcfBaseAdress() + 0xA89D0), 5, RankedRowClickLatchHookFunc);
+	if (RankedRowClickLatchJmpBackAddr == 0)
+	{
+		LOG(1, "[RankedListFilter] RankedRowClickLatch hook FAILED to place\n");
+	}
+
+	// Ranked row-click push site (VA 0x4AEE64, RVA 0xAEE64) - the request-
+	// type-0 latch path real clicks actually take. Replaces exactly the
+	// 6-byte `push dword ptr [edi+1ECh]` (FF B7 EC 01 00 00).
+	RankedRowClickPushJmpBackAddr = HookManager::SetHook("RankedRowClickPush",
+		(DWORD)(GetBbcfBaseAdress() + 0xAEE64), 6, RankedRowClickPushHookFunc);
+	if (RankedRowClickPushJmpBackAddr == 0)
+	{
+		LOG(1, "[RankedListFilter] RankedRowClickPush hook FAILED to place\n");
+	}
 
 	// Spectator SyncInput prologue (VA 0x77E340): push ebp / mov ebp,esp /
 	// sub esp,414h / mov eax,[security_cookie] / ... / cmp byte ptr [esi+5CC8h],0.
