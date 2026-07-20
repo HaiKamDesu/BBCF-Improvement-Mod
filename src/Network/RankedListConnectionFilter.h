@@ -270,10 +270,13 @@ private:
 	uint8_t* ResolveGameRowListStruct() const;
 	// Resolves the ranked search-result list WIDGET (the UI object that owns
 	// the scrollbar, cursor and row slots - built by the game's FUN_0064bfb0,
-	// identified by its "Rank Match Search Result" config pointer) and
-	// rewrites its item count / page bounds / cursor / per-slot active flags
-	// to match the given row count, so scrolling and selection can never
-	// reach past the live-shrunk list. Write-on-change only.
+	// identified by its "Rank Match Search Result" config pointer). Returns
+	// nullptr when the UI context isn't built or the ranked container isn't
+	// in use. All guards IsBadReadPtr-based, no allocation.
+	uint8_t* ResolveRankedResultWidget() const;
+	// Rewrites the ranked result widget's item count / page bounds / cursor /
+	// per-slot active flags to match the given row count, so scrolling and
+	// selection can never reach past the live-shrunk list. Write-on-change only.
 	void FixupRankedResultWidget(int32_t shownCount);
 	// Reorders the shown candidates per Settings::settingsIni.rankedListSortMode.
 	// Candidates whose sort key is unknown keep their relative order at the end.
@@ -323,6 +326,11 @@ private:
 	// identity) order - lets the pipeline restore identity exactly once when
 	// the features get turned off mid-session.
 	bool m_gamePermCustomized = false;
+	// True while live list mutations are frozen because the ranked flow is
+	// outside the browsable-list band (a click being resolved, the connect/
+	// confirmation flow, the entry menu). Tracked only to log the freeze
+	// engage/release transitions once instead of every 400ms tick.
+	bool m_liveOrderFrozen = false;
 	// Live hide/restore bookkeeping (see PollGameListAndApplyOrder). The
 	// game's row count (+0xae8) is shrunk to hide rows live: hidden rows'
 	// node payloads are swapped to the logical tail first, so positions

@@ -596,28 +596,28 @@ void RankedListConnectionFilter::WriteIdentityGamePermutation()
 	m_gamePermCustomized = false;
 }
 
-void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
+uint8_t* RankedListConnectionFilter::ResolveRankedResultWidget() const
 {
 	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
-	if (moduleBase == 0 || shownCount < 0)
+	if (moduleBase == 0)
 	{
-		return;
+		return nullptr;
 	}
 	// Lazy-init guard first - never touch the context before the game built it.
 	const uint8_t* const guard = reinterpret_cast<const uint8_t*>(moduleBase + kUiContextGuardRva);
 	if (IsBadReadPtr(guard, 1) || (*guard & 1) == 0)
 	{
-		return;
+		return nullptr;
 	}
 	const uint8_t* const ctx = reinterpret_cast<const uint8_t*>(moduleBase + kUiContextRva);
 	if (IsBadReadPtr(ctx + kUiWidgetPoolOffset, sizeof(void*)))
 	{
-		return;
+		return nullptr;
 	}
 	uint8_t* const pool = *reinterpret_cast<uint8_t* const*>(ctx + kUiWidgetPoolOffset);
 	if (pool == nullptr)
 	{
-		return;
+		return nullptr;
 	}
 	const void* const rankedConfigStr =
 		reinterpret_cast<const void*>(moduleBase + kRankedResultConfigStrRva);
@@ -627,7 +627,7 @@ void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
 		uint8_t* const container = pool + static_cast<uintptr_t>(i) * kUiContainerStride;
 		if (IsBadReadPtr(container, kUiContainerConfigOffset + sizeof(void*)))
 		{
-			return;
+			return nullptr;
 		}
 		if (*reinterpret_cast<const int32_t*>(container + kUiContainerInUseOffset) == 0 ||
 			*reinterpret_cast<void* const*>(container + kUiContainerConfigOffset) != rankedConfigStr)
@@ -638,8 +638,25 @@ void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
 		uint8_t* const widget = container + kUiContainerWidgetOffset;
 		if (IsBadWritePtr(widget + kWidgetCountOffset, sizeof(int32_t)))
 		{
-			return;
+			return nullptr;
 		}
+		return widget;
+	}
+	return nullptr;
+}
+
+void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
+{
+	if (shownCount < 0)
+	{
+		return;
+	}
+	uint8_t* const widget = ResolveRankedResultWidget();
+	if (widget == nullptr)
+	{
+		return;
+	}
+	{
 		int32_t* const count = reinterpret_cast<int32_t*>(widget + kWidgetCountOffset);
 		int32_t* const pageM1 = reinterpret_cast<int32_t*>(widget + kWidgetPageM1Offset);
 		int32_t* const cursor = reinterpret_cast<int32_t*>(widget + kWidgetCursorOffset);
@@ -711,39 +728,71 @@ void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
 
 namespace
 {
-	// Mirrors RankedProgressWindow.cpp's IsRankedPredictionMenuState (state==4, state1 in
-	// [43,48]) using this file's own raw network-struct read, so the live row permutation
-	// swaps below can be paused for the exact window the game is resolving a row click into
-	// its confirmation popup. Without this, a swap landing in that ~frame window can move a
-	// different player's data into the row the user actually clicked, so the popup that opens
-	// resolves to the wrong player (reproduced live via DEBUG.txt on 2026-07-18).
-	bool IsRankedConfirmationInProgress()
+	// The live row permutation/payload swaps below are only safe while the user is
+	// actually BROWSING the results list: state==4 && state1 in {36,38,39}
+	// (RankedAutomationHarness::IsRankedSearchResultsState). Every other state1 in
+	// the ranked flow is a window where the game is resolving or re-resolving a
+	// clicked row through these same structures:
+	//   - 40-42: click pressed, state machine still latching perm[cursor] into the
+	//     connect request (FUN_004a89d0 runs from a later state-machine tick, not
+	//     the input frame itself - state1=42 observed live between 39 and 43).
+	//   - 43-48: the connect/confirmation resolution band (the ONLY band the
+	//     previous fix froze - too narrow, reproduced wrong-player again
+	//     2026-07-19 22:09, DEBUG.txt: clicked HYUCKUMEN, popup showed
+	//     castroluisangel99).
+	//   - 30/31/34: entry menu / post-confirm screens. The list is not visible,
+	//     deliveries still arrive in the background, and the connect flow keeps
+	//     re-resolving its latched row index every frame - mutating here can
+	//     retarget a pending connection to a different player.
+	// So: freeze in ALL ranked states except the browsable-list band. When the
+	// struct is unreadable or state!=4 (not in the ranked flow at all), don't
+	// freeze - preserves the pre-existing cleanup behavior outside ranked.
+	bool IsRankedListSafeToMutate()
 	{
 		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
 		if (moduleBase == 0)
 		{
-			return false;
+			return true;
 		}
 
 		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
 		if (IsBadReadPtr(network, 0x08))
 		{
-			return false;
+			return true;
 		}
 
 		const int32_t state = *reinterpret_cast<const int32_t*>(network + 0x00);
 		const int32_t state1 = *reinterpret_cast<const int32_t*>(network + 0x04);
-		return state == 4 && state1 >= 43 && state1 <= 48;
+		if (state != 4)
+		{
+			return true;
+		}
+		return state1 == 36 || state1 == 38 || state1 == 39;
 	}
 }
 
 void RankedListConnectionFilter::PollGameListAndApplyOrder()
 {
-	if (IsRankedConfirmationInProgress())
+	const bool safeToMutate = IsRankedListSafeToMutate();
+	if (m_liveOrderFrozen == safeToMutate)
 	{
-		// The user has clicked a row and the game is resolving it into the connect
-		// confirmation popup - freeze the live permutation/hide swaps untouched until that
-		// resolves, so the row memory the popup reads back matches what was actually clicked.
+		// Log freeze engage/release once per transition, not per 400ms tick -
+		// and only while the pipeline is actually doing something, so menu
+		// navigation with the features off doesn't spam the log.
+		m_liveOrderFrozen = !safeToMutate;
+		if (m_hasRemapResult && IsPipelineActive())
+		{
+			LOG(1, "[RankedListFilter] live mutations %s (list %s browsable)\n",
+				m_liveOrderFrozen ? "FROZEN" : "resumed",
+				m_liveOrderFrozen ? "not" : "is");
+		}
+	}
+	if (!safeToMutate)
+	{
+		// A row click is being resolved (or a connect is pending, or the list
+		// screen simply isn't the one on screen) - leave the permutation, node
+		// payloads, row count and widget untouched so whatever row memory the
+		// game reads back matches what the user actually clicked.
 		return;
 	}
 
@@ -858,6 +907,26 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		int16_t areaFilter = 0;    // entry+0x5e, RANK_AREA_FILTER (secondary requirement)
 		uint8_t netColor = 0xFF;   // entry+0x74, HOST_NETCOLOR - the row's native square icon
 	};
+	// Cursor follow, part 1: remember which PHYSICAL row (node-chain position)
+	// the widget cursor currently sits on, before any payload moves. Without
+	// this, the cursor keeps its raw slot INDEX across the partition/re-sort
+	// below, so the highlighted player silently changes under the user right
+	// as they navigate/confirm - the other half of the wrong-player-selected
+	// bug (the user aims at one name, the click resolves to another).
+	uint8_t* const resultWidget = ResolveRankedResultWidget();
+	int32_t cursorSlotBefore = -1;
+	int32_t cursorPhysBefore = -1;
+	if (resultWidget != nullptr &&
+		!IsBadReadPtr(resultWidget + kWidgetCursorOffset, sizeof(int32_t)))
+	{
+		const int32_t cur = *reinterpret_cast<const int32_t*>(resultWidget + kWidgetCursorOffset);
+		if (cur >= 0 && cur < orig && perm[cur] >= 0 && perm[cur] < orig)
+		{
+			cursorSlotBefore = cur;
+			cursorPhysBefore = perm[cur];
+		}
+	}
+
 	std::vector<LiveRow> rows(static_cast<size_t>(orig));
 	for (int32_t logical = 0; logical < orig; ++logical)
 	{
@@ -1246,6 +1315,67 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		perm[slot] = slot;
 	}
 	m_gamePermCustomized = true;
+
+	// Cursor follow, part 2: the on-screen order just changed - move the
+	// widget cursor so it stays on the SAME PLAYER it was on before this
+	// pass, and keep the scroll window over it. If that player's row got
+	// hidden this pass, leave the cursor where FixupRankedResultWidget's
+	// clamp put it (there is no right answer for a vanished row).
+	if (resultWidget != nullptr && cursorSlotBefore >= 0 &&
+		!IsBadWritePtr(resultWidget + kWidgetCursorOffset, sizeof(int32_t)))
+	{
+		const int32_t physAfter = newPosOf[static_cast<size_t>(cursorPhysBefore)];
+		int32_t newSlot = -1;
+		if (physAfter >= 0 && physAfter < shownCount)
+		{
+			for (int32_t slot = 0; slot < shownCount; ++slot)
+			{
+				if (perm[slot] == physAfter)
+				{
+					newSlot = slot;
+					break;
+				}
+			}
+		}
+		int32_t* const cursor = reinterpret_cast<int32_t*>(resultWidget + kWidgetCursorOffset);
+		if (newSlot >= 0 && *cursor != newSlot)
+		{
+			LOG(1, "[RankedListFilter] cursor follow: slot %d -> %d (tracking the same player through the reorder)\n",
+				cursorSlotBefore, newSlot);
+			*cursor = newSlot;
+			// Keep the visible window over the cursor, same invariants the
+			// widget fixup maintains: top in [0, count-1-pageM1], bottom =
+			// top + pageM1, cursor within [top, bottom].
+			int32_t* const scrollTop = reinterpret_cast<int32_t*>(resultWidget + kWidgetScrollTopOffset);
+			int32_t* const bottom = reinterpret_cast<int32_t*>(resultWidget + kWidgetBottomRowOffset);
+			const int32_t pageM1 = *reinterpret_cast<const int32_t*>(resultWidget + kWidgetPageM1Offset);
+			if (pageM1 >= 0)
+			{
+				int32_t maxTop = (shownCount - 1) - pageM1;
+				if (maxTop < 0)
+				{
+					maxTop = 0;
+				}
+				if (*scrollTop > maxTop)
+				{
+					*scrollTop = maxTop;
+				}
+				if (*scrollTop < 0)
+				{
+					*scrollTop = 0;
+				}
+				if (newSlot < *scrollTop)
+				{
+					*scrollTop = newSlot;
+				}
+				if (newSlot > *scrollTop + pageM1)
+				{
+					*scrollTop = newSlot - pageM1;
+				}
+				*bottom = *scrollTop + pageM1;
+			}
+		}
+	}
 
 	std::string orderDump;
 	for (int32_t slot = 0; slot < shownCount; ++slot)

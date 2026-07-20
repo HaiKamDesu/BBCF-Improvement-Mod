@@ -3037,3 +3037,68 @@ deploys automatically. Before trusting any `DEBUG.txt` analysis, verify the depl
 `dinput8.dll` md5sum matches the freshly built one for the config the user actually used
 (check `bin/Release/dinput8.dll`, not just `bin/Debug/`) to avoid diagnosing stale-build
 behavior as if it were current.
+
+## Wrong-player selection RECURRED with the [43,48] freeze in place — root-caused and re-fixed (2026-07-20)
+
+User report (2026-07-19 ~22:09-22:11 session in `DEBUG.txt`): clicked "lv35 HYUCKUMEN" in the
+ranked list, confirmation popup showed "lv25 castroluisangel99" — with the 2026-07-18
+`IsRankedConfirmationInProgress()` freeze (state==4 && state1 in [43,48]) already deployed.
+
+### How the game actually resolves a click (new RE, from the disasm dump)
+
+- **`FUN_004a89d0`** (called from the confirm state machine `FUN_004ac6c0`, NOT from the
+  input frame itself): reads `perm[*(screenCtrl+0x1EC)]` (the +0xaf4 permutation indexed by
+  the controller's cursor) and latches the resulting LOGICAL row index as a **byte** into a
+  0x408-byte connect-request struct at `listStruct+0x3D8` (index at request+0x36D = abs
+  +0x745; request type at +0x374 = abs +0x74C, type 1), then hands the request to the mgr
+  via `FUN_004a56b0` → listStruct vtable slot 4.
+- **`FUN_0046dfa0`** consumes the request LATER: re-walks the node chain with the latched
+  index (`FUN_004a5450`), reads the identity sub-object (entry+0x114 → +0x4/+0x8) as the
+  connect-target Steam ID, and pulls the popup's display fields via entry vtable calls.
+- So there is a multi-frame **latch → resolve gap**, and (per the header comment, still
+  true) the connect flow re-resolves through the same perm/node structures every frame.
+
+### Why the [43,48] freeze was insufficient (log evidence)
+
+`state1` transition trace around the bad click (22:09:44): `39 → 43 → 44 → 46 → 48 → 30`,
+with standalone `state1=42` samples in other clicks. Two uncovered windows:
+
+1. **state1 40-42**: the click has been pressed and the state machine is mid-latch/resolve,
+   but the freeze only engaged at 43. A 400ms live pass landing there mutates the node
+   payloads between latch and resolve.
+2. **state1=30** (harness-confirmed: ranked search ENTRY menu, also where the flow parks
+   after 48): the freeze released the moment state1 left 48, while the connect flow was
+   still live — and the log shows live passes/payload swaps continuing at 22:10:45,
+   22:11:05, 22:11:15, 22:11:20 during state1=30. Deliveries keep arriving in the
+   background there too.
+
+Additionally, the log shows the *navigation-time* hazard directly: at 22:09:39.4-40.6 three
+rows were live-hidden within 1.2s (12→10→9 shown), shifting every row below them up while
+the user was aiming — the widget cursor is a raw slot index, so the highlighted player
+changes under the cursor on every insert/remove/re-sort.
+
+### Fix (both halves, shipped this session)
+
+1. `IsRankedConfirmationInProgress()` (blacklist [43,48]) replaced with
+   `IsRankedListSafeToMutate()` (whitelist): live mutations run ONLY while state==4 &&
+   state1 in {36,38,39} (the browsable-results band). Any other ranked state freezes the
+   pass entirely. state!=4 / unreadable struct keeps the old non-frozen behavior so
+   cleanup-outside-ranked is unchanged. Freeze engage/release is logged once per
+   transition ("live mutations FROZEN/resumed"), gated on the pipeline being active.
+2. **Cursor follow**: the live pass now records which physical node the widget cursor sits
+   on before the partition (perm[cursor] pre-pass), and after rewriting the permutation it
+   moves the cursor to that same player's new display slot (scroll window adjusted, same
+   invariants as the widget fixup). If the cursor's row got hidden, the existing clamp
+   behavior stands. Logged as "cursor follow: slot A -> B".
+
+`ResolveRankedResultWidget()` was extracted from `FixupRankedResultWidget()` for reuse.
+
+### Verification protocol
+
+1. On the results list, watch a reorder happen while the cursor is parked on a player:
+   the highlight must stay on that player's name (grep `cursor follow:`).
+2. Click a player and check `live mutations FROZEN` appears at/just after the click, and
+   `resumed` only after returning to the browsable list.
+3. The confirmation popup name must match the clicked row every time.
+4. Confirm hidden/restored rows still enter/leave the list live while browsing (the
+   freeze must not stick while state1 is 36/38/39).
