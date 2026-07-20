@@ -38,6 +38,7 @@ namespace {
 		{ "CheckUpdates", "Check for updates", "Interface", "Checks GitHub releases for a newer Improvement Mod version." },
 		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes DEBUG.txt with detailed runtime information for troubleshooting." },
 		{ "DCodeAutoRecover", "D-Code auto recovery", "Debug", "Detects the D-Code fetch wedge (profile payload rejected / stalled), dumps evidence to BBCF_IM, and forces the game's own retry path. Max 3 retries per slot per session." },
+		{ "SpectatorSyncHooksEnabled", "Spectator desync fix", "Debug", "While spectating, repeats the players' last known inputs for a moment when new ones haven't arrived yet, instead of letting the game guess with empty inputs (which permanently desyncs the spectated match). Only affects spectator mode. Turn off to fall back to vanilla (unfixed) behavior. Requires a game restart to take effect." },
 		{ "DCodeForceFailureOnce", "Force D-Code failure (test)", "Debug", "TEST ONLY: corrupts the first in-flight profile fetch after launch so the game rejects it, to verify D-Code failure detection and auto recovery. Fires once per launch while enabled." },
 		{ "DebugLogSessionHistory", "Debug log session history", "Debug", "Number of previous sessions' DEBUG.txt files kept in BBCF_IM\\DebugHistory (rotated at launch). 0 overwrites DEBUG.txt every launch like before." },
 		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows the ranked progress overlay while ranked data is available." },
@@ -250,6 +251,7 @@ namespace {
 			"DinputDllWrapper",
 			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks",
 			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
+			"SpectatorSyncHooksEnabled",
 			nullptr
 		};
 		for (int i = 0; kRestartKeys[i]; ++i)

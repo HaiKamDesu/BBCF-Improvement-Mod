@@ -2,8 +2,8 @@
   "exe": "C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x86\\cdb.exe",
   "args": [
     "-z",
-    "C:\\Users\\Usuario\\AppData\\Local\\CrashDumps\\BBCF.exe.32372.dmp",
+    "C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportArchive\\BBCF_LocalDumps\\BBCF.exe.42608.dmp",
     "-cf",
-    "C:\\Users\\Usuario\\source\\repos\\HaiKamDesu\\BBCF-Improvement-Mod\\tools\\cdb_ranked_crash_cmds.txt"
+    "C:\\Users\\Usuario\\source\\repos\\HaiKamDesu\\BBCF-Improvement-Mod\\tools\\cdb_spectator_crash_cmds.txt"
   ]
 }

@@ -1,0 +1,6 @@
+.ecxr
+kb 60
+~*kb 30
+lm m dinput8
+lm m BBCF
+q

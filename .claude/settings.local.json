@@ -177,7 +177,12 @@
       "Bash(sed -n '/^  004B9700:/,/^  004B97D0:/p' /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/d6ff33cc-07dd-4012-b837-60818f4782b1/scratchpad/disasm.txt)",
       "Bash(sed -n '/^  004C1380:/,/^  004C13C0:/p' /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/d6ff33cc-07dd-4012-b837-60818f4782b1/scratchpad/disasm.txt)",
       "Bash(sed -n '/void RankedListConnectionFilter::OnSteamCallbacksPump/,/^}/p' /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Network/RankedListConnectionFilter.cpp)",
-      "Bash(sed -n '/void RankedListConnectionFilter::OnJoinLobbyAttempt/,/^}/p' /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Network/RankedListConnectionFilter.cpp)"
+      "Bash(sed -n '/void RankedListConnectionFilter::OnJoinLobbyAttempt/,/^}/p' /mnt/c/Users/Usuario/source/repos/HaiKamDesu/BBCF-Improvement-Mod/src/Network/RankedListConnectionFilter.cpp)",
+      "Bash(grep -iE \" error |dinput8.dll$|Build FAILED\")",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /v:m)",
+      "Bash(unzip -o \"BBCF.IM.win-x86.v8.0.zip\" dinput8.dll -d .)",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=ReleaseDeploy /p:Platform=Win32 /p:PlatformToolset=v143 /v:m)",
+      "Bash(grep -iE \" error |dinput8.dll$|copied|Build FAILED\")"
     ]
   }
 }

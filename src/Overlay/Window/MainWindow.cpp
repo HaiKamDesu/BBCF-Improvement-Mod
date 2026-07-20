@@ -183,14 +183,22 @@ void MainWindow::DrawLanguageSelector()
 void MainWindow::DrawUtilButtons() const
 {
 #ifdef _DEBUG
-	if (ImGui::Button("DEBUG", BTN_SIZE))
-	{
-		m_pWindowContainer->GetWindow(WindowType_Debug)->ToggleOpen();
-	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(Messages.Debug_window_tooltip());
-	ImGui::SameLine();
+	const bool showDebugButton = true;
+#else
+	// Debug builds always get the DEBUG window; other builds only show it once
+	// the user opts into dev/diagnostic tooling (settings.def: EnableInDevelopmentFeatures).
+	const bool showDebugButton = Settings::settingsIni.enableInDevelopmentFeatures;
 #endif
+	if (showDebugButton)
+	{
+		if (ImGui::Button("DEBUG", BTN_SIZE))
+		{
+			m_pWindowContainer->GetWindow(WindowType_Debug)->ToggleOpen();
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(Messages.Debug_window_tooltip());
+		ImGui::SameLine();
+	}
 
 	if (ImGui::Button(Messages.Log(), BTN_SIZE))
 	{

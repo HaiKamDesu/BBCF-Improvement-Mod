@@ -640,10 +640,10 @@ void DebugWindow::DrawSpectatorSyncSection()
 		status.nextInputToSend, status.maxReceivedFrame,
 		(status.nextInputToSend >= 0 && status.maxReceivedFrame >= 0)
 			? status.maxReceivedFrame - status.nextInputToSend : -1);
-	ImGui::Text("Sync failures: %d | zero-input advances: %d | forced stalls: %d",
-		status.spectatorErrors, status.zeroInputAdvances, status.forcedStalls);
-
-	ImGui::Checkbox("SpectatorSyncFailStall (the fix)", &Settings::settingsIni.spectatorSyncFailStall);
+	ImGui::Text("Starvations: %d | vanilla advance-with-zero (desync-prone): %d | stalls: %d",
+		status.starvationCount, status.zeroInputAdvances, status.stalls);
+	ImGui::Text("Last gate scene-state: (%d, %d, %d)", status.sceneA, status.sceneB, status.sceneC);
+	ImGui::TextUnformatted("Instrumentation only -- vanilla behavior is unchanged this build.");
 
 	static int injectFrames = 10;
 	ImGui::PushItemWidth(120.0f);
@@ -652,7 +652,7 @@ void DebugWindow::DrawSpectatorSyncSection()
 	if (injectFrames < 1) injectFrames = 1;
 	if (injectFrames > 600) injectFrames = 600;
 	ImGui::SameLine();
-	if (ImGui::Button("Inject desync"))
+	if (ImGui::Button("Inject starvation"))
 	{
 		SpectatorSyncDiagnostics::InjectDesync(injectFrames);
 	}
@@ -661,8 +661,9 @@ void DebugWindow::DrawSpectatorSyncSection()
 		ImGui::SameLine();
 		ImGui::Text("injecting... %d left", status.injectRemaining);
 	}
-	ImGui::TextUnformatted("Fix OFF: expect the spectated match to visibly desync.");
-	ImGui::TextUnformatted("Fix ON: expect only a brief pause, match stays correct.");
+	ImGui::TextUnformatted("Forces N frames of SyncInput starvation so vanilla's real response");
+	ImGui::TextUnformatted("can be observed: a pause in normal states, or advance-with-zero in");
+	ImGui::TextUnformatted("transition states -- watch whether the latter visibly desyncs.");
 }
 
 void DebugWindow::DrawRoomSection()

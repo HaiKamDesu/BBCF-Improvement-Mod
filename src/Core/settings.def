@@ -41,12 +41,19 @@ SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
 // the receive buffer so the game's checksum rejects it) to exercise the state-6
 // wedge + auto-recovery end-to-end. Fires once per launch while set to 1.
 SETTING(bool, dcodeForceFailureOnce, "DCodeForceFailureOnce", "0");
-// Spectator desync candidate fix: when the spectator's SynchronizeInput fails
-// (input not yet received), always stall the frame instead of letting the game
-// advance the simulation with zeroed inputs (the desync mechanism at VA
-// 0x4E60D5). Log-only diagnostics run regardless; this flips the actual fix.
-// See docs/Research/SpectatorDesyncInvestigation.md.
-SETTING(bool, spectatorSyncFailStall, "SpectatorSyncFailStall", "0");
+// Spectator desync fix: when the spectator's SyncInput would report starvation
+// (input not yet received over the network), substitutes the previous frame's real
+// input instead of letting the game's caller advance the simulation with a fake
+// zeroed input (the desync mechanism). Always active while spectatorSyncHooksEnabled
+// is on -- there is no separate on/off toggle for the fix itself, since substitution
+// is unconditionally safer than both the original bug and the retired "force stall"
+// attempt (see docs/Research/SpectatorDesyncInvestigation.md for why that one
+// crashed the game with a GGPO event-queue assertion, and why this design doesn't).
+// Kill-switch for the spectator-sync hooks (SpectatorSyncInputEntry +
+// SpectatorSyncStarvation). 1 = install as normal (default). 0 = don't install them
+// at all, falling back to pure vanilla behavior (the original desync bug, unfixed).
+// Read at startup only -- requires a restart to take effect either way.
+SETTING(bool, spectatorSyncHooksEnabled, "SpectatorSyncHooksEnabled", "1");
 // Force Platinum's random personality/voice pick (Sena/Luna) instead of letting the
 // game roll it: 0 = Default (vanilla RNG), 1 = force Luna, 2 = force Sena. Enum options
 // rendered by SettingsIniWindow.cpp's kSettingEnumMetadata. Overwrites the game's own
