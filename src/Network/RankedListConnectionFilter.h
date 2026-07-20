@@ -149,6 +149,9 @@ public:
 		ConnectionFailed, // a real join attempt failed recently
 		NetworkFilter,    // Delay rating below the Network Filter floor
 		Requirement,      // room's connection requirement not met by us
+		RoomClosed,       // Steam says the lobby no longer exists (join would fail response=2)
+		RoomFull,         // lobby already has 2+ members (join would fail response=4)
+		RoomBroken,       // join succeeded but the host's game never engaged (zombie room)
 	};
 	struct HiddenPeerInfo
 	{
@@ -247,6 +250,46 @@ private:
 		int internalRankLevel = -1; // from "RANK_HOST_LEVEL" lobby metadata (visible level - 1); -1 = unknown
 	};
 
+	// Matchmaking-layer liveness of one listed lobby, refreshed by the
+	// RequestLobbyData round-robin (PollLobbyLiveness) and by join outcomes.
+	// This is the same source of truth Steam itself consults at join time, so
+	// "exists=false" here IS the future "LobbyEnter failed response=2", and
+	// "members>=2" IS the future response=4 - detected before the click.
+	struct LobbyLiveness
+	{
+		uint64_t lobbyId = 0;
+		uint64_t ownerSteamId = 0;
+		unsigned long long lastRequestTickMs = 0; // last RequestLobbyData we issued
+		unsigned long long lastUpdateTickMs = 0;  // last LobbyDataUpdate_t received
+		unsigned long long lastListedTickMs = 0;  // last time a delivery listed it (prune anchor)
+		bool known = false;    // at least one LobbyDataUpdate received
+		bool exists = true;    // false once Steam reports the lobby gone
+		int members = -1;      // GetNumLobbyMembers at last update
+		int memberMax = -1;    // GetLobbyMemberLimit at last update
+		// Raw metadata captured for failure-class discrimination (layer 3
+		// instrumentation): dumped at join time and on change, so the exact
+		// pre-join state of every failed room is in DEBUG.txt.
+		std::string sessionFlag;   // PLAYER_SESSION_FLAG
+		std::string sessionValue;  // PLAYER_SESSION_VALUE
+		std::string networkVersion;
+	};
+
+	// A (lobbyId -> owner) marked broken: a join on this exact lobby was
+	// accepted at the Steam layer but the host's game never engaged (the
+	// ~0.5s back-out / RankMatchLeaveMyself classes). Persistent for as long
+	// as the host keeps advertising THIS lobby id - a wedged client keeps its
+	// zombie lobby alive for hours (live-proven: same lobby id failing from
+	// 22:38 to 00:56 on 2026-07-19/20). Cleared the moment the owner shows up
+	// with a DIFFERENT lobby id (client restarted / made a fresh room - the
+	// "known recovered" signal), or by manual restore.
+	struct BrokenLobbyInfo
+	{
+		uint64_t ownerSteamId = 0;
+		unsigned long long markTickMs = 0;
+		int failCount = 0;
+		std::string reason;
+	};
+
 	// The delivery pipeline (proxy + reorder/compaction) runs when EITHER the
 	// hide-unreachable filter or a non-default sort order is active - the two
 	// features are independent.
@@ -327,12 +370,34 @@ private:
 	// Direct result of JoinLobby(): fires even when the join itself is rejected
 	// outright, a distinct failure mode from the RankMatchLeaveMyself timeout.
 	STEAM_CALLBACK(RankedListConnectionFilter, OnLobbyEnter, LobbyEnter_t);
+	// Answer to RequestLobbyData(): m_bSuccess==0 means the lobby no longer
+	// exists; success refreshes member count and metadata in m_lobbyLiveness.
+	STEAM_CALLBACK(RankedListConnectionFilter, OnLobbyDataUpdate, LobbyDataUpdate_t);
+
+	// Round-robin RequestLobbyData over the current candidates (rate-limited,
+	// see kLivenessRequestSpacingMs) so every listed room's existence and
+	// occupancy stay fresh while the list is on screen. Called from the pump.
+	void PollLobbyLiveness();
+	// Marks (lobbyId, owner) broken after a join the Steam layer accepted but
+	// the host's game never engaged. Idempotent; bumps failCount.
+	void MarkLobbyBroken(uint64_t lobbyId, uint64_t ownerSteamId, const char* reason);
+	// One-line dump of a lobby's cached liveness for the join-window logs.
+	std::string DescribeLobbyLiveness(uint64_t lobbyId) const;
 
 	std::unordered_map<uint64_t, PeerVerdict> m_verdicts;
 	// steamId -> probe start tick, for measuring establishment time.
 	std::unordered_map<uint64_t, unsigned long long> m_probesInFlight;
 	std::vector<LobbyCandidate> m_candidates;
 	std::vector<uint64_t> m_reachableLobbies;
+	// Matchmaking-layer state per listed lobby (keyed by lobbyId).
+	std::unordered_map<uint64_t, LobbyLiveness> m_lobbyLiveness;
+	// Zombie rooms (keyed by lobbyId) - see BrokenLobbyInfo.
+	std::unordered_map<uint64_t, BrokenLobbyInfo> m_brokenLobbies;
+	// Rate limiter for PollLobbyLiveness' RequestLobbyData calls.
+	unsigned long long m_lastLivenessRequestTickMs = 0;
+	// GetTickCount64() of the last JoinLobby attempt, for elapsed-time in the
+	// join-outcome logs (discriminates instant rejections from timeouts).
+	unsigned long long m_pendingJoinTickMs = 0;
 	bool m_hasRemapResult = false;
 	PipelineState m_pipelineState = PipelineState::Idle;
 	uint64_t m_pendingApiCall = 0;

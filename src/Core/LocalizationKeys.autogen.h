@@ -756,6 +756,15 @@ struct LocalizationKeysAccessor
         // unreachable
         inline const char* unreachable() const { return Get("unreachable"); }
 
+        // room closed
+        inline const char* room_closed() const { return Get("room closed"); }
+
+        // room full
+        inline const char* room_full() const { return Get("room full"); }
+
+        // room broken (host stuck)
+        inline const char* room_broken_host_stuck() const { return Get("room broken (host stuck)"); }
+
         // Ranked ladder
         inline const char* Ranked_ladder() const { return Get("Ranked ladder"); }
 

@@ -266,6 +266,15 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 			case RankedListConnectionFilter::HiddenReason::Requirement:
 				reasonText = L("network requirements not met");
 				break;
+			case RankedListConnectionFilter::HiddenReason::RoomClosed:
+				reasonText = L("room closed");
+				break;
+			case RankedListConnectionFilter::HiddenReason::RoomFull:
+				reasonText = L("room full");
+				break;
+			case RankedListConnectionFilter::HiddenReason::RoomBroken:
+				reasonText = L("room broken (host stuck)");
+				break;
 			default:
 				reasonText = L("unreachable");
 				break;

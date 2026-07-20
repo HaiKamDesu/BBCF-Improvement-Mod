@@ -191,6 +191,39 @@ namespace
 	// to bound log spam/repeated virtual-call cost, not a real limit on the
 	// game's own row count.
 	constexpr int kMaxDiagnosticRows = 32;
+
+	// Matchmaking-layer liveness polling (RequestLobbyData round-robin).
+	// Spacing bounds the request rate at ~4/s (Steam's limits are
+	// undocumented - watch a test session's log for LobbyDataUpdate callbacks
+	// drying up, the throttling symptom); the interval is how stale a single
+	// lobby's data may get with a full 20-lobby list (20 * 250ms = 5s cycle,
+	// matching the interval exactly).
+	constexpr unsigned long long kLivenessRequestSpacingMs = 250;
+	constexpr unsigned long long kLobbyLivenessIntervalMs = 5 * 1000;
+	// Liveness entries whose lobby stopped being listed get pruned; broken-
+	// lobby marks are kept much longer (a wedged host keeps its zombie lobby
+	// alive for hours) but still pruned eventually as a leak guard.
+	constexpr unsigned long long kLivenessPruneMs = 10 * 60 * 1000;
+	constexpr unsigned long long kBrokenLobbyPruneMs = 3 * 60 * 60 * 1000;
+
+	const char* ChatRoomEnterResponseName(unsigned int response)
+	{
+		switch (response)
+		{
+		case 1: return "Success";
+		case 2: return "DoesntExist";
+		case 3: return "NotAllowed";
+		case 4: return "Full";
+		case 5: return "Error";
+		case 6: return "Banned";
+		case 7: return "Limited";
+		case 8: return "ClanDisabled";
+		case 9: return "CommunityBan";
+		case 10: return "MemberBlockedYou";
+		case 11: return "YouBlockedMember";
+		default: return "Unknown";
+		}
+	}
 }
 
 RankedListConnectionFilter::RankedListConnectionFilter()
@@ -424,6 +457,68 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		}
 		m_candidates.push_back(candidate);
 		StartProbeIfNeeded(candidate.ownerSteamId);
+
+		// Seed/refresh the matchmaking-layer liveness entry. Being listed in a
+		// fresh delivery counts as existing (Steam just returned it), but the
+		// member count still comes from the RequestLobbyData round-robin.
+		const unsigned long long nowMs = GetTickCount64();
+		LobbyLiveness& liveness = m_lobbyLiveness[candidate.lobbyId];
+		liveness.lobbyId = candidate.lobbyId;
+		liveness.ownerSteamId = candidate.ownerSteamId;
+		liveness.lastListedTickMs = nowMs;
+		liveness.exists = true;
+
+		// Broken-lobby recovery signal: the owner is advertising a DIFFERENT
+		// lobby id than the one marked broken - their client made a fresh
+		// room, so the wedge is over. Clear every stale mark for this owner.
+		if (candidate.ownerSteamId != 0)
+		{
+			for (auto it = m_brokenLobbies.begin(); it != m_brokenLobbies.end();)
+			{
+				if (it->second.ownerSteamId == candidate.ownerSteamId &&
+					it->first != candidate.lobbyId)
+				{
+					LOG(1, "[RankedListFilter] broken-room mark cleared: owner=%llu (%s) now advertises lobby=%llu (broken one was %llu)\n",
+						static_cast<unsigned long long>(candidate.ownerSteamId),
+						candidate.ownerName.empty() ? "?" : candidate.ownerName.c_str(),
+						static_cast<unsigned long long>(candidate.lobbyId),
+						static_cast<unsigned long long>(it->first));
+					it = m_brokenLobbies.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+		}
+	}
+
+	// Prune liveness entries whose lobby hasn't been listed for a while, and
+	// (leak guard only) very old broken marks.
+	{
+		const unsigned long long nowMs = GetTickCount64();
+		for (auto it = m_lobbyLiveness.begin(); it != m_lobbyLiveness.end();)
+		{
+			if (nowMs - it->second.lastListedTickMs > kLivenessPruneMs)
+			{
+				it = m_lobbyLiveness.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+		for (auto it = m_brokenLobbies.begin(); it != m_brokenLobbies.end();)
+		{
+			if (nowMs - it->second.markTickMs > kBrokenLobbyPruneMs)
+			{
+				it = m_brokenLobbies.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
 	}
 
 	// Deliver immediately, always - no hold. Hiding uses whatever the
@@ -1304,6 +1399,50 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			reason = (verdictIt != m_verdicts.end() && verdictIt->second.reactiveFailCount > 0)
 				? HiddenReason::ConnectionFailed : HiddenReason::Unreachable;
 		}
+		// Matchmaking-layer checks: dead room (would fail response=2), full
+		// room (would fail response=4), and zombie room (join succeeds but
+		// the host's game never engages). All keyed via the row's candidate
+		// lobby. Gated on the master connection-filter toggle like the
+		// reputation hides.
+		if (!hide && !restoreExempt && filterEnabled && row.steamId != 0)
+		{
+			const LobbyCandidate* rowCandidate = nullptr;
+			for (const LobbyCandidate& candidate : m_candidates)
+			{
+				if (candidate.ownerSteamId == row.steamId)
+				{
+					rowCandidate = &candidate;
+					break;
+				}
+			}
+			if (rowCandidate != nullptr)
+			{
+				if (m_brokenLobbies.find(rowCandidate->lobbyId) != m_brokenLobbies.end())
+				{
+					hide = true;
+					reason = HiddenReason::RoomBroken;
+				}
+				else
+				{
+					const auto livenessIt = m_lobbyLiveness.find(rowCandidate->lobbyId);
+					if (livenessIt != m_lobbyLiveness.end() && livenessIt->second.known)
+					{
+						const LobbyLiveness& liveness = livenessIt->second;
+						const int fullAt = (liveness.memberMax > 0) ? liveness.memberMax : 2;
+						if (!liveness.exists)
+						{
+							hide = true;
+							reason = HiddenReason::RoomClosed;
+						}
+						else if (liveness.members >= fullAt)
+						{
+							hide = true;
+							reason = HiddenReason::RoomFull;
+						}
+					}
+				}
+			}
+		}
 		const int delayDigit = GameDelayDigitFromRtt(row.rttMs);
 		if (!hide && !restoreExempt && networkFloor > 0 && delayDigit >= 0 && delayDigit < networkFloor)
 		{
@@ -2154,6 +2293,7 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	// every few seconds and picks up the results).
 	PollProbes();
 	PollPendingConnectionConfirmation();
+	PollLobbyLiveness();
 
 	// Periodic whole-list reachability recheck - hidden entries included, so
 	// recovered peers get restored live (see kListRecheckIntervalMs).
@@ -2225,6 +2365,23 @@ void RankedListConnectionFilter::OnJoinLobbyAttempt(uint64_t lobbyId, uint64_t l
 {
 	m_pendingLobbyId = lobbyId;
 	m_pendingConnectionTarget = lobbyOwnerSteamId;
+	m_pendingJoinTickMs = GetTickCount64();
+
+	// Layer-3 instrumentation: the exact pre-join matchmaking state, so every
+	// failure that follows can be discriminated post-mortem from the log.
+	LOG(1, "[RankedListFilter] join attempt: lobby=%llu owner=%llu | pre-join %s\n",
+		static_cast<unsigned long long>(lobbyId),
+		static_cast<unsigned long long>(lobbyOwnerSteamId),
+		DescribeLobbyLiveness(lobbyId).c_str());
+
+	// Fire a fresh data request immediately - if the join fails, the answer
+	// (often arriving within the failure window) captures the room's true
+	// state at failure time.
+	if (g_interfaces.pSteamMatchmakingWrapper != nullptr &&
+		g_interfaces.pSteamMatchmakingWrapper->m_SteamMatchmaking != nullptr)
+	{
+		g_interfaces.pSteamMatchmakingWrapper->m_SteamMatchmaking->RequestLobbyData(CSteamID(lobbyId));
+	}
 }
 
 void RankedListConnectionFilter::OnMatchStarted()
@@ -2254,8 +2411,35 @@ void RankedListConnectionFilter::OnLobbyEnter(LobbyEnter_t* pParam)
 		return;
 	}
 
+	const unsigned int response = static_cast<unsigned int>(pParam->m_EChatRoomEnterResponse);
+	const uint64_t lobbyId = pParam->m_ulSteamIDLobby;
+	const unsigned long long now = GetTickCount64();
+	LOG(1, "[RankedListFilter] join outcome: LobbyEnter FAILED response=%u(%s) lobby=%llu elapsedMs=%llu | %s\n",
+		response, ChatRoomEnterResponseName(response),
+		static_cast<unsigned long long>(lobbyId),
+		m_pendingJoinTickMs != 0 ? now - m_pendingJoinTickMs : 0ull,
+		DescribeLobbyLiveness(lobbyId).c_str());
+
+	// Feed the outcome back into the liveness cache so the row hides
+	// immediately (the poll would learn the same thing a few seconds later).
+	const auto livenessIt = m_lobbyLiveness.find(lobbyId);
+	if (livenessIt != m_lobbyLiveness.end())
+	{
+		livenessIt->second.known = true;
+		livenessIt->second.lastUpdateTickMs = now;
+		if (response == k_EChatRoomEnterResponseDoesntExist)
+		{
+			livenessIt->second.exists = false;
+		}
+		else if (response == k_EChatRoomEnterResponseFull)
+		{
+			livenessIt->second.members = (livenessIt->second.memberMax > 0)
+				? livenessIt->second.memberMax : 2;
+		}
+	}
+
 	char reason[48];
-	sprintf_s(reason, "LobbyEnter failed response=%u", static_cast<unsigned int>(pParam->m_EChatRoomEnterResponse));
+	sprintf_s(reason, "LobbyEnter failed response=%u", response);
 	NotifyConnectionAttemptFailed(reason);
 }
 
@@ -2263,20 +2447,197 @@ void RankedListConnectionFilter::OnLeaveLobby(uint64_t lobbyId)
 {
 	if (lobbyId != 0 && lobbyId == m_pendingLobbyId && m_pendingConnectionTarget != 0)
 	{
+		const unsigned long long now = GetTickCount64();
+		LOG(1, "[RankedListFilter] join outcome: LeaveLobby before match start lobby=%llu elapsedMs=%llu | %s\n",
+			static_cast<unsigned long long>(lobbyId),
+			m_pendingJoinTickMs != 0 ? now - m_pendingJoinTickMs : 0ull,
+			DescribeLobbyLiveness(lobbyId).c_str());
+		// The Steam layer accepted the join (no LobbyEnter failure preceded
+		// this) but the game backed out before a match - the zombie-room
+		// class. Mark THIS lobby broken persistently; the 2-minute reputation
+		// hide below still applies as the immediate reaction.
+		MarkLobbyBroken(lobbyId, m_pendingConnectionTarget, "join accepted, game backed out pre-match");
 		MarkUnreachable(m_pendingConnectionTarget, "LeaveLobby before match start");
 	}
 	m_pendingLobbyId = 0;
 	m_pendingConnectionTarget = 0;
+	m_pendingJoinTickMs = 0;
 }
 
 void RankedListConnectionFilter::NotifyConnectionAttemptFailed(const char* reason)
 {
 	if (m_pendingConnectionTarget != 0)
 	{
+		// The RankMatchLeaveMyself timeout (~34s RTT-check stall) is also a
+		// host-side wedge - the Steam join worked, the host never talked.
+		// LobbyEnter failures come through here too, but those clear
+		// m_pendingLobbyId semantics differently: only mark broken when the
+		// failure is NOT a Steam-layer rejection (those are RoomClosed/
+		// RoomFull, already fed into the liveness cache by OnLobbyEnter).
+		if (m_pendingLobbyId != 0 && strncmp(reason, "LobbyEnter", 10) != 0)
+		{
+			MarkLobbyBroken(m_pendingLobbyId, m_pendingConnectionTarget, reason);
+		}
 		MarkUnreachable(m_pendingConnectionTarget, reason);
 	}
 	m_pendingLobbyId = 0;
 	m_pendingConnectionTarget = 0;
+	m_pendingJoinTickMs = 0;
+}
+
+void RankedListConnectionFilter::OnLobbyDataUpdate(LobbyDataUpdate_t* pParam)
+{
+	if (pParam == nullptr)
+	{
+		return;
+	}
+	// Member-scoped updates (lobby != member) carry per-member data we don't
+	// use; the lobby-wide answer is what liveness needs.
+	if (pParam->m_ulSteamIDLobby != pParam->m_ulSteamIDMember)
+	{
+		return;
+	}
+	const auto it = m_lobbyLiveness.find(pParam->m_ulSteamIDLobby);
+	if (it == m_lobbyLiveness.end())
+	{
+		return; // not one of ours (the game requests lobby data too)
+	}
+	LobbyLiveness& liveness = it->second;
+	const unsigned long long now = GetTickCount64();
+	const bool firstUpdate = !liveness.known;
+	const bool wasExisting = liveness.exists;
+	const int prevMembers = liveness.members;
+	liveness.known = true;
+	liveness.lastUpdateTickMs = now;
+
+	if (!pParam->m_bSuccess)
+	{
+		liveness.exists = false;
+		if (wasExisting || firstUpdate)
+		{
+			LOG(1, "[RankedListFilter] lobby liveness: lobby=%llu owner=%llu ROOM CLOSED (Steam: lobby no longer exists)\n",
+				static_cast<unsigned long long>(liveness.lobbyId),
+				static_cast<unsigned long long>(liveness.ownerSteamId));
+		}
+		return;
+	}
+
+	liveness.exists = true;
+	ISteamMatchmaking* const raw =
+		(g_interfaces.pSteamMatchmakingWrapper != nullptr)
+		? g_interfaces.pSteamMatchmakingWrapper->m_SteamMatchmaking : nullptr;
+	if (raw != nullptr)
+	{
+		const CSteamID lobby(liveness.lobbyId);
+		liveness.members = raw->GetNumLobbyMembers(lobby);
+		liveness.memberMax = raw->GetLobbyMemberLimit(lobby);
+		const char* const sessionFlag = raw->GetLobbyData(lobby, "PLAYER_SESSION_FLAG");
+		const char* const sessionValue = raw->GetLobbyData(lobby, "PLAYER_SESSION_VALUE");
+		const char* const networkVersion = raw->GetLobbyData(lobby, "NETWORK_VERSION");
+		liveness.sessionFlag = (sessionFlag != nullptr) ? sessionFlag : "";
+		liveness.sessionValue = (sessionValue != nullptr) ? sessionValue : "";
+		liveness.networkVersion = (networkVersion != nullptr) ? networkVersion : "";
+	}
+
+	// Log on first observation and on any state change (existence flip back,
+	// member count change) - quiet while nothing moves, so the round-robin
+	// doesn't flood the log.
+	if (firstUpdate || !wasExisting || liveness.members != prevMembers)
+	{
+		LOG(1, "[RankedListFilter] lobby liveness: lobby=%llu owner=%llu %s members=%d/%d sessionFlag='%s' sessionValue='%s' netVer='%s'\n",
+			static_cast<unsigned long long>(liveness.lobbyId),
+			static_cast<unsigned long long>(liveness.ownerSteamId),
+			wasExisting ? "update" : "ROOM ALIVE AGAIN",
+			liveness.members, liveness.memberMax,
+			liveness.sessionFlag.c_str(), liveness.sessionValue.c_str(),
+			liveness.networkVersion.c_str());
+	}
+}
+
+void RankedListConnectionFilter::PollLobbyLiveness()
+{
+	if (!m_hasRemapResult || m_candidates.empty() || !IsPipelineActive() ||
+		g_interfaces.pSteamMatchmakingWrapper == nullptr ||
+		g_interfaces.pSteamMatchmakingWrapper->m_SteamMatchmaking == nullptr)
+	{
+		return;
+	}
+	const unsigned long long now = GetTickCount64();
+	if (now - m_lastLivenessRequestTickMs < kLivenessRequestSpacingMs)
+	{
+		return;
+	}
+
+	// Pick the candidate whose liveness data is oldest (never-requested wins),
+	// skipping any that were requested recently enough.
+	LobbyLiveness* stalest = nullptr;
+	for (const LobbyCandidate& candidate : m_candidates)
+	{
+		const auto it = m_lobbyLiveness.find(candidate.lobbyId);
+		if (it == m_lobbyLiveness.end())
+		{
+			continue; // seeded at delivery; absent means pruned/stale row
+		}
+		LobbyLiveness& liveness = it->second;
+		if (now - liveness.lastRequestTickMs < kLobbyLivenessIntervalMs)
+		{
+			continue;
+		}
+		if (stalest == nullptr || liveness.lastRequestTickMs < stalest->lastRequestTickMs)
+		{
+			stalest = &liveness;
+		}
+	}
+	if (stalest == nullptr)
+	{
+		return;
+	}
+	stalest->lastRequestTickMs = now;
+	m_lastLivenessRequestTickMs = now;
+	g_interfaces.pSteamMatchmakingWrapper->m_SteamMatchmaking->RequestLobbyData(CSteamID(stalest->lobbyId));
+	LOG(7, "[RankedListFilter] liveness poll: RequestLobbyData lobby=%llu\n",
+		static_cast<unsigned long long>(stalest->lobbyId));
+}
+
+void RankedListConnectionFilter::MarkLobbyBroken(uint64_t lobbyId, uint64_t ownerSteamId, const char* reason)
+{
+	if (lobbyId == 0)
+	{
+		return;
+	}
+	BrokenLobbyInfo& info = m_brokenLobbies[lobbyId];
+	info.ownerSteamId = ownerSteamId;
+	info.markTickMs = GetTickCount64();
+	++info.failCount;
+	info.reason = (reason != nullptr) ? reason : "";
+	LOG(1, "[RankedListFilter] room marked BROKEN: lobby=%llu owner=%llu failCount=%d reason='%s' - hidden until the owner advertises a new lobby\n",
+		static_cast<unsigned long long>(lobbyId),
+		static_cast<unsigned long long>(ownerSteamId),
+		info.failCount, info.reason.c_str());
+}
+
+std::string RankedListConnectionFilter::DescribeLobbyLiveness(uint64_t lobbyId) const
+{
+	char buf[256];
+	const auto it = m_lobbyLiveness.find(lobbyId);
+	if (it == m_lobbyLiveness.end())
+	{
+		snprintf(buf, sizeof(buf), "liveness: untracked");
+		return buf;
+	}
+	const LobbyLiveness& liveness = it->second;
+	const unsigned long long now = GetTickCount64();
+	const auto brokenIt = m_brokenLobbies.find(lobbyId);
+	snprintf(buf, sizeof(buf),
+		"liveness: known=%d exists=%d members=%d/%d sessionFlag='%s' sessionValue='%s' netVer='%s' dataAgeMs=%llu listedAgeMs=%llu%s",
+		liveness.known ? 1 : 0, liveness.exists ? 1 : 0,
+		liveness.members, liveness.memberMax,
+		liveness.sessionFlag.c_str(), liveness.sessionValue.c_str(),
+		liveness.networkVersion.c_str(),
+		liveness.lastUpdateTickMs != 0 ? now - liveness.lastUpdateTickMs : 0ull,
+		liveness.lastListedTickMs != 0 ? now - liveness.lastListedTickMs : 0ull,
+		(brokenIt != m_brokenLobbies.end()) ? " [MARKED BROKEN]" : "");
+	return buf;
 }
 
 bool RankedListConnectionFilter::IsSteamIdFiltered(uint64_t steamId) const
@@ -2321,7 +2682,20 @@ void RankedListConnectionFilter::RestorePeer(uint64_t steamId)
 	// once fresh data says so again.
 	m_verdicts.erase(steamId);
 	m_restoreExemptions.insert(steamId);
-	LOG(1, "[RankedListFilter] user restored steamId=%llu - verdict cleared, filters exempted until next recheck\n",
+	// A manual restore also forgives this owner's broken-room marks - the
+	// user explicitly wants to try them again.
+	for (auto it = m_brokenLobbies.begin(); it != m_brokenLobbies.end();)
+	{
+		if (it->second.ownerSteamId == steamId)
+		{
+			it = m_brokenLobbies.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+	LOG(1, "[RankedListFilter] user restored steamId=%llu - verdict cleared, broken marks cleared, filters exempted until next recheck\n",
 		static_cast<unsigned long long>(steamId));
 }
 
@@ -2332,6 +2706,17 @@ void RankedListConnectionFilter::RestoreAllPeers()
 	{
 		m_verdicts.erase(entry.first);
 		m_restoreExemptions.insert(entry.first);
+		for (auto brokenIt = m_brokenLobbies.begin(); brokenIt != m_brokenLobbies.end();)
+		{
+			if (brokenIt->second.ownerSteamId == entry.first)
+			{
+				brokenIt = m_brokenLobbies.erase(brokenIt);
+			}
+			else
+			{
+				++brokenIt;
+			}
+		}
 		++restored;
 	}
 	LOG(1, "[RankedListFilter] user restored all hidden peers (%zu)\n", restored);

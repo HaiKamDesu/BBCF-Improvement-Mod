@@ -3329,3 +3329,57 @@ hidden cursor row just means the highlight lands on a neighbor - cosmetic only, 
 cursor-follow part 2 already no-ops cleanly when the tracked row leaves the shown region
 (newPosOf >= shownCount -> no cursor write; the widget fixup clamp bounds the cursor).
 m_lastDeferredCursorHideSteamId removed. Protection stack is now items 1, 2, 4, 5.
+
+## "Failed to connect to room" pre-detection implemented (2026-07-20, round 7)
+
+Three failure classes identified from live logs, each now discriminated and handled:
+- **A: room closed** (LobbyEnter response=2 DoesntExist) - host's lobby died after listing.
+- **B: room full** (LobbyEnter response=4 Full) - someone got in first.
+- **C: zombie room** (Steam join SUCCEEDS, game backs out ~0.5s later / RankMatchLeaveMyself
+  ~34s timeout) - host client wedged. Live evidence: Argos's lobby kept the SAME lobby id
+  (109775243753038783) across every failure from 22:38 to 00:56 while healthy hosts rotate
+  ids per room - the id surviving is the wedge marker.
+
+No transport-layer probe can predict any of these (all three classes are P2P-reachable);
+they live at the matchmaking layer. Implementation:
+
+**Layer 1 - liveness polling (classes A+B, self-restoring):**
+- `PollLobbyLiveness()` (pump): round-robin `RequestLobbyData` over listed candidates,
+  250ms global spacing (~4/s), 5s per-lobby refresh; entries seeded at delivery, pruned
+  after 10min unlisted. `OnLobbyDataUpdate` (new STEAM_CALLBACK): `m_bSuccess==0` ->
+  exists=false (hide as RoomClosed); success -> members/memberMax via
+  GetNumLobbyMembers/GetLobbyMemberLimit, plus PLAYER_SESSION_FLAG/VALUE and
+  NETWORK_VERSION captured raw (semantics TBD from test logs). members >= memberMax
+  (fallback 2) -> hide as RoomFull. Restore is the same poll observing the lobby back
+  alive with a free slot - certainty by construction. Join outcomes also feed the cache
+  immediately (response=2 -> dead, response=4 -> full) so the row hides without waiting
+  for the next poll.
+- Log lines: `lobby liveness: ... ROOM CLOSED` / `update members=N/M ...` /
+  `ROOM ALIVE AGAIN` - change-only, no per-poll spam (per-request lines at L7).
+
+**Layer 2 - broken-room marks (class C):**
+- `MarkLobbyBroken(lobbyId, owner, reason)` called from LeaveLobby-before-match-start and
+  from NotifyConnectionAttemptFailed for non-LobbyEnter reasons (RankMatchLeaveMyself);
+  LobbyEnter Steam-layer rejections are NOT marked broken (they're A/B).
+- Hide reason RoomBroken persists while THAT lobby id is advertised. Cleared when: the
+  owner shows up in a delivery with a DIFFERENT lobby id (`broken-room mark cleared:` log),
+  manual restore (single or restore-all), or 3h leak-guard prune.
+- The 2min reputation hide still applies on top (immediate reaction while the mark is the
+  long-term one).
+
+**Layer 3 - join-window instrumentation (for validating class discrimination):**
+- `join attempt: lobby=... owner=... | pre-join liveness: known/exists/members/sessionFlag/
+  sessionValue/netVer/dataAgeMs/listedAgeMs [MARKED BROKEN]` on every JoinLobby, plus an
+  immediate RequestLobbyData for at-failure-time state.
+- `join outcome: LobbyEnter FAILED response=N(Name) elapsedMs=... | liveness...` and
+  `join outcome: LeaveLobby before match start elapsedMs=... | liveness...`.
+
+**UI:** HiddenReason gains RoomClosed/RoomFull/RoomBroken; hidden-players window shows
+"room closed"/"room full"/"room broken (host stuck)" (localized, CSV rows added).
+
+**What the test session must answer:**
+1. Do LobbyDataUpdate callbacks keep arriving at ~4/s (no Steam throttling)?
+2. Does PLAYER_SESSION_FLAG/VALUE discriminate in-match hosts (would let layer 1 catch
+   class C pre-join too)?
+3. Are pre-join member counts predictive (a would-be response=4 preceded by members=2)?
+4. Does any healthy host ever keep one lobby id across matches (layer-2 false positive)?
