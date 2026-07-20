@@ -32,6 +32,7 @@ namespace
 	int g_starvationCount = 0;
 	int g_zeroInputAdvances = 0;
 	int g_stalls = 0;
+	int g_maxLagSeen = 0;
 	int g_sceneA = -999, g_sceneB = -999, g_sceneC = -999;
 	unsigned long g_lastLoggedBackend = 0;
 
@@ -89,6 +90,7 @@ extern "C" int __cdecl SpectatorSyncOnStarvationThunk()
 	{
 		g_lastLoggedBackend = g_spectatorBackendPtrRaw;
 		g_starvationCount = g_zeroInputAdvances = g_stalls = 0;
+		g_maxLagSeen = 0;
 		LOG(1, "SpectatorSync: new spectate session, backend=0x%08lX\n", g_spectatorBackendPtrRaw);
 	}
 
@@ -98,12 +100,21 @@ extern "C" int __cdecl SpectatorSyncOnStarvationThunk()
 	else
 		g_stalls++;
 
-	// Every advance-with-zero is the smoking gun -- log all of them. Log stalls sparsely.
-	if (advanceWithZero || g_starvationCount <= 20 || (g_starvationCount % 300) == 0)
+	// lag = buffered-but-unconsumed inputs. A high value means a needed in-order frame is
+	// missing while later ones pile up; if it approaches the 256-entry ring size the ring
+	// overwrites unconsumed inputs (HOST_INPUTS_LOST / stale reads) -- candidate desync #2.
+	const int lag = (nextInput >= 0 && maxRecv >= 0) ? (maxRecv - nextInput) : -1;
+	if (lag > g_maxLagSeen)
+		g_maxLagSeen = lag;
+	const bool ringDanger = lag > 100; // 256-entry ring; well before overflow
+
+	// Log every advance-with-zero and every ring-danger frame (the two suspects); stalls
+	// otherwise sparsely.
+	if (advanceWithZero || ringDanger || g_starvationCount <= 20 || (g_starvationCount % 300) == 0)
 	{
-		LOG(1, "SpectatorSync: starvation #%d scene=(%d,%d,%d) nextInput=%d maxRecv=%d lag=%d -> vanilla %s (zeroAdv total %d)\n",
-			g_starvationCount, g_sceneA, g_sceneB, g_sceneC, nextInput, maxRecv,
-			(nextInput >= 0 && maxRecv >= 0) ? (maxRecv - nextInput) : -1,
+		LOG(1, "SpectatorSync: starvation #%d scene=(%d,%d,%d) nextInput=%d maxRecv=%d lag=%d%s -> vanilla %s (zeroAdv total %d)\n",
+			g_starvationCount, g_sceneA, g_sceneB, g_sceneC, nextInput, maxRecv, lag,
+			ringDanger ? " [RING NEAR FULL]" : "",
 			advanceWithZero ? "ADVANCE-WITH-ZERO-INPUT (desync-prone)" : "stall (safe wait)",
 			g_zeroInputAdvances);
 	}
@@ -118,6 +129,7 @@ SpectatorSyncDiagnostics::Status SpectatorSyncDiagnostics::GetStatus()
 	s.starvationCount = g_starvationCount;
 	s.zeroInputAdvances = g_zeroInputAdvances;
 	s.stalls = g_stalls;
+	s.maxLagSeen = g_maxLagSeen;
 	s.injectRemaining = static_cast<int>(g_spectatorSyncInjectFramesRemaining);
 	s.sceneA = g_sceneA; s.sceneB = g_sceneB; s.sceneC = g_sceneC;
 	s.nextInputToSend = -1;

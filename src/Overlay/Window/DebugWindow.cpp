@@ -642,7 +642,8 @@ void DebugWindow::DrawSpectatorSyncSection()
 			? status.maxReceivedFrame - status.nextInputToSend : -1);
 	ImGui::Text("Starvations: %d | vanilla advance-with-zero (desync-prone): %d | stalls: %d",
 		status.starvationCount, status.zeroInputAdvances, status.stalls);
-	ImGui::Text("Last gate scene-state: (%d, %d, %d)", status.sceneA, status.sceneB, status.sceneC);
+	ImGui::Text("Last gate scene-state: (%d, %d, %d) | peak input backlog: %d / 256",
+		status.sceneA, status.sceneB, status.sceneC, status.maxLagSeen);
 	ImGui::TextUnformatted("Instrumentation only -- vanilla behavior is unchanged this build.");
 
 	static int injectFrames = 10;

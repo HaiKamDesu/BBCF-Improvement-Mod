@@ -35,6 +35,7 @@ namespace SpectatorSyncDiagnostics
 		int starvationCount;      // frames SyncInput reported starvation
 		int zeroInputAdvances;    // of those, how many vanilla will advance-with-zero (desync-prone)
 		int stalls;               // of those, how many vanilla will stall (safe wait)
+		int maxLagSeen;           // peak buffered-input backlog (toward the 256-ring limit)
 		int injectRemaining;
 		int nextInputToSend;      // -1 if no backend captured
 		int maxReceivedFrame;     // -1 if no backend captured
