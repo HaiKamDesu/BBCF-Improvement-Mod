@@ -1,0 +1,244 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 00422830 containing 00422830 -----
+Function: FUN_00422830
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+void __fastcall FUN_00422830(int param_1)
+
+{
+  char cVar1;
+  int iVar2;
+  int *piVar3;
+  int iVar4;
+  uint uVar5;
+  int iVar6;
+  uint uVar7;
+  undefined1 local_120 [8];
+  float local_118;
+  int local_114;
+  int local_110;
+  int local_10c;
+  undefined1 local_108 [256];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  iVar2 = lstrcmpW(L"bbdc.dat",(LPCWSTR)(param_1 + 0x44));
+  if (iVar2 == 0) {
+    FUN_00422b00();
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+  local_110 = FUN_00779390();
+  if (local_110 != 0) {
+    cVar1 = FUN_00423000(local_108,0x100);
+    if (cVar1 != '\0') {
+      local_10c = *(int *)(param_1 + 0x94);
+      iVar2 = *(int *)(param_1 + 0x98);
+      *(undefined4 *)(param_1 + 0xb4) = 0;
+      uVar7 = 0;
+      piVar3 = (int *)FUN_00407e80();
+      piVar3 = (int *)(**(code **)(*piVar3 + 8))(local_120);
+      if ((*(int *)(param_1 + 0x38) == *piVar3) && (*(int *)(param_1 + 0x3c) == piVar3[1])) {
+        cVar1 = FUN_00778fe0(local_108);
+        if (cVar1 == '\0') {
+          *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+          goto LAB_004229d4;
+        }
+        iVar4 = FUN_00779020(local_108,local_10c,iVar2);
+        iVar6 = iVar4;
+        while( true ) {
+          local_10c = local_10c + iVar4;
+          iVar2 = iVar2 - iVar4;
+          local_114 = iVar6;
+          if (iVar2 < 1) break;
+          if ((iVar4 == 0) && (uVar7 = uVar7 + 1, 4 < uVar7)) {
+            *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+            goto LAB_004229d6;
+          }
+          uVar5 = (uint)(iVar6 * 100) / *(uint *)(param_1 + 0x98);
+          local_118 = (float)(int)uVar5;
+          if ((int)uVar5 < 0) {
+            local_118 = local_118 + _DAT_0084ebf0;
+          }
+          *(float *)(param_1 + 0xb4) = local_118 / (float)_DAT_00850110;
+          Sleep(0x32);
+          iVar4 = FUN_00779020(local_108,local_10c,iVar2);
+          iVar6 = local_114 + iVar4;
+        }
+        *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+      }
+      else {
+        *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+LAB_004229d4:
+        iVar6 = 0;
+      }
+LAB_004229d6:
+      *(int *)(param_1 + 0xb8) = iVar6;
+      if (*(int **)(param_1 + 0xbc) != (int *)0x0) {
+        **(int **)(param_1 + 0xbc) = iVar6;
+        __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+        return;
+      }
+      goto LAB_00422a00;
+    }
+  }
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+LAB_00422a00:
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004237b0 containing 004237b0 -----
+Function: FUN_004237b0
+
+void __fastcall FUN_004237b0(int param_1)
+
+{
+  char cVar1;
+  int iVar2;
+  uint uVar3;
+  uint uVar4;
+  undefined4 local_11c;
+  undefined4 local_118;
+  uint local_110;
+  int local_10c;
+  undefined1 local_108 [256];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  iVar2 = lstrcmpW(L"bbdc.dat",(LPCWSTR)(param_1 + 0x44));
+  if (iVar2 == 0) {
+    FUN_00423a50();
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+  iVar2 = FUN_00779390();
+  if ((iVar2 != 0) && (cVar1 = FUN_00423000(local_108,0x100), cVar1 != '\0')) {
+    *(undefined4 *)(param_1 + 0xb4) = 0;
+    if (*(int *)(param_1 + 0x98) == 0) {
+      cVar1 = FUN_00778fc0(local_108);
+      *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+      if (cVar1 == '\0') goto LAB_00423845;
+    }
+    else {
+      uVar4 = *(uint *)(param_1 + 0x98);
+      uVar3 = FUN_00779340(local_108);
+      if (uVar3 < uVar4) {
+        local_11c = 0;
+        local_118 = 0;
+        local_110 = 0;
+        local_10c = 0;
+        cVar1 = FUN_007793a0(&local_11c,&local_110);
+        if ((cVar1 == '\0') ||
+           ((uVar4 = *(uint *)(param_1 + 0x98), local_10c == 0 && (local_110 < uVar4)))) {
+LAB_004238c7:
+          *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+          __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+          return;
+        }
+      }
+      uVar3 = 1;
+      cVar1 = FUN_007791b0(local_108,*(undefined4 *)(param_1 + 0x90),uVar4);
+      while (cVar1 == '\0') {
+        if (4 < uVar3) goto LAB_004238c7;
+        Sleep(0x32);
+        uVar3 = uVar3 + 1;
+        cVar1 = FUN_007791b0(local_108,*(undefined4 *)(param_1 + 0x90),
+                             *(undefined4 *)(param_1 + 0x98));
+      }
+      *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+    }
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+LAB_00423845:
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 00422680 containing 00422680 -----
+Function: FUN_00422680
+
+void __fastcall FUN_00422680(undefined4 *param_1)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  int local_8;
+  
+  puStack_c = &LAB_00823afd;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *param_1 = AASTEAM_CUMSTask::vftable;
+  local_8 = 2;
+  param_1[0x3c] =
+       CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable;
+  if (param_1[0x40] != 0 || param_1[0x41] != 0) {
+    SteamAPI_UnregisterCallResult(param_1 + 0x3c,param_1[0x40],param_1[0x41],uVar1);
+    param_1[0x40] = 0;
+    param_1[0x41] = 0;
+  }
+  local_8._0_1_ = 1;
+  param_1[0x34] = CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable
+  ;
+  if (param_1[0x38] != 0 || param_1[0x39] != 0) {
+    SteamAPI_UnregisterCallResult(param_1 + 0x34,param_1[0x38],param_1[0x39],uVar1);
+    param_1[0x38] = 0;
+    param_1[0x39] = 0;
+  }
+  local_8 = (uint)local_8._1_3_ << 8;
+  DeleteCriticalSection((LPCRITICAL_SECTION)(param_1 + 0x27));
+  *param_1 = AASTEAM_CAsyncTaskInterface::vftable;
+  local_8 = 0xffffffff;
+  DeleteCriticalSection((LPCRITICAL_SECTION)(param_1 + 1));
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+===== CALLEES =====
+--- callees of 00422830 (FUN_00422830) ---
+  00778fe0 FUN_00778fe0
+  00779020 FUN_00779020
+  EXTERNAL:00000075 Sleep
+  0079e869 __security_check_cookie
+  EXTERNAL:000000c9 lstrcmpW
+  00422b00 FUN_00422b00
+  00779390 FUN_00779390
+  00423000 FUN_00423000
+  00407e80 FUN_00407e80
+
+--- callees of 004237b0 (FUN_004237b0) ---
+  EXTERNAL:00000075 Sleep
+  0079e869 __security_check_cookie
+  00778fc0 FUN_00778fc0
+  EXTERNAL:000000c9 lstrcmpW
+  007791b0 FUN_007791b0
+  00779340 FUN_00779340
+  00423a50 FUN_00423a50
+  00779390 FUN_00779390
+  00423000 FUN_00423000
+  007793a0 FUN_007793a0
+
+--- callees of 00422680 (FUN_00422680) ---
+  EXTERNAL:00000078 DeleteCriticalSection
+  EXTERNAL:00000001 SteamAPI_UnregisterCallResult
+
+===== CALLERS =====
+--- callers of 00422830 (FUN_00422830) ---
+  004230a0 FUN_004230a0
+
+--- callers of 004237b0 (FUN_004237b0) ---
+  004230a0 FUN_004230a0
+

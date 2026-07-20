@@ -1,0 +1,195 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== SYMBOLS matching CUMSTask =====
+  00850194 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable_meta_ptr (Label)
+  00850198 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable (Label)
+  008501a4 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable_meta_ptr (Label)
+  008501a8 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable (Label)
+  008501b4 AASTEAM_CUMSTask::vftable_meta_ptr (Label)
+  008501b8 AASTEAM_CUMSTask::vftable (Label)
+  009a75b4 AASTEAM_CUMSTask::RTTI_Complete_Object_Locator (Label)
+  009a75c8 AASTEAM_CUMSTask::RTTI_Class_Hierarchy_Descriptor (Label)
+  009a75d8 AASTEAM_CUMSTask::RTTI_Base_Class_Array (Label)
+  009a75e4 AASTEAM_CUMSTask::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009a764c CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Complete_Object_Locator (Label)
+  009a7660 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Class_Hierarchy_Descriptor (Label)
+  009a7670 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Array (Label)
+  009a767c CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009a7698 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Complete_Object_Locator (Label)
+  009a76ac CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Class_Hierarchy_Descriptor (Label)
+  009a76bc CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Array (Label)
+  009a76c8 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (Label)
+  009d43ec AASTEAM_CUMSTask::RTTI_Type_Descriptor (Label)
+  009d4438 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Type_Descriptor (Label)
+  009d4490 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Type_Descriptor (Label)
+
+===== VTABLE at 00850194 =====
+  +0x00 -> 009A764C (not a function entry, stop)
+
+===== VTABLE at 00850198 =====
+  +0x00 -> 00421DA0 FUN_00421da0
+  +0x04 -> 00421D70 FUN_00421d70
+  +0x08 -> 00422CB0 FUN_00422cb0
+  +0x0C -> 009A7698 (not a function entry, stop)
+
+----- DECOMPILE 00421da0 (vtbl+0x00 of 00850198) -----
+Function: FUN_00421da0
+
+void __thiscall
+FUN_00421da0(int param_1,undefined4 param_2,undefined4 param_3,int param_4,int param_5)
+
+{
+  if ((param_4 == *(int *)(param_1 + 0x10)) && (param_5 == *(int *)(param_1 + 0x14))) {
+    *(undefined4 *)(param_1 + 0x10) = 0;
+    *(undefined4 *)(param_1 + 0x14) = 0;
+    (**(code **)(param_1 + 0x1c))(param_2,param_3);
+  }
+  return;
+}
+
+
+
+----- DECOMPILE 00421d70 (vtbl+0x04 of 00850198) -----
+Function: FUN_00421d70
+
+void __thiscall FUN_00421d70(int param_1,undefined4 param_2)
+
+{
+  *(undefined4 *)(param_1 + 0x10) = 0;
+  *(undefined4 *)(param_1 + 0x14) = 0;
+  (**(code **)(param_1 + 0x1c))(param_2,0);
+  return;
+}
+
+
+
+----- DECOMPILE 00422cb0 (vtbl+0x08 of 00850198) -----
+Function: FUN_00422cb0
+
+undefined4 FUN_00422cb0(void)
+
+{
+  return 0x118;
+}
+
+
+
+===== VTABLE at 008501a4 =====
+  +0x00 -> 009A7698 (not a function entry, stop)
+
+===== VTABLE at 008501a8 =====
+  +0x00 -> 00421DA0 FUN_00421da0
+  +0x04 -> 00421D70 FUN_00421d70
+  +0x08 -> 00422CA0 FUN_00422ca0
+  +0x0C -> 009A75B4 (not a function entry, stop)
+
+----- DECOMPILE 00422ca0 (vtbl+0x08 of 008501a8) -----
+Function: FUN_00422ca0
+
+undefined4 FUN_00422ca0(void)
+
+{
+  return 0x128;
+}
+
+
+
+===== VTABLE at 008501b4 =====
+  +0x00 -> 009A75B4 (not a function entry, stop)
+
+===== VTABLE at 008501b8 =====
+  +0x00 -> 004230A0 FUN_004230a0
+  +0x04 -> 00422780 FUN_00422780
+  +0x08 -> 65766153 (not a function entry, stop)
+
+----- DECOMPILE 004230a0 (vtbl+0x00 of 008501b8) -----
+Function: FUN_004230a0
+
+void __fastcall FUN_004230a0(int param_1)
+
+{
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) & 0xfffffffc;
+  *(undefined4 *)(param_1 + 0xb4) = 0;
+  if (*(int *)(param_1 + 0x94) != 0) {
+    FUN_00422830();
+    *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 2;
+    return;
+  }
+  if (*(int *)(param_1 + 0x90) != 0) {
+    FUN_004237b0();
+  }
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 2;
+  return;
+}
+
+
+
+----- DECOMPILE 00422780 (vtbl+0x04 of 008501b8) -----
+Function: FUN_00422780
+
+void * __thiscall FUN_00422780(void *param_1,byte param_2)
+
+{
+  FUN_00422680();
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  return param_1;
+}
+
+
+
+----- DECOMPILE 004148f0  -----
+Function: FUN_004148f0
+
+undefined4 * __fastcall FUN_004148f0(undefined4 *param_1)
+
+{
+  *param_1 = AA_CUserManagedStorage::vftable;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 004b8b90  -----
+Function: FUN_004b8b90
+
+undefined4 * __fastcall FUN_004b8b90(undefined4 *param_1)
+
+{
+  undefined4 *puVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082b5cb;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  *param_1 = GAME_COnlineStorageTransfer::vftable;
+  param_1[2] = 0;
+  param_1[3] = 0;
+  param_1[4] = 0;
+  puVar1 = (undefined4 *)operator_new(4);
+  if (puVar1 == (undefined4 *)0x0) {
+    puVar1 = (undefined4 *)0x0;
+  }
+  else {
+    *puVar1 = 0;
+  }
+  param_1[5] = puVar1;
+  *puVar1 = 0;
+  param_1[6] = 0;
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+===== STRING TABLE at 009DF4BC =====
+  [0] 008501C8 "b"
+  [1] 008AA0F8 "b"
+  [2] 008AA108 "b"
+  [3] 008AA11C "d"
+  [4] <unreadable>

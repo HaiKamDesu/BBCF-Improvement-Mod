@@ -415,6 +415,50 @@ between stale-handle (FileNotFound=9), rate limit (LimitExceeded=25), and
 generic IO failure — which in turn decides the fix (refresh handle & resub
 vs backoff vs unfixable client-side).
 
+## 2026-07-20: second natural capture — the Steam CallResult never fires
+
+Occurrence 2026-07-20 ~02:02 (opponent D-Code missing again). The new
+LogUMSWorkerState dumps show, for every failure: done=1, **steamEResult=0**
+(field +0xB8 is actually "bytes received" on the generic path / attempt
+result on the bbdc path — it stayed 0), recv=-1/-1, errFlags=0x03
+(2026-07-16 late session) or 0x3B (2026-07-20). The request block carries
+the wide name **"bbdc.dat"**, a per-opponent-stable dword (peer accountID)
+and a dword that varies per retry.
+
+Phases 14–17 (DCodeBug14..17GhidraReport.txt) mapped the remaining layers:
+
+- CUMSTask run (FUN_004230A0): +0x94 != 0 -> download (FUN_00422830),
+  else +0x90 -> share (FUN_004237B0). Both branch on
+  `lstrcmpW(L"bbdc.dat", req+0x44)`: equal -> the DEDICATED bbdc paths
+  FUN_00422B00 (download) / FUN_00423A50 (share); otherwise a generic
+  chunked-read path (FUN_00779xxx, 5-retry loop).
+- FUN_00422B00 (bbdc download): locks mutex DAT_00A29E2C, then up to 3
+  attempts of: stash {steamID, ugcHandle} into the **Steam work manager
+  singleton DAT_00A5A050** (getter FUN_00427CD0; params at +0xD0..0xDC,
+  current work item at +0xE4, created by FUN_004291D0(type 7=download /
+  8=share)), then poll `workMgr+4` up to 300x10ms (3s): 7=done, 9=empty,
+  0xB=error, else keep waiting. After 3 attempts with no progress -> error
+  bit (worker+0xC0 |= 1), bytes stay 0.
+- **Observed failure shape = the CallResult never fires**: first natural
+  failure took 9.4s = exactly 3x3s poll timeout; workMgr+4 never reached
+  7/9/0xB. Subsequent failures fast-fail, i.e. the work manager stays
+  latched. So the wedge lives in the work item / Steam async layer: the
+  RemoteStorage UGCDownload (or FileShare) call's CCallResult is lost —
+  candidate causes: SteamAPICall_t invalid (bad/zero UGC handle -> Steam
+  never schedules a result), CallResult re-registration cancelling an
+  in-flight one, or the shared "ReplayUploader" async thread wedging.
+
+Instrumentation added 2026-07-20 (deployed): failure dumps now include
+`[DCodeTick] SteamWorkMgr: state=.. steamId=.. ugcHandle=.. workItem=..`
+(singleton +4/+0xD0..0xDC/+0xE4). Next occurrence shows directly whether
+the UGC handle passed to Steam was zero/garbage (-> stale handle from lobby
+metadata; fix = refresh handle + reissue) or valid (-> lost CallResult; fix
+= reset work item / re-dispatch, or detect + warn).
+
+Remaining static targets if needed: FUN_004291D0 (work item factory),
+FUN_00429390 (work item release), the type-7 work class vtable (where
+UGCDownload is actually invoked and its OnComplete writes workMgr+4).
+
 Next capture should tell us: whether the rejected payload was all-zero
 (transport error), truncated (recvSize != 0x6800), or genuinely corrupt
 (full-size, bad checksum) — and whether a forced retry succeeds, which

@@ -273,6 +273,9 @@ namespace
 	//   includes UGC handle / steamID), +0x90/+0x94 request ids, +0xB8 Steam
 	//   EResult, +0xC0 bit0 = error latch (poll returns 100 -> state 6).
 	constexpr uintptr_t kUserManagedStorageSingletonRva = 0x00629E30;
+	// Steam work manager (DAT_00A5A050, getter FUN_00427CD0) driving the actual
+	// RemoteStorage UGCDownload/FileShare for bbdc.dat.
+	constexpr uintptr_t kSteamWorkMgrRva = 0x0065A050;
 	constexpr uintptr_t kUMSWorkerRequestBlockOffset = 0x30;
 	constexpr size_t kUMSWorkerRequestBlockSize = 0x60;
 
@@ -315,6 +318,24 @@ namespace
 			p += sprintf_s(p, 4, "%02X ", worker[kUMSWorkerRequestBlockOffset + i]);
 		}
 		IncidentPrintf("[DCodeTick] UMS request block +0x30: %s\n", hex);
+
+		// One level deeper: the Steam work manager singleton (DAT_00A5A050,
+		// getter FUN_00427CD0) that the bbdc paths poll. +4 = completion state
+		// written by the Steam CallResult (7 dl-done, 8 share-done, 9 dl-empty,
+		// 0xB error; anything else after the 3x3s poll = CallResult never fired),
+		// +0xD0/+0xD4 steamID and +0xD8/+0xDC UGC handle of the current request,
+		// +0xE4 current work item. See DCodeBug17GhidraReport.txt.
+		const uint8_t* const workMgr = reinterpret_cast<const uint8_t*>(moduleBase + kSteamWorkMgrRva);
+		if (!IsBadReadPtr(workMgr, 0xE8))
+		{
+			IncidentPrintf("[DCodeTick] SteamWorkMgr: state=%d steamId=%08X%08X ugcHandle=%08X%08X workItem=%08X\n",
+				*reinterpret_cast<const int32_t*>(workMgr + 4),
+				*reinterpret_cast<const uint32_t*>(workMgr + 0xD4),
+				*reinterpret_cast<const uint32_t*>(workMgr + 0xD0),
+				*reinterpret_cast<const uint32_t*>(workMgr + 0xDC),
+				*reinterpret_cast<const uint32_t*>(workMgr + 0xD8),
+				*reinterpret_cast<const uint32_t*>(workMgr + 0xE4));
+		}
 	}
 
 	// Handles both failure shapes with the same evidence dump + optional recovery.

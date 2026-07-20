@@ -1,0 +1,136 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 00427cd0 containing 00427cd0 -----
+Function: FUN_00427cd0
+
+undefined * FUN_00427cd0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_008243c8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a5a138 & 1) == 0) {
+    DAT_00a5a138 = DAT_00a5a138 | 1;
+    local_8 = 0;
+    FUN_004276a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    DAT_00a5a130 = 0;
+    local_8 = local_8 & 0xffffff00;
+    _atexit(FUN_008482f0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a5a050;
+}
+
+
+
+----- DECOMPILE 00427ef0 containing 00427ef0 -----
+Function: FUN_00427ef0
+
+void __thiscall
+FUN_00427ef0(int param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,undefined4 param_5
+            )
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  *(undefined4 *)(param_1 + 0xd0) = param_2;
+  *(undefined4 *)(param_1 + 0xd4) = param_3;
+  *(undefined4 *)(param_1 + 0xd8) = param_4;
+  *(undefined4 *)(param_1 + 0xdc) = param_5;
+  if (*(undefined4 **)(param_1 + 0xe4) != (undefined4 *)0x0) {
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe4))();
+    if (iVar1 == 7) {
+      (**(code **)(**(int **)(param_1 + 0xe4) + 4))(param_1);
+      return;
+    }
+  }
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  uVar2 = FUN_004291d0(7,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar2;
+  return;
+}
+
+
+
+----- DECOMPILE 00428180 containing 00428180 -----
+Function: FUN_00428180
+
+void __thiscall FUN_00428180(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  *(undefined4 *)(param_1 + 0xd8) = param_2;
+  *(undefined4 *)(param_1 + 0xdc) = param_3;
+  if (*(undefined4 **)(param_1 + 0xe4) != (undefined4 *)0x0) {
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe4))();
+    if (iVar1 == 8) {
+      (**(code **)(**(int **)(param_1 + 0xe4) + 4))(param_1);
+      return;
+    }
+  }
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  uVar2 = FUN_004291d0(8,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar2;
+  return;
+}
+
+
+
+===== CALLEES =====
+--- callees of 00427cd0 (FUN_00427cd0) ---
+  004276a0 FUN_004276a0
+  0079e1ff _atexit
+
+--- callees of 00427ef0 (FUN_00427ef0) ---
+  004291d0 FUN_004291d0
+  00429390 FUN_00429390
+
+--- callees of 00428180 (FUN_00428180) ---
+  004291d0 FUN_004291d0
+  00429390 FUN_00429390
+
+===== CALLERS =====
+--- callers of 00427cd0 (FUN_00427cd0) ---
+  0041c820 FUN_0041c820
+  0046a970 FUN_0046a970
+  0041bed1 FUN_0041bed1
+  0041c590 FUN_0041c590
+  0046a3d0 FUN_0046a3d0
+  0041d3d0 FUN_0041d3d0
+  0041c540 FUN_0041c540
+  0041d230 FUN_0041d230
+  0046be70 FUN_0046be70
+  0046bf10 FUN_0046bf10
+  0046a8f0 FUN_0046a8f0
+  0041d410 FUN_0041d410
+  008480b0 FUN_008480b0
+  0046bf80 FUN_0046bf80
+  0046a7c0 FUN_0046a7c0
+  00423a50 FUN_00423a50
+  0046a9b0 FUN_0046a9b0
+  0041ca20 FUN_0041ca20
+  0046b560 FUN_0046b560
+  0046a960 FUN_0046a960
+  0046a8d0 FUN_0046a8d0
+  0046bf20 FUN_0046bf20
+  00422b00 FUN_00422b00
+  0046a930 FUN_0046a930
+  0046a390 FUN_0046a390
+  0041bf70 FUN_0041bf70
+  0046a7e0 FUN_0046a7e0
+  0041d4c0 FUN_0041d4c0
+
+--- callers of 00427ef0 (FUN_00427ef0) ---
+  00422b00 FUN_00422b00
+
+--- callers of 00428180 (FUN_00428180) ---
+  00423a50 FUN_00423a50
+
