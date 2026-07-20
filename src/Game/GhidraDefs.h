@@ -1,3 +1,4 @@
+#pragma once
 #include <winsock.h>
 typedef unsigned char   undefined;
 
@@ -527,3 +528,74 @@ static constexpr uintptr_t ADDR_RoundRestart_VariantC = 0x0018F610; // vtable sl
 // at FUN_0055F780+0x7EA (RVA 0x15FF6A "or [ebx],0x4000000") when the
 // round-transition fade starts, cleared by the restart variants above.
 static constexpr uintptr_t ADDR_BattleScene_FlagsOffset = 0x00062B7C; // offset, not RVA
+
+// ---------------------------------------------------------------------------
+// Saved keyconfig -> controller-object apply chain (hotplug redetect fix,
+// 2026-07-19). All RVAs verified against tools/bbcf_disasm_ascii.txt.
+//
+// The KeyControler objects created by _create_pad_input_controllers
+// (FUN_004722C0) and _create_SystemKeyControler (FUN_00473EF0) are
+// GAMESTEAM_BattleKeyControler / GAMESTEAM_SystemKeyControler tasks
+// (vtables .rdata 0x89C61C / 0x89C658, RTTI-confirmed). Each holds:
+//   +0x18 = physical AA_CInput* device
+//   +0x34 = dword bindings[actionCount]  (physical key/button code per
+//           logical action index; -1 = unbound)
+//   +0x38 = actionCount (0x1C for these classes)
+// Init FUN_00496990(this, &devSlot, 0x1C) mallocs +0x34, fills it with -1,
+// then calls vtbl+0xC = SetDefaultBindings (Battle: FUN_004699C0, System:
+// FUN_00469AB0 - hardcoded default tables). THIS is why a mod-forced
+// recreate comes up with default Key Config: the game applies the SAVED
+// config in a separate later step (below).
+//
+// SystemManager (base+0x8929C8) controller slots (filled by the creators):
+//   +0x0C = keyboard SystemKeyControler   +0x18 = keyboard BattleKeyControler
+//   +0x10+4*slot = pad ctrl set A (also aliased at +0x1C+4*slot)
+//   +0x24+4*slot = pad ctrl set B (returned by FUN_004C1380(sysMgr, slot))
+//
+// Binding accessors on the controller object:
+//   FUN_00496AD0(this, actionIdx, code) stdcall-thiscall = SetBinding
+//   vtbl+0x10 = FUN_00469850(actionIdx) = GetBinding ([this+0x34][idx])
+static constexpr uintptr_t ADDR_KeyControler_SetBinding = 0x00096AD0;
+static constexpr uintptr_t ADDR_BattleKeyControler_SetDefaults = 0x000699C0; // FUN_004699C0
+static constexpr uintptr_t ADDR_SystemKeyControler_SetDefaults = 0x00069AB0; // FUN_00469AB0
+//
+// Saved keyconfig storage: one giant static option/save-data blob at
+// 0xCF85D8 (lazy-init ctor FUN_004B9350; serialized to/from bbsave.dat).
+//   FUN_004B9700() cdecl -> 0x00CF85E0 = option DATA pointer ("optData")
+//   FUN_004B9770() cdecl -> 0x00CF85D8 = option manager (this for applies)
+// Inside optData (all byte fields/tables):
+//   +0x4254/+0x4255  = P1/P2 selected pad keyconfig profile index
+//   +0x4204 (VA 0xCFC7E4) = pad keyconfig records, 20 bytes per
+//                     (profile + slot*2) record, applied to ctrl set B
+//   +0x4256 (VA 0xCFC836) = keyboard keyconfig records (20-byte stride),
+//                     applied to sysMgr+0x18; defaults copied from const
+//                     table .data 0x9DFE00 by FUN_004BCAA0 (reset-to-default)
+//   +0x54AA5/+0x54AA6 = P1/P2 profile index for the second config set
+//   +0x54A55 (VA 0xD4D035) = pad records for ctrl set A (buttons only)
+//   +0x54AA7 (VA 0xD4D087) = keyboard records for sysMgr+0x0C
+static constexpr uintptr_t ADDR_GetOptionData = 0x000B9700;    // FUN_004B9700
+static constexpr uintptr_t ADDR_GetOptionManager = 0x000B9770; // FUN_004B9770
+//
+// Apply functions (thiscall, ecx = FUN_004B9770() result; they resolve the
+// SystemManager themselves via [0xC929C8] and call SetBinding per action):
+//   FUN_004BB6E0(mgr, padSlot, profileIdx) - pad set B  (ret 8)
+//   FUN_004BB860(mgr, profileIdx)          - keyboard sysMgr+0x18 (ret 4)
+//   FUN_004BBA10(mgr, padSlot, profileIdx) - pad set A  (ret 8)
+//   FUN_004BBB30(mgr, profileIdx)          - keyboard sysMgr+0x0C (ret 4)
+// The game's own apply-all sequence (menu-side, FUN_00483F10 at 0x483F60..
+// 0x483FFE, sole caller 0x4832B4) is exactly:
+//   optData = FUN_004B9700(); mgr = FUN_004B9770();
+//   FUN_004BB6E0(mgr, 0, optData[0x4254]); FUN_004BB6E0(mgr, 1, optData[0x4255]);
+//   FUN_004BB860(mgr, optData[0x4254]);
+//   FUN_004BBA10(mgr, 0, optData[0x54AA5]); FUN_004BBA10(mgr, 1, optData[0x54AA6]);
+//   FUN_004BBB30(mgr, optData[0x54AA5]);
+// Run this after ControllerOverrideManager::RedetectControllers_Internal()
+// to restore the player's saved Key Config on the recreated controllers.
+// (In-match VS mode instead re-applies via 0x612704/0x6A8B11 with per-player
+// profile ids from engine+0x25F4/+0x25F8.)
+typedef unsigned char* (__cdecl* GAME_GetOptionData_t)();
+typedef void* (__cdecl* GAME_GetOptionManager_t)();
+static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetB = 0x000BB6E0;
+static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetB = 0x000BB860;
+static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetA = 0x000BBA10;
+static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetA = 0x000BBB30;

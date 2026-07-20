@@ -173,7 +173,9 @@
       "Bash(pwsh tools/generate_localization_bindings.ps1 -CsvPath resource/localization/Localization.csv -OutPath src/Core/LocalizationKeys.autogen.h)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(grep -rniE \"restart.{0,10}round|round.{0,10}restart|practice.{0,10}reset|reset.{0,10}practice\" src/ docs/)",
-      "Bash(echo \"rg exit=$?\")"
+      "Bash(echo \"rg exit=$?\")",
+      "Bash(sed -n '/^  004B9700:/,/^  004B97D0:/p' /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/d6ff33cc-07dd-4012-b837-60818f4782b1/scratchpad/disasm.txt)",
+      "Bash(sed -n '/^  004C1380:/,/^  004C13C0:/p' /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/d6ff33cc-07dd-4012-b837-60818f4782b1/scratchpad/disasm.txt)"
     ]
   }
 }

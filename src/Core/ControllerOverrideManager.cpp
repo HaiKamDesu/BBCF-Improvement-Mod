@@ -8,6 +8,7 @@
 #include "Core/RuntimePlatform.h"
 #include "Hooks/hooks_battle_input.h"
 #include "Game/gamestates.h"
+#include "Game/GhidraDefs.h"
 
 #include <Shellapi.h>
 #include <dinput.h>
@@ -1472,6 +1473,59 @@ namespace
     }
 
 
+    // Re-applies the player's SAVED Key Config to the freshly recreated controller
+    // objects. _create_pad_input_controllers/_create_SystemKeyControler construct the
+    // KeyControler tasks with COMPILED-IN default bindings (their init calls
+    // vtbl+0xC = SetDefaultBindings); the game normally applies the bbsave.dat-backed
+    // config in a separate step that a mid-session redetect skips - which is why
+    // hotplugging a pad reset players' binds to default. This replicates the game's
+    // own menu-side apply-all sequence (FUN_00483F10 at 0x483F60..0x483FFE) using the
+    // game's own apply functions. See GhidraDefs.h "Saved keyconfig" block.
+    void ReapplySavedKeyConfig()
+    {
+        const uintptr_t base = GetBbcfBase();
+        if (base == 0)
+        {
+            return;
+        }
+
+        using ApplyPadFn = void(__thiscall*)(void*, int padSlot, int profileIdx);
+        using ApplyKbdFn = void(__thiscall*)(void*, int profileIdx);
+
+        auto getOptData = reinterpret_cast<GAME_GetOptionData_t>(base + ADDR_GetOptionData);
+        auto getOptMgr = reinterpret_cast<GAME_GetOptionManager_t>(base + ADDR_GetOptionManager);
+        auto applyPadB = reinterpret_cast<ApplyPadFn>(base + ADDR_ApplyPadKeyConfig_SetB);
+        auto applyKbdB = reinterpret_cast<ApplyKbdFn>(base + ADDR_ApplyKeyboardKeyConfig_SetB);
+        auto applyPadA = reinterpret_cast<ApplyPadFn>(base + ADDR_ApplyPadKeyConfig_SetA);
+        auto applyKbdA = reinterpret_cast<ApplyKbdFn>(base + ADDR_ApplyKeyboardKeyConfig_SetA);
+
+        unsigned char* optData = getOptData(); // lazy-inits the option blob if needed
+        void* optMgr = getOptMgr();
+        if (optData == nullptr || optMgr == nullptr)
+        {
+            LOG(1, "[BBCF] ReapplySavedKeyConfig: option blob unavailable (optData=%p mgr=%p), skipping\n",
+                optData, optMgr);
+            return;
+        }
+
+        const int padProfileP1 = optData[0x4254];
+        const int padProfileP2 = optData[0x4255];
+        const int setAProfileP1 = optData[0x54AA5];
+        const int setAProfileP2 = optData[0x54AA6];
+
+        LOG(1, "[BBCF] ReapplySavedKeyConfig: profiles setB=(%d,%d) setA=(%d,%d)\n",
+            padProfileP1, padProfileP2, setAProfileP1, setAProfileP2);
+
+        applyPadB(optMgr, 0, padProfileP1);
+        applyPadB(optMgr, 1, padProfileP2);
+        applyKbdB(optMgr, padProfileP1);
+        applyPadA(optMgr, 0, setAProfileP1);
+        applyPadA(optMgr, 1, setAProfileP2);
+        applyKbdA(optMgr, setAProfileP1);
+
+        LOG(1, "[BBCF] ReapplySavedKeyConfig: saved Key Config re-applied to recreated controllers\n");
+    }
+
     // This is the actual "rebuild controller tasks" driver.
     void RedetectControllers_Internal()
     {
@@ -1501,6 +1555,8 @@ namespace
 
         LOG(1, "[BBCF] RedetectControllers_Internal: calling _create_SystemKeyControler\n");
         createSys(systemManager);
+
+        ReapplySavedKeyConfig();
 
         LOG(1, "[BBCF] RedetectControllers_Internal: done\n");
     }
