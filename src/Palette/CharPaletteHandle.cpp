@@ -178,19 +178,9 @@ void CharPaletteHandle::ReplaceSinglePalFile(const char* newPalData, PaletteFile
 
 void CharPaletteHandle::OnMatchInit()
 {
-	int rawIndex = *m_pCurPalIndex;
+	CorrectToggleArtifact();
 
-	// If the raw slot is sitting on the toggle pair our own last hot-swap created, the
-	// player didn't pick a new native color -- it's just our redraw trick's leftover
-	// state. Restore the slot they actually chose instead of trusting the artifact.
-	if (m_lastLogicalPalIndex >= 0 &&
-		(rawIndex == m_lastTogglePairA || rawIndex == m_lastTogglePairB) &&
-		rawIndex != m_lastLogicalPalIndex)
-	{
-		LOG(1, "CharPaletteHandle::OnMatchInit detected toggle artifact (raw=%d), restoring logical slot %d\n", rawIndex, m_lastLogicalPalIndex);
-		rawIndex = m_lastLogicalPalIndex;
-		*m_pCurPalIndex = rawIndex;
-	}
+	int rawIndex = *m_pCurPalIndex;
 
 	m_origPalIndex = rawIndex;
 	m_lastLogicalPalIndex = rawIndex;
@@ -372,6 +362,29 @@ void CharPaletteHandle::UpdatePalette()
 		: m_switchPalIndex1;
 
 	LockUpdate();
+}
+
+void CharPaletteHandle::CorrectToggleArtifact()
+{
+	// Called every frame via PaletteManager::OnUpdate, including outside of a match
+	// (e.g. at the main menu) when the pointer hasn't been resolved yet.
+	if (m_pCurPalIndex == nullptr)
+		return;
+
+	// If the raw slot is sitting on the toggle pair our own last hot-swap created, the
+	// player didn't pick a new native color -- it's just our redraw trick's leftover
+	// state. Restore the slot they actually chose instead of trusting the artifact.
+	// Called every frame (not just OnMatchInit) so a mid-match toggle -- e.g. from
+	// RestoreOrigPal on a state transition -- never leaks the artifact past one frame.
+	int rawIndex = *m_pCurPalIndex;
+
+	if (m_lastLogicalPalIndex >= 0 &&
+		(rawIndex == m_lastTogglePairA || rawIndex == m_lastTogglePairB) &&
+		rawIndex != m_lastLogicalPalIndex)
+	{
+		LOG(1, "CharPaletteHandle::CorrectToggleArtifact detected toggle artifact (raw=%d), restoring logical slot %d\n", rawIndex, m_lastLogicalPalIndex);
+		*m_pCurPalIndex = m_lastLogicalPalIndex;
+	}
 }
 
 void CharPaletteHandle::LockUpdate()

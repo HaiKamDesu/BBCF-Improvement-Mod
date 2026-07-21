@@ -74,4 +74,5 @@ private:
 	void BackupOrigPal();
 	void RestoreOrigPal();
 	void UpdatePalette();
+	void CorrectToggleArtifact();
 };

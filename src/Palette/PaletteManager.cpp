@@ -784,6 +784,11 @@ void PaletteManager::SetCurrentPalInfo(CharPaletteHandle& palHandle, IMPL_info_t
 
 void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 {
+	// Runs after this frame's draw calls, so it's safe to correct any toggle
+	// artifact UpdatePalette() left behind before it can leak into next frame.
+	P1.CorrectToggleArtifact();
+	P2.CorrectToggleArtifact();
+
 	P1.UnlockUpdate();
 	P2.UnlockUpdate();
 }

@@ -188,7 +188,9 @@
       "Bash(sed -i '22,91d;112,190d' src/Overlay/Window/ReleaseCheckerWindow.cpp)",
       "Bash(sed -i '20,89d;113,191d' src/Overlay/Window/UpdateNotifierWindow.cpp)",
       "Bash(grep -E \"error|Error\\\\\\(s\\\\\\)|Build succeeded|MarkdownRenderer.cpp$\")",
-      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)"
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)",
+      "Bash(sed -n '80,135' src/Network/RoomManager.cpp)",
+      "Bash(sed -n '160,200' src/Network/RoomManager.cpp)"
     ]
   }
 }
