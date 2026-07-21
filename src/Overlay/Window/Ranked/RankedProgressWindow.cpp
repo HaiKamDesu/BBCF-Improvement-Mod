@@ -4745,6 +4745,36 @@ ImVec4 GetVisibleRankColor(uint32_t visibleRank, bool isUnranked)
 	return g_rankedOverlayTuning.leaderRankColor;
 }
 
+bool ComputeTotalLpFromPackedScore(uint32_t internalRank, uint32_t packedSubscore, uint32_t* outTotalLp)
+{
+	if (!outTotalLp)
+	{
+		return false;
+	}
+
+	uint32_t lowerBound = 0;
+	uint32_t upperBound = 0;
+	if (!TryGetRankedLpBounds(internalRank, &lowerBound, &upperBound, nullptr, nullptr) || upperBound <= lowerBound)
+	{
+		return false;
+	}
+
+	const uint32_t cumulativeBase = GetCumulativeRankedLpBase(internalRank);
+	const uint32_t rankSpan = upperBound - lowerBound;
+	uint32_t rankProgressLp = 0u;
+	if (packedSubscore > lowerBound)
+	{
+		rankProgressLp = packedSubscore - lowerBound;
+		if (rankProgressLp > rankSpan)
+		{
+			rankProgressLp = rankSpan;
+		}
+	}
+
+	*outTotalLp = cumulativeBase + rankProgressLp;
+	return true;
+}
+
 void NoteRankedUploadAttempt(int32_t characterId, int32_t score, const char* leaderboardName)
 {
 	uint32_t resolvedCharacterId = (characterId >= 0 && characterId < 64)
@@ -5512,6 +5542,10 @@ void DrawRankedMatchesMainMenuSection()
 	if ((actions & RankedUi::RankedMainMenuAction_OpenOnline) != 0u)
 	{
 		WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_Room)->ToggleOpen();
+	}
+	if ((actions & RankedUi::RankedMainMenuAction_OpenLeaderboard) != 0u)
+	{
+		WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_RankedLeaderboard)->Open();
 	}
 }
 

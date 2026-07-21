@@ -183,7 +183,12 @@
       "Bash(unzip -o \"BBCF.IM.win-x86.v8.0.zip\" dinput8.dll -d .)",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /m /p:Configuration=ReleaseDeploy /p:Platform=Win32 /p:PlatformToolset=v143 /v:m)",
       "Bash(grep -iE \" error |dinput8.dll$|copied|Build FAILED\")",
-      "Bash(sort -t= -k2 -n)"
+      "Bash(sort -t= -k2 -n)",
+      "Bash(tee /tmp/claude-1000/-mnt-c-Users-Usuario-source-repos-HaiKamDesu-BBCF-Improvement-Mod/0ec1397b-5449-4d12-bf5a-cede1ca5e2df/scratchpad/cdb_out.txt)",
+      "Bash(sed -i '22,91d;112,190d' src/Overlay/Window/ReleaseCheckerWindow.cpp)",
+      "Bash(sed -i '20,89d;113,191d' src/Overlay/Window/UpdateNotifierWindow.cpp)",
+      "Bash(grep -E \"error|Error\\\\\\(s\\\\\\)|Build succeeded|MarkdownRenderer.cpp$\")",
+      "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)"
     ]
   }
 }

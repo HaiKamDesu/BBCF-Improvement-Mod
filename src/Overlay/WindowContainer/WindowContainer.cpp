@@ -20,6 +20,7 @@
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/Window/NetworkSquareColorWindow.h"
 #include "Overlay/Window/Ranked/RankedListFilterWindow.h"
+#include "Overlay/Window/Ranked/RankedLeaderboardWindow.h"
 #include "Overlay/Window/ReleaseCheckerWindow.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
@@ -109,5 +110,9 @@ WindowContainer::WindowContainer()
         AddWindow(WindowType_RankedListFilter,
                 new RankedListFilterWindow((L("Ranked List Config") + "###RankedListFilter").c_str(), true,
                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse));
+
+        AddWindow(WindowType_RankedLeaderboard,
+                new RankedLeaderboardWindow((L("Ranked Leaderboard") + "###RankedLeaderboard").c_str(), true,
+                        ImGuiWindowFlags_NoCollapse));
 }
 

@@ -67,6 +67,14 @@ namespace RankedUi
 		ImGui::ShowHelpMarker(L("Opens the ranked ladder window, including known LP thresholds and population estimates.").c_str());
 
 		ImGui::HorizontalSpacing();
+		if (ImGui::Button(L("Ranked leaderboard").c_str()))
+		{
+			actions |= RankedMainMenuAction_OpenLeaderboard;
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Opens a detailed, paged leaderboard browser (all players or per character) with exact scores, rank + LP, last-used character, Steam level, online status, and a profile shortcut.").c_str());
+
+		ImGui::HorizontalSpacing();
 		if (ImGui::Button(L("How does ranked work?").c_str()))
 		{
 			actions |= RankedMainMenuAction_OpenRulesSelector;

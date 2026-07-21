@@ -1,0 +1,7 @@
+.echo ===== CRASH CONTEXT =====
+.ecxr
+kb 60
+.echo ===== ALL THREAD STACKS =====
+~*kb 40
+.echo ===== DONE =====
+q

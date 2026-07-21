@@ -10,6 +10,7 @@ namespace RankedUi
 		RankedMainMenuAction_OpenLadder = 1u << 0,
 		RankedMainMenuAction_OpenRulesSelector = 1u << 1,
 		RankedMainMenuAction_OpenOnline = 1u << 2,
+		RankedMainMenuAction_OpenLeaderboard = 1u << 3,
 	};
 
 	uint32_t DrawMainMenuSection();

@@ -130,11 +130,29 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	config.OversampleV = 1;
 	config.PixelSnapH = true;
 
-	const ImWchar* ranges = ImGui::GetIO().Fonts->GetGlyphRangesJapanese();
-	ranges = ranges + 2; // Skip default ranges to prevent overwriting the default font
+	// Build the glyph range for the merged Unicode (M+) font. We keep the Japanese set (skipping its
+	// leading default Latin range so we don't overwrite the base font's Latin glyphs), and additionally
+	// pull in the Western typography GitHub release notes rely on. Without these, codepoints such as the
+	// em-dash, curly quotes, ellipsis and bullet have no glyph in the atlas and ImGui renders them as '?'.
+	static ImVector<ImWchar> mergedRanges;
+	if (mergedRanges.empty())
+	{
+		ImFontAtlas::GlyphRangesBuilder builder;
+		builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesJapanese() + 2); // JP set minus the default Latin pair
+
+		static const ImWchar extraRanges[] =
+		{
+			0x2000, 0x206F, // General Punctuation (en/em dash, curly quotes, ellipsis, bullet, etc.)
+			0x2190, 0x21FF, // Arrows
+			0x2122, 0x2122, // Trademark sign
+			0,
+		};
+		builder.AddRanges(extraRanges);
+		builder.BuildRanges(&mergedRanges);
+	}
 
 	ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(mplusMedium_compressed_data, mplusMedium_compressed_size,
-		unicodeFontSize, &config, ranges);
+		unicodeFontSize, &config, mergedRanges.Data);
 
 
 	//ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(DroidSans_compressed_data, DroidSans_compressed_size, 20);
