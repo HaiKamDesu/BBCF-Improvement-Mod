@@ -98,7 +98,7 @@ namespace {
 		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop ending seconds", "Unlimited Playback", "Seconds near loop end reserved before restart." },
 		{ "UnlimitedPlaybackLoopRestartLabState", "Restart lab state on loop", "Unlimited Playback", "Reloads lab state when an unlimited playback loop restarts." },
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop restart mode", "Unlimited Playback", "Selects how unlimited playback restarts when looping." },
-		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Forces Platinum's random personality/voice pick (Sena or Luna) instead of leaving it to the game's own RNG. Local override only - not confirmed to sync with the opponent online." },
+		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks which voice (Sena or Luna) YOUR Platinum uses instead of the game's random roll. Local audio only: it never affects gameplay and never desyncs. Applies ONLY to the Platinum you control - other Platinums (including a mirror opponent) are unaffected. Works offline and online vs anyone. Online: an opponent on a compatible mod hears your pick too; an opponent without the mod just hears the game's random voice for your Platinum on their end." },
 	};
 
 	static const SettingMetadata* GetSettingMetadata(const char* iniKey)

@@ -114,3 +114,235 @@ opponent hears the same choice you force locally.
   existing `GetPaletteIndexPointers` hook for both players. Overwrites struct+0x4 right
   before the commit copy (`0047D910`) runs, so both the live and committed copies end up
   forced consistently.
+
+---
+
+# Resolved: online sync mechanism + why the override fails online (2026-07-22)
+
+Follow-up after Cuack's two-session bug report ("Platinum voice not working online"). With
+the richer `[PlatVoice]` diagnostic logging (setting value, both char indices, the flag the
+game rolled *before* our write, online state, local match slot), the mechanism is now
+**confirmed**, and the original v8.0 "sync unresolved" is closed.
+
+## Field evidence (Cuack, `Bug Reports/Cuack Platinum voice/Test 2`)
+
+Single-Platinum online matches (local player = match slot 0 = P1; opponent not Platinum):
+
+| Setting | game roll (`origFlag`) | our override | heard |
+|---|---|---|---|
+| Luna | 0 (Luna) | `0 -> 0` no-op | Luna ✓ (luck) |
+| Luna | 0 (Luna) | `0 -> 0` no-op | Luna ✓ (luck) |
+| **Luna** | **1 (Sena)** | **`1 -> 0` forced Luna** | **Sena ✗** |
+
+The last row is the smoking gun: the hook fired, detected Platinum online, wrote 0 (Luna) to
+the live struct — yet **Sena (the original roll) played**. The voice online always equals the
+pre-override roll; our write is ignored. Both players always heard the *same* voice even on
+vanilla RNG → the game synchronizes it natively.
+
+## Sync mechanism
+
+The roll is **not** transmitted in a packet. It is a **deterministic shared-seed PRNG draw**:
+`FUN_004807E0` (personality randomize) runs at character-select *confirm* on both clients
+(lockstep flow, driven by synced inputs), and draws stream 0 of the global PRNG
+`FUN_0040BF00` (`streamIndex*0x9CC + [0xA135C8]`, `Next()` = `FUN_004528A0`). That stream is
+seeded once per match from a value both clients agree on, so both roll **identically** →
+identical voice. This is the same class of RNG the engine uses for other select-time picks.
+
+The RNG is **MT19937** (Mersenne Twister): `FUN_00452990` regenerates the 624-word block,
+`FUN_00452940` = `init_genrand(seed)` (`0x6C078965` multiplier). Two seed paths were found:
+
+- **Offline** (training / arcade / vs-CPU): `FUN_00471F00` seeds streams 0/1 (`0x00472262` /
+  `0x00472284`) from a **high-resolution timer** (QueryPerformanceCounter-style, imports
+  `[0x84A37C]`+`[0x84A378]`). Non-deterministic, per-boot.
+- **Online + replay**: `FUN_0069D001` seeds streams 0/1 (`0x0069D7BA` / `0x0069D7CE`) from a
+  **stored per-match value**, copied earlier (`0x0069D54C..0x0069D563`) out of
+  `FUN_0055C540()+0x83E48` / `+0x83E4C` into the per-slot match/replay struct at
+  `0x0155B908` / `0x0155B90C` (stride `0xA0`). Both clients seed from the **same** value →
+  identical MT sequence → identical roll. (The exact wire handshake that agrees this seed at
+  session init isn't a distinct char-select packet; per `SpectatorDesyncInvestigation.md` the
+  netcode is a GGPO rollback port where per-match state is agreed at session init and only
+  inputs cross the wire mid-match. That the seed is deterministic-shared is proven both by the
+  code path and by the field evidence that vanilla always produced the same voice on both ends.)
+
+**There is no native channel carrying the voice flag** — nothing to piggyback / intercept.
+A modded client therefore cannot "tell" a vanilla opponent which voice to use; the opponent
+recomputes the roll from the shared seed regardless. Any online force must be a MOD-level
+exchange (both peers modded), applied identically on both sides — see the design options below.
+
+## Why our current hook is ignored online (the ordering bug)
+
+- `FUN_004807E0` writes the rolled value directly into the **live** select-struct at
+  `[playerIndex*0x20 + base + 0x164C]` (base = `FUN_0047E860()` singleton).
+- The battle-time reads of the flag are script-VM condition opcodes
+  (`0x0057D3F3 / 0x0057D416 / 0x0057D439`, `ret 8`, `sete al`) that read from that **same
+  live struct via `FUN_0047E860`** — *not* from the `+0x24D8` committed copy.
+- Our `ForcePlatinumVoiceChoice` runs from the `GetPaletteIndexPointers` hook, which sits on
+  the per-frame commit copy (`0047D92D`, `lea edi,[edx+24D8h]`). Online, the confirm-time
+  roll (`FUN_004807E0`) lands **after** the last time our commit-copy hook runs, so the roll
+  overwrites our value in the live struct, and the battle reads the roll. Our write is dead.
+
+## Correct hook point
+
+Force the value **at the roll**, `FUN_004807E0` (base-rel `0x000807E0`), substituting the
+rolled register right before it is stored:
+- P1 write `0x00480B7E mov [esi+edi+164Ch],edx` → force `edx`
+- P2 write `0x00480BAC mov [ebx+164Ch],eax`     → force `eax`
+
+Forcing here puts our value into the live struct at the authoritative moment; all downstream
+battle reads honor it. Offsets recorded in `GhidraDefs.h`
+(`ADDR_PlatinumPersonalityRoll*`).
+
+## DESYNC CAVEAT — must be designed around
+
+The battle-time reads are **script-VM opcodes**, i.e. the personality flag feeds the
+**deterministic simulation** (not purely cosmetic audio). Since `FUN_004807E0` is part of the
+lockstep-deterministic select flow, if the two clients force **different** values the
+simulations diverge → desync. Therefore forcing at the roll is only safe if both clients end
+up with the same per-slot value. Two viable designs:
+
+1. **Network-synced force (correct, matches user expectation "each controls own voice").**
+   Exchange each player's `PlatinumVoiceChoice` over the existing packet path
+   (`OnlinePaletteManager` is the natural home), then on BOTH clients force each Platinum slot
+   to *that slot owner's* choice. Deterministic on both sides → no desync.
+2. **Offline/local-only (safe interim).** Only force in offline / training / replay contexts
+   (no peer to desync); leave online on vanilla shared RNG. Effectively reverts the online
+   promise but removes the desync risk immediately.
+
+Naïvely moving the current local-only force to the roll site **without** one of the above
+would risk desyncs whenever the two players pick different voices — do not ship that.
+
+## Implementation (2026-07-22, option 1: network-synced force)
+
+Shipped the mod-level exchange. Files:
+
+- **`Packet.h`** — new `PacketType_PlatinumVoiceChoice` (1-byte payload: the settings enum
+  0/1/2).
+- **`NetworkManager.cpp`** — dispatch case → `OnlinePaletteManager::RecvPlatinumVoiceChoicePacket`.
+- **`OnlinePaletteManager.{h,cpp}`** — `SendPlatinumVoiceChoicePacket` (sent in the existing
+  match-init `SendPalettePackets` flow, which goes only to IMPlayers that completed the
+  Announce/Acknowledge handshake → **never reaches a mod-less opponent**, so no interference),
+  `RecvPlatinumVoiceChoicePacket`, `m_playerVoiceChoices[2]` (per-slot, -1 = none),
+  `GetPlayerVoiceChoice()`, reset in `OnMatchInit`/`ClearSavedPalettePacketQueues`.
+- **`hooks_palette.cpp`** — removed the old commit-copy-time force. New
+  `ApplyPlatinumVoiceForce()` called every frame from `MatchState::OnUpdate`; writes the flag
+  directly into the live select-struct (`FUN_0047E860()` singleton + `slot*0x20 + 0x164C`).
+  Slot mapping: our own match slot → our setting; opponent slot → their received choice (else
+  vanilla RNG). Offline → P1 (local-player slot; P2-side/local-2P not distinguished).
+- **`GhidraDefs.h`** — `ADDR_GetCharSelectStruct` etc.; address resolved via
+  `GetBbcfBaseAdress() + RVA`.
+
+Two modded clients converge on identical per-slot flags → no divergence. A mod-less opponent
+hears you via their own RNG (accepted cosmetic tradeoff). **Still requires the live
+mismatch test** (see caveat above) before wide release to rule out any sim divergence.
+
+## Resolved: the flag IS synced state — mismatch desyncs (Test 3, 2026-07-22)
+
+The live mismatch test (Cuack modded vs a mod-less opponent) settled the caveat:
+
+| Test | Setting | you heard | opp heard | forced value vs opp RNG | result |
+|---|---|---|---|---|---|
+| 1 | Default | sena | sena | (no force) | ok |
+| 2 | Luna | luna | luna | match (opp RNG rolled Luna) | ok |
+| 3 | Luna | luna | sena | **mismatch** (opp RNG rolled Sena) | **DESYNC → connection lost** |
+
+Clean signal: **matching value → no desync; differing value → desync.** The personality flag
+is therefore part of the synced/checksummed match state (gameplay may be identical, but it is
+hashed). The async per-frame write itself is fine (Test 2 forced a value via the same write
+with no desync — because it happened to match). **Forcing a value that differs from what the
+opponent's client holds desyncs.**
+
+Consequence: **you cannot override the voice against a mod-less opponent** — their client
+recomputes the flag from the shared-seed RNG, and any override diverges from it. The
+"cosmetic-only, safe against mod-less" assumption is disproven.
+
+### Fix applied
+
+Online forcing is now gated on the opponent being confirmed modded:
+`OnlinePaletteManager::HasReceivedVoiceChoice(oppSlot)` (a mod-less client never sends the
+voice packet). `ApplyPlatinumVoiceForce()`:
+- **offline** → force P1 (unchanged).
+- **online, opponent modded** → force both slots to their converged owner choices (both
+  clients compute identical values → in sync).
+- **online, opponent mod-less / not-yet-received / spectator** → do NOT touch the flag; leave
+  vanilla shared RNG (you hear the game's pick for your own Platinum too, but no desync).
+
+Remaining risk to validate: the modded-vs-modded arrival-order race (we start forcing when we
+receive the peer's packet; if they haven't applied ours yet there's a brief window). Test 2
+shows a matched async write doesn't desync, and pre-packet both sides share identical RNG, so
+convergence should be clean — but confirm with a two-modded-client match.
+
+## CORRECTION: the suffix-only hook is silent; the LOAD read must also be biased (2026-07-22)
+
+The first audio approach (below) hooked only the PLAY resolvers' suffix read. Live test: forcing
+Sena gave TOTAL silence. Root cause, traced and verified against the shipped game files:
+
+- Platinum's two personalities ship as SEPARATE XACT banks: `data/Sound/Voice/vbtl_pt_0.pac`
+  (cues `pt000a..pt417a` = Luna) and `vbtl_pt_1.pac` (`pt000b..pt417b` = Sena). Plus tiny
+  `vbtldb_pt_0/1.pac` (dialogue) and a subvoice set. **Only the rolled personality's bank is
+  mounted per match.**
+- The voice-bank LOAD routine `FUN_00555A20` (battle load; `edi` = select-struct base =
+  `FUN_0047E860()`) reads the personality and uses it to index a `.pac` filename format table
+  (`0x9DC8D0` `vbtl_%s_%d`, `0x9DC8F0` `vbtldb_%s_%d`, `%s`=`pt`) and mount that bank. Reads:
+  slot-0 at `+0x164C` (`0x5560D0` vbtl, `0x55621D` subvoice, `0x55640C` vbtldb), slot-1 at
+  `+0x166C` (`0x556176`, `0x556319`, `0x556488`; last one uses `eax` as base, not `edi`). All
+  bases are the select-struct singleton. Loader call targets: `0x4763F0/0x476480/0x4764F0`.
+- So forcing only the PLAY suffix to "b" requests `pt###b` from a bank that mounted only
+  `pt###a` → name lookup (`FUN_004BF730`→`FUN_004C1060` slot, `FUN_00405190` name) fails →
+  playback skipped → silence. Exactly the observed bug.
+- NOTE: an earlier RE pass mislabeled `0x5560D0` etc. as "UI label" reads. They are the voice
+  BANK LOADER. That mislabel is why the suffix-only approach was attempted. Corrected here.
+- The audio system is XACT (`AA_CWaveBankDataBase_XACT::RegistBank`), not CriWare. Mounted
+  banks + play handles (`char+0x1E9E4`) are per-client heap → never in the GGPO checksum.
+
+### Fix (implemented): bias BOTH the load and play reads, in-register, gated to Platinum
+`hooks_palette.cpp` now hooks all 8 personality reads (6 load + 2 play) by direct address and
+substitutes the chosen personality IN-REGISTER (`esi` at load sites, `eax` at play sites),
+NEVER writing `+0x164C`. Shared `BiasPlatinumPersonality(base, slot)` reads char index at
+`base+slot*0x20+0x1648` (Platinum-gated) and returns the chosen value or the original rolled
+value. Per-slot choice: own slot → our setting (offline = P1); opponent slot → their sent
+choice via `OnlinePaletteManager::GetPlayerVoiceChoice` else the original RNG value. Forcing
+the load mounts the chosen bank; forcing the play requests its cues → audible, no silence.
+Nothing synced changes → desync-safe offline, online vs modded, and online vs mod-less.
+Addresses recorded in `GhidraDefs.h` (`ADDR_PlatVoiceLoad_*`, `ADDR_PlatinumVoiceResolver*`).
+
+Blast-radius note: the load reads are shared by ALL characters (for non-Platinum `+0x164C`
+is a voice-set half index, not personality), so every hook is gated on
+`char index == Platinum`; non-Platinum returns the original value unchanged. NEEDS in-game
+validation: (1) offline Platinum both voices audible; (2) other characters' voices unaffected;
+(3) online no desync + correct local voice vs modded and mod-less opponents.
+
+## (superseded) FIRST client-side audio-only attempt (2026-07-22)
+
+The flag-forcing approach was abandoned entirely: since the flag feeds the deterministic
+script VM, there is no way to force it against a mod-less/RNG opponent without desyncing, and
+gating to modded-only would drop the feature for the common case. Instead we override at the
+audio layer, which is purely client-side.
+
+**How the voice file is chosen.** The personality is read in two kinds of sites:
+- The query VM (evaluator `FUN_0057D020`, jump table `0x0057DEB8`) — deterministic script
+  execution. This is why the flag is checksum-relevant; we never touch it.
+- Two voice-file-path resolvers `FUN_005CFC80` / `FUN_005D1440`. Each reads the personality
+  (`mov eax,[eax+ecx+164Ch]` at `0x005CFF57` / `0x005D15E2`; `eax = slot<<5`, `ecx` = struct
+  base) and appends a filename suffix: `0→"a" 1→"b" 2→"c" 3→"d"` + `.wav` (strings
+  `0x958960/68/70/78`, `0x95433C`), producing `data/char/<name><suffix>.wav`. The loaded voice
+  handle is stored at char+`0x1E9E4` — a per-client heap pointer, so it cannot be part of the
+  GGPO checksum (else every match would desync). **The suffix is the only thing that differs
+  between Sena and Luna.**
+
+**The hook.** `hooks_palette.cpp` hooks the personality read in both resolvers by direct
+address (`GetBbcfBaseAdress() + RVA`, 7-byte `mov`, jmp-back just past it). The trampoline
+computes the local override in `ResolvePlatinumVoiceLocal(base, slot<<5)` and puts it in `eax`
+for the following suffix switch — **without writing back to `+0x164C`**. It reads the char
+index at `base+slot*0x20+0x1648` and only acts for Platinum. Per-slot decision:
+- our own slot (offline = P1; online = `GetThisPlayerMatchPlayerIndex`) → our
+  `PlatinumVoiceChoice`;
+- other slot → the choice that player sent over `PacketType_PlatinumVoiceChoice`
+  (`GetPlayerVoiceChoice`), else the game's RNG value (unchanged);
+- spectator → each slot uses that player's sent choice.
+
+**Result:** no synced state ever changes → cannot desync. Works offline, online vs modded, and
+online vs mod-less. You always hear your own Platinum in your chosen voice; a modded opponent
+hears it too (packet); a mod-less opponent hears their own RNG for your Platinum. The
+`OnlinePaletteManager` voice packet is retained purely so modded clients render each other's
+picks; it is never required for correctness or safety. The per-frame flag write, the
+`GetPaletteIndexPointers` force, and the modded-only desync gate were all removed.

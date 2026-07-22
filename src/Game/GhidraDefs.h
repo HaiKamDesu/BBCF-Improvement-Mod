@@ -599,3 +599,78 @@ static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetB = 0x000BB6E0;
 static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetB = 0x000BB860;
 static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetA = 0x000BBA10;
 static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetA = 0x000BBB30;
+
+// ---------------------------------------------------------------------------
+// Platinum personality/voice roll (Sena/Luna). See
+// docs/Research/PlatinumVoiceChoiceInvestigation.md (2026-07-22 "Resolved: ..."
+// section) for the full trace. Flag lives at selectStruct+0x164C
+// (== our +0x4 view), player stride 0x20; 1 = Sena, 0 = Luna.
+//
+// Select-struct singleton getter (ecx-less cdecl, returns base in eax); the
+// SAME base our GetPaletteIndexPointers hook derives (edx). Both the roll and
+// the battle-time read below index off this.
+static constexpr uintptr_t ADDR_GetCharSelectStruct = 0x0007E860; // FUN_0047E860
+//
+// Personality randomize function. Runs at character-select CONFIRM on both
+// clients (lockstep-deterministic), NOT per-frame. Signature roughly:
+//   void __thiscall Roll(void* selectStructBase /*ecx*/, int playerIndex /*[ebp+8]*/)
+// Draws stream-0 of the shared-seed PRNG (FUN_0040BF00, push 0) and writes
+// rand()%2 into [playerIndex*0x20 + selectStruct + 0x164C]. This is the
+// authoritative write; everything downstream (battle-time reads) sees it.
+static constexpr uintptr_t ADDR_PlatinumPersonalityRoll = 0x000807E0; // FUN_004807E0
+//   Write site P1: 0x00480B7E  mov [esi+edi+164Ch],edx  (edx = rolled value)
+//   Write site P2: 0x00480BAC  mov [ebx+164Ch],eax      (eax = rolled value)
+static constexpr uintptr_t ADDR_PlatinumPersonalityRoll_WriteP1 = 0x00080B7E;
+static constexpr uintptr_t ADDR_PlatinumPersonalityRoll_WriteP2 = 0x00080BAC;
+//
+// Shared-seed PRNG draw: FUN_0040BF00(int streamIndex) -> indexes
+// streamIndex*0x9CC + [0xA135C8], calls Next() (FUN_004528A0). This is
+// MT19937 (Mersenne Twister): FUN_00452990 = regenerate-624, FUN_00452940 =
+// init_genrand(seed) (0x6C078965 multiplier). The personality roll uses
+// stream 0.
+static constexpr uintptr_t ADDR_SharedSelectRng_Next = 0x0000BF00; // FUN_0040BF00
+static constexpr uintptr_t ADDR_MT_InitGenrand = 0x00052940;       // FUN_00452940 init_genrand(seed)
+//
+// SEED SOURCE (this is the actual online sync). Two seed paths:
+//   Offline (training/arcade/vs-CPU): FUN_00471F00 seeds streams 0/1 from a
+//     high-res timer (QPC-style) -> non-deterministic, per-boot.
+//   Online + replay: FUN_0069D001 seeds streams 0/1 (sites 0x0069D7BA /
+//     0x0069D7CE) from a stored per-match value, copied earlier
+//     (0x0069D54C..0x0069D563) out of FUN_0055C540()+0x83E48 / +0x83E4C into
+//     the per-slot match/replay struct at 0x0155B908 / 0x0155B90C (stride
+//     0xA0). Both clients get the SAME seed -> identical MT sequence ->
+//     identical personality roll. The flag itself never crosses the wire.
+static constexpr uintptr_t ADDR_SelectRngSeed_Offline = 0x00071F00; // FUN_00471F00 (timer)
+static constexpr uintptr_t ADDR_SelectRngSeed_OnlineReplay = 0x0029D001; // FUN_0069D001 (shared match seed)
+//
+// Battle-time READ sites: script-VM boolean condition opcodes (ret 8), case handlers
+// in the query-VM jump table at 0x0057DEB8 (evaluator FUN_0057D020). They read the flag
+// from the LIVE select struct via FUN_0047E860. Because the flag feeds DETERMINISTIC
+// script execution, it is part of the synced/checksummed match state: writing a value
+// that differs between clients desyncs the match (confirmed by live test). DO NOT force
+// the flag online.
+//   0x0057D3F3 cmp [...+164Ch],1 / 0x0057D416 ==2 / 0x0057D439 ==3 (also 0x0057DAE4/DB12/DB41/DB70)
+static constexpr uintptr_t ADDR_PlatinumPersonalityRead_Eq1 = 0x0017D3F3;
+//
+// AUDIO override (how the mod changes the voice - client-side only, NEVER writes the flag).
+// Platinum ships TWO separate voice banks: vbtl_pt_0.pac (suffix "a" = Luna cues) and
+// vbtl_pt_1.pac (suffix "b" = Sena); only the rolled personality's bank is mounted. So the
+// personality is read at TWO kinds of client-side sites, BOTH must be biased together:
+//
+//  1. Voice-bank LOAD routine FUN_00555A20 (runs at battle load; edi = select-struct base =
+//     FUN_0047E860()). Reads personality to index a .pac filename table (0x9DC8D0 "vbtl_%s_%d",
+//     0x9DC8F0 "vbtldb_%s_%d") and mount that bank. Slot-0 reads at +0x164C, slot-1 at +0x166C:
+static constexpr uintptr_t ADDR_PlatVoiceLoad_VbtlP1 = 0x001560D0; // mov esi,[edi+164Ch] vbtl slot0
+static constexpr uintptr_t ADDR_PlatVoiceLoad_VbtlP2 = 0x00156176; // mov esi,[edi+166Ch] vbtl slot1
+static constexpr uintptr_t ADDR_PlatVoiceLoad_SubP1  = 0x0015621D; // subvoice slot0
+static constexpr uintptr_t ADDR_PlatVoiceLoad_SubP2  = 0x00156319; // subvoice slot1
+static constexpr uintptr_t ADDR_PlatVoiceLoad_DbP1   = 0x0015640C; // vbtldb slot0
+static constexpr uintptr_t ADDR_PlatVoiceLoad_DbP2   = 0x00156488; // vbtldb slot1 (base = eax here)
+//  2. Voice-file PLAY resolvers FUN_005CFC80 / FUN_005D1440 (`mov eax,[eax+ecx+164Ch]`,
+//     eax=slot<<5, ecx=base): read personality to pick the "<base><a/b/c/d>.wav" cue name.
+static constexpr uintptr_t ADDR_PlatinumVoiceResolverA = 0x001CFC80; // FUN_005CFC80 (read 0x1CFF57)
+static constexpr uintptr_t ADDR_PlatinumVoiceResolverB = 0x001D1440; // FUN_005D1440 (read 0x1D15E2)
+// hooks_palette.cpp hooks all 8 reads and substitutes the chosen personality IN-REGISTER
+// (never memory) for the local player's Platinum. The mounted XACT bank + voice handle
+// (char+0x1E9E4) are per-client heap, never in the GGPO checksum -> desync-safe vs anyone.
+// The audio system is XACT (AA_CWaveBankDataBase_XACT::RegistBank @0x89923F), not CriWare.

@@ -1,0 +1,15 @@
+te mando los test
+test 1 (default)
+sena
+sena
+test 2 (luna)
+luna
+luna
+test 3 (luna)
+luna
+luna
+test 4 (luna)
+sena
+sena
+debajo de los test es lo que escuchaba cada player, asi que siempre escuchabamos el mismo
+y el entreparentesis es lo que tenia como opcion en el IM

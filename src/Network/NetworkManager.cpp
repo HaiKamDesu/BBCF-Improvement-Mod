@@ -82,6 +82,13 @@ void NetworkManager::RecvPacket(Packet* packet)
 		}
 		break;
 
+	case PacketType_PlatinumVoiceChoice:
+		if (g_interfaces.pRoomManager->IsPacketFromSameMatchNonSpectator(packet))
+		{
+			g_interfaces.pOnlinePaletteManager->RecvPlatinumVoiceChoicePacket(packet);
+		}
+		break;
+
 	case PacketType_GameMode:
 		if (g_interfaces.pRoomManager->IsPacketFromSameMatchNonSpectator(packet) &&
 			*g_gameVals.pGameState == GameState_CharacterSelectionScreen)

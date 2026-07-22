@@ -32,6 +32,7 @@ void OnlinePaletteManager::SendPalettePackets()
 	}
 
 	SendPaletteDownloadPermissionPacket(thisPlayerMatchPlayerIndex);
+	SendPlatinumVoiceChoicePacket(thisPlayerMatchPlayerIndex);
 	SendPaletteInfoPacket(charPalHandle, thisPlayerMatchPlayerIndex);
 	SendPaletteDataPackets(charPalHandle, thisPlayerMatchPlayerIndex);
 }
@@ -92,6 +93,32 @@ void OnlinePaletteManager::RecvPaletteDownloadPermissionPacket(Packet* packet)
 		allowDownload ? PaletteDownloadPermission::Granted : PaletteDownloadPermission::Denied;
 }
 
+void OnlinePaletteManager::RecvPlatinumVoiceChoicePacket(Packet* packet)
+{
+	LOG(2, "OnlinePaletteManager::RecvPlatinumVoiceChoicePacket\n");
+
+	uint16_t matchPlayerIndex = m_pRoomManager->GetPlayerMatchPlayerIndexByRoomMemberIndex(packet->roomMemberIndex);
+	if (matchPlayerIndex > 1 || packet->dataSize < sizeof(uint8_t))
+		return;
+
+	uint8_t choice = 0;
+	memcpy_s(&choice, sizeof(choice), packet->data, sizeof(choice));
+	if (choice > 2)
+		choice = 0;
+
+	m_playerVoiceChoices[matchPlayerIndex] = (int8_t)choice;
+	LOG(2, "[PlatVoice] recv opponent voice choice=%u for matchPlayerIndex=%u\n", choice, matchPlayerIndex);
+}
+
+int OnlinePaletteManager::GetPlayerVoiceChoice(uint16_t matchPlayerIndex) const
+{
+	if (matchPlayerIndex > 1)
+		return 0;
+
+	const int8_t choice = m_playerVoiceChoices[matchPlayerIndex];
+	return choice > 0 ? choice : 0; // -1 (none) / 0 (Default) -> leave vanilla RNG
+}
+
 void OnlinePaletteManager::ProcessSavedPalettePackets()
 {
 	LOG(2, "OnlinePaletteManager::ProcessSavedPalettePackets\n");
@@ -113,6 +140,8 @@ void OnlinePaletteManager::ClearSavedPalettePacketQueues()
 	m_loggedMatchInitWait = false;
 	m_playerPaletteDownloadPermissions[0] = PaletteDownloadPermission::Unknown;
 	m_playerPaletteDownloadPermissions[1] = PaletteDownloadPermission::Unknown;
+	m_playerVoiceChoices[0] = -1;
+	m_playerVoiceChoices[1] = -1;
 }
 
 void OnlinePaletteManager::OnMatchInit()
@@ -121,6 +150,8 @@ void OnlinePaletteManager::OnMatchInit()
 
 	m_playerPaletteDownloadPermissions[0] = PaletteDownloadPermission::Unknown;
 	m_playerPaletteDownloadPermissions[1] = PaletteDownloadPermission::Unknown;
+	m_playerVoiceChoices[0] = -1;
+	m_playerVoiceChoices[1] = -1;
 	m_matchInitPending = true;
 	m_loggedMatchInitWait = false;
 	OnUpdate();
@@ -190,6 +221,21 @@ void OnlinePaletteManager::SendPaletteDownloadPermissionPacket(uint16_t roomMemb
 		(char*)&allowDownload,
 		(uint16_t)sizeof(allowDownload),
 		PacketType_PaletteDownloadPermission,
+		roomMemberIndex
+	);
+
+	m_pRoomManager->SendPacketToSameMatchIMPlayers(&packet);
+}
+
+void OnlinePaletteManager::SendPlatinumVoiceChoicePacket(uint16_t roomMemberIndex)
+{
+	LOG(2, "OnlinePaletteManager::SendPlatinumVoiceChoicePacket\n");
+
+	uint8_t choice = (uint8_t)Settings::settingsIni.platinumVoiceChoice;
+	Packet packet(
+		(char*)&choice,
+		(uint16_t)sizeof(choice),
+		PacketType_PlatinumVoiceChoice,
 		roomMemberIndex
 	);
 

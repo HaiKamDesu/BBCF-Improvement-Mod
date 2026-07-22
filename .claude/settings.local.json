@@ -190,7 +190,10 @@
       "Bash(grep -E \"error|Error\\\\\\(s\\\\\\)|Build succeeded|MarkdownRenderer.cpp$\")",
       "Bash(\"/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" BBCF_IM.sln /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143)",
       "Bash(sed -n '80,135' src/Network/RoomManager.cpp)",
-      "Bash(sed -n '160,200' src/Network/RoomManager.cpp)"
+      "Bash(sed -n '160,200' src/Network/RoomManager.cpp)",
+      "Bash(grep -rn \"0x00[0-9A-Fa-f]\\\\{4,6\\\\}\" src/Game/ReplayRewind/)",
+      "Bash(unzip -l \"bin/Debug/BBCF.IM.win-x86.v8.1.zip\")",
+      "Bash(grep -vE \"^ntdll|Symbol search|Deferred|SRV\\\\*|Loading|\\\\.\\\\.\\\\.\\\\.\\\\.\\\\.$\")"
     ]
   }
 }

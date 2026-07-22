@@ -1,0 +1,1336 @@
+
+
+
+
+BBCF_FIX START - 2026-07-21 22:21:59
+/////////////////////////////////////
+/////////////////////////////////////
+
+[2026-07-21 22:21:59.018][T12620][L0] [Init] Set logging OK
+[2026-07-21 22:21:59.018][T12620][L0] [Init] Logging configured (generateDebugLogs=1, urtReTrace=0 level=2 maxMB=16 backups=3).
+[2026-07-21 22:21:59.018][T12620][L1] Starting BBCF_IM_Start thread
+[2026-07-21 22:21:59.018][T12620][L0] [Init] Starting initialization thread.
+[2026-07-21 22:21:59.018][T12620][L1] CreateCustomDirectories
+[2026-07-21 22:21:59.018][T12620][L0] [Init] Custom directories ensured.
+[2026-07-21 22:21:59.018][T12620][L0] [Crash] Unhandled exception filter installed.
+[2026-07-21 22:21:59.018][T12620][L0] [Init] Crash handlers installed.
+[2026-07-21 22:21:59.019][T12620][L1] settings.ini config:
+[2026-07-21 22:21:59.019][T12620][L1] 	- ToggleButton = F1
+	- ToggleOnlineButton = F2
+	- ToggleHUDButton = F3
+	- SaveStateKeybind = F5
+	- LoadStateKeybind = F9
+	- LoadReplayStateKeybind = F4
+	- freezeFrameKeybind = C
+	- stepFramesKeybind = V
+	- DinputDllWrapper = none
+	- RenderingWidth = 1920
+	- RenderingHeight = 1080
+	- Viewport = 1
+	- AntiAliasing = 5
+	- V-sync = 0
+	- MenuSize = 2
+	- Notifications = 1
+	- CheckUpdates = 1
+	- GenerateDebugLogs = 1
+	- ShowRankedProgress = 0
+	- ShowSquareColorProgress = 0
+	- ShowRankedPrediction = 1
+	- RankedProgressShowMatches = 1
+	- RankedProgressShowWins = 1
+	- RankedProgressShowLosses = 0
+	- RankedProgressShowWinrate = 1
+	- RankedProgressShowCharacterLeaderboardPlacement = 0
+	- RankedProgressShowGlobalLeaderboardPlacement = 0
+	- RankedAutomationHarnessEnabled = 0
+	- RankedAutomationHarnessHotkey = F8
+	- RankedAutomationHarnessAutorun = 0
+	- RankedAutomationHarnessQuitOnFinish = 0
+	- DCodeAutoRecover = 1
+	- DCodeForceFailureOnce = 0
+	- SpectatorSyncHooksEnabled = 1
+	- PlatinumVoiceChoice = 1
+	- DebugLogSessionHistory = 10
+	- URT_RE_TraceEnabled = 0
+	- URT_RE_TraceLevel = 2
+	- URT_RE_MaxFileMB = 16
+	- URT_RE_MaxBackups = 3
+	- URT_RE_AllowSizeMismatchProbe = 0
+	- URT_RE_AllowUnsafeProbeLoad = 0
+	- EnableInDevelopmentFeatures = 0
+	- EnableRankedListConnectionFilter = 1
+	- ShowRankedListFilterWindow = 1
+	- ShowRankedListHiddenPopup = 0
+	- RankedListSortMode = 1
+	- RankedListNetworkFilter = 0
+	- HideUnmetRequirementRooms = 0
+	- LoadForeignPalettesToggleDefault = 1
+	- AllowPaletteDownloads = 1
+	- SwapControllerPos = 0
+	- EnableControllerHooks = 1
+	- ForceEnableControllerSettingHooks = 0
+	- PrimaryKeyboardDeviceId = container|_3BD2A4E5_5A95_11F1_A068_D843AE8BAA5B
+	- IgnoredKeyboardIds = 
+	- KeyboardRenameMap = 
+	- KeyboardMappings = 
+	- AutomaticallyUpdateControllers = 1
+	- AutoRefreshSteamGraceMs = 0
+	- AutoRefreshFollowupDelayMs = 500
+	- AutoRefreshTimerIntervalMs = 100
+	- UploadReplayData = 1
+	- UploadReplayDataHost = 89.167.76.6
+	- UploadReplayDataEndpoint = /upload
+	- UploadReplayDataPort = 5000
+	- autoArchive = 0
+	- FrameHistoryWidth = 12
+	- FrameHistoryHeight = 20
+	- FrameHistorySpacing = 6
+	- FrameHistoryAutoReset = 1
+	- FrameHistoryEnabled = 0
+	- FrameHistoryCountEmptyFrames = 0
+	- Language = en
+	- UnlimitedPlaybackTriggerKeyCode = 0
+	- UnlimitedPlaybackLoopKeyCode = 0
+	- UnlimitedPlaybackLoopSetupSeconds = 0
+	- UnlimitedPlaybackLoopEndingSeconds = 0
+	- UnlimitedPlaybackLoopRestartLabState = 0
+	- UnlimitedPlaybackLoopRestartMode = 0
+[2026-07-21 22:21:59.019][T12620][L0] [Init] Settings initialized and saved settings loaded.
+[2026-07-21 22:21:59.019][T12620][L2] [Language] Found RCDATA resource name rawWideUtf8='"LOCALIZATION.CSV"' (len=18)
+[2026-07-21 22:21:59.019][T12620][L2] [Language] Loaded embedded localization CSV (80148 bytes).
+[2026-07-21 22:21:59.019][T12620][L2] [Language] Stripped UTF-8 BOM from localization CSV.
+[2026-07-21 22:21:59.019][T12620][L2] [Language] CSV first line (as parsed bytes) = 'MethodName,en,es'
+[2026-07-21 22:21:59.019][T12620][L2] [Language] CSV first 32 bytes hex = 4d 65 74 68 6f 64 4e 61 6d 65 2c 65 6e 2c 65 73 a 5f 4c 61 6e 67 75 61 67 65 43 6f 64 65 2c 65 
+[2026-07-21 22:21:59.019][T12620][L2] [Language] CSV row 414 column mismatch: got=6 expected=3 key='This will continuously loop the current recording slot'
+[2026-07-21 22:21:59.019][T12620][L2] [Language] CSV language column[0] raw='en' (len=2)
+[2026-07-21 22:21:59.019][T12620][L2] [Language] CSV language column[1] raw='es' (len=2)
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'or higher.' for language 'en' (row 349). Overwriting previous value.
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'or higher.' for language 'es' (row 349). Overwriting previous value.
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'Unknown' for language 'en' (row 468). Overwriting previous value.
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'Unknown' for language 'es' (row 468). Overwriting previous value.
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'Reset' for language 'en' (row 482). Overwriting previous value.
+[2026-07-21 22:21:59.020][T12620][L2] [Language] Duplicate key 'Reset' for language 'es' (row 482). Overwriting previous value.
+[2026-07-21 22:21:59.021][T12620][L2] [Language] Loaded 2 language(s) from localization CSV.
+[2026-07-21 22:21:59.021][T12620][L2] [Language] Fallback language set to 'en'.
+[2026-07-21 22:21:59.021][T12620][L2] [Language] Sanity: lang='en' hasKey('Main window notification format')=1
+[2026-07-21 22:21:59.021][T12620][L2] [Language] Sanity: lang='es' hasKey('Main window notification format')=1
+[2026-07-21 22:21:59.021][T12620][L0] [Init] Localization initialized for language en.
+[2026-07-21 22:21:59.023][T12620][L1] orig_DirectInput8Create: 0x6AF433F0
+[2026-07-21 22:21:59.023][T12620][L0] [Init] About to place Detours hooks
+[2026-07-21 22:21:59.023][T12620][L1] placeHooks_detours
+[2026-07-21 22:21:59.023][T12620][L2] Successfully hooked Direct3DCreate9Ex at 0x71A14CA0
+[2026-07-21 22:21:59.023][T12620][L2] Successfully hooked D3DXCreateEffect at 0x6B26DCD0
+[2026-07-21 22:21:59.023][T12620][L2] Successfully hooked D3DXCreateSprite at 0x6B1989C7
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked SteamAPI_Init at 0x71BD96F0
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked SteamAPI_RunCallbacks at 0x71BD9C40
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked SteamAPI_RegisterCallResult at 0x71BD9960
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked SteamAPI_UnregisterCallResult at 0x71BD9E40
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked SteamAPI_ISteamUserStats_UploadLeaderboardScore at 0x71BD6C90
+[2026-07-21 22:21:59.024][T12620][L2] Successfully hooked CreateWindowExW at 0x76AE0290
+[2026-07-21 22:21:59.024][T12620][L0] [Init] Detours hooks placed OK
+[2026-07-21 22:21:59.030][T12620][L2] BattleInputWrite found at: 0x0077A192
+[2026-07-21 22:21:59.030][T12620][L2] Hook set on BattleInputWrite
+[2026-07-21 22:21:59.030][T12620][L1] BattleInputWrite hook installed OK
+[2026-07-21 22:21:59.030][T12620][L2] SystemInputWrite found at: 0x006B6408
+[2026-07-21 22:21:59.030][T12620][L2] Hook set on SystemInputWrite
+[2026-07-21 22:21:59.030][T12620][L1] SystemInputWrite hook installed OK
+[2026-07-21 22:21:59.030][T12620][L1] GetBbcfBaseAdress() = 0x00620000
+[2026-07-21 22:21:59.030][T12620][L0] [Init] Hooks installed; base address resolved to 0x00620000.
+[2026-07-21 22:21:59.030][T12620][L2] PaletteManager::PaletteManager
+[2026-07-21 22:21:59.030][T12620][L2] CreatePaletteFolders
+[2026-07-21 22:21:59.030][T12620][L0] [Init] PaletteManager constructed.
+[2026-07-21 22:21:59.139][T4016][L1] SteamAPI_Init
+[2026-07-21 22:21:59.212][T4016][L2] SteamMatchmaking found at: 0x00627AEC
+[2026-07-21 22:21:59.212][T4016][L2] Hook set on SteamMatchmaking
+[2026-07-21 22:21:59.212][T4016][L2] SteamNetworking found at: 0x00627B4C
+[2026-07-21 22:21:59.212][T4016][L2] Hook set on SteamNetworking
+[2026-07-21 22:21:59.212][T4016][L2] SteamUser found at: 0x00627AAE
+[2026-07-21 22:21:59.212][T4016][L2] Hook set on SteamUser
+[2026-07-21 22:21:59.212][T4016][L2] SteamFriends found at: 0x00627AC3
+[2026-07-21 22:21:59.213][T4016][L2] Hook set on SteamFriends
+[2026-07-21 22:21:59.213][T4016][L2] SteamUtils found at: 0x00627AD7
+[2026-07-21 22:21:59.213][T4016][L2] Hook set on SteamUtils
+[2026-07-21 22:21:59.213][T4016][L2] SteamUserStats found at: 0x00627B1A
+[2026-07-21 22:21:59.213][T4016][L2] Hook set on SteamUserStats
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamUser
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamFriends
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamUtils
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamMatchmaking
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamUserStats
+[2026-07-21 22:21:59.213][T4016][L2] [STEAM][UserStats] Create wrapper slot=00BF322C raw=08430B80
+[2026-07-21 22:21:59.213][T4016][L2] [STEAM][RawUserStats] Hook StoreStats target=693224A0 orig=076B88A0
+[2026-07-21 22:21:59.213][T4016][L2] [STEAM][RawUserStats] Hook FindOrCreateLeaderboard target=6931C800 orig=076B8918
+[2026-07-21 22:21:59.213][T4016][L2] [STEAM][RawUserStats] Hook FindLeaderboard target=69321A80 orig=076B89E0
+[2026-07-21 22:21:59.213][T4016][L2] [STEAM][RawUserStats] Hook UploadLeaderboardScore target=693225C0 orig=076B88F0
+[2026-07-21 22:21:59.213][T4016][L2] GetSteamNetworking
+[2026-07-21 22:21:59.224][T4016][L2] Correct window: 0x000B0812
+[2026-07-21 22:21:59.230][T4016][L1] Direct3DCreate9EX pD3DEx: 0x00C7A52C
+[2026-07-21 22:21:59.353][T4016][L1] cDirect3D9ExWrapper
+[2026-07-21 22:21:59.358][T4016][L1] CreateDeviceEx:
+[2026-07-21 22:21:59.358][T4016][L1] 	Adapter: 0
+	DeviceType: 1
+	hFocusWindow: 0x000B0812
+	BehaviorFlags: 0x00000040
+[2026-07-21 22:21:59.358][T4016][L1] Original D3D PresentationParameters:
+[2026-07-21 22:21:59.358][T4016][L1] 	- BackBufferWidth: 0
+[2026-07-21 22:21:59.358][T4016][L1] 	- BackBufferHeight: 0
+[2026-07-21 22:21:59.358][T4016][L1] 	- BackBufferFormat: 21
+[2026-07-21 22:21:59.358][T4016][L1] 	- BackBufferCount: 1
+[2026-07-21 22:21:59.358][T4016][L1] 	- SwapEffect: 1
+[2026-07-21 22:21:59.358][T4016][L1] 	- MultiSampleType: 0
+[2026-07-21 22:21:59.358][T4016][L1] 	- MultiSampleQuality: 0
+[2026-07-21 22:21:59.358][T4016][L1] 	- EnableAutoDepthStencil: 1
+[2026-07-21 22:21:59.358][T4016][L1] 	- FullScreen_RefreshRateInHz: 0
+[2026-07-21 22:21:59.358][T4016][L1] 	- hDeviceWindow: 0x000B0812
+[2026-07-21 22:21:59.358][T4016][L1] 	- Windowed: 1
+[2026-07-21 22:21:59.358][T4016][L1] 	- Flags: 0x00000000
+[2026-07-21 22:21:59.358][T4016][L1] 	- PresentationInterval: 0x00000000
+[2026-07-21 22:21:59.455][T4016][L1] CreateDeviceEx created with original PresentationParameters
+[2026-07-21 22:21:59.455][T4016][L1] Modified D3D PresentationParameters:
+[2026-07-21 22:21:59.455][T4016][L1] 	- BackBufferWidth: 1920
+[2026-07-21 22:21:59.455][T4016][L1] 	- BackBufferHeight: 1061
+[2026-07-21 22:21:59.455][T4016][L1] 	- BackBufferFormat: 21
+[2026-07-21 22:21:59.455][T4016][L1] 	- BackBufferCount: 1
+[2026-07-21 22:21:59.455][T4016][L1] 	- SwapEffect: 1
+[2026-07-21 22:21:59.455][T4016][L1] 	- MultiSampleType: 0
+[2026-07-21 22:21:59.455][T4016][L1] 	- MultiSampleQuality: 0
+[2026-07-21 22:21:59.455][T4016][L1] 	- EnableAutoDepthStencil: 1
+[2026-07-21 22:21:59.455][T4016][L1] 	- FullScreen_RefreshRateInHz: 0
+[2026-07-21 22:21:59.455][T4016][L1] 	- hDeviceWindow: 0x000B0812
+[2026-07-21 22:21:59.455][T4016][L1] 	- Windowed: 1
+[2026-07-21 22:21:59.455][T4016][L1] 	- Flags: 0x00000000
+[2026-07-21 22:21:59.455][T4016][L1] 	- PresentationInterval: 0x80000000
+[2026-07-21 22:21:59.455][T4016][L1] cDirect3DDevice9ExWrapper with modified PresentationParameters
+[2026-07-21 22:21:59.455][T4016][L2] placeHooks_bbcf
+[2026-07-21 22:21:59.472][T4016][L2] GetGameStateTitleScreen found at: 0x00819AEE
+[2026-07-21 22:21:59.473][T4016][L2] Hook set on GetGameStateTitleScreen
+[2026-07-21 22:21:59.512][T4016][L2] GetGameStateMenuScreen found at: 0x0094DD33
+[2026-07-21 22:21:59.512][T4016][L2] Hook set on GetGameStateMenuScreen
+[2026-07-21 22:21:59.539][T4016][L2] GetGameStateLobby found at: 0x0096B811
+[2026-07-21 22:21:59.539][T4016][L2] Hook set on GetGameStateLobby
+[2026-07-21 22:21:59.556][T4016][L2] GetGameStateVictoryScreen found at: 0x00848FA9
+[2026-07-21 22:21:59.556][T4016][L2] Hook set on GetGameStateVictoryScreen
+[2026-07-21 22:21:59.571][T4016][L2] GetGameStateVersusScreen found at: 0x0083BBDE
+[2026-07-21 22:21:59.571][T4016][L2] Hook set on GetGameStateVersusScreen
+[2026-07-21 22:21:59.591][T4016][L2] GetGameStateReplayMenuScreen found at: 0x008E3550
+[2026-07-21 22:21:59.591][T4016][L2] Hook set on GetGameStateReplayMenuScreen
+[2026-07-21 22:21:59.594][T4016][L2] WindowMsgHandler found at: 0x0066F359
+[2026-07-21 22:21:59.594][T4016][L2] Hook set on WindowMsgHandler
+[2026-07-21 22:21:59.595][T4016][L2] DenyKeyboardInputFromGame found at: 0x006394C1
+[2026-07-21 22:21:59.595][T4016][L2] Hook set on DenyKeyboardInputFromGame
+[2026-07-21 22:21:59.598][T4016][L2] PacketProcessingFunc found at: 0x006BB234
+[2026-07-21 22:21:59.598][T4016][L2] Hook set on PacketProcessingFunc
+[2026-07-21 22:21:59.601][T4016][L2] GetPlayerAvatarBaseFunc found at: 0x006C0BE1
+[2026-07-21 22:21:59.601][T4016][L2] Hook set on GetPlayerAvatarBaseFunc
+[2026-07-21 22:21:59.609][T4016][L2] GetMatchVariables found at: 0x0077F67F
+[2026-07-21 22:21:59.609][T4016][L2] Hook set on GetMatchVariables
+[2026-07-21 22:21:59.620][T4016][L2] MatchIntroStartsPlaying found at: 0x00778846
+[2026-07-21 22:21:59.620][T4016][L2] Hook set on MatchIntroStartsPlaying
+[2026-07-21 22:21:59.629][T4016][L2] DCodeFetchTick found at: 0x006C25C0
+[2026-07-21 22:21:59.629][T4016][L2] Hook set on DCodeFetchTick
+[2026-07-21 22:21:59.629][T4016][L2] RankedRowClickLatch found at: 0x006C89D0
+[2026-07-21 22:21:59.629][T4016][L2] Hook set on RankedRowClickLatch
+[2026-07-21 22:21:59.629][T4016][L2] RankedRowClickPush found at: 0x006CEE64
+[2026-07-21 22:21:59.629][T4016][L2] Hook set on RankedRowClickPush
+[2026-07-21 22:21:59.723][T4016][L2] SpectatorSyncInputEntry found at: 0x0099E340
+[2026-07-21 22:21:59.723][T4016][L2] Hook set on SpectatorSyncInputEntry
+[2026-07-21 22:21:59.735][T4016][L2] SpectatorSyncInputError found at: 0x007060F1
+[2026-07-21 22:21:59.735][T4016][L2] Hook set on SpectatorSyncInputError
+[2026-07-21 22:21:59.752][T4016][L2] GetStageSelectAddr found at: 0x0082B6DA
+[2026-07-21 22:21:59.752][T4016][L2] Hook set on GetStageSelectAddr
+[2026-07-21 22:21:59.758][T4016][L2] GetMusicSelectAddr found at: 0x00709306
+[2026-07-21 22:21:59.758][T4016][L2] Hook set on GetMusicSelectAddr
+[2026-07-21 22:21:59.772][T4016][L2] OverwriteStagesList found at: 0x008320BA
+[2026-07-21 22:21:59.772][T4016][L2] Hook set on OverwriteStagesList
+[2026-07-21 22:21:59.785][T4016][L2] GetEntityListAddr found at: 0x00778BF4
+[2026-07-21 22:21:59.785][T4016][L2] Hook set on GetEntityListAddr
+[2026-07-21 22:21:59.806][T4016][L2] GetEntityListDeleteAddr found at: 0x0077CC23
+[2026-07-21 22:21:59.806][T4016][L2] Hook set on GetEntityListDeleteAddr
+[2026-07-21 22:21:59.855][T4016][L2] GetIsHUDHidden found at: 0x0076FB23
+[2026-07-21 22:21:59.855][T4016][L2] Hook set on GetIsHUDHidden
+[2026-07-21 22:21:59.858][T4016][L2] GetViewAndProjMatrixes found at: 0x006668DB
+[2026-07-21 22:21:59.858][T4016][L2] Hook set on GetViewAndProjMatrixes
+[2026-07-21 22:21:59.875][T4016][L2] GameUpdatePause found at: 0x008EC450
+[2026-07-21 22:21:59.875][T4016][L2] Activating GameUpdatePause hook.
+[2026-07-21 22:21:59.879][T4016][L2] GetFrameCounter found at: 0x006F2409
+[2026-07-21 22:21:59.879][T4016][L2] Hook set on GetFrameCounter
+[2026-07-21 22:21:59.906][T4016][L2] UnlimitedPlaybackPreTick found at: 0x0078B1F0
+[2026-07-21 22:21:59.906][T4016][L2] Hook set on UnlimitedPlaybackPreTick
+[2026-07-21 22:21:59.909][T4016][L2] GetRoomOne found at: 0x006BEF00
+[2026-07-21 22:21:59.909][T4016][L2] Hook set on GetRoomOne
+[2026-07-21 22:21:59.912][T4016][L2] GetRoomTwo found at: 0x006BEDEE
+[2026-07-21 22:21:59.912][T4016][L2] Hook set on GetRoomTwo
+[2026-07-21 22:21:59.929][T4016][L2] GetFFAMatchThisPlayerIndex found at: 0x00745F8D
+[2026-07-21 22:21:59.929][T4016][L2] Hook set on GetFFAMatchThisPlayerIndex
+[2026-07-21 22:21:59.939][T4016][L2] GetMoneyAddr found at: 0x006D9DC4
+[2026-07-21 22:21:59.940][T4016][L2] SetDumpfileCommentString found at: 0x0066E782
+[2026-07-21 22:21:59.940][T4016][L2] Hook set on SetDumpfileCommentString
+[2026-07-21 22:21:59.940][T4016][L2] UploadReplayToEndpoint found at: 0x006EB0B0
+[2026-07-21 22:21:59.940][T4016][L2] Hook set on UploadReplayToEndpoint
+[2026-07-21 22:21:59.940][T4016][L2] DelNetworkReqWatchReplays found at: 0x008E2F6F
+[2026-07-21 22:21:59.940][T4016][L2] Hook set on DelNetworkReqWatchReplays
+[2026-07-21 22:21:59.940][T4016][L2] BeforeWriteReplayListDat found at: 0x008E2AF8
+[2026-07-21 22:21:59.940][T4016][L2] Hook set on BeforeWriteReplayListDat
+[2026-07-21 22:21:59.940][T4016][L2] SkipReplayListConfirm found at: 0x008E3038
+[2026-07-21 22:21:59.940][T4016][L2] Hook set on SkipReplayListConfirm
+[2026-07-21 22:21:59.948][T4016][L2] GetCharObjPointers found at: 0x007784EF
+[2026-07-21 22:21:59.948][T4016][L2] Hook set on GetCharObjPointers
+[2026-07-21 22:21:59.965][T4016][L2] GetPalBaseAddresses found at: 0x007D6372
+[2026-07-21 22:21:59.965][T4016][L2] Hook set on GetPalBaseAddresses
+[2026-07-21 22:21:59.969][T4016][L2] GetPaletteIndexPointers found at: 0x0069D92D
+[2026-07-21 22:21:59.969][T4016][L2] Hook set on GetPaletteIndexPointers
+[2026-07-21 22:21:59.986][T4016][L2] GetGameStateCharacterSelect found at: 0x008331F2
+[2026-07-21 22:21:59.986][T4016][L2] Hook set on GetGameStateCharacterSelect
+[2026-07-21 22:21:59.990][T4016][L2] ForceBloomOn found at: 0x0079C927
+[2026-07-21 22:21:59.990][T4016][L2] Activating ForceBloomOn hook.
+[2026-07-21 22:22:00.008][T4016][L2] GetIsP1CPU found at: 0x0094D09B
+[2026-07-21 22:22:00.008][T4016][L2] Hook set on GetIsP1CPU
+[2026-07-21 22:22:00.008][T4016][L2] placeHooks_CustomGameModes
+[2026-07-21 22:22:00.023][T4016][L2] steroid_OverdriveCharge found at: 0x007E0FAC
+[2026-07-21 22:22:00.037][T4016][L2] steroid_HeatModify found at: 0x007E11A8
+[2026-07-21 22:22:00.045][T4016][L2] steroid_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.053][T4016][L2] vampire_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.062][T4016][L2] vampire_HealthDrain found at: 0x0079CBE7
+[2026-07-21 22:22:00.070][T4016][L2] exVampire_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.079][T4016][L2] exVampire_HealthDrain found at: 0x0079CBE7
+[2026-07-21 22:22:00.086][T4016][L2] onepunch_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.094][T4016][L2] twopunch_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.101][T4016][L2] fivepunch_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.109][T4016][L2] tugofwar_HealthModify found at: 0x007BAEE1
+[2026-07-21 22:22:00.123][T4016][L2] infiniteheat_HeatModify found at: 0x007E11A8
+[2026-07-21 22:22:00.140][T4016][L2] getTrainingHealthModifyFixJmpBackAddr found at: 0x007ECFFD
+[2026-07-21 22:22:00.141][T4016][L2] Saving original bytes failed.
+[2026-07-21 22:22:00.153][T4016][L2] training_healthModifyFix found at: 0x007ECEF4
+[2026-07-21 22:22:00.153][T4016][L3] CreateRenderTargetEx
+[2026-07-21 22:22:00.153][T4016][L3] 	- Width: 1920
+[2026-07-21 22:22:00.153][T4016][L3] 	- Height: 1152
+[2026-07-21 22:22:00.153][T4016][L3] 	- Multisample: 0
+[2026-07-21 22:22:00.153][T4016][L3] 	- ppSurface: 0x00C7B638
+[2026-07-21 22:22:00.153][T4016][L3] CreateDepthStencilSurfaceEx
+[2026-07-21 22:22:00.153][T4016][L3] 	- Width: 1920
+[2026-07-21 22:22:00.153][T4016][L3] 	- Height: 1152
+[2026-07-21 22:22:00.153][T4016][L3] 	- Multisample: 0
+[2026-07-21 22:22:00.153][T4016][L3] 	- ppSurface: 0x00C7B634
+[2026-07-21 22:22:00.153][T4016][L2] 	- HRESULT: 0
+[2026-07-21 22:22:00.193][T4016][L0] [Init] Entered DirectInput8Create export
+[2026-07-21 22:22:00.194][T4016][L1] orig_DirectInput8Create: 0x6AF433F0
+[2026-07-21 22:22:00.194][T4016][L0] [Init] Calling orig_DirectInput8Create...
+[2026-07-21 22:22:00.205][T4016][L0] [Init] Returned from orig_DirectInput8Create (hr=0x00000000)
+[2026-07-21 22:22:00.206][T4016][L1] DirectInput8WWrapper::EnumDevices - type=0x00000004 flags=0x00000001
+[2026-07-21 22:22:00.291][T4016][L1] DirectInput8WWrapper::EnumDevices - hr=0x00000000 collected=0
+[2026-07-21 22:22:00.291][T4016][L1] ControllerOverrideManager::ControllerOverrideManager - initializing device list
+[2026-07-21 22:22:00.291][T4016][L1] ControllerOverrideManager::RefreshDevices - begin (override=0)
+[2026-07-21 22:22:00.291][T4016][L1] ControllerOverrideManager::CollectDevices - begin
+[2026-07-21 22:22:00.291][T4016][L1] [SteamInputDetect] env 'SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT' len=0
+[2026-07-21 22:22:00.291][T4016][L1] [SteamInputDetect] env 'SDL_GAMECONTROLLER_IGNORE_DEVICES' len=11705
+[2026-07-21 22:22:00.291][T4016][L1] [SteamInputDetect] env 'SDL_ENABLE_STEAM_CONTROLLERS' len=0
+[2026-07-21 22:22:00.291][T4016][L1] [SteamInputDetect] ignore list entries=836 len=11704 threshold=2000 meetsThreshold=1
+[2026-07-21 22:22:00.292][T4016][L1] [SteamInputDetect] raw HID devices (gamepad/joystick)=1
+[2026-07-21 22:22:00.292][T4016][L1]   [RAW] Device[0]: vid=0x28DE pid=0x11FF name='\\.\pipe\HID#VID_045E&PID_028E&IG_00#045E&028E&00045E28E3BFAF18#0#18604'
+[2026-07-21 22:22:00.292][T4016][L1] ControllerOverrideManager::TryEnumerateDevicesW - begin
+[2026-07-21 22:22:00.384][T4016][L1] ControllerOverrideManager::TryEnumerateDevicesW - success count=0
+[2026-07-21 22:22:00.385][T4016][L1] ControllerOverrideManager::TryEnumerateWinmmDevices - begin count=4
+[2026-07-21 22:22:00.385][T4016][L1]   [WINMM] Device id=0 name='Microsoft PC-joystick driver' guid={77696E6D-6D64-6576-0000-000000000000}
+[2026-07-21 22:22:00.385][T4016][L2]   [WINMM] Device id=1 state query failed err=0x000000A7
+[2026-07-21 22:22:00.385][T4016][L2]   [WINMM] Device id=2 state query failed err=0x000000A7
+[2026-07-21 22:22:00.385][T4016][L2]   [WINMM] Device id=3 state query failed err=0x000000A7
+[2026-07-21 22:22:00.385][T4016][L1] ControllerOverrideManager::CollectDevices - envLikely=1 steamInputLikely=0 diSuccess=1 diCount=0 winmmCount=1 total=1
+[2026-07-21 22:22:00.385][T4016][L1]   Device[0]: name='Keyboard' guid={6F1D2B61-D5A0-11CF-BFC7-444553540000} keyboard=1 winmm=0 winmmId=4294967295
+[2026-07-21 22:22:00.385][T4016][L1] [SteamInputDetect] anyListedGamepad=0 diGamepadCount=0
+[2026-07-21 22:22:00.385][T4016][L1] [SteamInputDetect] module steaminput.dll=00000000 steamcontroller.dll=00000000 loaded=0
+[2026-07-21 22:22:00.385][T4016][L1] [SteamInputDetect] final steamInputLikely=1 (envLikely=1 moduleLoaded=0 rawSuggestsFiltering=1 winmmSuggestsFiltering=1 rawMissing=1 rawCount=1 envIgnoreEntries=836 envLen=11704)
+[2026-07-21 22:22:00.385][T4016][L1] ControllerOverrideManager::RefreshDevices - end (devices=1, hash=1414143575 rawHid=1 changed=1)
+[2026-07-21 22:22:00.385][T4016][L1] ControllerOverrideManager::RefreshKeyboardDevices - begin
+[2026-07-21 22:22:00.391][T4016][L1] ControllerOverrideManager::RefreshKeyboardDevices - end count=0->4
+[2026-07-21 22:22:00.391][T4016][L2] Settings::changeSetting: File updated successfully.
+[2026-07-21 22:22:00.391][T4016][L1] ControllerOverrideManager::UpdateP1KeyboardSelectionLocked - selected keyboards=1 available=4 all=4
+[2026-07-21 22:22:00.391][T4016][L1] ControllerOverrideManager::EnsureP1KeyboardsValid - resolved handles=1 devices=4 allDevices=4
+[2026-07-21 22:22:00.402][T4016][L2] Settings::changeSetting: File updated successfully.
+[2026-07-21 22:22:00.402][T4016][L1] ControllerOverrideManager::UpdateP1KeyboardSelectionLocked - selected keyboards=1 available=4 all=4
+[2026-07-21 22:22:00.402][T4016][L1] ControllerOverrideManager::EnsureP1KeyboardsValid - resolved handles=1 devices=4 allDevices=4
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] GetBbcfBaseAdress() = 0x00620000
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] battle_key_controller addr = 0x00EB29C8
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] menu_p1 slot ptr addr = 0x076D51A8
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] menu_p2 slot ptr addr = 0x076D51AC
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] unk_p1  slot ptr addr = 0x076D51B4
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] unk_p2  slot ptr addr = 0x076D51B8
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] char_p1 slot ptr addr = 0x076D51BC
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] char_p2 slot ptr addr = 0x076D51C0
+[2026-07-21 22:22:00.402][T4016][L1] [SEP] BEFORE TOGGLE:
+[2026-07-21 22:22:00.402][T4016][L1]       *menu_p1 = 0x077A53B8
+[2026-07-21 22:22:00.402][T4016][L1]       *menu_p2 = 0x00000000
+[2026-07-21 22:22:00.402][T4016][L1]       *unk_p1  = 0x077A53B8
+[2026-07-21 22:22:00.402][T4016][L1]       *unk_p2  = 0x00000000
+[2026-07-21 22:22:00.402][T4016][L1]       *char_p1 = 0x077A50B8
+[2026-07-21 22:22:00.402][T4016][L1]       *char_p2 = 0x00000000
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A5118
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:00.406][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:00.411][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=24
+[2026-07-21 22:22:00.411][T4016][L1] [SaveWatch] save manager actionRunning -2 -> 0, nextAction -2 -> 1, mode=0, netcolor=0 counter=0
+[2026-07-21 22:22:00.411][T4016][L1] [SaveWatch] bbsave.dat baseline (size=362680), netcolor=0 counter=0
+[2026-07-21 22:22:00.411][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=24
+[2026-07-21 22:22:00.411][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=24
+[2026-07-21 22:22:00.435][T4016][L1] ControllerOverrideManager::HandleWindowMessage - WM_DEVICECHANGE wParam=0x00000007 lParam=0x00000000
+[2026-07-21 22:22:00.435][T4016][L1] ControllerOverrideManager::RefreshKeyboardDevices - begin
+[2026-07-21 22:22:00.439][T4016][L1] ControllerOverrideManager::RefreshKeyboardDevices - end count=4->4
+[2026-07-21 22:22:00.439][T4016][L2] Settings::changeSetting: File updated successfully.
+[2026-07-21 22:22:00.439][T4016][L1] ControllerOverrideManager::UpdateP1KeyboardSelectionLocked - selected keyboards=1 available=4 all=4
+[2026-07-21 22:22:00.439][T4016][L1] ControllerOverrideManager::EnsureP1KeyboardsValid - resolved handles=1 devices=4 allDevices=4
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A5118
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:00.439][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:00.440][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=23
+[2026-07-21 22:22:00.440][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=23
+[2026-07-21 22:22:00.440][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=23
+[2026-07-21 22:22:00.449][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:00.449][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A5118
+[2026-07-21 22:22:00.449][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:00.449][T4016][L1] [SystemInputHook] skip before game ready mode=-1 state=-1 scene=0 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:00.449][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=22
+[2026-07-21 22:22:00.449][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=22
+[2026-07-21 22:22:00.449][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=22
+[2026-07-21 22:22:00.470][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=21
+[2026-07-21 22:22:00.470][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=21
+[2026-07-21 22:22:00.470][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=21
+[2026-07-21 22:22:00.482][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=20
+[2026-07-21 22:22:00.482][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=20
+[2026-07-21 22:22:00.482][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=20
+[2026-07-21 22:22:00.501][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=19
+[2026-07-21 22:22:00.501][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=19
+[2026-07-21 22:22:00.501][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=19
+[2026-07-21 22:22:00.766][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=18
+[2026-07-21 22:22:00.766][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=18
+[2026-07-21 22:22:00.766][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=18
+[2026-07-21 22:22:00.769][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:00.770][T4016][L2] GetMatchVariables
+[2026-07-21 22:22:00.770][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=17
+[2026-07-21 22:22:00.770][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=17
+[2026-07-21 22:22:00.770][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=17
+[2026-07-21 22:22:00.785][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=16
+[2026-07-21 22:22:00.785][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=16
+[2026-07-21 22:22:00.785][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=16
+[2026-07-21 22:22:00.801][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=15
+[2026-07-21 22:22:00.801][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=15
+[2026-07-21 22:22:00.801][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=15
+[2026-07-21 22:22:00.818][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=14
+[2026-07-21 22:22:00.818][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=14
+[2026-07-21 22:22:00.818][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=14
+[2026-07-21 22:22:00.834][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=13
+[2026-07-21 22:22:00.834][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=13
+[2026-07-21 22:22:00.834][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=13
+[2026-07-21 22:22:00.851][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=12
+[2026-07-21 22:22:00.851][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=12
+[2026-07-21 22:22:00.851][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=12
+[2026-07-21 22:22:00.867][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=11
+[2026-07-21 22:22:00.867][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=11
+[2026-07-21 22:22:00.867][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=11
+[2026-07-21 22:22:00.884][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:00.885][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=10
+[2026-07-21 22:22:00.885][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=10
+[2026-07-21 22:22:00.885][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=10
+[2026-07-21 22:22:00.901][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=9
+[2026-07-21 22:22:00.901][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=9
+[2026-07-21 22:22:00.901][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=9
+[2026-07-21 22:22:00.918][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=8
+[2026-07-21 22:22:00.918][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=8
+[2026-07-21 22:22:00.918][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=8
+[2026-07-21 22:22:00.934][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=7
+[2026-07-21 22:22:00.934][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=7
+[2026-07-21 22:22:00.934][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=7
+[2026-07-21 22:22:00.951][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=6
+[2026-07-21 22:22:00.951][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=6
+[2026-07-21 22:22:00.951][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=6
+[2026-07-21 22:22:00.967][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=5
+[2026-07-21 22:22:00.967][T4016][L1] [SaveWatch] save manager actionRunning 0 -> 2, nextAction 1 -> 7, mode=2, netcolor=0 counter=0
+[2026-07-21 22:22:00.967][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=5
+[2026-07-21 22:22:00.967][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=5
+[2026-07-21 22:22:00.984][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=4
+[2026-07-21 22:22:00.984][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=4
+[2026-07-21 22:22:00.984][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=4
+[2026-07-21 22:22:01.000][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.000][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=3
+[2026-07-21 22:22:01.001][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=3
+[2026-07-21 22:22:01.001][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=3
+[2026-07-21 22:22:01.018][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=2
+[2026-07-21 22:22:01.018][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=2
+[2026-07-21 22:22:01.018][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=2
+[2026-07-21 22:22:01.033][T4016][L1] [EndSceneProbe] before MatchState::OnUpdate budget=1
+[2026-07-21 22:22:01.033][T4016][L1] [EndSceneProbe] after MatchState::OnUpdate budget=1
+[2026-07-21 22:22:01.033][T4016][L1] [EndSceneProbe] after WindowManager::Render budget=1
+[2026-07-21 22:22:01.100][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.166][T4016][L1] [SaveWatch] save manager actionRunning 2 -> 0, nextAction 7 -> 1, mode=2, netcolor=0 counter=0
+[2026-07-21 22:22:01.216][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.318][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.437][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.550][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.651][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.768][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.868][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:01.985][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:02.085][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 0
+[2026-07-21 22:22:02.118][T4016][L2] [STEAM][UserStats] RequestCurrentStats result=1
+[2026-07-21 22:22:02.200][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 2
+[2026-07-21 22:22:02.307][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 2
+[2026-07-21 22:22:02.310][T4016][L3] ResetEx
+[2026-07-21 22:22:02.310][T4016][L1] Original D3D PresentationParameters:
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferWidth: 1920
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferHeight: 1080
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferFormat: 22
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferCount: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- SwapEffect: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- MultiSampleType: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- MultiSampleQuality: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- EnableAutoDepthStencil: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- FullScreen_RefreshRateInHz: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- hDeviceWindow: 0x000B0812
+[2026-07-21 22:22:02.310][T4016][L1] 	- Windowed: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- Flags: 0x00000000
+[2026-07-21 22:22:02.310][T4016][L1] 	- PresentationInterval: 0x80000000
+[2026-07-21 22:22:02.310][T4016][L1] Modified D3D PresentationParameters:
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferWidth: 1920
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferHeight: 1080
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferFormat: 22
+[2026-07-21 22:22:02.310][T4016][L1] 	- BackBufferCount: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- SwapEffect: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- MultiSampleType: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- MultiSampleQuality: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- EnableAutoDepthStencil: 1
+[2026-07-21 22:22:02.310][T4016][L1] 	- FullScreen_RefreshRateInHz: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- hDeviceWindow: 0x000B0812
+[2026-07-21 22:22:02.310][T4016][L1] 	- Windowed: 0
+[2026-07-21 22:22:02.310][T4016][L1] 	- Flags: 0x00000000
+[2026-07-21 22:22:02.310][T4016][L1] 	- PresentationInterval: 0x80000000
+[2026-07-21 22:22:02.344][T4016][L3] CreateRenderTargetEx
+[2026-07-21 22:22:02.344][T4016][L3] 	- Width: 1920
+[2026-07-21 22:22:02.344][T4016][L3] 	- Height: 1080
+[2026-07-21 22:22:02.344][T4016][L3] 	- Multisample: 0
+[2026-07-21 22:22:02.344][T4016][L3] 	- ppSurface: 0x00C7B638
+[2026-07-21 22:22:02.345][T4016][L3] CreateDepthStencilSurfaceEx
+[2026-07-21 22:22:02.345][T4016][L3] 	- Width: 1920
+[2026-07-21 22:22:02.345][T4016][L3] 	- Height: 1080
+[2026-07-21 22:22:02.345][T4016][L3] 	- Multisample: 0
+[2026-07-21 22:22:02.345][T4016][L3] 	- ppSurface: 0x00C7B634
+[2026-07-21 22:22:02.345][T4016][L2] 	- HRESULT: 0
+[2026-07-21 22:22:02.463][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 3
+[2026-07-21 22:22:02.463][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:22:02.535][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 6
+[2026-07-21 22:22:02.829][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 8
+[2026-07-21 22:22:02.829][T4016][L1] ControllerOverrideManager::IsSafeToRefreshGameInputsNow - deferring refresh for scene status 8
+[2026-07-21 22:22:02.853][T4016][L1] ControllerOverrideManager::ProcessPendingDeviceChange - begin (autoRefresh=1)
+[2026-07-21 22:22:02.853][T4016][L1] ControllerOverrideManager::RefreshDevices - begin (override=0)
+[2026-07-21 22:22:02.853][T4016][L1] ControllerOverrideManager::CollectDevices - begin
+[2026-07-21 22:22:02.853][T4016][L1] [SteamInputDetect] env 'SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT' len=0
+[2026-07-21 22:22:02.853][T4016][L1] [SteamInputDetect] env 'SDL_GAMECONTROLLER_IGNORE_DEVICES' len=11705
+[2026-07-21 22:22:02.853][T4016][L1] [SteamInputDetect] env 'SDL_ENABLE_STEAM_CONTROLLERS' len=0
+[2026-07-21 22:22:02.853][T4016][L1] [SteamInputDetect] ignore list entries=836 len=11704 threshold=2000 meetsThreshold=1
+[2026-07-21 22:22:02.853][T4016][L1] [SteamInputDetect] raw HID devices (gamepad/joystick)=1
+[2026-07-21 22:22:02.853][T4016][L1]   [RAW] Device[0]: vid=0x28DE pid=0x11FF name='\\.\pipe\HID#VID_045E&PID_028E&IG_00#045E&028E&00045E28E3BFAF18#0#18604'
+[2026-07-21 22:22:02.853][T4016][L1] ControllerOverrideManager::TryEnumerateDevicesW - begin
+[2026-07-21 22:22:02.937][T4016][L1] ControllerOverrideManager::TryEnumerateDevicesW - success count=0
+[2026-07-21 22:22:02.937][T4016][L1] ControllerOverrideManager::TryEnumerateWinmmDevices - begin count=4
+[2026-07-21 22:22:02.937][T4016][L1]   [WINMM] Device id=0 name='Microsoft PC-joystick driver' guid={77696E6D-6D64-6576-0000-000000000000}
+[2026-07-21 22:22:02.937][T4016][L2]   [WINMM] Device id=1 state query failed err=0x000000A7
+[2026-07-21 22:22:02.937][T4016][L2]   [WINMM] Device id=2 state query failed err=0x000000A7
+[2026-07-21 22:22:02.937][T4016][L2]   [WINMM] Device id=3 state query failed err=0x000000A7
+[2026-07-21 22:22:02.937][T4016][L1] ControllerOverrideManager::CollectDevices - envLikely=1 steamInputLikely=1 diSuccess=1 diCount=0 winmmCount=1 total=1
+[2026-07-21 22:22:02.937][T4016][L1]   Device[0]: name='Keyboard' guid={6F1D2B61-D5A0-11CF-BFC7-444553540000} keyboard=1 winmm=0 winmmId=4294967295
+[2026-07-21 22:22:02.937][T4016][L1] [SteamInputDetect] anyListedGamepad=0 diGamepadCount=0
+[2026-07-21 22:22:02.937][T4016][L1] [SteamInputDetect] module steaminput.dll=00000000 steamcontroller.dll=00000000 loaded=0
+[2026-07-21 22:22:02.937][T4016][L1] [SteamInputDetect] final steamInputLikely=1 (envLikely=1 moduleLoaded=0 rawSuggestsFiltering=1 winmmSuggestsFiltering=1 rawMissing=1 rawCount=1 envIgnoreEntries=836 envLen=11704)
+[2026-07-21 22:22:02.937][T4016][L1] ControllerOverrideManager::RefreshDevices - end (devices=1, hash=1414143575 rawHid=1 changed=0)
+[2026-07-21 22:22:02.937][T4016][L1] ControllerOverrideManager::ProcessPendingDeviceChange - device hash unchanged, skipping reinitialize
+[2026-07-21 22:22:02.969][T4016][L1] ControllerOverrideManager::HandleWindowMessage - auto refresh timer idle, killed
+[2026-07-21 22:22:20.799][T4016][L2] GetGameStateTitleScreen
+[2026-07-21 22:22:20.799][T4016][L1] InitSteamApiWrappers
+[2026-07-21 22:22:20.799][T4016][L2] SteamMatchmakingWrapper
+[2026-07-21 22:22:20.799][T4016][L2] 	- before: *pSteamMatchmaking: 0x08430B70, thispointer: 0x17A252F0
+[2026-07-21 22:22:20.799][T4016][L2] 	- after: *pSteamMatchmaking: 0x17A252F0, m_SteamMatchmaking: 0x08430B70
+[2026-07-21 22:22:20.799][T4016][L2] SteamNetworkingWrapper
+[2026-07-21 22:22:20.799][T4016][L2] 	- before: *pSteamNetworking: 0x08430B88, thispointer: 0x146B5FF0
+[2026-07-21 22:22:20.799][T4016][L2] 	- after: *pSteamNetworking: 0x146B5FF0, m_SteamNetworking: 0x08430B88
+[2026-07-21 22:22:20.799][T4016][L2] SteamApiHelper::SteamApiHelper, *pSteamUserStats: 0x6AB2D48C, *pSteamFriends: 0x6AB2C594
+[2026-07-21 22:22:20.799][T4016][L1] InitManagers
+[2026-07-21 22:22:20.799][T4016][L2] CreateGameModesVector
+[2026-07-21 22:22:20.799][T4016][L2] WindowManager::Initialize
+[2026-07-21 22:22:20.799][T4016][L1] [Overlay] [system] Initialization starting...
+[2026-07-21 22:22:20.799][T4016][L2] [Language] Missing key 'Ranked Leaderboard' in fallback language 'en'; defaulting to key text.
+[2026-07-21 22:22:20.799][T4016][L2] [Language] Missing key bytes hex = 52 61 6e 6b 65 64 20 4c 65 61 64 65 72 62 6f 61 72 64 
+[2026-07-21 22:22:20.799][T4016][L2] [Language] Inserted missing key 'Ranked Leaderboard' into fallback language 'en' as literal key text.
+[2026-07-21 22:22:20.799][T4016][L1] Wine Has Not Been Detected.
+[2026-07-21 22:22:20.802][T4016][L1] [Overlay] [system] Toggling key set to 'F1'
+[2026-07-21 22:22:20.802][T4016][L1] [Overlay] [system] Online toggling key set to 'F2'
+[2026-07-21 22:22:20.802][T4016][L1] [Overlay] [system] HUD toggling key set to 'F3'
+[2026-07-21 22:22:20.802][T4016][L2] LoadAllPalettes
+[2026-07-21 22:22:20.802][T4016][L2] InitCustomPaletteVector
+[2026-07-21 22:22:20.802][T4016][L2] LoadPaletteFiles
+[2026-07-21 22:22:20.802][T4016][L1] [Overlay] [system] Loading local custom palettes...
+[2026-07-21 22:22:20.802][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Ragna\*
+[2026-07-21 22:22:20.802][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Jin\*
+[2026-07-21 22:22:20.802][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Noel\*
+[2026-07-21 22:22:20.802][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Rachel\*
+[2026-07-21 22:22:20.802][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Taokaka\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Tager\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Litchi\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Arakune\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Bang\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Carl\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Hakumen\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Nu\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Tsubaki\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Hazama\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Mu\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Makoto\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Valkenhayn\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Platinum\*
+[2026-07-21 22:22:20.803][T4016][L2] 	FILE: nagisinum the mominity.cfpl
+[2026-07-21 22:22:20.803][T4016][L2] 		Full path: BBCF_IM\Palettes\Platinum\nagisinum the mominity.cfpl
+[2026-07-21 22:22:20.803][T4016][L2] FindCustomPalIndex
+[2026-07-21 22:22:20.803][T4016][L1] [Overlay] [system] Platinum: Loaded 'nagisinum the mominity.cfpl'
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Relius\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Izayoi\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Amane\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Bullet\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Azrael\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Kagura\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Kokonoe\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Terumi\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Celica\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Lambda\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Hibiki\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Nine\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Naoto\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Izanami\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Susanoo\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Es\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Mai\*
+[2026-07-21 22:22:20.803][T4016][L2] LoadPalettesIntoContainer BBCF_IM\Palettes\Jubei\*
+[2026-07-21 22:22:20.803][T4016][L1] [Overlay] [system] Finished loading local custom palettes
+[2026-07-21 22:22:20.803][T4016][L2] InitPaletteSlotsVector
+[2026-07-21 22:22:20.803][T4016][L2] LoadPaletteSettingsFile
+[2026-07-21 22:22:20.858][T4016][L1] [Overlay] [system] Finished initialization
+[2026-07-21 22:22:20.858][T4016][L1] [Overlay] ------------------------------------------------------------------
+[2026-07-21 22:22:20.858][T4016][L2] Initialize end
+[2026-07-21 22:22:20.858][T4016][L1] [TitleHook] after WindowManager::Initialize
+[2026-07-21 22:22:20.859][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:20.859][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:20.859][T4016][L1] [RankedListFilter] visibility check: gstate=4 state=0 state1=0 onList=0
+[2026-07-21 22:22:20.873][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.873][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.873][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.873][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.873][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.877][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.877][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.877][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.877][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.877][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.880][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.880][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.880][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.880][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.880][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.881][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.883][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.883][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.883][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.883][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.883][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.903][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.903][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.903][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.903][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.903][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:20.919][T4016][L1] [RankedAutoProbe] system_input slot=None state=4 word=0x00000000 controller=0x077A4F98
+[2026-07-21 22:22:20.919][T4016][L1] [RankedAutoProbe] system_input slot=MenuP1 state=4 word=0x00000000 controller=0x077A53B8
+[2026-07-21 22:22:20.919][T4016][L1] [RankedAutoProbe] system_input slot=CharP1 state=4 word=0x00000000 controller=0x077A50B8
+[2026-07-21 22:22:20.919][T4016][L1] [RankedAutoProbe] system_input slot=MenuP2 state=4 word=0x00000000 controller=0x077A4C98
+[2026-07-21 22:22:20.919][T4016][L1] [RankedAutoProbe] system_input slot=CharP2 state=4 word=0x00000000 controller=0x077A35B8
+[2026-07-21 22:22:21.735][T4016][L2] GetGameStateMenuScreen
+[2026-07-21 22:22:21.735][T4016][L1] InitSteamApiWrappers
+[2026-07-21 22:22:21.735][T4016][L1] InitManagers
+[2026-07-21 22:22:21.735][T4016][L1] [MenuHook] after WindowManager::Initialize
+[2026-07-21 22:22:21.735][T4016][L1] [MenuExit] Enter menu screen hook: gameMode=12 gameState=4 sceneStatus=3
+[2026-07-21 22:22:21.735][T4016][L1] [UP][STATE] MenuExit enter mode=1 enabled=1 suppressed=0 armed=0 frame=52 gameMode=12 gameState=4 entries=0 cache=0 activeProfile=''
+[2026-07-21 22:22:21.735][T4016][L1] [UP][DATA] MenuExit enter entries=0 cache=0 activeProfile=''
+[2026-07-21 22:22:21.735][T4016][L2] MatchState::OnMatchEnd
+[2026-07-21 22:22:21.735][T4016][L2] EndGameMode
+[2026-07-21 22:22:21.735][T4016][L2] ResetAllHooks
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating steroid_OverdriveCharge hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating steroid_HeatModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating steroid_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating vampire_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating vampire_HealthDrain hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating exVampire_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating exVampire_HealthDrain hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating onepunch_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating twopunch_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating fivepunch_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating tugofwar_HealthModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:22:21.735][T4016][L2] Deactivating infiniteheat_HeatModify hook.
+[2026-07-21 22:22:21.735][T4016][L2] OnlinePaletteManager::ClearSavedPalettePacketQueues
+[2026-07-21 22:22:21.735][T4016][L2] OnlineGameModeManager::ClearPlayerGameModeChoices
+[2026-07-21 22:22:21.735][T4016][L1] [MenuHook] after HandleMenuScreenMatchEnd
+[2026-07-21 22:22:21.735][T4016][L2] GetPaletteIndexPointers
+[2026-07-21 22:22:21.735][T4016][L2] 	- P1 palIndex: 0x00EB1A00
+[2026-07-21 22:22:21.735][T4016][L2] 	- P2 palIndex: 0x00EB1A20
+[2026-07-21 22:22:21.754][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=0 state1=0 onList=0
+[2026-07-21 22:22:21.759][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:22:21.859][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:22.765][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=0 state1=0 onList=0
+[2026-07-21 22:22:22.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:22.873][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:23.789][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=0 state1=0 onList=0
+[2026-07-21 22:22:23.839][T4016][L2] GetPlayerAvatarBaseFunc
+[2026-07-21 22:22:23.839][T4016][L2] g_gameVals.playerAvatarBaseAddr: 0x00ECD190
+[2026-07-21 22:22:23.839][T4016][L2] g_gameVals.playerAvatarAddr: 0x00ED329C
+[2026-07-21 22:22:23.839][T4016][L2] g_gameVals.playerAvatarColAddr: 0x00ED32A0
+[2026-07-21 22:22:23.839][T4016][L2] g_gameVals.playerAvatarAcc1: 0x00ED3354
+[2026-07-21 22:22:23.839][T4016][L2] g_gameVals.playerAvatarAcc2: 0x00ED3355
+[2026-07-21 22:22:23.839][T4016][L2] Deactivating GetPlayerAvatarBaseFunc hook.
+[2026-07-21 22:22:23.840][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=2 state1=3 onList=0
+[2026-07-21 22:22:23.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:23.854][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=2 state1=100 onList=0
+[2026-07-21 22:22:24.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:24.871][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=2 state1=100 onList=0
+[2026-07-21 22:22:24.889][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:25.139][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=0 onList=0
+[2026-07-21 22:22:25.154][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=5 onList=0
+[2026-07-21 22:22:25.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:26.171][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=5 onList=0
+[2026-07-21 22:22:26.489][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=16 onList=0
+[2026-07-21 22:22:26.504][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=13 onList=0
+[2026-07-21 22:22:26.690][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=3 state1=16 onList=0
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 0 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 1 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 2 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 3 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 4 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.704][T4016][L1] [DCodeTick] slot 5 fetch state -2 -> 0 (recvSize=0x0, heldPrevFor=0ms)
+[2026-07-21 22:22:26.705][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=0 onList=0
+[2026-07-21 22:22:26.721][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=1 onList=0
+[2026-07-21 22:22:26.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:26.904][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:27.171][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=4 state1=0 onList=0
+[2026-07-21 22:22:27.190][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=4 state1=34 onList=0
+[2026-07-21 22:22:27.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:28.140][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=4 state1=30 onList=0
+[2026-07-21 22:22:28.154][T4016][L2] GetPaletteIndexPointers
+[2026-07-21 22:22:28.154][T4016][L2] 	- P1 palIndex: 0x00EB1A00
+[2026-07-21 22:22:28.154][T4016][L2] 	- P2 palIndex: 0x00EB1A20
+[2026-07-21 22:22:28.255][T4016][L1] [SaveWatch] save manager actionRunning 0 -> 2, nextAction 1 -> 0, mode=0, netcolor=1 counter=52
+[2026-07-21 22:22:28.455][T4016][L1] [SaveWatch] save manager actionRunning 2 -> 0, nextAction 0 -> 0, mode=0, netcolor=1 counter=52
+[2026-07-21 22:22:28.455][T4016][L1] [SaveWatch] bbsave.dat WRITTEN (size=362680), netcolor=1 counter=52
+[2026-07-21 22:22:28.504][T4016][L2] GetPaletteIndexPointers
+[2026-07-21 22:22:28.504][T4016][L2] 	- P1 palIndex: 0x00EB1A00
+[2026-07-21 22:22:28.504][T4016][L2] 	- P2 palIndex: 0x00EB1A20
+[2026-07-21 22:22:28.505][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=0 onList=0
+[2026-07-21 22:22:28.521][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=1 onList=0
+[2026-07-21 22:22:28.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:28.921][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:28.939][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=0 onList=0
+[2026-07-21 22:22:28.956][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=66 onList=0
+[2026-07-21 22:22:29.421][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:29.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:30.440][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:30.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:30.940][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:31.454][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:31.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:32.471][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:32.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:32.954][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:33.489][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:33.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:34.504][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=67 onList=0
+[2026-07-21 22:22:34.621][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=68 onList=0
+[2026-07-21 22:22:34.654][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=69 onList=0
+[2026-07-21 22:22:34.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:34.939][T4016][L2] GetRoomOne
+[2026-07-21 22:22:34.939][T4016][L2] RoomManager::JoinRoom
+[2026-07-21 22:22:34.939][T4016][L2] RoomManager::SendAnnounce
+[2026-07-21 22:22:34.940][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=0 onList=0
+[2026-07-21 22:22:34.954][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:34.971][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:35.070][T4016][L2] GetFFAMatchThisPlayerIndex
+[2026-07-21 22:22:35.070][T4016][L2] Deactivating GetFFAMatchThisPlayerIndex hook.
+[2026-07-21 22:22:35.861][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:35.966][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:36.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:36.988][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:36.988][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:37.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:38.004][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:38.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:39.005][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:39.021][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:39.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:40.038][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:40.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:41.020][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:41.053][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:41.854][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:42.070][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:42.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:43.042][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:43.072][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:43.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:44.091][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:44.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:45.058][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:45.107][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:45.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:46.124][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:46.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:47.072][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:47.141][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:47.859][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:48.156][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:48.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:49.091][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:49.172][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:49.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:50.191][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:50.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:51.105][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:51.205][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:51.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:52.222][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:52.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:53.123][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:53.241][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:53.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:54.255][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:54.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:55.140][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:55.272][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:55.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:56.292][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:56.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:57.155][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:57.322][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:57.855][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:58.343][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:58.856][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:22:59.171][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:22:59.369][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:22:59.869][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:00.388][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:00.872][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:01.191][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:01.406][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:01.872][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:02.419][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:02.870][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:03.203][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:03.437][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:03.872][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:04.454][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:04.871][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:05.220][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:05.469][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:05.886][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:06.488][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:06.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:07.239][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:07.505][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:07.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:08.521][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:08.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:09.255][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:09.538][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:09.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:10.555][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:10.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:11.272][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:11.573][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:23:11.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:12.154][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=85 onList=0
+[2026-07-21 22:23:12.171][T4016][L1] [DCodeTick] slot 4 fetch state 0 -> 1 (recvSize=0x0, heldPrevFor=45469ms)
+[2026-07-21 22:23:12.172][T4016][L1] [DCodeTick] slot 5 fetch state 0 -> 1 (recvSize=0x0, heldPrevFor=45469ms)
+[2026-07-21 22:23:12.173][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=86 onList=0
+[2026-07-21 22:23:12.190][T4016][L1] [DCodeTick] slot 4 fetch state 1 -> 2 (recvSize=0x0, heldPrevFor=16ms)
+[2026-07-21 22:23:12.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:13.202][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=86 onList=0
+[2026-07-21 22:23:13.396][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:13.402][T4016][L2] GetGameStateCharacterSelect
+[2026-07-21 22:23:13.416][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:13.427][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:23:13.455][T4016][L1] [DCodeTick] slot 4 fetch state 2 -> 3 (recvSize=0x6800, heldPrevFor=1265ms)
+[2026-07-21 22:23:13.455][T4016][L1] [DCodeTick] slot 4 accepted payload checksum16=0xFFFF (valid=0xFFFF)
+[2026-07-21 22:23:13.457][T4016][L1] [DCodeTick] slot 5 fetch state 1 -> 2 (recvSize=0x0, heldPrevFor=1281ms)
+[2026-07-21 22:23:13.890][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:14.445][T4016][L2] GetMusicSelectAddr
+[2026-07-21 22:23:14.445][T4016][L2] GetStageSelectAddr
+[2026-07-21 22:23:14.445][T4016][L2] stageListMemory: 0x014602A0
+[2026-07-21 22:23:14.445][T4016][L2] OverwriteStagesList
+[2026-07-21 22:23:14.445][T4016][L2] Overwriting stages
+[2026-07-21 22:23:14.448][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:14.751][T4016][L1] [DCodeTick] slot 5 fetch state 2 -> 3 (recvSize=0x6800, heldPrevFor=1297ms)
+[2026-07-21 22:23:14.751][T4016][L1] [DCodeTick] slot 5 accepted payload checksum16=0xFFFF (valid=0xFFFF)
+[2026-07-21 22:23:14.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:15.402][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:15.469][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:15.887][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:16.487][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:16.887][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:17.419][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:17.497][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:17.886][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:18.518][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:18.885][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:19.437][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:19.537][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:19.889][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:20.552][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:20.885][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:21.451][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:21.568][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:21.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:22.572][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:22.888][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:23.472][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:23.589][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:23.885][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:24.618][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:24.892][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:25.491][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:25.630][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:25.894][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:26.641][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:26.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:27.508][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:27.658][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:27.894][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:28.675][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:28.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:29.525][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:29.691][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:29.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:30.708][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:30.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:31.557][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:31.725][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:31.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:32.729][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:32.893][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:33.575][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:33.757][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:33.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:34.775][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:34.890][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:35.591][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:35.775][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:35.890][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:36.807][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:36.891][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:37.607][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:37.825][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:37.890][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:38.840][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:38.890][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:39.625][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:39.859][T4016][L1] [RankedListFilter] visibility check: gstate=6 state=7 state1=86 onList=0
+[2026-07-21 22:23:39.893][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:40.474][T4016][L2] [PlatVoice] slot0 forced personality flag 1 -> 0 (choice=Luna)
+[2026-07-21 22:23:40.539][T4016][L2] GetGameStateVersusScreen
+[2026-07-21 22:23:40.539][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:40.556][T4016][L2] GetGameStateVersusScreen
+[2026-07-21 22:23:40.573][T4016][L2] GetGameStateVersusScreen
+[2026-07-21 22:23:40.589][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:23:40.984][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:41.542][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:41.643][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:41.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:42.559][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:42.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:43.577][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:43.659][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:43.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:44.593][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:44.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:45.610][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:45.677][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:45.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:46.626][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:46.993][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:47.642][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:47.692][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:47.997][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:48.659][T4016][L1] [RankedListFilter] visibility check: gstate=14 state=7 state1=86 onList=0
+[2026-07-21 22:23:48.961][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:48.981][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:23:48.994][T4016][L2] SetPlayedWith
+[2026-07-21 22:23:49.249][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:49.508][T4016][L2] GetPalBaseAddresses
+[2026-07-21 22:23:49.511][T4016][L2] GetPalBaseAddresses
+[2026-07-21 22:23:49.512][T4016][L2] GetPalBaseAddresses
+[2026-07-21 22:23:49.520][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:49.520][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:49.538][T4016][L2] GetMatchVariables
+[2026-07-21 22:23:49.538][T4016][L2] MatchState::OnMatchInit
+[2026-07-21 22:23:49.538][T4016][L2] InitPaletteSlotsVector
+[2026-07-21 22:23:49.538][T4016][L2] LoadPaletteSettingsFile
+[2026-07-21 22:23:49.569][T4016][L1] PaletteManager::OnMatchInit -- P1 --
+[2026-07-21 22:23:49.569][T4016][L1] CharPaletteHandle::OnMatchInit raw native color slot = 4 (pCurPalIndex=00EB1A00)
+[2026-07-21 22:23:49.569][T4016][L2] CharPaletteHandle::BackupOrigPal
+[2026-07-21 22:23:49.569][T4016][L1] PaletteManager::OnMatchInit -- P2 --
+[2026-07-21 22:23:49.569][T4016][L1] CharPaletteHandle::OnMatchInit raw native color slot = 5 (pCurPalIndex=00EB1A20)
+[2026-07-21 22:23:49.569][T4016][L2] CharPaletteHandle::BackupOrigPal
+[2026-07-21 22:23:49.569][T4016][L1] PaletteManager::OnMatchInit applying default for P1
+[2026-07-21 22:23:49.569][T4016][L2] ApplyDefaultCustomPalette
+[2026-07-21 22:23:49.569][T4016][L1] ApplyDefaultCustomPalette char=Platinum slot=4 -> ini entry=''
+[2026-07-21 22:23:49.569][T4016][L1] PaletteManager::OnMatchInit applying default for P2
+[2026-07-21 22:23:49.569][T4016][L2] ApplyDefaultCustomPalette
+[2026-07-21 22:23:49.569][T4016][L1] ApplyDefaultCustomPalette char=Platinum slot=5 -> ini entry=''
+[2026-07-21 22:23:49.569][T4016][L2] CharPaletteHandle::RestoreOrigPalette
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::OnMatchInit
+[2026-07-21 22:23:49.569][T4016][L1] [OnlinePalette] Local palette handle became ready; sending match-init palette packets
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::SendPalettePackets
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::SendPaletteDownloadPermissionPacket
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::SendPlatinumVoiceChoicePacket
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::SendPaletteInfoPacket
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::SendPaletteDataPackets
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::ProcessSavedPalettePackets
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::ProcessSavedPaletteInfoPackets
+[2026-07-21 22:23:49.569][T4016][L2] OnlinePaletteManager::ProcessSavedPaletteDataPackets
+[2026-07-21 22:23:49.569][T4016][L2] OnlineGameModeManager::OnMatchInit
+[2026-07-21 22:23:49.569][T4016][L2] SetActiveGameMode
+[2026-07-21 22:23:49.569][T4016][L2] SetPlayedWith
+[2026-07-21 22:23:49.569][T4016][L2] ReplayUploadManager::SendReplayUploadEnabledCheckPacket
+[2026-07-21 22:23:49.569][T4016][L2] RoomManager::SendPacketToSameMatchIMPlayers
+[2026-07-21 22:23:49.569][T4016][L1] [UP][STATE] OnMatchInit before reset mode=1 enabled=1 suppressed=0 armed=0 frame=0 gameMode=15 gameState=15 entries=0 cache=0 activeProfile=''
+[2026-07-21 22:23:49.569][T4016][L1] [UP][STATE] ResetTriggerRuntimeState begin enableRuntime=1 oldEnabled=1 oldSuppressed=0 oldArmed=0 oldLastFrame=-1 entries=0 cache=0 mode=1
+[2026-07-21 22:23:49.572][T4016][L1] [UP][STATE] ResetTriggerRuntimeState end mode=1 enabled=1 suppressed=0 armed=0 frame=0 gameMode=15 gameState=15 entries=0 cache=0 activeProfile=''
+[2026-07-21 22:23:49.572][T4016][L1] [UP][STATE] OnMatchInit after reset mode=1 enabled=1 suppressed=0 armed=0 frame=0 gameMode=15 gameState=15 entries=0 cache=0 activeProfile=''
+[2026-07-21 22:23:49.572][T4016][L1] CharPaletteHandle::CorrectToggleArtifact detected toggle artifact (raw=6), restoring logical slot 5
+[2026-07-21 22:23:49.706][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:49.974][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:50.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:50.991][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:51.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:51.611][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:51.611][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:51.611][T4016][L2] MatchIntroStartsPlayingFunc
+[2026-07-21 22:23:51.611][T4016][L2] InitGameMode
+[2026-07-21 22:23:51.611][T4016][L2] ResetAllHooks
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating steroid_OverdriveCharge hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating steroid_HeatModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating steroid_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating vampire_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating vampire_HealthDrain hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating exVampire_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating exVampire_HealthDrain hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating onepunch_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating twopunch_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating fivepunch_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating tugofwar_HealthModify hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:51.611][T4016][L2] Deactivating infiniteheat_HeatModify hook.
+[2026-07-21 22:23:51.728][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:52.003][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:52.253][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:53.020][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:53.253][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:53.742][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:53.821][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:53.821][T4016][L2] GetCharObjPointers
+[2026-07-21 22:23:53.822][T4016][L2] MatchIntroStartsPlayingFunc
+[2026-07-21 22:23:53.822][T4016][L2] InitGameMode
+[2026-07-21 22:23:53.822][T4016][L2] ResetAllHooks
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating steroid_OverdriveCharge hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating steroid_HeatModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating steroid_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating vampire_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating vampire_HealthDrain hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating exVampire_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating exVampire_HealthDrain hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating onepunch_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating twopunch_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating fivepunch_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating tugofwar_HealthModify hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:23:53.822][T4016][L2] Deactivating infiniteheat_HeatModify hook.
+[2026-07-21 22:23:54.042][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:54.248][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:55.056][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:55.257][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:55.754][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:56.088][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:56.254][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:57.104][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:57.254][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:57.773][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:23:58.123][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:58.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:59.138][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:23:59.254][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:23:59.788][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:00.156][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:00.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:01.172][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:01.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:01.791][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:02.191][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:02.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:03.206][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:03.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:03.806][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:04.223][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:04.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:05.241][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:05.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:05.822][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:06.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:06.256][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:07.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:07.272][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:07.841][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:08.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:08.291][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:09.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:09.322][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:09.856][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:10.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:10.341][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:11.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:11.356][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:11.872][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:12.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:12.373][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:13.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:13.391][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:13.891][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:14.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:14.406][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:15.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:15.422][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:15.906][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:16.256][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:16.440][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:17.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:17.455][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:17.922][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:18.255][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:18.472][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=86 onList=0
+[2026-07-21 22:24:18.638][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=90 onList=0
+[2026-07-21 22:24:18.684][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=91 onList=0
+[2026-07-21 22:24:19.253][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:19.370][T4016][L1] [RankedListFilter] visibility check: gstate=15 state=7 state1=89 onList=0
+[2026-07-21 22:24:19.453][T4016][L2] GetGameStateMenuScreen
+[2026-07-21 22:24:19.453][T4016][L1] InitSteamApiWrappers
+[2026-07-21 22:24:19.453][T4016][L1] InitManagers
+[2026-07-21 22:24:19.453][T4016][L1] [MenuHook] after WindowManager::Initialize
+[2026-07-21 22:24:19.453][T4016][L1] [MenuExit] Enter menu screen hook: gameMode=15 gameState=15 sceneStatus=3
+[2026-07-21 22:24:19.453][T4016][L1] [UP][STATE] MenuExit enter mode=1 enabled=1 suppressed=0 armed=0 frame=0 gameMode=15 gameState=15 entries=0 cache=0 activeProfile=''
+[2026-07-21 22:24:19.453][T4016][L1] [UP][DATA] MenuExit enter entries=0 cache=0 activeProfile=''
+[2026-07-21 22:24:19.453][T4016][L2] MatchState::OnMatchEnd
+[2026-07-21 22:24:19.453][T4016][L2] EndGameMode
+[2026-07-21 22:24:19.453][T4016][L2] ResetAllHooks
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating steroid_OverdriveCharge hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating steroid_HeatModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating steroid_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating vampire_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating vampire_HealthDrain hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating exVampire_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating exVampire_HealthDrain hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating onepunch_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating twopunch_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating fivepunch_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating tugofwar_HealthModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating training_healthModifyFix hook.
+[2026-07-21 22:24:19.453][T4016][L2] Deactivating infiniteheat_HeatModify hook.
+[2026-07-21 22:24:19.453][T4016][L2] OnlinePaletteManager::ClearSavedPalettePacketQueues
+[2026-07-21 22:24:19.453][T4016][L2] OnlineGameModeManager::ClearPlayerGameModeChoices
+[2026-07-21 22:24:19.453][T4016][L1] [MenuHook] after HandleMenuScreenMatchEnd
+[2026-07-21 22:24:19.453][T4016][L2] GetPaletteIndexPointers
+[2026-07-21 22:24:19.453][T4016][L2] 	- P1 palIndex: 0x00EB1A00
+[2026-07-21 22:24:19.453][T4016][L2] 	- P2 palIndex: 0x00EB1A20
+[2026-07-21 22:24:19.472][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=89 onList=0
+[2026-07-21 22:24:19.478][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:24:19.939][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:20.598][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:20.598][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=89 onList=0
+[2026-07-21 22:24:20.682][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:21.603][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:21.703][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:21.952][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:22.604][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:22.725][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:23.606][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:23.740][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:23.973][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:24.605][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:24.756][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:25.606][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:25.772][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:25.991][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:26.620][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:26.787][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:27.619][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:27.802][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:28.005][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:28.622][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:28.813][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:29.620][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:29.837][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:30.020][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:30.637][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:30.840][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:31.640][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:31.856][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:32.041][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:32.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:32.870][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:33.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:33.889][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:34.057][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:34.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:34.904][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:35.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:35.920][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:36.088][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:36.635][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:36.935][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:37.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:37.952][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:38.124][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:38.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:38.968][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:39.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:39.986][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:40.135][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:40.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:41.005][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:41.634][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:42.018][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:42.151][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:42.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:43.042][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:43.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:44.068][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:44.168][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:44.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:45.086][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:45.642][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:46.089][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:46.190][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:46.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:47.104][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:47.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:48.120][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:48.203][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:48.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:49.139][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:49.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:50.154][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:50.219][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:50.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:51.169][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:51.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:52.189][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:52.238][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:52.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:53.204][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:53.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:54.220][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:54.254][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:54.643][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:55.236][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:55.640][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:56.254][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:56.269][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:56.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:57.270][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:57.637][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:58.289][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:24:58.289][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:58.639][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:24:59.304][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:24:59.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:00.304][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:00.320][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:00.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:01.338][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:01.636][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:02.320][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:02.352][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:02.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:03.370][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:03.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:04.338][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:04.388][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:04.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:05.403][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:05.638][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:06.355][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:06.430][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:06.642][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:07.432][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:07.649][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:08.382][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:08.399][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=82 onList=0
+[2026-07-21 22:25:08.635][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:08.668][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=81 onList=0
+[2026-07-21 22:25:08.918][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=82 onList=0
+[2026-07-21 22:25:09.152][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=7 state1=93 onList=0
+[2026-07-21 22:25:09.184][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=0 onList=0
+[2026-07-21 22:25:09.201][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=6 state1=66 onList=0
+[2026-07-21 22:25:09.651][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:09.651][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=0 onList=0
+[2026-07-21 22:25:09.668][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=1 onList=0
+[2026-07-21 22:25:10.401][T4016][L1] [RankedListFilter] rowDiag: initGuardReadable=1 initDone=1 populatedRows=0 firstNonZeroRow=-1
+[2026-07-21 22:25:10.650][T4016][L2] GetIsHUDHidden
+[2026-07-21 22:25:10.650][T4016][L1] [RankedListFilter] rankedListMgrDiag: mgr=0x14738450 vtable=0x00ABC3A4 rowCount=0 shownCount=0 tiers:
+[2026-07-21 22:25:10.683][T4016][L1] [RankedListFilter] visibility check: gstate=27 state=1 state1=1 onList=0
+[2026-07-21 22:25:10.908][T4016][L2] GetGameStateTitleScreen
+[2026-07-21 22:25:10.908][T4016][L1] InitSteamApiWrappers
+[2026-07-21 22:25:10.908][T4016][L1] InitManagers
+[2026-07-21 22:25:10.908][T4016][L1] [TitleHook] after WindowManager::Initialize
+[2026-07-21 22:25:10.908][T4016][L1] [RankedListFilter] visibility check: gstate=4 state=1 state1=1 onList=0
+[2026-07-21 22:25:11.485][T4016][L1] BBCF_IM_Shutdown
+[2026-07-21 22:25:11.485][T4016][L2] [RANK][VerdictSummary] reason='BBCF_IM_Shutdown' seq=0 lobby=0 builder=0 compose=0 state3=0 packSelect=0 phase3=0 bit4skip=0 sourceTotal=0 sourcePair=0 writePacked=0 gameCall=0 upload=0
+[2026-07-21 22:25:11.485][T4016][L2] [RANK][VerdictSummary] firstSeq lobby=0 builder=0 compose=0 state3=0 packSelect=0 phase3=0 bit4skip=0 sourceTotal=0 sourcePair=0 writePacked=0 gameCall=0 upload=0 firstInMatch=0 firstOutOfMatchAfterInMatch=0 firstTrusted=0 cheapPathTrusted=0
+[2026-07-21 22:25:11.485][T4016][L2] [RANK][VerdictSummary] interpretation=no_trusted_rank_chain_before_first_inmatch_transition
+[2026-07-21 22:25:11.485][T4016][L2] WindowManager::Shutdown
+[2026-07-21 22:25:11.486][T4016][L1] CleanupInterfaces
+BBCF_FIX STOP - 2026-07-21 22:25:11
