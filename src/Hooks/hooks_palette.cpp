@@ -7,6 +7,7 @@
 #include "Core/utils.h"
 #include "Game/gamestates.h"
 #include "Game/characters.h"
+#include "Game/GhidraDefs.h"
 #include "Core/Settings.h"
 
 DWORD GetCharObjPointersJmpBackAddr = 0;
@@ -183,11 +184,22 @@ static int PlatinumVoiceChoiceForSlot(int slot)
 	return (slot == 0) ? Settings::settingsIni.platinumVoiceChoice : 0; // offline: local player is P1
 }
 
+// The personality value each Platinum slot's voice bank was MOUNTED with, latched at load time
+// by the LOAD hooks. -1 = never latched. The PLAY hooks echo this instead of re-reading the
+// live setting, so changing the setting mid-match cannot make PLAY request a suffix the mounted
+// bank lacks (which would go silent). A setting change therefore only takes effect at the next
+// match load, when the LOAD hooks re-latch. It is intentionally NOT reset between matches: the
+// latch always mirrors whatever bank is currently mounted (it is written at mount-decision
+// time), and PLAY only reads it for a Platinum slot after LOAD has run - so a value from a
+// prior match is never mis-applied, and never reset out from under an in-flight match. Mid-match
+// bank reloading was attempted and abandoned (it crashed); see the investigation doc.
+static int g_platLatchedForced[2] = { -1, -1 };
+
 // Shared by every hook. base = select-struct singleton; slot = 0/1; kind = 0 for a voice-bank
-// LOAD read, 1 for a PLAY-resolver read (used only for logging). Reads (never writes) the char
-// index and the rolled personality, and returns the value the hooked instruction should yield:
-// the chosen personality for the local override, or the original rolled value otherwise
-// (non-Platinum, no override, bad slot) so behaviour is identical to vanilla in those cases.
+// LOAD read (start of match), 1 for a PLAY-resolver read (per voice line). Reads (never writes)
+// the char index and the rolled personality, and returns the value the hooked instruction
+// should yield: for a Platinum slot, the chosen personality (LOAD, latched) or the latched
+// value (PLAY); otherwise the original rolled value so behaviour matches vanilla.
 static int BiasPlatinumPersonality(DWORD base, int slot, int kind)
 {
 	if (!base || (slot != 0 && slot != 1))
@@ -199,29 +211,35 @@ static int BiasPlatinumPersonality(DWORD base, int slot, int kind)
 	if (asInts[0] != CharIndex_Platinum)
 		return original;
 
-	const int choice = PlatinumVoiceChoiceForSlot(slot);
-	const int forced = (choice == 0) ? original : ((choice == 2) ? 1 : 0); // 1=Sena(b), 0=Luna(a)
+	if (kind == 0)
+	{
+		// LOAD (start-of-match mount): decide + latch which bank to mount for this slot.
+		const int choice = PlatinumVoiceChoiceForSlot(slot);
+		const int forced = (choice == 0) ? original : ((choice == 2) ? 1 : 0); // 1=Sena(b), 0=Luna(a)
+		g_platLatchedForced[slot] = forced;
 
-	// Diagnostics for online tests. LOAD reads are bounded (a handful per match) so we always
-	// log them - they prove which bank got mounted. PLAY reads fire per voice line, so dedup
-	// them per slot to avoid spam. Rich context lets us diagnose slot mapping / packet receipt.
-	const bool online = g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional();
-	const int localSlot = (online && !g_interfaces.pRoomManager->IsThisPlayerSpectator())
-		? (int)g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex() : -1;
-	const int oppSent = (online && g_interfaces.pOnlinePaletteManager)
-		? g_interfaces.pOnlinePaletteManager->GetPlayerVoiceChoice((uint16_t)slot) : -1;
-	const char* kindStr = (kind == 0) ? "load" : "play";
-	const char* choiceStr = (choice == 2) ? "Sena" : (choice == 1) ? "Luna" : "default";
+		const bool online = g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional();
+		const int localSlot = (online && !g_interfaces.pRoomManager->IsThisPlayerSpectator())
+			? (int)g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex() : -1;
+		const int oppSent = (online && g_interfaces.pOnlinePaletteManager)
+			? g_interfaces.pOnlinePaletteManager->GetPlayerVoiceChoice((uint16_t)slot) : -1;
+		LOG(2, "[PlatVoice] load slot%d orig=%d -> %d choice=%s online=%d localSlot=%d oppSent=%d\n",
+			slot, original, forced, (choice == 2) ? "Sena" : (choice == 1) ? "Luna" : "default",
+			(int)online, localSlot, oppSent);
+		return forced;
+	}
+
+	// PLAY: echo whatever the bank was mounted with at load. Never re-read the live setting -
+	// that would desync PLAY from the mounted bank on a mid-match toggle and go silent.
+	const int play = (g_platLatchedForced[slot] >= 0) ? g_platLatchedForced[slot] : original;
 
 	static int sLastPlayLogged[2] = { -99, -99 };
-	const bool shouldLog = (kind == 0) || (sLastPlayLogged[slot] != forced);
-	if (kind == 1)
-		sLastPlayLogged[slot] = forced;
-	if (shouldLog)
-		LOG(2, "[PlatVoice] %s slot%d orig=%d -> %d choice=%s online=%d localSlot=%d oppSent=%d\n",
-			kindStr, slot, original, forced, choiceStr, (int)online, localSlot, oppSent);
-
-	return forced;
+	if (sLastPlayLogged[slot] != play)
+	{
+		sLastPlayLogged[slot] = play;
+		LOG(2, "[PlatVoice] play slot%d orig=%d -> %d\n", slot, original, play);
+	}
+	return play;
 }
 
 // --- PLAY resolvers: `mov eax,[eax+ecx+164Ch]` (7 bytes). eax = slot<<5, ecx = base.

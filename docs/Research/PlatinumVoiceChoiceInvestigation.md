@@ -271,6 +271,89 @@ receive the peer's packet; if they haven't applied ours yet there's a brief wind
 shows a matched async write doesn't desync, and pre-packet both sides share identical RNG, so
 convergence should be clean — but confirm with a two-modded-client match.
 
+## Mid-match voice swap + real-time mod-vs-mod (2026-07-22, implemented)
+
+Once the load+play override worked, mid-match swapping was added. RE of the XACT loader found
+it runs on a dedicated WORKER thread (`CreateThread` @0x4506AD, request queue under a critical
+section; `CreateFileA`/`ReadFile` on the worker) — the game thread only enqueues a load. So
+re-triggering a bank load mid-match does NOT stall the game thread (no freeze -> no netplay
+disconnect); the only cost is latency (first post-swap line may be briefly silent until the
+worker finishes).
+
+Design (on-demand reload, "Option A"): the voice-bank load routine `FUN_00555A20`
+(`__thiscall`, ecx = voice manager) is PURE LOAD — it contains no play calls and takes no
+stack args — so re-invoking it just remounts banks (our load-bias hooks pick the chosen
+personality) without replaying anything. Implementation in `hooks_palette.cpp`:
+- The 6 load hooks capture `ebx` (= the routine's `this`, unchanged across it) into
+  `g_platVoiceMgrThis`.
+- `PollPlatinumVoiceReload()` runs every frame from `MatchState::OnUpdate`, gated to
+  `GameState_InMatch` (15). It computes each Platinum slot's effective choice and, on a change
+  vs the last mount, re-invokes `FUN_00555A20(this)` (async enqueue → freeze-free).
+- `ADDR_PlatinumVoiceLoadRoutine = 0x00155A20` in `GhidraDefs.h`.
+
+Real-time mod-vs-mod: `OnlinePaletteManager::OnUpdate` re-sends `PacketType_PlatinumVoiceChoice`
+whenever the local setting changes after the match-init flush (`m_lastSentVoiceChoice` tracks
+the last sent value; set in `SendPlatinumVoiceChoicePacket`, reset on match init/clear). The
+receiving modded client stores it, and its own per-frame poller remounts the opponent slot's
+bank — so a compatible-mod opponent hears the change live.
+
+### v1 (reload only) was still silent — the cue table wasn't re-registered
+
+Testing showed mid-match swap still went silent. Diagnosis: `FUN_00555A20` loads the bank but
+does NOT register the game-side cue-name table (`0xEBFF68`) that the play resolver searches —
+that is a SEPARATE routine `FUN_0056B850`. So the remount loaded the alternate bank into XACT,
+but the resolver kept the original personality's cue names (e.g. Sena's `pt###b`); requesting
+the swapped suffix (`pt###a`) found nothing → silence.
+
+`FUN_0056B850` (addr `ADDR_PlatinumVoiceCueTableRegister = 0x0016B850`): `__cdecl`, no args,
+self-bootstraps its context (`FUN_0047CA90` → `this`, `FUN_0047E860`), reads the currently
+loaded banks by tag (`FUN_0047CA50`, a generic 0x3D4-entry tag→handle table) and rebuilds the
+cue-name tables into registry slots 6/7/8 (`FUN_004C07C0`/`FUN_004C0A70`).
+
+Preload-both feasibility (checked, rejected): the tags (`0x48…`) and registry slots (6/7/8) are
+hardcoded throughout the mount; making a second personality coexist would need a hand-built
+parallel load-submit under spare tags + register into spare slots 2–5 + a redirect hook on
+`FUN_004C1060`. High effort and a manual-resource crash surface — not the easy path.
+
+### FINAL (2026-07-23): mid-match abandoned — start-of-match only, via a latch
+
+v2 (below) CRASHED immediately offline: calling `FUN_0056B850` standalone to re-register the
+cue tables is not safe outside the game's own load sequence. Preload-both was assessed as not
+worth the effort/risk. So mid-match live swapping was dropped entirely. Final design:
+
+- The LOAD hooks latch the mounted personality per slot into `g_platLatchedForced[2]`.
+- The PLAY hooks ECHO that latch instead of re-reading the live setting. So toggling the
+  setting mid-match cannot make PLAY request a suffix the mounted bank lacks — no silent-voice
+  bug. The change simply takes effect at the next match load, when LOAD re-latches.
+- The latch is intentionally NOT reset between matches: it always mirrors the currently mounted
+  bank (written at mount-decision time), and PLAY only reads it for a Platinum slot after LOAD
+  has run, so a prior match's value is never mis-applied and is never wiped mid-match.
+- Removed: `PollPlatinumVoiceReload`, the mid-match reload, the cue-table re-register, and the
+  real-time packet resend. Mod-vs-mod still applies the opponent's pick at match start via the
+  existing match-init `PacketType_PlatinumVoiceChoice` send (not live mid-match).
+
+Everything below is retained as the RE record of the abandoned mid-match attempts.
+
+### v2 (reload + re-register), implemented — REVERTED (crashed)
+
+`PollPlatinumVoiceReload()` on a detected choice change now: (1) re-invokes `FUN_00555A20`
+(async bank reload, biased to the chosen personality by our load hooks), then (2) opens a
+90-frame window and calls `FUN_0056B850()` every ~15 frames. The async bank load lands after a
+variable disk-latency delay; whichever re-register call runs after it lands picks up the new
+cues (idempotent — earlier/later calls just rebuild the current tables). Spacing avoids
+per-frame churn.
+
+RESIDUAL RISK (could not be settled by static analysis; validate offline FIRST):
+- `FUN_0056B850` is normally invoked via the load-sequencing callback; calling it standalone
+  mid-match is judged safe (pure cue-table rebuild, self-contained, game-thread only), but is
+  unverified in that context.
+- `FUN_004C07C0` frees a slot's cue table before rebuilding. Resolve and rebuild both run on
+  the game thread (never concurrent), and playing audio holds an engine handle rather than the
+  cue-name table, so a free-in-use is judged benign — but unverified.
+Validation plan: offline, swap the voice mid-match repeatedly and during active voice lines —
+confirm no crash/hitch and the voice changes within ~1.5s; then online (both modded) watching
+for desync and confirming the opponent hears the change.
+
 ## CORRECTION: the suffix-only hook is silent; the LOAD read must also be biased (2026-07-22)
 
 The first audio approach (below) hooked only the PLAY resolvers' suffix read. Live test: forcing

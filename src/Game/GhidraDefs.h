@@ -670,6 +670,21 @@ static constexpr uintptr_t ADDR_PlatVoiceLoad_DbP2   = 0x00156488; // vbtldb slo
 //     eax=slot<<5, ecx=base): read personality to pick the "<base><a/b/c/d>.wav" cue name.
 static constexpr uintptr_t ADDR_PlatinumVoiceResolverA = 0x001CFC80; // FUN_005CFC80 (read 0x1CFF57)
 static constexpr uintptr_t ADDR_PlatinumVoiceResolverB = 0x001D1440; // FUN_005D1440 (read 0x1D15E2)
+// The voice-bank LOAD routine itself (FUN_00555A20, __thiscall, ecx = voice manager). It is
+// PURE LOAD (contains no play calls) and enqueues async worker-thread loads, so it can be
+// re-invoked mid-match to remount the chosen personality's bank without stalling the game
+// thread or re-playing voices. hooks_palette.cpp captures its `this` (live in ebx at the load
+// hook sites) and re-invokes it when the voice choice changes mid-match.
+// FUN_00555A20 is the start-of-match voice-bank LOAD routine (where our LOAD bias hooks fire).
+// NOTE: mid-match voice swapping was attempted by re-invoking the load + the cue-table
+// registrar below; it CRASHED and was removed. The choice now latches at match load only.
+static constexpr uintptr_t ADDR_PlatinumVoiceLoadRoutine = 0x00155A20; // FUN_00555A20
+// The voice CUE-TABLE registrar (FUN_0056B850): rebuilds the game-side cue-name tables in
+// registry 0xEBFF68 (slots 6/7/8) that the play resolver searches. FUN_00555A20 loads the bank
+// but does NOT register the cue table. Driving THIS standalone mid-match to re-register after a
+// swap CRASHED in testing - do NOT call it outside the game's own load sequence. Kept only as
+// an RE reference. (Preload-both + slot redirect was assessed as not worth the effort/risk.)
+static constexpr uintptr_t ADDR_PlatinumVoiceCueTableRegister = 0x0016B850; // FUN_0056B850
 // hooks_palette.cpp hooks all 8 reads and substitutes the chosen personality IN-REGISTER
 // (never memory) for the local player's Platinum. The mounted XACT bank + voice handle
 // (char+0x1E9E4) are per-client heap, never in the GGPO checksum -> desync-safe vs anyone.
