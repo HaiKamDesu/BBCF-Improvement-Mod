@@ -414,6 +414,49 @@ The organic log (advance-with-zero events + scene states) now accumulates automa
 whenever a real desync next occurs, correlate its DEBUG.txt against these to identify #1
 vs #2 vs #3.
 
+## ROOT CAUSE CONFIRMED + targeted fix (2026-07-23/24)
+
+A real organic desync was finally captured (`Bug Reports/Cuack desync/Desync DEBUG 1 -
+rachel vs kokonoe.txt`, a friend's mid-session save). It **confirms the advance-with-zero
+theory** the benign sessions couldn't:
+- 45 `ADVANCE-WITH-ZERO-INPUT` events (benign sessions had 0-1), zero `RING NEAR FULL`,
+  all `lag=-1` (stall at the live edge).
+- Worst burst (20:47:49): 18 consecutive advance-with-zero at scene `(4,4,1)` with
+  `nextInput` frozen at 3247 over ~0.28s — 18 phantom zero-input frames inserted while
+  waiting for frame 3247. The input THEN arrived (`nextInput` jumped 3247->3280, catch-up
+  drained the backlog), but the 18 phantom frames had already permanently desynced the
+  deterministic re-sim.
+- Advance-with-zero scene states seen: `(5,4,0) (4,5,0) (5,4,1) (4,4,1) (4,5,1)` — all
+  match the gate condition `(a,b) in {(4,5),(5,3),(*,4)} && c != -1`.
+
+So: a brief network stall coinciding with a transition scene state -> vanilla advances
+the fight with fake neutral inputs -> phantom frames -> permanent desync. The stalls are
+TEMPORARY (input arrives ~0.3s later), which is exactly what makes freezing the fix.
+
+### The fix (shipped, `SpectatorSyncOnStarvationThunk` + caller hook 0x4E60F1)
+Freeze the fight ONLY in the advance-with-zero states, within a bounded absorb window,
+pumping DoPoll each frozen frame:
+- **advance-with-zero state + within window (streak <= 90 frames)** -> return 1 -> jump to
+  the vanilla stall path (0x4E6110); fight does not advance -> zero phantom frames. Pump
+  `SteamSpectatorBackend::DoPoll` (RVA 0x37E090) so the awaited input arrives and the
+  event queue can't overflow. Streak resets when `_next_input_to_send` advances (input
+  consumed -> stall absorbed with no desync).
+- **absorb window exceeded (streak > 90)** -> return 0 -> vanilla advance-with-zero. This
+  is the match-end / dead-connection escape: 90 frames (~1.5s) is well under the game's
+  5000ms disconnect timeout, so vanilla plays the ending and reaches victory before the
+  connection drops (a 300-frame/5s cap re-broke match-end; 90 does not).
+- **normal (non-transition) starvation** -> return 0 -> vanilla stalls (already correct).
+
+Why this succeeds where earlier freezes failed: (1) only freezes the narrow desync-prone
+states, not all starvation; (2) pumps DoPoll (the first freeze crashed for lack of it);
+(3) short cap preserves match-end (the 300-frame freeze broke it). All three lessons
+folded in, and now justified by real captured data rather than theory.
+
+Needs in-game validation: confirm a spectated match no longer desyncs under the same
+network conditions, and that match-end/rematch lobbies still work (watch for the
+`FREEZE (absorb stall...)` vs `advance-with-zero LEAKED` counts in DEBUG.txt / the
+DEBUG window).
+
 ### Confirmation protocol
 1. Build `Debug|Win32`, deploy manually, spectate real matches with
    `SpectatorSyncFailStall = 0`. In DEBUG.txt look for `SpectatorSync:` lines:

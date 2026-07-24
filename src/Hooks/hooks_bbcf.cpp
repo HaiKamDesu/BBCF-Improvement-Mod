@@ -8834,6 +8834,7 @@ void __declspec(naked)SpectatorSyncInputEntryHookFunc()
 		cmp g_spectatorSyncInjectFramesRemaining, 0
 		je NO_INJECT
 		dec g_spectatorSyncInjectFramesRemaining
+		mov g_spectatorInjectingThisFrame, 1  // flag this frame as injected for the thunk
 		mov eax, 4            // fake starvation (thiscall, 3 stack args -> ret 0Ch)
 		ret 0Ch
 	NO_INJECT:
@@ -8845,14 +8846,18 @@ void __declspec(naked)SpectatorSyncInputEntryHookFunc()
 	}
 }
 
-// INSTRUMENTATION ONLY. SynchronizeInput error/starvation branch (VA 0x4E60F1); the
-// replaced 5 bytes are `call FUN_0055C540` (battle-scene getter), which vanilla feeds
-// into its advance-vs-stall gate (0055EDB0). We call the diagnostic thunk (which logs
-// scene state / advance-with-zero prediction and ALWAYS returns 0), then replicate the
-// replaced call and jmp back -- so vanilla's behavior is completely unchanged. Behavior
-// changes were tried here and retired (freeze broke match-end); see the doc.
+// The fix. SynchronizeInput error/starvation branch (VA 0x4E60F1); the replaced 5 bytes
+// are `call FUN_0055C540` (battle-scene getter), which vanilla feeds into its
+// advance-with-zero-vs-stall gate (0055EDB0). The thunk decides: return 1 to FREEZE
+// (only in the desync-prone advance-with-zero states, within the absorb window) -> jump
+// to the vanilla stall path (0x4E6110), so the fight does not advance and no phantom
+// frame is inserted; return 0 to let vanilla run unchanged (replicate the replaced call
+// + jmp back) -- normal-state stalls and post-absorb-window advance-with-zero (match-end).
 DWORD SpectatorSyncInputErrorJmpBackAddr = 0;       // = found + 5 (VA 0x4E60F6)
+DWORD SpectatorSyncInputErrorStallAddr = 0;         // = jmpback + 0x1A (VA 0x4E6110)
+DWORD SpectatorSyncInputErrorAdvanceAddr = 0;       // = jmpback + 0x0F (VA 0x4E6105)
 DWORD SpectatorSyncInputErrorSceneGetterAddr = 0;   // FUN_0055C540, from replaced rel32
+static DWORD g_spectatorFreezeDecision = 0;
 static int(__cdecl* const g_pSpectatorSyncOnStarvationThunk)() = SpectatorSyncOnStarvationThunk;
 void __declspec(naked)SpectatorSyncInputErrorHookFunc()
 {
@@ -8861,11 +8866,21 @@ void __declspec(naked)SpectatorSyncInputErrorHookFunc()
 		pushfd
 		pushad
 		call g_pSpectatorSyncOnStarvationThunk
+		mov g_spectatorFreezeDecision, eax
 		popad
 		popfd
-		// vanilla, unchanged: replicate the replaced `call 0055C540`, then jmp back
+		cmp g_spectatorFreezeDecision, 1
+		je FREEZE
+		cmp g_spectatorFreezeDecision, 2
+		je FORCE_ADVANCE
+		// vanilla: replicate the replaced `call 0055C540`, then jmp back
 		call[SpectatorSyncInputErrorSceneGetterAddr]
 		jmp[SpectatorSyncInputErrorJmpBackAddr]
+	FREEZE:
+		jmp[SpectatorSyncInputErrorStallAddr]
+	FORCE_ADVANCE:
+		// TEST ONLY: take the advance-with-zero path (phantom frame) to reproduce desync
+		jmp[SpectatorSyncInputErrorAdvanceAddr]
 	}
 }
 
@@ -9388,6 +9403,8 @@ bool placeHooks_bbcf()
 			"x????xxxxxxx????xxxx", 5, SpectatorSyncInputErrorHookFunc);
 		if (SpectatorSyncInputErrorJmpBackAddr)
 		{
+			SpectatorSyncInputErrorStallAddr = SpectatorSyncInputErrorJmpBackAddr + 0x1A;   // VA 0x4E6110
+			SpectatorSyncInputErrorAdvanceAddr = SpectatorSyncInputErrorJmpBackAddr + 0x0F; // VA 0x4E6105
 			SpectatorSyncInputErrorSceneGetterAddr = SpectatorSyncInputErrorJmpBackAddr
 				+ HookManager::GetOriginalBytes("SpectatorSyncInputError", 1, 4);
 		}
