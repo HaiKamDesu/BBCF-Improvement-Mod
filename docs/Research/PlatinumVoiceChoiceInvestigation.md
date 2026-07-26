@@ -1,5 +1,18 @@
 # Platinum Voice Choice (Sena/Luna) Investigation (2026-07-15)
 
+> **SHIPPED STATE (2026-07-25): OFFLINE-ONLY by default.** `PlatinumVoiceChoice` applies the
+> voice override offline (training / vs CPU / replay / local versus) via a client-side load+play
+> in-register bias of the personality read; there it is safe. ONLINE it is DISABLED by default
+> because it is CONFIRMED to desync (mounting the other voice bank diverges checksummed battle
+> state). A bool setting `PlatinumVoiceOnlineDesyncUnsafe` (default 0, with loud DESYNC warnings
+> in the tooltip) gates the online path for anyone continuing the work. A desync-safe online
+> path is viable via "mod-private audio" (load the other .pac ourselves + XACT RegistBank +
+> register cues into a spare registry slot + redirect playback, leaving all checksummed state
+> byte-identical to vanilla) — the recipe is RE'd in this doc but NOT yet implemented
+> (large/crash-prone; the core cue-container assumption is unproven). The chronological history
+> of every attempt (flag-write desync, suffix-only silence, load+play bias online desync,
+> mid-match reload crash) is below.
+
 **Verdict: flag identified and confirmed by two independent methods. Sync-across-network status is unresolved (no evidence either way) — treat the settings.ini override as a local-only cosmetic force unless/until proven otherwise.**
 
 ## Background

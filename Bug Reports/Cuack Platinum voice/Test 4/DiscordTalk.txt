@@ -1,0 +1,14 @@
+otro test de voz de plat
+test 1 (default)
+luna
+luna
+test 2 (luna)
+luna
+luna
+test 3 (luna)
+luna
+luna
+test 4 (luna)
+luna
+sena
+el ultimo test salio diferente y salia el tipico desync detected

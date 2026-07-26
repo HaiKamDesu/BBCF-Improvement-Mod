@@ -62,6 +62,12 @@ SETTING(bool, spectatorSyncHooksEnabled, "SpectatorSyncHooksEnabled", "1");
 // end up with the forced value. Local override only - see the investigation doc for why
 // cross-client sync isn't guaranteed.
 SETTING(int, platinumVoiceChoice, "PlatinumVoiceChoice", "0");
+// Platinum voice override is OFFLINE-ONLY by default. This flag also applies it in ONLINE
+// matches - which is KNOWN TO CAUSE DESYNC ("desync detected", both players kicked from the
+// match). It exists only so the online work can be continued/experimented with; a desync-safe
+// online path is not implemented yet. Leave at 0 unless you know exactly what you are doing.
+// 0 = off (offline only, safe), 1 = also apply online (WILL desync).
+SETTING(bool, platinumVoiceOnlineDesyncUnsafe, "PlatinumVoiceOnlineDesyncUnsafe", "0");
 // Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
 // launch). 0 = old behavior, DEBUG.txt is overwritten every launch.
 SETTING(int, debugLogSessionHistory, "DebugLogSessionHistory", "10");

@@ -457,6 +457,39 @@ network conditions, and that match-end/rematch lobbies still work (watch for the
 `FREEZE (absorb stall...)` vs `advance-with-zero LEAKED` counts in DEBUG.txt / the
 DEBUG window).
 
+## Field validation of the fix (2026-07-25, Cuack DEBUG 2)
+
+`Bug Reports/Cuack desync/Desync DEBUG 2 - fatal error + no desyncs.txt` — Cuack
+spectating a while on the fix build (base 0x4A0000; no test injection, FORCED=0). Result:
+the fix engaged on REAL organic transition-state stalls and worked as designed.
+- **104 frames absorbed** (frozen instead of advance-with-zero), **1 leaked**, 80 normal-
+  state vanilla stalls, 0 forced. No visible desyncs, no crash, log ends cleanly.
+- Freezes occurred in scene states `(4,5,0)` and `(4,5,1)` — the exact desync-prone
+  states from DEBUG 1.
+- The single leak (starvation #148): a **1.5s TOTAL network freeze** (maxRecv frozen at
+  8176, nextInput stuck at 8177, no packets at all) in state (4,5,0). The fix froze 90
+  frames then leaked exactly 1 phantom frame at the 90-cap, and it resolved. In vanilla
+  that same 1.5s stall would have advanced-with-zero ~91 times = ~91 phantom frames =
+  guaranteed catastrophic desync. The fix reduced it to 1 imperceptible frame.
+
+Assessment: strong validation — the fix demonstrably absorbs the phantom-frame insertion
+that causes the desync, on real adverse network events, without crashing or breaking
+match transitions. NOT a definitive A/B (the organic desync did not occur for any
+spectator this session, vanilla included, so there was no vanilla-desyncs-fixed-doesn't
+comparison). Cuack could not reproduce a vanilla desync on demand.
+
+Optional tuning: raise kMaxAbsorbFrames 90 -> ~120 (2s, still << 5s disconnect) to absorb
+even ~2s total-freeze stalls with zero leaks; minor, only matters for multi-second total
+network freezes.
+
+### The "fatal error" (DEBUG 2) is NOT the mod
+The fatal error that hit everyone at the start is absent from the mod log: the crash
+handler never fired (only its install line), no fatal/disconnect/GGPO/error strings
+appear anywhere, and the log runs clean to the end. The mod's spectator hooks only affect
+the local spectator's replay and cannot cause a shared/player-side failure. It is a
+game-side netplay event (BBCF's own "fatal error" kicks all participants when the PLAYERS'
+match desyncs or a connection drops) — unrelated to this mod.
+
 ### Confirmation protocol
 1. Build `Debug|Win32`, deploy manually, spectate real matches with
    `SpectatorSyncFailStall = 0`. In DEBUG.txt look for `SpectatorSync:` lines:
