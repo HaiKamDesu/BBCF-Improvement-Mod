@@ -51,6 +51,12 @@ public:
 	int GetOrigPalIndex() const;
 	bool IsCurrentPalWithBloom() const;
 
+	// True when the palette storage currently holds something other than the colors backed up at
+	// match start, i.e. a custom palette is in effect (from palettes.ini, the palette editor, or
+	// an opponent's synced palette). Content-based rather than flag-based so it stays correct no
+	// matter which path applied the palette.
+	bool IsCustomPaletteActive() const;
+
 private:
 	void SetPaletteIndex(int palIndex);
 	void ReplacePalData(IMPL_data_t* newPaletteData);

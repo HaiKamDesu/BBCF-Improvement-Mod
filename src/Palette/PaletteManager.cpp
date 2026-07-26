@@ -793,6 +793,49 @@ void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 	P2.UnlockUpdate();
 }
 
+// Platinum's drive lets her hold an item, and while she does, her script runs the PT_LinkColor
+// command (handler at BBCF.exe 0x005B2AC3). That command points her CharData::linkedPaletteId at
+// one of eight engine-side PaletteControlObj palettes chosen by her item type (CharData +0x1A0),
+// and the renderer then draws her from that palette instead of her own palette storage.
+//
+// Those PaletteControlObj palettes are built once, when the round loads, from whatever her color
+// slot held at that moment - and nothing refreshes them afterwards. That is the whole bug:
+//   - palettes.ini works because PaletteManager::OnMatchInit patches the palette storage before
+//     the round's palettes are built, so the copy they capture is already the custom one.
+//   - picking a palette mid-match writes the storage correctly (verified in memory), but the
+//     already-built copy keeps the original colors, so she reverts to her native color for as
+//     long as she holds an item. Re-picking the palette cannot fix it, and neither can writing
+//     the data harder: by then the stale palette only exists past the point we can reach.
+//
+// The same handler writes -1 to linkedPaletteId when she has no item, meaning "draw from my own
+// palette storage" - so clearing the link is a value the game itself uses, not an invented state.
+// We only clear it while a custom palette is actually active, so unmodified play is untouched.
+void PaletteManager::ClearPlatinumItemPaletteLink(Player& playerOne, Player& playerTwo)
+{
+	Player* const players[2] = { &playerOne, &playerTwo };
+
+	for (int i = 0; i < 2; ++i)
+	{
+		if (players[i]->IsCharDataNullPtr())
+			continue;
+
+		CharData* const charData = players[i]->GetData();
+		if (charData == nullptr || charData->charIndex != CharIndex_Platinum)
+			continue;
+
+		if (charData->linkedPaletteId == -1)
+			continue;
+
+		if (!players[i]->GetPalHandle().IsCustomPaletteActive())
+			continue;
+
+		LOG(2, "PaletteManager::ClearPlatinumItemPaletteLink P%d dropping stale item palette link %d\n",
+			i + 1, charData->linkedPaletteId);
+
+		charData->linkedPaletteId = -1;
+	}
+}
+
 void PaletteManager::OnMatchInit(Player& playerOne, Player& playerTwo)
 {
 	LOG(1, "PaletteManager::OnMatchInit -- P1 --\n");

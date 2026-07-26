@@ -110,7 +110,13 @@ public:
 	int32_t BoundingAddY; //0x032C do not use not sure what it is, but it's Unknown23087?
 	int32_t BoundingAddX; //0x0330
 	int32_t stageEdgeTouchTimer; //0x0334
-	char pad_0338[336]; //0x0338
+	char pad_0338[36]; //0x0338
+	// Palette this entity borrows instead of its own, as an engine palette id, or -1 for "use my
+	// own". Platinum's PT_LinkColor script command (handler at BBCF.exe 0x005B2AC3) points this at
+	// one of the PaletteControlObj1..8 objects while she holds a drive item; the same handler
+	// writes -1 when she has none. See PaletteManager::ClearPlatinumItemPaletteLink.
+	int32_t linkedPaletteId; //0x035C
+	char pad_0360[296]; //0x0360
 	int32_t typeOfAttack; //0x0488 1=normal, 2=special, 3=DD/EA, 5=AH
 	int32_t attackLevel; //0x048C
 	int32_t moveDamage; //0x0490; raw damage

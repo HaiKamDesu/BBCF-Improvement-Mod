@@ -122,6 +122,10 @@ void MatchState::OnUpdate()
 		g_interfaces.player1.GetPalHandle(),
 		g_interfaces.player2.GetPalHandle()
 	);
+	g_interfaces.pPaletteManager->ClearPlatinumItemPaletteLink(
+		g_interfaces.player1,
+		g_interfaces.player2
+	);
 	if (g_interfaces.pOnlinePaletteManager)
 	{
 		g_interfaces.pOnlinePaletteManager->OnUpdate();

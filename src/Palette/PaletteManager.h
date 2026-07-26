@@ -50,6 +50,10 @@ public:
 	// Call it ONCE per frame
 	void OnUpdate(CharPaletteHandle& P1, CharPaletteHandle& P2);
 
+	// Call it ONCE per frame, after OnUpdate. Keeps Platinum's custom palette applied while she
+	// is holding a drive item.
+	void ClearPlatinumItemPaletteLink(Player& playerOne, Player& playerTwo);
+
 	// Call it ONCE upon match start
 	void OnMatchInit(Player& playerOne, Player& playerTwo);
 

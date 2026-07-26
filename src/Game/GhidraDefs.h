@@ -689,3 +689,35 @@ static constexpr uintptr_t ADDR_PlatinumVoiceCueTableRegister = 0x0016B850; // F
 // (never memory) for the local player's Platinum. The mounted XACT bank + voice handle
 // (char+0x1E9E4) are per-client heap, never in the GGPO checksum -> desync-safe vs anyone.
 // The audio system is XACT (AA_CWaveBankDataBase_XACT::RegistBank @0x89923F), not CriWare.
+
+// ---------------------------------------------------------------------------------------------
+// Platinum PT_LinkColor - the item-state palette redirection (fixed 2026-07-26).
+//
+// While Platinum holds a drive item, her script runs the character-specific BBScript command
+// PT_LinkColor. Its handler picks one of eight engine objects named PaletteControlObj1..8 by her
+// item type and stores THAT object's palette id into CharData+0x35C (linkedPaletteId), so the
+// renderer draws her from that palette instead of her own palette storage. Those eight palettes
+// are built once at round load and never refreshed - which is why a mid-match custom palette
+// appeared to "stop applying" while she held an item, but palettes.ini (applied at OnMatchInit,
+// before the build) worked. The handler itself writes -1 when she has no item, meaning "draw from
+// my own palette storage"; PaletteManager::ClearPlatinumItemPaletteLink writes that same -1 while
+// a custom palette is active. Full write-up: docs/Research/PlatinumItemPaletteInvestigation.md.
+static constexpr uintptr_t ADDR_PlatLinkColorCmdCompare = 0x001B2AC3; // "PT_LinkColor" name compare
+static constexpr uintptr_t ADDR_PlatLinkColorClear      = 0x001B2AE1; // mov [ebx+35Ch],-1 (no item)
+static constexpr uintptr_t ADDR_PlatLinkColorDispatch   = 0x001B2AFE; // add eax,-3 / cmp 0Dh / jmp table
+static constexpr uintptr_t ADDR_PlatLinkColorStore      = 0x001B2B66; // mov [ebx+35Ch],eax (the link)
+// Item type (CharData+0x1A0, SLOT_59) -> object, via byte table 0x005B52D0 + jump table 0x005B52B4:
+//   3,4 -> Obj2   5,6 -> Obj3   7,8 -> Obj4   9,10 -> Obj5   11,12 -> Obj6   13,14 -> Obj7
+//   15,16 -> Obj8   (default -> Obj1, 0 -> no link). Name strings at 0x00954D50..0x00954DDC.
+// So the engine has a SEVEN-way per-item palette slot set that vanilla fills with identical
+// copies - see docs/Research/PlatinumPerItemPaletteFeasibility.md.
+static constexpr uintptr_t ADDR_PlatLinkColorIndexTable = 0x001B52D0; // byte table, item types 3..16
+static constexpr uintptr_t ADDR_PlatLinkColorJumpTable  = 0x001B52B4; // jump targets per case
+//
+// Palette container loader: stores the loaded container at owner+0x830 (the mod's
+// GetPalBaseAddresses hook site is the store at 0x005B6372). The owning object carries a
+// "vr<charcode>" resource tag at +0x834 matching char_%s_vri.pac; Platinum's is "vrpt". NOTE it
+// fires THREE times per match load and the mod keeps only the first two as P1/P2 - the third is
+// not a 24-slot character container (it resolves only 2 slots) and must not be written to as if
+// it were; doing so corrupts the heap.
+static constexpr uintptr_t ADDR_PaletteContainerLoad    = 0x001B6310; // FUN_005B6310

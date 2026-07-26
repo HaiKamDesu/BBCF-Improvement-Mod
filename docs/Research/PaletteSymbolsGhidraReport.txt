@@ -1,0 +1,107 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== SYMBOLS MATCHING PALETTE =====
+0084efe8  s_PALETTETEXTURE_0084efe8  (Label)
+00954324  s_Palette_Reserve_Error_00954324  (Label)
+00954580  s_Emission_Palette_Reserve_Error_00954580  (Label)
+00954d50  s_PaletteControlObj1_00954d50  (Label)
+00954d64  s_PaletteControlObj2_00954d64  (Label)
+00954d78  s_PaletteControlObj3_00954d78  (Label)
+00954d8c  s_PaletteControlObj4_00954d8c  (Label)
+00954da0  s_PaletteControlObj5_00954da0  (Label)
+00954db4  s_PaletteControlObj6_00954db4  (Label)
+00954dc8  s_PaletteControlObj7_00954dc8  (Label)
+00954ddc  s_PaletteControlObj8_00954ddc  (Label)
+total: 11
+
+===== FUNCTIONS MATCHING PALETTE =====
+
+===== STRINGS MATCHING PALETTE / pal / vri =====
+0084efe8  PALETTETEXTURE
+00851b3c  PALETTETEXTURE
+0086d97c  PALETTETEXTURE
+00874f54  PALETTETEXTURE
+0087dbec  PALETTETEXTURE
+008838dc  PALETTETEXTURE
+008a419c  char_story_pal/
+008a61d0  char_%s_vri.pac
+008a6208  char_%s_pal.pac
+008a6218  char_%s_act%d_pal.pac
+008a6244  char_old_ny_pal.pac
+008acb3c  PALETTETEXTURE
+008ad554  PALETTETEXTURE
+008aec34  PALETTETEXTURE
+008c66d4  PALETTETEXTURE
+008ca29c  PALETTETEXTURE
+008ce754  PALETTETEXTURE
+008d3514  PALETTETEXTURE
+008d6f14  PALETTETEXTURE
+008db0dc  PALETTETEXTURE
+008dfa84  PALETTETEXTURE
+008e34e4  PALETTETEXTURE
+008e776c  PALETTETEXTURE
+008ec234  PALETTETEXTURE
+008f045c  PALETTETEXTURE
+008f4e64  PALETTETEXTURE
+008f91f4  PALETTETEXTURE
+008fde94  PALETTETEXTURE
+009020fc  PALETTETEXTURE
+009058fc  PALETTETEXTURE
+0090911c  PALETTETEXTURE
+0091eb44  PALETTETEXTURE
+0092ddfc  PALETTETEXTURE
+00930f34  PALETTETEXTURE
+009501e0  story0%d_pal%2d
+00954324  Palette Reserve Error
+00954580  Emission Palette Reserve Error
+00954930  vr_laser_waki.hip
+00954944  vr_lasertex.hip
+00954954  vr_laser_base.hip
+00954968  vr_laser_tsubu.hip
+00954ae8  vrdraintex_test.hip
+00954afc  vrdraintex_test2.hip
+00954ba4  vr_nbc_ceef_cable.hip
+00954d50  PaletteControlObj1
+00954d64  PaletteControlObj2
+00954d78  PaletteControlObj3
+00954d8c  PaletteControlObj4
+00954da0  PaletteControlObj5
+00954db4  PaletteControlObj6
+00954dc8  PaletteControlObj7
+00954ddc  PaletteControlObj8
+009710f4  abyss_txt_palam.hip
+009d6a04  .?AVAA_CPalette_Custom@@
+009d6a28  .?AVAA_CPalette_HIP@@
+009d8920  .?AVAA_CPaletteFactory_HIP@@
+009f4a10  .?AVAA_CPaletteFactory_Custom@@
+
+===== CLASS NAMESPACES =====
+00899380  AA_CPalette_Custom::vftable_meta_ptr
+00899384  AA_CPalette_Custom::vftable
+008993b4  AA_CPalette_HIP::vftable_meta_ptr
+008993b8  AA_CPalette_HIP::vftable
+0089c314  AA_CPaletteFactory_HIP::vftable_meta_ptr
+0089c318  AA_CPaletteFactory_HIP::vftable
+0094e13c  AA_CPaletteFactory_Custom::vftable_meta_ptr
+0094e140  AA_CPaletteFactory_Custom::vftable
+009aa150  AA_CPalette_Custom::RTTI_Complete_Object_Locator
+009aa164  AA_CPalette_Custom::RTTI_Class_Hierarchy_Descriptor
+009aa174  AA_CPalette_Custom::RTTI_Base_Class_Array
+009aa180  AA_CPalette_Custom::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+009aa19c  AA_CPalette_HIP::RTTI_Complete_Object_Locator
+009aa1b0  AA_CPalette_HIP::RTTI_Class_Hierarchy_Descriptor
+009aa1c0  AA_CPalette_HIP::RTTI_Base_Class_Array
+009aa1cc  AA_CPalette_HIP::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+009ab524  AA_CPaletteFactory_HIP::RTTI_Complete_Object_Locator
+009ab538  AA_CPaletteFactory_HIP::RTTI_Class_Hierarchy_Descriptor
+009ab548  AA_CPaletteFactory_HIP::RTTI_Base_Class_Array
+009ab554  AA_CPaletteFactory_HIP::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+009b1ca0  AA_CPaletteFactory_Custom::RTTI_Complete_Object_Locator
+009b1cb4  AA_CPaletteFactory_Custom::RTTI_Class_Hierarchy_Descriptor
+009b1cc4  AA_CPaletteFactory_Custom::RTTI_Base_Class_Array
+009b1cd0  AA_CPaletteFactory_Custom::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+009d69fc  AA_CPalette_Custom::RTTI_Type_Descriptor
+009d6a20  AA_CPalette_HIP::RTTI_Type_Descriptor
+009d8918  AA_CPaletteFactory_HIP::RTTI_Type_Descriptor
+009f4a08  AA_CPaletteFactory_Custom::RTTI_Type_Descriptor

@@ -282,6 +282,18 @@ bool CharPaletteHandle::IsCurrentPalWithBloom() const
 		m_currentPalData.palInfo.hasBloom;
 }
 
+bool CharPaletteHandle::IsCustomPaletteActive() const
+{
+	if (m_pCurPalIndex == nullptr)
+		return false;
+
+	char* pLivePalData = nullptr;
+	if (!TryGetPalFileAddr(*m_pCurPalIndex, PaletteFile_Character, &pLivePalData))
+		return false;
+
+	return memcmp(pLivePalData, m_origPalBackup.file0, IMPL_PALETTE_DATALEN) != 0;
+}
+
 void CharPaletteHandle::ReplacePalArrayInMemory(char* Dst, const void* Src)
 {
 	// The palette datas are duplicated in the memory at offset 0x800

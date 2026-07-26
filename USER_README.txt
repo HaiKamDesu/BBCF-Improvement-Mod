@@ -77,18 +77,15 @@ Known issues
 ==========================
 1. Vampire and Extreme Vampire desync online. Avoid using these two custom game modes when online.
 
-2. Platinum keeps swapping between her default and the selected custom palette whenever she has her drive active.
-	- To prevent this, assign her custom palette in palettes.ini before the match starts, and do not switch it during match.
-
-3. Hitbox overlay is not aligned properly or is off-screen when the game's window resolution mismatches the rendering resolution.
+2. Hitbox overlay is not aligned properly or is off-screen when the game's window resolution mismatches the rendering resolution.
 	- To prevent this, open up the settings.ini file, and set Viewport to 2, while setting the RenderingWidth and RenderingHeight to the resolution values you have in the ingame display options.
 
-4. Hitbox overlay shows phantom hitboxes that are disabled by the engine (shoutout to Shtkn for discovering this)
+3. Hitbox overlay shows phantom hitboxes that are disabled by the engine (shoutout to Shtkn for discovering this)
 
-5. Screen not displaying properly when Viewport in settings.ini is set to 2 or 3 with keep aspect ratio enabled in in-game settings. This is still being investigated. For now, either
+4. Screen not displaying properly when Viewport in settings.ini is set to 2 or 3 with keep aspect ratio enabled in in-game settings. This is still being investigated. For now, either
 disable keep aspect ratio or keep the Viewport option set to 1.
 
-6. Enabling "Separate Keyboard and Controllers" crashes the game on startup. The option is forced off each launch and no longer saves between sessions; enable it manually after the game loads if needed.
+5. Enabling "Separate Keyboard and Controllers" crashes the game on startup. The option is forced off each launch and no longer saves between sessions; enable it manually after the game loads if needed.
 
 Troubleshooting
 ==========================
