@@ -3,6 +3,20 @@
 #include "Core/Localization.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 
+namespace {
+// Reads a CF slot the way the user thinks of it: while Unlimited Playback has the slot
+// borrowed, the live slot memory holds its temporary playback data, so read the contents
+// that are going to be restored to the slot instead.
+void ReadCfSlot(int slot, std::vector<char>* outFrames, char* outFacing) {
+	if (UnlimitedPlaybackManager::Instance().ReadBorrowedCfSlot(slot, outFrames, outFacing)) {
+		return;
+	}
+	PlaybackSlot pslot(slot);
+	*outFrames = pslot.get_slot_buffer();
+	*outFacing = pslot.get_facing_direction();
+}
+}
+
 bool PlaybackEditorWindow::OpenUnlimitedEntry(size_t entryIndex) {
 	if (!BeginUnlimitedEntryEdit(entryIndex)) {
 		return false;
@@ -84,8 +98,18 @@ void PlaybackEditorWindow::DrawEditorContents(bool closeOnUnlimitedEntrySave) {
 		std::string labelRefresh = std::string(Messages.Refresh()) + "##playback_editor_window";
 
 		if (ImGui::Button(labelRefresh.c_str())) {
-			playback_slot_buffers[selected_slot] = PlaybackSlot(selected_slot + 1).get_slot_buffer();
-			facing_direction_slot_buffers[selected_slot] = PlaybackSlot(selected_slot + 1).get_facing_direction();
+			ReadCfSlot(selected_slot + 1,
+				&playback_slot_buffers[selected_slot],
+				&facing_direction_slot_buffers[selected_slot]);
+		}
+
+		// Unlimited Playback temporarily borrows a CF slot while it plays an entry and
+		// restores the slot afterwards. Saying so beats letting the slot look haunted.
+		if (UnlimitedPlaybackManager::Instance().GetBorrowedCfSlot() == selected_slot + 1) {
+			ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.25f, 1.0f),
+				"Slot %d is currently borrowed by Unlimited Playback. It holds playback data right now; "
+				"saving still applies to the contents that get restored to this slot.",
+				selected_slot + 1);
 		}
 	}
 
@@ -193,7 +217,12 @@ void PlaybackEditorWindow::DrawEditorContents(bool closeOnUnlimitedEntrySave) {
 				}
 			}
 		} else {
-			PlaybackEditorWindow::playback_manager.load_into_slot(*selected_slot_buffer, *selected_facing_direction, selected_slot + 1);
+			const int cfSlot = selected_slot + 1;
+			PlaybackEditorWindow::playback_manager.load_into_slot(*selected_slot_buffer, *selected_facing_direction, cfSlot);
+			// If Unlimited Playback has this slot borrowed, its pending restore would wipe
+			// the write we just did, making Save look like it did nothing at all.
+			UnlimitedPlaybackManager::Instance().AbsorbExternalSlotWrite(
+				cfSlot, *selected_slot_buffer, (*selected_facing_direction) != 0);
 		}
 	}
 	if (m_dataSourceMode == DataSource_UnlimitedEntry) {

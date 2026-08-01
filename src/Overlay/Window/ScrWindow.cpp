@@ -1545,7 +1545,8 @@ void ScrWindow::DrawSaveStates() {
             };
             static float wait_before_exec_s = 0;
 
-            if (ImGui::Button("Save snapshot") || ImGui::IsKeyPressed(g_modVals.save_states_save_keycode)) {
+            if (ImGui::Button("Save snapshot") ||
+                (!IsTypingInImGuiTextField() && ImGui::IsKeyPressed(g_modVals.save_states_save_keycode))) {
                 SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
                 if (apparatus) {
                     apparatus->save_snapshot(0);
@@ -1558,7 +1559,8 @@ void ScrWindow::DrawSaveStates() {
             ImGui::SameLine();
             const bool has_snapshot = snap_apparatus && snap_apparatus->snapshot_count != 0;
             if (has_snapshot) {
-                if (ImGui::Button("Load snapshot") || ImGui::IsKeyPressed(g_modVals.save_states_load_keycode)) {
+                if (ImGui::Button("Load snapshot") ||
+                    (!IsTypingInImGuiTextField() && ImGui::IsKeyPressed(g_modVals.save_states_load_keycode))) {
                     SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
                     if (apparatus) {
                         apparatus->load_snapshot(0);
@@ -2155,7 +2157,8 @@ void ScrWindow::DrawReplayTakeover() {
             ImGui::ShowHelpMarker(Messages.Takeover_as_p2_tooltip());
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
-            if ((ImGui::Button("Load Replay State") || ImGui::IsKeyPressed(g_modVals.replay_takeover_load_keycode))
+            if ((ImGui::Button("Load Replay State") ||
+                (!IsTypingInImGuiTextField() && ImGui::IsKeyPressed(g_modVals.replay_takeover_load_keycode)))
                 && snap_apparatus_takeover->snapshot_count > 0) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
                     snap_apparatus_takeover->load_snapshot(0);

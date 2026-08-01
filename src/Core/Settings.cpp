@@ -53,6 +53,23 @@ void Settings::applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters)
 	}
 
 
+	applyRuntimeSettings();
+
+	pPresentationParameters->PresentationInterval = settingsIni.vsync ? D3DPRESENT_INTERVAL_DEFAULT : D3DPRESENT_INTERVAL_IMMEDIATE;
+
+
+	//pPresentationParameters->Windowed = !settingsIni.fullscreen;
+	//if (settingsIni.fullscreen)
+	//{
+	//	pPresentationParameters->FullScreen_RefreshRateInHz = 60; // savedSettings.adapterRefreshRate;
+	//}
+}
+
+// Mirrors the settings that subsystems read from g_modVals instead of from settingsIni.
+// Called both on device create/reset and right after the in-game settings window saves,
+// so those settings really do take effect live instead of waiting for the next reset.
+void Settings::applyRuntimeSettings()
+{
 	if (Settings::settingsIni.uploadReplayDataHost == "50.118.225.175") {
 		Settings::changeSetting("UploadReplayDataHost", "89.167.76.6");
 		Settings::settingsIni.uploadReplayDataHost = "89.167.76.6";
@@ -76,16 +93,6 @@ void Settings::applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters)
 	//CA2W pszwide2(str2.c_str());
 	g_modVals.uploadReplayDataEndpoint = Settings::settingsIni.uploadReplayDataEndpoint;
 	g_modVals.uploadReplayDataPort = Settings::settingsIni.uploadReplayDataPort;
-	//pPresentationParameters->Windowed = !Settings::settingsIni.fullscreen;
-
-	pPresentationParameters->PresentationInterval = settingsIni.vsync ? D3DPRESENT_INTERVAL_DEFAULT : D3DPRESENT_INTERVAL_IMMEDIATE;
-	
-	
-	//pPresentationParameters->Windowed = !settingsIni.fullscreen;
-	//if (settingsIni.fullscreen)
-	//{
-	//	pPresentationParameters->FullScreen_RefreshRateInHz = 60; // savedSettings.adapterRefreshRate;
-	//}
 }
 
 int Settings::readSettingsFilePropertyInt(LPCWSTR key, LPCWSTR defaultVal, LPCWSTR filename)

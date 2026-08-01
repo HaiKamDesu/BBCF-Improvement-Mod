@@ -485,6 +485,11 @@ void SettingsIniWindow::DrawModal()
 		if (Settings::settingsIni.generateDebugLogs != debugLogsWereEnabled)
 			SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);
 
+		// Push the settings that subsystems read through g_modVals (keybinds, frame history
+		// sizing, palette/upload toggles). Without this they'd only take effect on the next
+		// D3D device reset, even though the window labels them "Live".
+		Settings::applyRuntimeSettings();
+
 		ImGui::CloseCurrentPopup();
 
 		if (m_needsRestart)

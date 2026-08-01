@@ -331,6 +331,12 @@ void WindowManager::HandleButtons()
 		return;
 	}
 
+	// Never let a rebound letter hotkey fire while the user is typing into a text field.
+	if (IsTypingInImGuiTextField())
+	{
+		return;
+	}
+
 	if (ImGui::IsKeyPressed(keyToggleMainWindow))
 	{
 		m_windowContainer->GetWindow(WindowType_Main)->ToggleOpen();

@@ -978,12 +978,18 @@ bool UnlimitedPlaybackManager::CaptureSlotToLibrary(int slot, const std::string&
         return false;
     }
 
-    PlaybackSlot pslot(slot);
-    std::vector<char> frames = pslot.get_slot_buffer_raw();
+    std::vector<char> frames;
+    bool facingLeft = false;
+    // While the runtime has this slot borrowed it holds our temporary playback data, not
+    // the user's recording -- read what is going to be restored to it instead.
+    if (!TryReadBorrowedSlot(slot, &frames, &facingLeft)) {
+        PlaybackSlot pslot(slot);
+        frames = pslot.get_slot_buffer_raw();
+        facingLeft = pslot.get_facing_direction() != 0;
+    }
     if (frames.size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
         frames.resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
     }
-    const bool facingLeft = pslot.get_facing_direction() != 0;
 
     const std::string baseName = displayName.empty() ? FormatLocalized("Slot %d", slot) : displayName;
 
@@ -1293,6 +1299,9 @@ bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
     }
 
     m_runtimePlaybackManager.load_raw_into_slot(frames, facingToLoad, slot);
+    // Keep the write if the runtime happens to have this very slot borrowed, instead of
+    // letting the pending restore quietly undo it.
+    AbsorbExternalSlotWriteRaw(slot, frames, facingToLoad != 0);
     PushToast(L("Entry loaded into slot."));
     return true;
 }
@@ -1304,12 +1313,18 @@ bool UnlimitedPlaybackManager::SaveEntryFromSlot(size_t idx, int slot) {
         return false;
     }
 
-    PlaybackSlot pslot(slot);
-    std::vector<char> frames = pslot.get_slot_buffer_raw();
+    std::vector<char> frames;
+    bool facingLeft = false;
+    // While the runtime has this slot borrowed it holds our temporary playback data, not
+    // the user's recording -- read what is going to be restored to it instead.
+    if (!TryReadBorrowedSlot(slot, &frames, &facingLeft)) {
+        PlaybackSlot pslot(slot);
+        frames = pslot.get_slot_buffer_raw();
+        facingLeft = pslot.get_facing_direction() != 0;
+    }
     if (frames.size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
         frames.resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
     }
-    const bool facingLeft = pslot.get_facing_direction() != 0;
 
     const std::string relPath = EnsureEntryLibraryRelativePath(idx);
     (void)relPath;
@@ -2745,6 +2760,62 @@ void UnlimitedPlaybackManager::BackupRuntimeSlotIfNeeded() {
     m_runtimeSlotBackupValid = true;
 }
 
+int UnlimitedPlaybackManager::GetBorrowedCfSlot() const {
+    if (!m_runtimeSlotBackupValid && !m_runtimeSlotRestorePending) {
+        return 0;
+    }
+    return m_runtimeSlotNumber;
+}
+
+bool UnlimitedPlaybackManager::AbsorbExternalSlotWrite(int slot, const std::vector<char>& trimmedFrames, bool facingLeft) {
+    std::vector<char> clampedFrames = trimmedFrames;
+    if (clampedFrames.size() > static_cast<size_t>(kMaxFramesPerPlayback)) {
+        clampedFrames.resize(kMaxFramesPerPlayback);
+    }
+    return AbsorbExternalSlotWriteRaw(slot, ExpandPlaybackBytes(clampedFrames), facingLeft);
+}
+
+bool UnlimitedPlaybackManager::AbsorbExternalSlotWriteRaw(int slot, const std::vector<char>& rawFrames, bool facingLeft) {
+    if (!m_runtimeSlotBackupValid || slot != m_runtimeSlotNumber) {
+        return false;
+    }
+
+    std::vector<char> clampedFrames = rawFrames;
+    if (clampedFrames.size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
+        clampedFrames.resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
+    }
+
+    // The pending restore is what the slot will end up holding, so the write has to land
+    // there too -- otherwise the restore overwrites it and the save looks like a no-op.
+    m_runtimeSlotBackupFrames = clampedFrames;
+    m_runtimeSlotBackupFacingLeft = facingLeft;
+    LOG(1, "[UP] Absorbed external write to borrowed slot %d into pending restore. rawBytes=%u facing=%d\n",
+        slot,
+        static_cast<unsigned int>(clampedFrames.size()),
+        facingLeft ? 1 : 0);
+    return true;
+}
+
+bool UnlimitedPlaybackManager::ReadBorrowedCfSlot(int slot, std::vector<char>* outTrimmedFrames, char* outFacing) const {
+    std::vector<char> rawFrames;
+    bool facingLeft = false;
+    if (!outTrimmedFrames || !outFacing || !TryReadBorrowedSlot(slot, &rawFrames, &facingLeft)) {
+        return false;
+    }
+    *outTrimmedFrames = CompactPlaybackBytes(rawFrames);
+    *outFacing = facingLeft ? 1 : 0;
+    return true;
+}
+
+bool UnlimitedPlaybackManager::TryReadBorrowedSlot(int slot, std::vector<char>* outRawFrames, bool* outFacingLeft) const {
+    if (!m_runtimeSlotBackupValid || slot != m_runtimeSlotNumber || !outRawFrames || !outFacingLeft) {
+        return false;
+    }
+    *outRawFrames = m_runtimeSlotBackupFrames;
+    *outFacingLeft = m_runtimeSlotBackupFacingLeft;
+    return true;
+}
+
 void UnlimitedPlaybackManager::TryRestoreRuntimeSlotAfterPlayback() {
     if (!m_runtimeSlotRestorePending || !m_runtimeSlotBackupValid) {
         return;
@@ -2961,11 +3032,16 @@ bool UnlimitedPlaybackManager::IsTriggerKeyDown(int virtualKey) const {
     if (virtualKey <= 0 || virtualKey >= 256) {
         return false;
     }
+    if (IsTypingInImGuiTextField()) {
+        return false;
+    }
     return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 }
 
 bool UnlimitedPlaybackManager::IsKeyPressedEdge(int virtualKey) {
-    if (!IsGameWindowFocused()) {
+    // Typing into an overlay text field must not fire keyboard triggers. Controller
+    // bindings are unaffected -- a gamepad button is never "typing".
+    if (!IsGameWindowFocused() || (!IsControllerBindCode(virtualKey) && IsTypingInImGuiTextField())) {
         if (IsControllerBindCode(virtualKey)) {
             const int index = virtualKey - kControllerBindBase;
             m_prevControllerBindDown[static_cast<size_t>(index)] = false;

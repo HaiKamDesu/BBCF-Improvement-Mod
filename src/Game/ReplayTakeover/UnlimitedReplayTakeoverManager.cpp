@@ -1820,6 +1820,11 @@ bool UnlimitedReplayTakeoverManager::IsKeyPressedEdge(int virtualKey) const {
     if (virtualKey <= 0 || virtualKey >= 256) {
         return false;
     }
+    if (IsTypingInImGuiTextField()) {
+        // Swallow the edge as well, so the keypress isn't queued up for after typing ends.
+        (void)(GetAsyncKeyState(virtualKey) & 0x1);
+        return false;
+    }
     return (GetAsyncKeyState(virtualKey) & 0x1) != 0;
 }
 

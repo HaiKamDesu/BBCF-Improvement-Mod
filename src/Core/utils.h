@@ -24,6 +24,12 @@ DWORD QuickChecksum(DWORD *pData, int size);
 bool utils_WriteFile(const char* path, void* inBuffer, unsigned long bufferSize, bool binaryFile = false, bool append = false);
 bool utils_ReadFile(const char* path, void* outBuffer, unsigned long bufferSize, bool binaryFile = false);
 
+/* True while an ImGui text field owns keyboard input (typing an entry name, a search
+   filter, ...). Keyboard hotkeys must stay inert while this is true, otherwise typing a
+   letter that happens to be bound -- "C" freezes the game by default -- fires the hotkey.
+   Controller/gamepad bindings are unaffected and must not consult this. */
+bool IsTypingInImGuiTextField();
+
 std::string utf16_to_utf8(const std::wstring & wstr);
 std::wstring utf8_to_utf16(const std::string & utf8_str);
 int SafeDereferencePtr(int* ptr);

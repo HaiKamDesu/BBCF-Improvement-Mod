@@ -142,6 +142,13 @@ public:
     bool SaveEntryToFile(size_t idx, const std::string& outputPath);
     bool PlayEntryNow(size_t idx);
 
+    // While an entry is played back, the runtime borrows one CF slot and owes the user a
+    // restore of that slot's original contents. Anything else that writes to a CF slot has
+    // to know about it, otherwise the pending restore silently reverts the write.
+    int GetBorrowedCfSlot() const; // 0 when no slot is currently borrowed
+    bool AbsorbExternalSlotWrite(int slot, const std::vector<char>& trimmedFrames, bool facingLeft);
+    bool ReadBorrowedCfSlot(int slot, std::vector<char>* outTrimmedFrames, char* outFacing) const;
+
     void ClearAll();
 
     bool SaveProfile(const std::string& profilePath);
@@ -171,6 +178,9 @@ private:
     std::string SanitizeFileName(const std::string& input) const;
     std::string BuildUniqueRelativePath(const std::string& preferredName) const;
     std::string EnsureEntryLibraryRelativePath(size_t idx);
+
+    bool AbsorbExternalSlotWriteRaw(int slot, const std::vector<char>& rawFrames, bool facingLeft);
+    bool TryReadBorrowedSlot(int slot, std::vector<char>* outRawFrames, bool* outFacingLeft) const;
 
     bool ReadPlaybackFile(const std::string& fullPath, CachedPlayback* out, bool forceLoadIncompatible = false);
     bool WritePlaybackFile(const std::string& fullPath, bool facingLeft, const std::vector<char>& frames);

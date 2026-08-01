@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <fstream>
 #include <Psapi.h>
+#include <imgui.h>
 
 char* GetBbcfBaseAdress() {
 	static char* bbcf_base = NULL;
@@ -289,6 +290,13 @@ bool utils_ReadFile(const char* path, void* outBuffer, unsigned long bufferSize,
 	file.close();
 
 	return true;
+}
+
+bool IsTypingInImGuiTextField()
+{
+	// WantTextInput is recomputed every NewFrame() and only set while an InputText
+	// widget is the active item, so this stays false for plain window focus.
+	return ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantTextInput;
 }
 
 std::string utf16_to_utf8(const std::wstring& wstr)
