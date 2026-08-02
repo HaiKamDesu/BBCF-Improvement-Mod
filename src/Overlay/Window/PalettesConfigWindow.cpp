@@ -612,8 +612,7 @@ void PalettesConfigWindow::DrawImportButton()
 	const bool dialogBusy = IsFileDialogActive();
 	if (dialogBusy)
 	{
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		ImGui::BeginDisabled();
 	}
 
 	if (ImGui::Button(Messages.Import_palette_button(), ImVec2(buttonWidth, 0)) && !dialogBusy)
@@ -621,8 +620,7 @@ void PalettesConfigWindow::DrawImportButton()
 
 	if (dialogBusy)
 	{
-		ImGui::PopStyleVar();
-		ImGui::PopItemFlag();
+		ImGui::EndDisabled();
 	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.Palette_import_help());

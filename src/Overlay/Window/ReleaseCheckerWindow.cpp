@@ -314,15 +314,13 @@ void ReleaseCheckerWindow::Draw()
 	const bool isFetching = (fetchState == FetchState::Fetching);
 	if (isFetching)
 	{
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		ImGui::BeginDisabled();
 	}
 	if (ImGui::Button("Refresh", buttonSize))
 		StartFetch(true);
 	if (isFetching)
 	{
-		ImGui::PopStyleVar();
-		ImGui::PopItemFlag();
+		ImGui::EndDisabled();
 	}
 
 	ImGui::SameLine();
@@ -489,8 +487,7 @@ void ReleaseCheckerWindow::DrawRelease(const Updater::GitHubRelease& release, si
 		// Install button (disabled when coordinator is busy)
 		if (coordinatorBusy)
 		{
-			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+			ImGui::BeginDisabled();
 		}
 		if (ImGui::Button(("Install##" + release.tagName).c_str(), actionBtnSize))
 		{
@@ -501,8 +498,7 @@ void ReleaseCheckerWindow::DrawRelease(const Updater::GitHubRelease& release, si
 		}
 		if (coordinatorBusy)
 		{
-			ImGui::PopStyleVar();
-			ImGui::PopItemFlag();
+			ImGui::EndDisabled();
 		}
 	}
 	else

@@ -143,7 +143,7 @@ void ImGui::AddTextBold(ImDrawList* drawList, const ImVec2& pos, ImU32 col, cons
 
 void ImGui::HoverTooltip(const char* text)
 {
-	if (IsItemHovered())
+	if (IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay))
 	{
 		BeginTooltip();
 		TextUnformatted(text);
@@ -353,7 +353,9 @@ bool ImGui::ColorPicker4On32Bit(const char* label, unsigned char val[4], ImGuiCo
 void ImGui::ShowHelpMarker(const char* desc)
 {
 	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered())
+	// DelayNormal (1.89+): tooltips no longer fire the instant the cursor crosses a marker,
+	// so sweeping the mouse over a dense settings panel stops flashing popups everywhere.
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay))
 	{
 		ImGui::BeginTooltip();
 		ImGui::PushTextWrapPos(450.0f);

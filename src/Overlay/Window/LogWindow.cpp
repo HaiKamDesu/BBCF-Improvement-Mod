@@ -201,11 +201,9 @@ void LogWindow::DrawSaveAsButton()
 		std::lock_guard<std::mutex> lock(g_saveDialogState.mutex);
 		if (g_saveDialogState.active)
 		{
-			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+			ImGui::BeginDisabled();
 			ImGui::Button(Messages.Save_as());
-			ImGui::PopStyleVar();
-			ImGui::PopItemFlag();
+			ImGui::EndDisabled();
 			return;
 		}
 
