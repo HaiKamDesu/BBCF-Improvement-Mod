@@ -99,6 +99,7 @@ namespace {
 		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop ending seconds", "Unlimited Playback", "Seconds near loop end reserved before restart." },
 		{ "UnlimitedPlaybackLoopRestartLabState", "Restart lab state on loop", "Unlimited Playback", "Reloads lab state when an unlimited playback loop restarts." },
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop restart mode", "Unlimited Playback", "Selects how unlimited playback restarts when looping." },
+		{ "D3D9IatFallbackHook", "D3D9 import-table fallback hook", "Graphics", "Rescues the overlay on PCs where another program (notably NVIDIA Optimus' nvd3d9wrap.dll on dual-GPU laptops) hooks Direct3D before the mod and knocks the mod back out, so the game runs fine but no mod window ever appears. Automatic only acts on affected PCs and does nothing everywhere else - leave it there unless you are debugging. Requires a restart." },
 		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks which voice (Sena or Luna) YOUR Platinum uses instead of the game's random roll. OFFLINE ONLY by default (training, vs CPU, replays, local versus) - there it never affects gameplay and is completely safe. It does NOT apply in online matches unless you enable 'Platinum voice: apply ONLINE' below, which is known to cause desyncs. Applies only to the Platinum you control." },
 		{ "PlatinumVoiceOnlineDesyncUnsafe", "Platinum voice: apply ONLINE (CAUSES DESYNC)", "Other", "DANGER - leave OFF. Makes the Platinum voice choice above also apply in ONLINE matches. This is KNOWN TO DESYNC: the game will detect a desync and kick BOTH players out of the match. There is no working desync-safe online version yet; this switch only exists so that work can be continued. Do NOT enable this for normal online play - you will ruin matches for yourself and your opponent." },
 	};
@@ -146,6 +147,12 @@ namespace {
 		int optionCount;
 	};
 
+	static const SettingEnumOption kD3D9IatFallbackHookOptions[] = {
+		{ 0, "Off" },
+		{ 1, "Automatic (recommended)" },
+		{ 2, "Always" },
+	};
+
 	static const SettingEnumOption kPlatinumVoiceChoiceOptions[] = {
 		{ 0, "Default (random)" },
 		{ 1, "Luna" },
@@ -154,6 +161,7 @@ namespace {
 
 	static const SettingEnumMetadata kSettingEnumMetadata[] = {
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
+		{ "D3D9IatFallbackHook", kD3D9IatFallbackHookOptions, _countof(kD3D9IatFallbackHookOptions) },
 	};
 
 	static const SettingEnumMetadata* GetSettingEnumMetadata(const char* iniKey)
@@ -254,6 +262,7 @@ namespace {
 			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks",
 			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
 			"SpectatorSyncHooksEnabled",
+			"D3D9IatFallbackHook",
 			nullptr
 		};
 		for (int i = 0; kRestartKeys[i]; ++i)
