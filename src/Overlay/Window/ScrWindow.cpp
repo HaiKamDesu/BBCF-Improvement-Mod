@@ -393,11 +393,26 @@ void ScrWindow::DrawStatesSection()
     auto states = g_interfaces.player2.states;
     {
         ImGui::BeginChild("left pane", ImVec2(200, 0), true);
-        for (int i = 0; i < g_interfaces.player2.states.size(); i++)
         {
-            std::string label= g_interfaces.player2.states[i]->name;
-            if (ImGui::Selectable(label.c_str(), selected == i))
-                selected = i;
+            // A character's script state list runs to several hundred entries, and every one of
+            // them was building a std::string and submitting a Selectable each frame even though
+            // only a couple of dozen fit in the pane. The clipper submits just the visible range;
+            // rows are uniform height so it can seek directly.
+            const int stateCount = static_cast<int>(g_interfaces.player2.states.size());
+            ImGuiListClipper clipper;
+            clipper.Begin(stateCount);
+            while (clipper.Step())
+            {
+                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+                {
+                    // State names are not guaranteed unique, so scope the id by index rather
+                    // than letting two identically named states collide.
+                    ImGui::PushID(i);
+                    if (ImGui::Selectable(g_interfaces.player2.states[i]->name.c_str(), selected == i))
+                        selected = i;
+                    ImGui::PopID();
+                }
+            }
         }
         ImGui::EndChild();
         ImGui::SameLine();
