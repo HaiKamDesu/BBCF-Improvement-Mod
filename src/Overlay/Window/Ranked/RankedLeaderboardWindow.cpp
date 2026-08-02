@@ -478,39 +478,51 @@ namespace
 		LeaderboardModel& m = Model();
 		const uint64_t localId = m.LocalSteamId();
 
-		ImGui::Separator();
-		ImGui::Columns(7, "###LbCols", true);
-		const float fullWidth = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x);
-		ImGui::SetColumnWidth(0, fullWidth * 0.07f); // #
-		ImGui::SetColumnWidth(1, fullWidth * 0.30f); // player
-		ImGui::SetColumnWidth(2, fullWidth * 0.16f); // rank tier
-		ImGui::SetColumnWidth(3, fullWidth * 0.12f); // total LP
-		ImGui::SetColumnWidth(4, fullWidth * 0.18f); // character
-		ImGui::SetColumnWidth(5, fullWidth * 0.06f); // online
-		ImGui::SetColumnWidth(6, fullWidth * 0.11f); // profile
+		// Tables rather than Columns: the old code re-applied SetColumnWidth() every frame, so
+		// dragging a separator was undone on the very next one and the columns felt frozen.
+		// Table column widths are user state - the ratios below are only the initial layout -
+		// and we get a frozen header row, per-column clipping and borders for free.
+		const ImGuiTableFlags tableFlags =
+			ImGuiTableFlags_Resizable |
+			ImGuiTableFlags_Reorderable |
+			ImGuiTableFlags_Hideable |
+			ImGuiTableFlags_RowBg |
+			ImGuiTableFlags_BordersOuter |
+			ImGuiTableFlags_BordersV |
+			ImGuiTableFlags_ScrollY |
+			ImGuiTableFlags_SizingStretchProp;
 
-		ImGui::TextUnformatted(L("#").c_str());                ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Player").c_str());           ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Rank").c_str());             ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Total LP").c_str());         ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Character").c_str());        ImGui::NextColumn();
-		ImGui::TextUnformatted("");                            ImGui::NextColumn();
-		ImGui::TextUnformatted("");                            ImGui::NextColumn();
-		ImGui::Separator();
+		if (!ImGui::BeginTable("###LbCols", 7, tableFlags))
+			return;
+
+		ImGui::TableSetupScrollFreeze(0, 1); // keep the header visible while scrolling
+		ImGui::TableSetupColumn(L("#").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.07f);
+		ImGui::TableSetupColumn(L("Player").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.30f);
+		ImGui::TableSetupColumn(L("Rank").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.16f);
+		ImGui::TableSetupColumn(L("Total LP").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.12f);
+		ImGui::TableSetupColumn(L("Character").c_str(), ImGuiTableColumnFlags_WidthStretch, 0.18f);
+		ImGui::TableSetupColumn("##online", ImGuiTableColumnFlags_WidthStretch, 0.06f);
+		ImGui::TableSetupColumn("##profile", ImGuiTableColumnFlags_WidthStretch, 0.11f);
+		ImGui::TableHeadersRow();
 
 		for (size_t i = 0; i < m.rows.size(); ++i)
 		{
 			const LeaderboardRow& row = m.rows[i];
 			const bool isLocal = row.steamId == localId && localId != 0;
 
+			ImGui::TableNextRow();
+			ImGui::PushID(static_cast<int>(i));
+
 			if (isLocal)
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.92f, 0.45f, 1.0f));
 
+			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("%d", row.globalRank);
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(1);
 			ImGui::TextUnformatted(row.name.empty() ? L("(loading...)").c_str() : row.name.c_str());
-			ImGui::NextColumn();
+
+			ImGui::TableSetColumnIndex(2);
 
 			// Rank tier label + colour, decoded from the packed score.
 			{
@@ -525,37 +537,38 @@ namespace
 						FormatVisibleRankLabel(visibleRank, false).c_str());
 				}
 			}
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(3);
 			if (row.hasTotalLp)
 				ImGui::Text("%u", static_cast<unsigned int>(row.totalLp));
 			else
 				ImGui::TextUnformatted("-");
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(4);
 			if (row.characterId < static_cast<uint8_t>(kNumRankedCharacters))
 				ImGui::TextUnformatted(getCharacterNameByIndexA(row.characterId).c_str());
 			else
 				ImGui::TextUnformatted("-");
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(5);
 			DrawOnlineDot(row.personaState);
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(6);
 			char btnId[32];
-			std::snprintf(btnId, sizeof(btnId), "%s###LbProf%zu", L("Profile").c_str(), i);
+			std::snprintf(btnId, sizeof(btnId), "%s###LbProf", L("Profile").c_str());
 			if (ImGui::SmallButton(btnId))
 			{
 				if (g_interfaces.pSteamFriendsWrapper)
 					g_interfaces.pSteamFriendsWrapper->ActivateGameOverlayToUser("steamid", CSteamID(static_cast<uint64>(row.steamId)));
 			}
-			ImGui::NextColumn();
 
 			if (isLocal)
 				ImGui::PopStyleColor();
+
+			ImGui::PopID();
 		}
 
-		ImGui::Columns(1);
+		ImGui::EndTable();
 	}
 }
 
@@ -581,7 +594,7 @@ void RankedLeaderboardWindow::Draw()
 	if (m.downloadPending && m.rows.empty())
 		ImGui::TextUnformatted(L("Loading...").c_str());
 
-	ImGui::BeginChild("###LbScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+	// No wrapping child: the table owns its own vertical scrolling (ImGuiTableFlags_ScrollY),
+	// so nesting it in a scrollable child would give two scrollbars fighting each other.
 	DrawTable();
-	ImGui::EndChild();
 }
