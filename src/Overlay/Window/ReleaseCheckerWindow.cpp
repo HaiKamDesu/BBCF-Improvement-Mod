@@ -105,7 +105,11 @@ void ReleaseCheckerWindow::FetchThread()
 	Updater::GitHubReleaseClient client;
 	std::vector<Updater::GitHubRelease> releases;
 	std::string error;
-	const bool ok = client.FetchAllReleases(releases, error);
+	EnterCriticalSection(&m_lock);
+	const bool forceRefresh = m_forceRefresh;
+	LeaveCriticalSection(&m_lock);
+
+	const bool ok = client.FetchAllReleases(releases, error, forceRefresh);
 
 	EnterCriticalSection(&m_lock);
 	if (ok)
@@ -121,9 +125,10 @@ void ReleaseCheckerWindow::FetchThread()
 	LeaveCriticalSection(&m_lock);
 }
 
-void ReleaseCheckerWindow::StartFetch()
+void ReleaseCheckerWindow::StartFetch(bool forceRefresh)
 {
 	EnterCriticalSection(&m_lock);
+	m_forceRefresh = forceRefresh;
 	m_fetchState = FetchState::Fetching;
 	m_releases.clear();
 	m_fetchError.clear();
@@ -313,7 +318,7 @@ void ReleaseCheckerWindow::Draw()
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 	}
 	if (ImGui::Button("Refresh", buttonSize))
-		StartFetch();
+		StartFetch(true);
 	if (isFetching)
 	{
 		ImGui::PopStyleVar();
