@@ -3007,26 +3007,32 @@ namespace
 			}
 		}
 
-		ImGui::Columns(4, "ranked_ladder_columns", true);
-		ImGui::TextUnformatted(L("Rank").c_str());
-		ImGui::NextColumn();
-		ImGui::TextUnformatted(L("LP").c_str());
-		ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Next").c_str());
-		ImGui::NextColumn();
-		ImGui::TextUnformatted(L("Players").c_str());
-		ImGui::NextColumn();
-		ImGui::Separator();
+		const ImGuiTableFlags ladderTableFlags =
+			ImGuiTableFlags_Resizable |
+			ImGuiTableFlags_BordersInnerV |
+			ImGuiTableFlags_BordersInnerH |
+			ImGuiTableFlags_RowBg;
+		if (!ImGui::BeginTable("ranked_ladder_columns", 4, ladderTableFlags))
+		{
+			ImGui::End();
+			return;
+		}
+		ImGui::TableSetupColumn(L("Rank").c_str());
+		ImGui::TableSetupColumn(L("LP").c_str());
+		ImGui::TableSetupColumn(L("Next").c_str());
+		ImGui::TableSetupColumn(L("Players").c_str());
+		ImGui::TableHeadersRow();
 
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
 		ImGui::TextUnformatted("AUTH");
-		ImGui::NextColumn();
 		ImGui::PushStyleColor(ImGuiCol_Text, GetRankedThresholdColor());
+		ImGui::TableSetColumnIndex(1);
 		ImGui::TextUnformatted("0 LP");
-		ImGui::NextColumn();
+		ImGui::TableSetColumnIndex(2);
 		ImGui::TextUnformatted("LV1");
-		ImGui::NextColumn();
+		ImGui::TableSetColumnIndex(3);
 		ImGui::TextUnformatted(L("Ignored").c_str());
-		ImGui::NextColumn();
 		ImGui::PopStyleColor();
 
 		constexpr uint32_t rankCount = static_cast<uint32_t>(sizeof(kRankedLpBoundsTable) / sizeof(kRankedLpBoundsTable[0]));
@@ -3038,22 +3044,25 @@ namespace
 			const uint32_t requiredLp = GetCumulativeRankedLpBase(internalRank);
 			const uint32_t nextLp = requiredLp + GetRankedLpSpan(internalRank);
 
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
 			ImGui::PushStyleColor(ImGuiCol_Text, rankColor);
 			ImGui::TextUnformatted(rankLabel.c_str());
 			ImGui::PopStyleColor();
-			ImGui::NextColumn();
 
 			char lpBuffer[32] = {};
 			std::snprintf(lpBuffer, sizeof(lpBuffer), "%u LP", static_cast<unsigned int>(requiredLp));
+			ImGui::TableSetColumnIndex(1);
 			ImGui::PushStyleColor(ImGuiCol_Text, GetRankedThresholdColor());
 			ImGui::TextUnformatted(lpBuffer);
-			ImGui::NextColumn();
 
 			char nextBuffer[32] = {};
 			std::snprintf(nextBuffer, sizeof(nextBuffer), "%u LP", static_cast<unsigned int>(nextLp));
+			ImGui::TableSetColumnIndex(2);
 			ImGui::TextUnformatted(nextBuffer);
-			ImGui::NextColumn();
 			ImGui::PopStyleColor();
+
+			ImGui::TableSetColumnIndex(3);
 
 			uint32_t populationCount = 0u;
 			float populationPercent = 0.0f;
@@ -3070,10 +3079,9 @@ namespace
 			{
 				ImGui::TextUnformatted(populationLoading ? L("Loading").c_str() : "--");
 			}
-			ImGui::NextColumn();
 		}
 
-		ImGui::Columns(1);
+		ImGui::EndTable();
 		ImGui::End();
 	}
 
