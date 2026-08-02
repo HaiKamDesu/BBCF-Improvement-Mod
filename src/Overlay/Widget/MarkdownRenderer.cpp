@@ -380,7 +380,10 @@ namespace
 		}
 
 		const float spaceW = ImGui::CalcTextSize(" ").x;
-		const float wrapMaxX = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+		// Right edge of whatever we are currently inside. Using the cursor plus the available
+		// region rather than the window content region means this is also correct inside a table
+		// cell, where the window edge would let text run straight through the column border.
+		const float wrapMaxX = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
 
 		bool firstOnLine = true;
 		for (const Piece& p : pieces)
@@ -397,6 +400,70 @@ namespace
 			RenderRun(p);
 			firstOnLine = false;
 		}
+	}
+
+	// ---- GFM tables ----------------------------------------------------------
+	// A table is a header row followed by a delimiter row of dashes, e.g.
+	//   | Char | Change |
+	//   |------|--------|
+	//   | Plat | voice  |
+
+	std::vector<std::string> SplitTableRow(const std::string& line)
+	{
+		std::vector<std::string> cells;
+		std::string cur;
+		for (size_t i = 0; i < line.size(); ++i)
+		{
+			if (line[i] == '\\' && i + 1 < line.size() && line[i + 1] == '|')
+			{
+				cur.push_back('|'); // escaped pipe is content, not a separator
+				++i;
+				continue;
+			}
+			if (line[i] == '|')
+			{
+				cells.push_back(Trim(cur));
+				cur.clear();
+				continue;
+			}
+			cur.push_back(line[i]);
+		}
+		cells.push_back(Trim(cur));
+
+		// Rows are conventionally fenced by pipes, which yields empty outer cells.
+		if (!cells.empty() && cells.front().empty())
+			cells.erase(cells.begin());
+		if (!cells.empty() && cells.back().empty())
+			cells.pop_back();
+		return cells;
+	}
+
+	bool IsTableDelimiterRow(const std::string& line)
+	{
+		const std::string trimmed = Trim(line);
+		if (trimmed.find('|') == std::string::npos || trimmed.find('-') == std::string::npos)
+			return false;
+
+		for (char c : trimmed)
+		{
+			if (c != '|' && c != '-' && c != ':' && c != ' ' && c != '\t')
+				return false;
+		}
+		// Every cell must be a run of dashes with optional alignment colons.
+		const std::vector<std::string> cells = SplitTableRow(trimmed);
+		if (cells.empty())
+			return false;
+		for (const std::string& cell : cells)
+		{
+			if (cell.find('-') == std::string::npos)
+				return false;
+		}
+		return true;
+	}
+
+	bool IsTableRow(const std::string& line)
+	{
+		return line.find('|') != std::string::npos;
 	}
 
 	int CountLeadingSpaces(const std::string& line)
@@ -483,6 +550,67 @@ namespace ImGuiMarkdown
 					ImGui::Separator();
 				ImGui::Spacing();
 				continue;
+			}
+
+			// GFM table: header row, delimiter row, then body rows until a non-table line.
+			if (IsTableRow(trimmed) && i + 1 < lines.size() && IsTableDelimiterRow(lines[i + 1]))
+			{
+				const std::vector<std::string> header = SplitTableRow(trimmed);
+				const int columnCount = static_cast<int>(header.size());
+				if (columnCount > 0)
+				{
+					size_t rowIndex = i + 2; // skip header and delimiter
+					std::vector<std::vector<std::string>> body;
+					while (rowIndex < lines.size())
+					{
+						const std::string bodyLine = Trim(lines[rowIndex]);
+						if (bodyLine.empty() || !IsTableRow(bodyLine))
+							break;
+						body.push_back(SplitTableRow(bodyLine));
+						++rowIndex;
+					}
+
+					const ImGuiTableFlags flags =
+						ImGuiTableFlags_Resizable |
+						ImGuiTableFlags_Borders |
+						ImGuiTableFlags_RowBg |
+						ImGuiTableFlags_SizingStretchProp;
+
+					ImGui::Spacing();
+					if (ImGui::BeginTable("##md_table", columnCount, flags))
+					{
+						for (int c = 0; c < columnCount; ++c)
+							ImGui::TableSetupColumn(header[c].c_str());
+
+						// Header cells go through the inline renderer too, so **bold** and links
+						// inside them behave the same as anywhere else.
+						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+						for (int c = 0; c < columnCount; ++c)
+						{
+							ImGui::TableSetColumnIndex(c);
+							g_forceBold = true;
+							RenderInline(header[c]);
+							g_forceBold = false;
+						}
+
+						for (size_t r = 0; r < body.size(); ++r)
+						{
+							ImGui::TableNextRow();
+							for (int c = 0; c < columnCount; ++c)
+							{
+								ImGui::TableSetColumnIndex(c);
+								// Ragged rows are legal in GFM; missing cells render empty.
+								if (c < static_cast<int>(body[r].size()))
+									RenderInline(body[r][c]);
+							}
+						}
+						ImGui::EndTable();
+					}
+					ImGui::Spacing();
+
+					i = rowIndex - 1; // the outer loop will step past the last consumed row
+					continue;
+				}
 			}
 
 			// Horizontal rule.
