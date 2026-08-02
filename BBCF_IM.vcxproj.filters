@@ -240,7 +240,6 @@
     <ClInclude Include="depends\imgui\imgui.h" />
     <ClInclude Include="depends\imgui\imgui_impl_dx9.h" />
     <ClInclude Include="depends\imgui\imgui_impl_win32.h" />
-    <ClInclude Include="depends\imgui_markdown\imgui_markdown.h" />
     <ClInclude Include="depends\imgui\imgui_internal.h" />
     <ClInclude Include="depends\imgui\imstb_rectpack.h" />
     <ClInclude Include="depends\imgui\imstb_textedit.h" />

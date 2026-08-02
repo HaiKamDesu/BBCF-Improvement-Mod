@@ -115,6 +115,32 @@ static inline void Float4ToBGRA8(const float in[4], unsigned char val[4], bool w
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+float ImGui::GetBoldOverdrawOffset()
+{
+	const float scaled = GetFontSize() * 0.07f;
+	return scaled > 1.0f ? scaled : 1.0f;
+}
+
+ImVec2 ImGui::CalcTextSizeBold(const char* text, const char* textEnd)
+{
+	ImVec2 size = CalcTextSize(text, textEnd);
+	size.x += GetBoldOverdrawOffset();
+	return size;
+}
+
+void ImGui::AddTextBold(ImDrawList* drawList, const ImVec2& pos, ImU32 col, const char* text, const char* textEnd)
+{
+	ImFont* const font = GetFont();
+	const float fontSize = GetFontSize();
+	const float offset = GetBoldOverdrawOffset();
+
+	// Three passes at 0, half and full offset: the half step fills the gap a single full step
+	// would leave once the font is large, so the stroke thickens evenly instead of ghosting.
+	drawList->AddText(font, fontSize, pos, col, text, textEnd);
+	drawList->AddText(font, fontSize, ImVec2(pos.x + offset * 0.5f, pos.y), col, text, textEnd);
+	drawList->AddText(font, fontSize, ImVec2(pos.x + offset, pos.y), col, text, textEnd);
+}
+
 void ImGui::HoverTooltip(const char* text)
 {
 	if (IsItemHovered())

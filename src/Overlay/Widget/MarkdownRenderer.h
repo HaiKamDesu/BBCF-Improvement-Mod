@@ -5,7 +5,7 @@
 // Lightweight GitHub-flavoured markdown renderer for ImGui.
 //
 // Renders a subset of markdown close to how GitHub displays release notes:
-//   - ATX headings (# .. ######) with a size hierarchy and rules under H1/H2
+//   - ATX headings (# .. ######) with a size hierarchy, bold weight, and rules under H1/H2
 //   - Inline **bold**, *italic*/_italic_, `code`, ~~strike~~ and [text](url) links (clickable)
 //   - Bare http(s) autolinks
 //   - Unordered/ordered/task lists with nesting by indentation

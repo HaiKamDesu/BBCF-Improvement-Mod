@@ -406,14 +406,17 @@ void ReleaseCheckerWindow::DrawRelease(const Updater::GitHubRelease& release, si
 		const ImVec4 titleColor = ImVec4(0.98f, 0.98f, 1.0f, 1.0f);
 		const ImVec4 titleHoverColor = ImVec4(0.76f, 0.76f, 0.80f, 1.0f);
 
-		ImGui::SetWindowFontScale(1.12f);
-		const ImVec2 titleSize = ImGui::CalcTextSize(displayTitle.c_str());
+		// PushFont(NULL, size) rather than SetWindowFontScale: the latter is discouraged since
+		// 1.92 and scales a baked bitmap, where this rasterizes at the real size.
+		ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 1.12f);
+		const ImVec2 titleSize = ImGui::CalcTextSizeBold(displayTitle.c_str());
 		ImGui::AlignItemHorizontalCenter(titleSize.x);
 		const ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImGui::InvisibleButton(("##titlelink_" + release.tagName).c_str(), titleSize);
 		const bool hovered = ImGui::IsItemHovered();
 		const bool clicked = ImGui::IsItemClicked();
-		ImGui::GetWindowDrawList()->AddText(
+		ImGui::AddTextBold(
+			ImGui::GetWindowDrawList(),
 			pos,
 			ImGui::ColorConvertFloat4ToU32(hovered ? titleHoverColor : titleColor),
 			displayTitle.c_str());
@@ -424,7 +427,7 @@ void ReleaseCheckerWindow::DrawRelease(const Updater::GitHubRelease& release, si
 				ImVec2(pos.x + titleSize.x, pos.y + titleSize.y),
 				ImGui::ColorConvertFloat4ToU32(titleHoverColor));
 		}
-		ImGui::SetWindowFontScale(1.0f);
+		ImGui::PopFont();
 		if (clicked && !release.htmlUrl.empty())
 		{
 			const std::wstring url(release.htmlUrl.begin(), release.htmlUrl.end());

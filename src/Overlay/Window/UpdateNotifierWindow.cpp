@@ -50,15 +50,18 @@ namespace
 
 		ImGui::TextColoredAlignedHorizontalCenter(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), release.tagName.c_str());
 
-		ImGui::SetWindowFontScale(1.18f);
-		const ImVec2 textSize = ImGui::CalcTextSize(title.c_str());
+		// Bold, and sized via PushFont rather than the discouraged SetWindowFontScale, to match
+		// how GitHub renders a release title (and the All Releases window).
+		ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 1.18f);
+		const ImVec2 textSize = ImGui::CalcTextSizeBold(title.c_str());
 		ImGui::AlignItemHorizontalCenter(textSize.x);
 		const ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImGui::InvisibleButton(("##ReleaseLink" + release.tagName).c_str(), textSize);
 		const bool hovered = ImGui::IsItemHovered();
 		const bool clicked = ImGui::IsItemClicked();
 
-		ImGui::GetWindowDrawList()->AddText(
+		ImGui::AddTextBold(
+			ImGui::GetWindowDrawList(),
 			pos,
 			ImGui::ColorConvertFloat4ToU32(hovered ? titleHoverColor : titleColor),
 			title.c_str());
@@ -69,7 +72,7 @@ namespace
 				ImVec2(pos.x + textSize.x, pos.y + textSize.y),
 				ImGui::ColorConvertFloat4ToU32(titleHoverColor));
 		}
-		ImGui::SetWindowFontScale(1.0f);
+		ImGui::PopFont();
 		if (clicked && !release.htmlUrl.empty())
 		{
 			const std::wstring url(release.htmlUrl.begin(), release.htmlUrl.end());

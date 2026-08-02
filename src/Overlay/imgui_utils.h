@@ -12,6 +12,13 @@ namespace ImGui
 	IMGUI_API bool IsVirtualKeyPressed(int virtualKey, bool repeat = true);
 	IMGUI_API bool IsVirtualKeyDown(int virtualKey);
 
+	// Faux bold. No bold face is bundled and neither stb_truetype nor ImGui synthesizes weight,
+	// so bold is an overdraw whose offset scales with the current font size (a fixed 1px reads
+	// as bold at body size and as nothing at heading size).
+	IMGUI_API float GetBoldOverdrawOffset();
+	IMGUI_API ImVec2 CalcTextSizeBold(const char* text, const char* textEnd = NULL);
+	IMGUI_API void AddTextBold(ImDrawList* drawList, const ImVec2& pos, ImU32 col, const char* text, const char* textEnd = NULL);
+
 	IMGUI_API void HoverTooltip(const char* text);
 	IMGUI_API bool ButtonUrl(const std::string& label, const wchar_t* url, const ImVec2& btnSize = ImVec2(0, 0));
 	IMGUI_API void TextAlignedHorizontalCenter(const char* text, ...);

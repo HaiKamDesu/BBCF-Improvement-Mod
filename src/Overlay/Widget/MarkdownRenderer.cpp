@@ -1,5 +1,7 @@
 #include "MarkdownRenderer.h"
 
+#include "Overlay/imgui_utils.h"
+
 #include <imgui.h>
 
 #include <cctype>
@@ -281,12 +283,26 @@ namespace
 	}
 
 	// ---- rendering -----------------------------------------------------------
+
+	// Set while rendering heading content. GitHub renders every heading at font-weight 600, but
+	// headings here went through the plain inline path and came out at regular weight.
+	bool g_forceBold = false;
+
+	Style EffectiveStyle(const Piece& p)
+	{
+		// Code chips and links keep their own styling; only body text is emboldened.
+		if (g_forceBold && (p.style == Style::Normal || p.style == Style::Italic))
+			return Style::Bold;
+		return p.style;
+	}
+
 	ImVec2 MeasureRun(const Piece& p)
 	{
+		const Style style = EffectiveStyle(p);
 		ImVec2 sz = ImGui::CalcTextSize(p.text.c_str());
-		if (p.style == Style::Bold)
-			sz.x += 1.0f; // fake-bold widens by ~1px
-		if (p.style == Style::Code)
+		if (style == Style::Bold)
+			sz.x += ImGui::GetBoldOverdrawOffset();
+		if (style == Style::Code)
 			sz.x += 6.0f; // horizontal padding inside the code chip
 		return sz;
 	}
@@ -335,16 +351,16 @@ namespace
 		// Normal / Bold / Italic / Strike all share the base font (no italic face
 		// is bundled, so italic reuses the regular weight). Bold is faked by an
 		// overdraw; strike gets a line through the middle.
+		const Style style = EffectiveStyle(p);
 		ImGui::TextUnformatted(p.text.c_str());
 		const ImVec2 mn = ImGui::GetItemRectMin();
 		const ImVec2 mx = ImGui::GetItemRectMax();
 
-		if (p.style == Style::Bold)
+		if (style == Style::Bold)
 		{
-			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
-				ImVec2(mn.x + 1.0f, mn.y), ImGui::GetColorU32(ImGuiCol_Text), p.text.c_str());
+			ImGui::AddTextBold(drawList, mn, ImGui::GetColorU32(ImGuiCol_Text), p.text.c_str());
 		}
-		else if (p.style == Style::Strike)
+		else if (style == Style::Strike)
 		{
 			const float midY = mn.y + (mx.y - mn.y) * 0.5f;
 			drawList->AddLine(ImVec2(mn.x, midY), ImVec2(mx.x, midY),
@@ -398,7 +414,7 @@ namespace
 
 namespace ImGuiMarkdown
 {
-	void Render(const std::string& markdown)
+	static void RenderBuiltin(const std::string& markdown)
 	{
 		const std::vector<std::string> lines = SplitLines(markdown);
 		bool inCodeBlock = false;
@@ -444,10 +460,12 @@ namespace ImGuiMarkdown
 			if (headingLevel > 0 && headingLevel < static_cast<int>(trimmed.size()) && trimmed[headingLevel] == ' ')
 			{
 				const std::string content = Trim(trimmed.substr(headingLevel + 1));
+				// Roughly GitHub's ratios (h1 2em, h2 1.5em, h3 1.25em, h4 1em), pulled in a
+				// little so an h1 does not dominate an overlay window.
 				const float scale =
-					headingLevel == 1 ? 1.50f :
-					headingLevel == 2 ? 1.30f :
-					headingLevel == 3 ? 1.15f : 1.05f;
+					headingLevel == 1 ? 1.70f :
+					headingLevel == 2 ? 1.45f :
+					headingLevel == 3 ? 1.22f : 1.05f;
 
 				ImGui::Spacing();
 				ImGui::PushStyleColor(ImGuiCol_Text, kHeadingColor);
@@ -456,7 +474,9 @@ namespace ImGuiMarkdown
 				// current font and only changes the size. SetWindowFontScale is discouraged now
 				// and produced visibly soft headings.
 				ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * scale);
+				g_forceBold = true;
 				RenderInline(content);
+				g_forceBold = false;
 				ImGui::PopFont();
 				ImGui::PopStyleColor();
 				if (headingLevel <= 2)
@@ -526,5 +546,10 @@ namespace ImGuiMarkdown
 			// Plain paragraph.
 			RenderInline(trimmed);
 		}
+	}
+
+	void Render(const std::string& markdown)
+	{
+		RenderBuiltin(markdown);
 	}
 }
