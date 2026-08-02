@@ -6000,7 +6000,9 @@ void DrawRankedProgressOverlayStandalone()
 	{
 		drawList->AddRectFilled(barPos, ImVec2(barPos.x + fillWidth, barPos.y + barSize.y), rankColorU32, 5.0f);
 	}
-	drawList->AddRect(barPos, ImVec2(barPos.x + barSize.x, barPos.y + barSize.y), borderColor, 5.0f, 0, 1.0f);
+	// Explicit flags: a bare 0 here meant "round no corners" before ImGui 1.82 and means
+	// "round all corners" now, so spell out the intent that matches the rounded fill above.
+	drawList->AddRect(barPos, ImVec2(barPos.x + barSize.x, barPos.y + barSize.y), borderColor, 5.0f, ImDrawFlags_RoundCornersAll, 1.0f);
 	ImGui::Dummy(ImVec2(barSize.x, barSize.y + 6.0f));
 
 	const float availableRowWidth = ImGui::GetContentRegionAvail().x;

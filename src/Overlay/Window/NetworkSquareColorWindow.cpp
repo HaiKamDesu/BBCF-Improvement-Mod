@@ -8,6 +8,8 @@
 #include "Game/gamestates.h"
 #include "Game/Room/RoomMemberEntry.h"
 
+#include <imgui_internal.h> // ShadeVertsLinearColorGradientKeepAlpha
+
 #include <Windows.h>
 
 #include <algorithm>
@@ -794,36 +796,54 @@ namespace
 		ImGui::Dummy(ImVec2(rowWidth, rowHeight));
 	}
 
+	// Fills the rounded bar rect with a horizontal two-stop gradient, restricted to [x0, x1].
+	//
+	// AddRectFilledMultiColor cannot do this: it always emits one sharp quad, ignoring rounding.
+	// That went unnoticed for years because the bar's border was sharp too - ImDrawFlags 0 meant
+	// "round no corners" before ImGui 1.82, and now means "round all corners", so the border
+	// became rounded and left the square gradient corners poking out from under it.
+	//
+	// Instead draw the full rounded rect and recolor its vertices, which keeps the rounded
+	// corners and the antialiased edges intact (KeepAlpha preserves the AA fringe alpha).
+	void DrawShadedBarSpan(ImDrawList* drawList, const ImVec2& p0, const ImVec2& p1, float rounding,
+		float x0, float x1, ImU32 colLeft, ImU32 colRight)
+	{
+		if (x1 <= x0)
+		{
+			return;
+		}
+
+		drawList->PushClipRect(ImVec2(x0, p0.y), ImVec2(x1, p1.y), true);
+		const int vtxStart = drawList->VtxBuffer.Size;
+		drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(IM_COL32_WHITE), rounding);
+		ImGui::ShadeVertsLinearColorGradientKeepAlpha(drawList, vtxStart, drawList->VtxBuffer.Size,
+			ImVec2(x0, p0.y), ImVec2(x1, p0.y), colLeft, colRight);
+		drawList->PopClipRect();
+	}
+
 	void DrawGradientProgressBarAt(uint8_t previousColor, uint8_t currentColor, uint8_t nextColor, float progress, const ImVec2& p0, const ImVec2& size)
 	{
 		const ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
-		const ImVec2 mid = ImVec2(p0.x + (size.x * 0.5f), p1.y);
+		const float midX = p0.x + (size.x * 0.5f);
+		const float rounding = 4.0f;
 		ImDrawList* const drawList = ImGui::GetWindowDrawList();
 		const ImU32 bgColor = ImGui::GetColorU32(ImVec4(0.13f, 0.14f, 0.16f, 0.96f));
 		const ImU32 borderColor = ImGui::GetColorU32(ImVec4(0.36f, 0.37f, 0.41f, 1.0f));
 
-		drawList->AddRectFilled(p0, p1, bgColor, 4.0f);
+		drawList->AddRectFilled(p0, p1, bgColor, rounding);
 		const float fillWidth = size.x * (std::max)(0.0f, (std::min)(1.0f, progress));
 		if (fillWidth > 0.0f)
 		{
+			const ImU32 colPrevious = ImGui::GetColorU32(GetNetColorVec4(previousColor));
+			const ImU32 colCurrent = ImGui::GetColorU32(GetNetColorVec4(currentColor));
+			const ImU32 colNext = ImGui::GetColorU32(GetNetColorVec4(nextColor));
+
 			drawList->PushClipRect(p0, ImVec2(p0.x + fillWidth, p1.y), true);
-			drawList->AddRectFilledMultiColor(
-				p0,
-				mid,
-				ImGui::GetColorU32(GetNetColorVec4(previousColor)),
-				ImGui::GetColorU32(GetNetColorVec4(currentColor)),
-				ImGui::GetColorU32(GetNetColorVec4(currentColor)),
-				ImGui::GetColorU32(GetNetColorVec4(previousColor)));
-			drawList->AddRectFilledMultiColor(
-				ImVec2(mid.x, p0.y),
-				p1,
-				ImGui::GetColorU32(GetNetColorVec4(currentColor)),
-				ImGui::GetColorU32(GetNetColorVec4(nextColor)),
-				ImGui::GetColorU32(GetNetColorVec4(nextColor)),
-				ImGui::GetColorU32(GetNetColorVec4(currentColor)));
+			DrawShadedBarSpan(drawList, p0, p1, rounding, p0.x, midX, colPrevious, colCurrent);
+			DrawShadedBarSpan(drawList, p0, p1, rounding, midX, p1.x, colCurrent, colNext);
 			drawList->PopClipRect();
 		}
-		drawList->AddRect(p0, p1, borderColor, 4.0f, 0, 1.0f);
+		drawList->AddRect(p0, p1, borderColor, rounding, ImDrawFlags_RoundCornersAll, 1.0f);
 	}
 
 	void DrawGradientProgressBar(uint8_t previousColor, uint8_t currentColor, uint8_t nextColor, float progress, const ImVec2& size)
