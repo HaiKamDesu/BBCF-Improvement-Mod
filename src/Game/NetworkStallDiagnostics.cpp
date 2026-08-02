@@ -72,6 +72,22 @@ namespace
 	constexpr uintptr_t kNetColorOffset = 0x0194;
 	constexpr uintptr_t kNetColorCounterOffset = 0x0195;
 
+	// ---- TUS ("Title User Storage") disabled latch -- the progress-reset cause ----
+	// DAT_00CF77A8 (Ghidra VA) -> RVA 0x8F77A8. A process-wide flag meaning
+	// "network profile storage is unavailable". Set to 1 when the own-profile sync
+	// runs out of retries (FUN_004B0970 at 0x4B0ACE: dec [esi+0x20] starting from
+	// 0xBB8 = 3000 ticks, then latch) and on sibling error paths (0x4AC098,
+	// 0x4AFED2, 0x4B0AB2); cleared to 0 only on a successful sync (0x4B0A1A).
+	// While set:
+	//   - FUN_004A96D0 (upload my 0x6800 profile blob as L"bbdc.dat" via
+	//     FUN_004B9210 -> uei::ThinkLogicStrategyUploadTUS) returns immediately,
+	//     so ranked/net-color progress is NEVER made durable. A restart then loads
+	//     the last successfully uploaded profile == the reported "progress reset".
+	//   - FUN_004B8CF0 / FUN_004B8D30 short-circuit, so D-Code reads stop working.
+	// Nothing but a process restart clears it if no sync ever succeeds again.
+	// Full derivation: docs/Research/DCodeNetworkStallBug.md (phases 18-23).
+	constexpr uintptr_t kTusDisabledGateRva = 0x008F77A8;
+
 	bool IsDiagnosticsEnabled()
 	{
 		return Settings::settingsIni.enableInDevelopmentFeatures;
@@ -81,6 +97,11 @@ namespace
 	int32_t g_lastSaveActionRunning = -2;
 	int32_t g_lastSaveNextAction = -2;
 	ULONGLONG g_lastSaveFileWriteTime = 0;
+	int32_t g_lastTusGate = -2;
+	int g_tusGateClears = 0;
+	ULONGLONG g_lastTusGateClearMs = 0;
+	constexpr int kMaxTusGateClears = 20;          // per process
+	constexpr ULONGLONG kTusGateClearCooldownMs = 10000;
 	char g_lastPopupMessage[kPopupMessageBufferSize + 1] = {};
 	bool g_havePopupMessage = false;
 	ULONGLONG g_lastPollTickMs = 0;
@@ -338,6 +359,153 @@ namespace
 		}
 	}
 
+	// ---- TUS latch handling (shared by the 200ms poll and the failure handler) ----
+
+	int32_t* TusGatePtr(uintptr_t moduleBase)
+	{
+		int32_t* const gate = reinterpret_cast<int32_t*>(moduleBase + kTusDisabledGateRva);
+		return IsBadReadPtr(gate, sizeof(int32_t)) ? nullptr : gate;
+	}
+
+	// Re-arms every wedged slot so the game's own retry path issues fresh fetches.
+	// Called right after the latch is cleared: while the latch was set the lower
+	// layer was disabled, so any state-6 slot and any consumed retry budget was
+	// collateral damage, not evidence of a bad peer.
+	void ReArmAllSlots(uintptr_t moduleBase)
+	{
+		const uint8_t* const netUserData = reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
+		int rearmed = 0;
+		for (int slot = 0; slot < kRoomSlotCountMax; ++slot)
+		{
+			g_slotTracks[slot].autoRecoveries = 0;
+			g_slotTracks[slot].stallHandled = false;
+
+			const uint8_t* const row = netUserData + kRoomRowBaseOffset + slot * kRoomRowStride;
+			if (IsBadReadPtr(row + kRoomRowSubObjectPtrOffset, sizeof(void*)))
+			{
+				continue;
+			}
+			uint8_t* const subObject = *reinterpret_cast<uint8_t* const*>(row + kRoomRowSubObjectPtrOffset);
+			if (subObject == nullptr || IsBadReadPtr(subObject + kSubObjectFetchStateOffset, sizeof(int32_t)))
+			{
+				continue;
+			}
+			int32_t* const state = reinterpret_cast<int32_t*>(subObject + kSubObjectFetchStateOffset);
+			if (*state == 6)
+			{
+				*state = 0; // the precondition the game itself uses to re-issue a fetch
+				g_slotTracks[slot].lastState = 0;
+				++rearmed;
+			}
+		}
+		IncidentPrintf("[TusGate] re-armed %d wedged slot(s) and reset all retry budgets\n", rearmed);
+	}
+
+	// Returns true if the latch was found set (whether or not we cleared it).
+	bool HandleTusGate(uintptr_t moduleBase, ULONGLONG now, const char* progress)
+	{
+		int32_t* const gate = TusGatePtr(moduleBase);
+		if (gate == nullptr)
+		{
+			return false;
+		}
+
+		const int32_t value = *gate;
+		if (value != g_lastTusGate)
+		{
+			if (value != 0)
+			{
+				IncidentPrintf("[TusGate] !!! network profile storage DISABLED (%d -> %d): profile uploads are being skipped, progress earned from here would NOT persist. %s\n",
+					g_lastTusGate, value, progress ? progress : "");
+			}
+			else
+			{
+				IncidentPrintf("[TusGate] network profile storage available (%d -> %d), %s\n",
+					g_lastTusGate, value, progress ? progress : "");
+			}
+			g_lastTusGate = value;
+		}
+
+		if (value == 0)
+		{
+			return false;
+		}
+
+		if (!Settings::settingsIni.dcodeTusGateAutoClear)
+		{
+			return true;
+		}
+
+		if (g_tusGateClears >= kMaxTusGateClears)
+		{
+			return true; // give up quietly; the transition above was already logged
+		}
+		if (g_lastTusGateClearMs != 0 && (now - g_lastTusGateClearMs) < kTusGateClearCooldownMs)
+		{
+			return true; // cooling down, try again on a later poll
+		}
+
+		// 0 is the value the game itself writes once a sync succeeds (0x4B0A1A),
+		// so this only puts the subsystem back into a state the game produces.
+		*gate = 0;
+		++g_tusGateClears;
+		g_lastTusGateClearMs = now;
+		g_lastTusGate = 0;
+		IncidentPrintf("[TusGate] auto-clear: latch reset to 0 (%d/%d this session), profile uploads re-enabled\n",
+			g_tusGateClears, kMaxTusGateClears);
+		ReArmAllSlots(moduleBase);
+		return true;
+	}
+
+	// ---- Profile upload observation ----
+	// Reads the shared CUMSTask worker: +0x90 nonzero = an upload/share request
+	// (FUN_00423950 path, i.e. our own bbdc.dat going out), +0x94 nonzero = a
+	// download. Purely observational; proves whether uploads resume after recovery.
+	uint32_t g_lastUploadReqId = 0;
+	bool g_uploadInFlight = false;
+
+	void ObserveProfileUploads(uintptr_t moduleBase, const char* progress)
+	{
+		const uint8_t* const* const singletonPtr =
+			reinterpret_cast<const uint8_t* const*>(moduleBase + kUserManagedStorageSingletonRva);
+		if (IsBadReadPtr(singletonPtr, sizeof(void*)) || *singletonPtr == nullptr)
+		{
+			return;
+		}
+		const uint8_t* const ums = *singletonPtr;
+		if (IsBadReadPtr(ums + 4, sizeof(void*)))
+		{
+			return;
+		}
+		const uint8_t* const worker = *reinterpret_cast<const uint8_t* const*>(ums + 4);
+		if (worker == nullptr || IsBadReadPtr(worker, 0xC4))
+		{
+			return;
+		}
+
+		const uint32_t uploadReq = *reinterpret_cast<const uint32_t*>(worker + 0x90);
+		const uint8_t done = worker[0x1C];
+		const uint8_t busy = worker[0x1D];
+		const uint8_t errFlags = worker[0xC0];
+
+		if (uploadReq != 0 && !g_uploadInFlight)
+		{
+			g_uploadInFlight = true;
+			g_lastUploadReqId = uploadReq;
+			IncidentPrintf("[Upload] profile upload submitted (req=%08X), %s\n", uploadReq, progress ? progress : "");
+		}
+		else if (uploadReq != 0 && g_uploadInFlight && done != 0 && busy == 0)
+		{
+			g_uploadInFlight = false;
+			IncidentPrintf("[Upload] profile upload finished: %s (errFlags=%02X), %s\n",
+				(errFlags & 1) ? "FAILED" : "ok", errFlags, progress ? progress : "");
+		}
+		else if (uploadReq == 0)
+		{
+			g_uploadInFlight = false;
+		}
+	}
+
 	// Handles both failure shapes with the same evidence dump + optional recovery.
 	void HandleSlotFailure(const char* kind, int slot, SlotTrack& track, uint8_t* subObject)
 	{
@@ -372,19 +540,35 @@ namespace
 			IncidentPrintf("[DCodeTick] no in-flight snapshot available for slot %d\n", slot);
 		}
 
-		if (Settings::settingsIni.dcodeAutoRecover && track.autoRecoveries < kMaxAutoRecoveries)
+		// Deal with the underlying cause before the symptom. While the TUS latch is
+		// set the transfer layer is disabled, so retrying the fetch cannot succeed
+		// and must not consume this slot's budget -- that is what exhausted every
+		// budget in the 2026-07-30 report while the real problem went unaddressed.
+		// HandleTusGate also re-arms wedged slots, which restarts this fetch.
+		bool latchHandled = false;
+		if (moduleBase != 0 && HandleTusGate(moduleBase, GetTickCount64(), nullptr))
 		{
-			// State 0 is the exact precondition the game's own display path
-			// (FUN_0049D560 via FUN_004A1AB0) uses to justify issuing a fresh
-			// fetch, so this only re-arms an existing retry path.
-			*reinterpret_cast<int32_t*>(subObject + kSubObjectFetchStateOffset) = 0;
-			++track.autoRecoveries;
-			IncidentPrintf("[DCodeTick] auto-recover: slot %d fetch state forced to 0 (retry %d/%d)\n",
-				slot, track.autoRecoveries, kMaxAutoRecoveries);
+			latchHandled = true;
+			IncidentPrintf("[DCodeTick] slot %d failure attributed to the TUS latch; not counted against its retry budget\n",
+				slot);
 		}
-		else if (Settings::settingsIni.dcodeAutoRecover)
+
+		if (!latchHandled)
 		{
-			IncidentPrintf("[DCodeTick] auto-recover budget exhausted for slot %d, leaving state as-is\n", slot);
+			if (Settings::settingsIni.dcodeAutoRecover && track.autoRecoveries < kMaxAutoRecoveries)
+			{
+				// State 0 is the exact precondition the game's own display path
+				// (FUN_0049D560 via FUN_004A1AB0) uses to justify issuing a fresh
+				// fetch, so this only re-arms an existing retry path.
+				*reinterpret_cast<int32_t*>(subObject + kSubObjectFetchStateOffset) = 0;
+				++track.autoRecoveries;
+				IncidentPrintf("[DCodeTick] auto-recover: slot %d fetch state forced to 0 (retry %d/%d)\n",
+					slot, track.autoRecoveries, kMaxAutoRecoveries);
+			}
+			else if (Settings::settingsIni.dcodeAutoRecover)
+			{
+				IncidentPrintf("[DCodeTick] auto-recover budget exhausted for slot %d, leaving state as-is\n", slot);
+			}
 		}
 
 		// Last: the copy now contains every line above.
@@ -582,6 +766,19 @@ void NetworkStallDiagnostics::OnUpdate()
 		{
 			sprintf_s(progress, "netcolor=unreadable");
 		}
+
+		// --- TUS disabled latch: the actual progress-reset switch ---
+		// Watched unconditionally, and also checked at failure time inside
+		// HandleSlotFailure so recovery happens on the same frame as the symptom.
+		HandleTusGate(moduleBase, now, progress);
+
+		// --- Profile upload activity ---
+		// FUN_004A96D0 rebuilds the whole 0x6800 profile from live state before
+		// submitting, so a single successful upload after recovery persists all
+		// accumulated progress -- nothing needs replaying. Watch the shared CUMSTask
+		// worker for upload requests (+0x90 nonzero = share/upload) to confirm they
+		// resume once the latch is cleared.
+		ObserveProfileUploads(moduleBase, progress);
 
 		// CSaveDataManager action state (actionRunning doubles as the "auto-save
 		// trigger global" -- same memory, see header comment).

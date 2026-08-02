@@ -1,0 +1,241 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 004291d0 containing 004291d0 -----
+Function: FUN_004291d0
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+int * FUN_004291d0(undefined4 param_1,undefined4 param_2)
+
+{
+  void *pvVar1;
+  int *piVar2;
+  
+  switch(param_1) {
+  case 0:
+    piVar2 = (int *)operator_new(4);
+    if (piVar2 != (int *)0x0) {
+      *piVar2 = (int)uei::ThinkLogicStrategyIdle::vftable;
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 1:
+    pvVar1 = operator_new(0xc);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428ef0();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 2:
+    pvVar1 = operator_new(8);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428d10();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 3:
+    pvVar1 = operator_new(0x18);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428e30();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 4:
+    pvVar1 = operator_new(0x10);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428dd0();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 5:
+    pvVar1 = operator_new(8);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428e90();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 6:
+    pvVar1 = operator_new(8);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428f50();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 7:
+    pvVar1 = operator_new(8);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428d70();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+    break;
+  case 8:
+    pvVar1 = operator_new(0xc);
+    if (pvVar1 != (void *)0x0) {
+      piVar2 = (int *)FUN_00428fb0();
+      (**(code **)(*piVar2 + 4))(param_2);
+      return piVar2;
+    }
+  }
+  (**(code **)(_DAT_00000000 + 4))(param_2);
+  return (int *)0x0;
+}
+
+
+
+----- DECOMPILE 00429390 containing 00429390 -----
+Function: FUN_00429390
+
+void FUN_00429390(int *param_1,undefined4 param_2)
+
+{
+  if (param_1 != (int *)0x0) {
+    (**(code **)(*param_1 + 8))(param_2);
+    FID_conflict__free(param_1);
+  }
+  return;
+}
+
+
+
+----- DECOMPILE 004276a0 containing 004276a0 -----
+Function: FUN_004276a0
+
+int __fastcall FUN_004276a0(int param_1)
+
+{
+  uint uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00824212;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  *(undefined4 *)(param_1 + 0x1c) = 7;
+  *(undefined4 *)(param_1 + 0x18) = 0;
+  *(undefined2 *)(param_1 + 8) = 0;
+  *(undefined4 *)(param_1 + 0x24) = 0;
+  *(undefined4 *)(param_1 + 0x28) = 0;
+  *(undefined4 *)(param_1 + 0x2c) = 0;
+  *(undefined4 *)(param_1 + 0x30) = 0;
+  *(undefined4 *)(param_1 + 0x34) = 0;
+  *(undefined4 *)(param_1 + 0x38) = 0;
+  *(undefined4 *)(param_1 + 0x58) = 0xf;
+  *(undefined4 *)(param_1 + 0x54) = 0;
+  *(undefined1 *)(param_1 + 0x44) = 0;
+  *(undefined4 *)(param_1 + 0xb8) = 7;
+  *(undefined4 *)(param_1 + 0xb4) = 0;
+  *(undefined2 *)(param_1 + 0xa4) = 0;
+  local_8 = 5;
+  FUN_004282c0(uVar1);
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 0041c820 containing 0041c820 -----
+Function: FUN_0041c820
+
+undefined4 __fastcall FUN_0041c820(int param_1)
+
+{
+  undefined4 *_Memory;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008231a0;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  FUN_00427cd0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  FUN_00427c40();
+  _Memory = *(undefined4 **)(param_1 + 0x3a40);
+  if (_Memory != (undefined4 *)0x0) {
+    local_8 = 0xffffffff;
+    *_Memory = CCallbackImpl<16>::vftable;
+    if ((*(byte *)(_Memory + 1) & 1) != 0) {
+      SteamAPI_UnregisterCallback(_Memory);
+    }
+    FID_conflict__free(_Memory);
+    *(undefined4 *)(param_1 + 0x3a40) = 0;
+  }
+  ExceptionList = local_10;
+  return 0;
+}
+
+
+
+----- DECOMPILE 0046a970 containing 0046a970 -----
+Function: FUN_0046a970
+
+undefined4 * FUN_0046a970(undefined4 param_1)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  
+  FUN_00427cd0(param_1);
+  iVar1 = FUN_00427e00(param_1);
+  puVar2 = (undefined4 *)(iVar1 + 4);
+  if (7 < *(uint *)(iVar1 + 0x18)) {
+    puVar2 = (undefined4 *)*puVar2;
+  }
+  return puVar2;
+}
+
+
+
+===== CALLEES =====
+--- callees of 004291d0 (FUN_004291d0) ---
+  00428d70 FUN_00428d70
+  00428d10 FUN_00428d10
+  00428e90 FUN_00428e90
+  00428e30 FUN_00428e30
+  00428ef0 FUN_00428ef0
+  00428fb0 FUN_00428fb0
+  0079e086 operator_new
+  00429dc0 FUN_00429dc0
+  00428dd0 FUN_00428dd0
+  00428f50 FUN_00428f50
+
+--- callees of 00429390 (FUN_00429390) ---
+  0079e0d5 FID_conflict:_free
+
+--- callees of 004276a0 (FUN_004276a0) ---
+  004282c0 FUN_004282c0
+
+--- callees of 0041c820 (FUN_0041c820) ---
+  00427c40 FUN_00427c40
+  0079e0d5 FID_conflict:_free
+  00427cd0 FUN_00427cd0
+  EXTERNAL:00000008 SteamAPI_UnregisterCallback
+
+--- callees of 0046a970 (FUN_0046a970) ---
+  00427cd0 FUN_00427cd0
+  00427e00 FUN_00427e00
+
+===== CALLERS =====
+--- callers of 004291d0 (FUN_004291d0) ---
+  00427fd0 FUN_00427fd0
+  00428020 FUN_00428020
+  00427ef0 FUN_00427ef0
+  00427ec0 FUN_00427ec0
+  004281e0 FUN_004281e0
+  00428180 FUN_00428180
+  00428050 FUN_00428050
+  00427f60 FUN_00427f60
+  00428110 FUN_00428110
+  00427e40 FUN_00427e40
+

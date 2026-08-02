@@ -459,6 +459,70 @@ Remaining static targets if needed: FUN_004291D0 (work item factory),
 FUN_00429390 (work item release), the type-7 work class vtable (where
 UGCDownload is actually invoked and its OnComplete writes workMgr+4).
 
+## 2026-08-02: ROOT CAUSE — the TUS "storage unavailable" latch (DAT_00CF77A8)
+
+Third-party report (`Bug Reports/Dcode progress reset/Report 1`, another user's
+machine, v8.1, 2026-07-30) supplied the missing evidence. Two sessions:
+17:01–18:24 and 18:31–20:30, 47 logged failures with the SteamWorkMgr dumps.
+
+**Two earlier conclusions were WRONG and are corrected here:**
+
+1. *"The wedge freezes progress in memory."* No. In session 2 the net-color
+   counter moved 50→49→50→51→52→53 while healthy, and then still moved
+   53→52 **during** the wedge (20:14). RAM keeps updating fine.
+2. *"`ugcHandle=` shows the Steam UGC handle."* No — mislabeled. The two
+   dwords I printed are `workMgr+0xD8` = **destination buffer pointer** and
+   `workMgr+0xDC` = **0x6800 size** (confirmed: the "handle" always reads
+   `00006800xxxxxxxx`, and its low half equals the `reqIds` buffer pointer).
+   The download request carries `{steamID, buffer, size}` and NO UGC handle;
+   `workMgr+0xD0/0xD4` is the peer steamID (valid `0x0110000100000000`-form
+   values that vary per opponent). Field labels fixed in the source comments.
+
+**The actual architecture (phases 18–23).** `bbdc.dat` is the network profile
+in **TUS (Title User Storage)** — the filename table at 0x009DF4BC holds
+L"bbdc.dat"/L"bbd.dat"/L"bbdp.dat"/L"dummy.dat", and the transfer strategies
+are literally named `uei::ThinkLogicStrategyDownloadTUS` (type 7) and
+`uei::ThinkLogicStrategyUploadTUS` (type 8), created by FUN_004291D0 and
+polled through the work manager DAT_00A5A050 (state at +4: 7 = download done,
+8 = share done, 9 = download empty, 0xB = error).
+
+- Download submit: UMS vtbl+0x10 = FUN_00422A10, built by FUN_004B8EB0
+  (the path our row-fetch hook already watches).
+- **Upload submit: UMS vtbl+0x0C = FUN_00423950, built by FUN_004B9210,
+  called from FUN_004A96D0** = "upload my 0x6800 profile blob as bbdc.dat".
+  This was completely uninstrumented — and it is the path that makes
+  ranked/net-color progress durable.
+
+**`DAT_00CF77A8` (RVA 0x8F77A8) is the bug.** A process-wide "TUS
+unavailable" latch:
+
+- Written 1 at 0x4B0ACE when the own-profile sync exhausts its retry counter
+  (`mov [esi+0x20],0BB8h` = 3000 ticks ≈ 50 s at 60 fps, then
+  `dec`/`jns`/latch), and at 0x4AC098, 0x4AFED2, 0x4B0AB2 on sibling error
+  paths. Written 0 only at 0x4B0A1A, on a successful sync.
+- Read by **FUN_004A96D0 → early return** (profile upload skipped) and by
+  FUN_004B8CF0 / FUN_004B8D30 → return 0 (D-Code reads short-circuit).
+
+That single flag explains every symptom coherently: D-Codes vanish, the
+in-memory counters keep moving, `bbsave.dat` keeps being written (local save,
+a different store), and on restart the game loads the last *successfully
+uploaded* profile — i.e. progress "resets to the last match before the bug",
+exactly as reported, no matter how many matches were played afterwards. Only a
+process restart clears the latch.
+
+**Fix shipped 2026-08-02** (deployed v8.1 Release): `[TusGate]` lines in
+DCodeIncidents.log on every transition of the latch (with the current
+net-color/counter), plus setting **`DCodeTusGateAutoClear`** (default 1,
+"Recover profile uploads" in the settings window) which writes the latch back
+to 0 — the same value the game writes itself on a successful sync — so the
+upload path and D-Code reads go live again. Rate-limited to 10 clears per
+process with a 30 s cooldown so a genuinely offline session cannot become a
+retry storm.
+
+Verification wanted from the next occurrence: a `[TusGate] !!!` line
+appearing at the moment D-Codes vanish (proves the mechanism end-to-end),
+followed by `auto-clear` and then progress surviving a restart.
+
 Next capture should tell us: whether the rejected payload was all-zero
 (transport error), truncated (recvSize != 0x6800), or genuinely corrupt
 (full-size, bad checksum) — and whether a forced retry succeeds, which

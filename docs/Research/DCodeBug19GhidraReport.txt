@@ -1,0 +1,170 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 00428d70  -----
+Function: FUN_00428d70
+
+undefined4 * __fastcall FUN_00428d70(undefined4 *param_1)
+
+{
+  *param_1 = uei::ThinkLogicStrategyBase::vftable;
+  *param_1 = uei::ThinkLogicStrategyDownloadTUS::vftable;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 00428fb0  -----
+Function: FUN_00428fb0
+
+undefined4 * __fastcall FUN_00428fb0(undefined4 *param_1)
+
+{
+  *param_1 = uei::ThinkLogicStrategyBase::vftable;
+  *param_1 = uei::ThinkLogicStrategyUploadTUS::vftable;
+  return param_1;
+}
+
+
+
+===== SHARE PATH CALLER CHAINS (2 levels, decompiled) =====
+--- level1 callers of 004237b0 (FUN_004237b0) ---
+  004230a0 FUN_004230a0
+
+----- DECOMPILE 004230a0 (caller of FUN_004237b0) -----
+Function: FUN_004230a0
+
+void __fastcall FUN_004230a0(int param_1)
+
+{
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) & 0xfffffffc;
+  *(undefined4 *)(param_1 + 0xb4) = 0;
+  if (*(int *)(param_1 + 0x94) != 0) {
+    FUN_00422830();
+    *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 2;
+    return;
+  }
+  if (*(int *)(param_1 + 0x90) != 0) {
+    FUN_004237b0();
+  }
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 2;
+  return;
+}
+
+
+
+  --- level2 callers of FUN_004230a0 ---
+
+--- level1 callers of 00423a50 (FUN_00423a50) ---
+  004237b0 FUN_004237b0
+
+----- DECOMPILE 004237b0 (caller of FUN_00423a50) -----
+Function: FUN_004237b0
+
+void __fastcall FUN_004237b0(int param_1)
+
+{
+  char cVar1;
+  int iVar2;
+  uint uVar3;
+  uint uVar4;
+  undefined4 local_11c;
+  undefined4 local_118;
+  uint local_110;
+  int local_10c;
+  undefined1 local_108 [256];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  iVar2 = lstrcmpW(L"bbdc.dat",(LPCWSTR)(param_1 + 0x44));
+  if (iVar2 == 0) {
+    FUN_00423a50();
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+  iVar2 = FUN_00779390();
+  if ((iVar2 != 0) && (cVar1 = FUN_00423000(local_108,0x100), cVar1 != '\0')) {
+    *(undefined4 *)(param_1 + 0xb4) = 0;
+    if (*(int *)(param_1 + 0x98) == 0) {
+      cVar1 = FUN_00778fc0(local_108);
+      *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+      if (cVar1 == '\0') goto LAB_00423845;
+    }
+    else {
+      uVar4 = *(uint *)(param_1 + 0x98);
+      uVar3 = FUN_00779340(local_108);
+      if (uVar3 < uVar4) {
+        local_11c = 0;
+        local_118 = 0;
+        local_110 = 0;
+        local_10c = 0;
+        cVar1 = FUN_007793a0(&local_11c,&local_110);
+        if ((cVar1 == '\0') ||
+           ((uVar4 = *(uint *)(param_1 + 0x98), local_10c == 0 && (local_110 < uVar4)))) {
+LAB_004238c7:
+          *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+          __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+          return;
+        }
+      }
+      uVar3 = 1;
+      cVar1 = FUN_007791b0(local_108,*(undefined4 *)(param_1 + 0x90),uVar4);
+      while (cVar1 == '\0') {
+        if (4 < uVar3) goto LAB_004238c7;
+        Sleep(0x32);
+        uVar3 = uVar3 + 1;
+        cVar1 = FUN_007791b0(local_108,*(undefined4 *)(param_1 + 0x90),
+                             *(undefined4 *)(param_1 + 0x98));
+      }
+      *(undefined4 *)(param_1 + 0xb4) = 0x3f800000;
+    }
+    __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+    return;
+  }
+LAB_00423845:
+  *(uint *)(param_1 + 0xc0) = *(uint *)(param_1 + 0xc0) | 1;
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+  --- level2 callers of FUN_004237b0 ---
+    004230a0 FUN_004230a0
+
+===== SYMBOLS matching Steam storage APIs =====
+  008500d0 CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::vftable_meta_ptr
+  008500d4 CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::vftable
+  00850134 CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::vftable_meta_ptr
+  00850138 CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::vftable
+  00850144 CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::vftable_meta_ptr
+  00850148 CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::vftable
+  00850194 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable_meta_ptr
+  00850198 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::vftable
+  008501a4 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable_meta_ptr
+  008501a8 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::vftable
+  009a7438 CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Complete_Object_Locator
+  009a744c CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Class_Hierarchy_Descriptor
+  009a745c CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Array
+  009a7468 CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a751c CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::RTTI_Complete_Object_Locator
+  009a7530 CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::RTTI_Class_Hierarchy_Descriptor
+  009a7540 CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Array
+  009a754c CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a7568 CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::RTTI_Complete_Object_Locator
+  009a757c CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::RTTI_Class_Hierarchy_Descriptor
+  009a758c CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::RTTI_Base_Class_Array
+  009a7598 CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a764c CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Complete_Object_Locator
+  009a7660 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Class_Hierarchy_Descriptor
+  009a7670 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Array
+  009a767c CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a7698 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Complete_Object_Locator
+  009a76ac CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Class_Hierarchy_Descriptor
+  009a76bc CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Array
+  009a76c8 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009d4288 CCallResult<class_AASTEAM_CReplayDownloadTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Type_Descriptor
+  009d4338 CCallResult<class_AASTEAM_CReplayUploadTask,struct_RemoteStorageFileShareResult_t>::RTTI_Type_Descriptor
+  009d4398 CCallResult<class_AASTEAM_CReplayUploadTask,struct_LeaderboardUGCSet_t>::RTTI_Type_Descriptor
+  009d4438 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageFileShareResult_t>::RTTI_Type_Descriptor
+  009d4490 CCallResult<class_AASTEAM_CUMSTask,struct_RemoteStorageDownloadUGCResult_t>::RTTI_Type_Descriptor

@@ -1,0 +1,347 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== FILENAME TABLE CONTENTS (wide strings) =====
+  [0] 008501C8 L"bbdc.dat"
+  [1] 008AA0F8 L"bbd.dat"
+  [2] 008AA108 L"bbdp.dat"
+  [3] 008AA11C L"dummy.dat"
+  [4] <unreadable>
+
+===== XREFS TO FILENAME TABLE =====
+  from 004b91c8 in FUN_004b9180
+  from 004b9252 in FUN_004b9210
+  from 004b8d9c in FUN_004b8d50
+  from 004b8e79 in FUN_004b8e00
+  from 004b8f1b in FUN_004b8eb0
+
+----- DECOMPILE 004b9180 (references filename table) -----
+Function: FUN_004b9180
+
+void __thiscall FUN_004b9180(int *param_1,undefined4 param_2,undefined4 param_3,int param_4)
+
+{
+  int *piVar1;
+  undefined4 uVar2;
+  int iVar3;
+  int iVar4;
+  undefined1 local_208 [512];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  iVar4 = (param_4 != 0) + 1;
+  piVar1 = (int *)(**(code **)(*param_1 + 8))();
+  iVar3 = *piVar1;
+  uVar2 = (**(code **)(*param_1 + 0x18))
+                    (local_208,param_2,param_3,(&PTR_u_bbdc_dat_009df4bc)[iVar4],iVar4,0,param_1 + 1
+                     ,4);
+  iVar3 = (**(code **)(iVar3 + 0xc))(uVar2);
+  if ((-1 < iVar3) && (iVar3 == 0)) {
+    param_1[3] = 2;
+  }
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004b9210 (references filename table) -----
+Function: FUN_004b9210
+
+void __thiscall
+FUN_004b9210(int *param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,
+            undefined4 param_5,int param_6)
+
+{
+  int iVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  undefined1 local_208 [512];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  piVar2 = (int *)(**(code **)(*param_1 + 8))();
+  iVar1 = *piVar2;
+  uVar3 = (**(code **)(*param_1 + 0x18))
+                    (local_208,param_2,param_3,(&PTR_u_bbdc_dat_009df4bc)[param_6],param_6,0,param_4
+                     ,param_5);
+  (**(code **)(iVar1 + 0xc))(uVar3);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004b8d50 (references filename table) -----
+Function: FUN_004b8d50
+
+void __thiscall FUN_004b8d50(int *param_1,undefined4 param_2,undefined4 param_3,int param_4)
+
+{
+  int *piVar1;
+  undefined4 uVar2;
+  int iVar3;
+  int iVar4;
+  undefined1 local_208 [512];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  param_1[1] = 0;
+  iVar4 = (param_4 != 0) + 1;
+  piVar1 = (int *)(**(code **)(*param_1 + 8))();
+  iVar3 = *piVar1;
+  uVar2 = (**(code **)(*param_1 + 0x18))
+                    (local_208,param_2,param_3,(&PTR_u_bbdc_dat_009df4bc)[iVar4],iVar4,0,param_1 + 1
+                     ,4,0);
+  iVar3 = (**(code **)(iVar3 + 0x10))(uVar2);
+  if ((-1 < iVar3) && (iVar3 == 0)) {
+    param_1[2] = 2;
+  }
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004b8e00 (references filename table) -----
+Function: FUN_004b8e00
+
+void __thiscall
+FUN_004b8e00(int *param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,int param_5,
+            undefined4 param_6)
+
+{
+  int iVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  undefined1 local_2d4 [512];
+  undefined1 local_d4 [204];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  FUN_00407940();
+  iVar1 = (**(code **)(*param_1 + 0xc))();
+  *(undefined4 *)(iVar1 + 4) = 0;
+  piVar2 = (int *)(**(code **)(*param_1 + 0xc))();
+  iVar1 = *piVar2;
+  uVar3 = (**(code **)(*param_1 + 0x1c))
+                    (local_2d4,param_2,local_d4,(&PTR_u_bbdc_dat_009df4bc)[param_5],param_5,param_3,
+                     param_4,param_6);
+  (**(code **)(iVar1 + 0xc))(uVar3);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 004b8eb0 (references filename table) -----
+Function: FUN_004b8eb0
+
+void __thiscall
+FUN_004b8eb0(int *param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,
+            undefined4 param_5,int param_6,undefined4 param_7,undefined4 param_8)
+
+{
+  int iVar1;
+  int *piVar2;
+  undefined4 uVar3;
+  undefined1 local_208 [512];
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  piVar2 = (int *)(**(code **)(*param_1 + 8))();
+  iVar1 = *piVar2;
+  uVar3 = (**(code **)(*param_1 + 0x18))
+                    (local_208,param_2,param_3,(&PTR_u_bbdc_dat_009df4bc)[param_6],param_6,param_8,
+                     param_4,param_5,param_7);
+  (**(code **)(iVar1 + 0x10))(uVar3);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+===== FACADE FUNCTION CALLERS =====
+--- callers of 004b8f70 (FUN_004b8f70) ---
+  004a8190 FUN_004a8190
+  004af1a0 FUN_004af1a0
+  004a79f0 FUN_004a79f0
+  0049f590 FUN_0049f590
+  004a9af0 FUN_004a9af0
+  0061a350 FUN_0061a350
+  004a25c0 FUN_004a25c0
+  006c4990 FUN_006c4990
+  004a7a20 FUN_004a7a20
+  004aaad0 FUN_004aaad0
+  004a96d0 FUN_004a96d0
+  004b0970 FUN_004b0970
+  004b01b0 FUN_004b01b0
+
+--- callers of 004b8eb0 (FUN_004b8eb0) ---
+  004a25c0 FUN_004a25c0
+
+--- callers of 004b8ce0 (FUN_004b8ce0) ---
+  004a25c0 FUN_004a25c0
+
+--- callers of 004b8c50 (FUN_004b8c50) ---
+
+--- callers of 004b8c40 (FUN_004b8c40) ---
+  00471820 FUN_00471820
+  00828fa0 Unwind@00828fa0
+
+--- callers of 004b8b90 (FUN_004b8b90) ---
+  004717c0 FUN_004717c0
+
+===== UPWARD LEVEL 1 =====
+--- callers of FUN_004b9180 ---
+  0049f590 FUN_0049f590
+
+--- callers of FUN_004b9210 ---
+  004a96d0 FUN_004a96d0
+
+--- callers of FUN_004b8d50 ---
+  0049f590 FUN_0049f590
+
+--- callers of FUN_004b8e00 ---
+  004b9100 FUN_004b9100
+
+--- callers of FUN_004b8eb0 ---
+  004a25c0 FUN_004a25c0
+
+--- callers of FUN_004a8190 ---
+  0054c6e0 FUN_0054c6e0
+  0062ac30 FUN_0062ac30
+
+--- callers of FUN_004af1a0 ---
+  004a6f70 FUN_004a6f70
+
+--- callers of FUN_004a79f0 ---
+  0070bdc0 FUN_0070bdc0
+
+--- callers of FUN_0049f590 ---
+  0056bcb0 FUN_0056bcb0
+
+--- callers of FUN_004a9af0 ---
+  0070bdc0 FUN_0070bdc0
+
+--- callers of FUN_0061a350 ---
+
+--- callers of FUN_004a25c0 ---
+  0049d440 FUN_0049d440
+  004a26a0 FUN_004a26a0
+  0049a940 FUN_0049a940
+
+--- callers of FUN_006c4990 ---
+  006c4880 FUN_006c4880
+
+--- callers of FUN_004a7a20 ---
+  0070bdc0 FUN_0070bdc0
+
+--- callers of FUN_004aaad0 ---
+  004a6f70 FUN_004a6f70
+
+--- callers of FUN_004a96d0 ---
+  004a8190 FUN_004a8190
+  004aaad0 FUN_004aaad0
+  004af1a0 FUN_004af1a0
+  004b0970 FUN_004b0970
+  004b01b0 FUN_004b01b0
+
+--- callers of FUN_004b0970 ---
+  004a6f70 FUN_004a6f70
+
+--- callers of FUN_004b01b0 ---
+  004a6f70 FUN_004a6f70
+
+--- callers of FUN_00471820 ---
+
+--- callers of Unwind@00828fa0 ---
+
+--- callers of FUN_004717c0 ---
+  004b8f70 FUN_004b8f70
+
+===== UPWARD LEVEL 2 =====
+--- callers of FUN_004b9100 ---
+  004b0970 FUN_004b0970
+  004b01b0 FUN_004b01b0
+
+--- callers of FUN_0054c6e0 ---
+
+--- callers of FUN_0062ac30 ---
+  0062b240 FUN_0062b240
+
+--- callers of FUN_004a6f70 ---
+  004a73d0 FUN_004a73d0
+
+--- callers of FUN_0070bdc0 ---
+  0070b3e0 FUN_0070b3e0
+
+--- callers of FUN_0056bcb0 ---
+
+--- callers of FUN_0049d440 ---
+  004a6f70 FUN_004a6f70
+
+--- callers of FUN_004a26a0 ---
+  0049a230 FUN_0049a230
+  0049d560 FUN_0049d560
+
+--- callers of FUN_0049a940 ---
+  004b0970 FUN_004b0970
+
+--- callers of FUN_006c4880 ---
+  00699040 FUN_00699040
+
+--- callers of FUN_004b8f70 ---
+  004a8190 FUN_004a8190
+  004af1a0 FUN_004af1a0
+  004a79f0 FUN_004a79f0
+  0049f590 FUN_0049f590
+  004a9af0 FUN_004a9af0
+  0061a350 FUN_0061a350
+  004a25c0 FUN_004a25c0
+  006c4990 FUN_006c4990
+  004a7a20 FUN_004a7a20
+  004aaad0 FUN_004aaad0
+  004a96d0 FUN_004a96d0
+  004b0970 FUN_004b0970
+  004b01b0 FUN_004b01b0
+
+===== UPWARD LEVEL 3 =====
+--- callers of FUN_0062b240 ---
+  00628bb0 FUN_00628bb0
+
+--- callers of FUN_004a73d0 ---
+
+--- callers of FUN_0070b3e0 ---
+  0070ee90 FUN_0070ee90
+  00718950 FUN_00718950
+  007127b0 FUN_007127b0
+  00717460 FUN_00717460
+  00713b60 FUN_00713b60
+  00716590 FUN_00716590
+  00716bf0 FUN_00716bf0
+  007157d0 FUN_007157d0
+  00713390 FUN_00713390
+
+--- callers of FUN_0049a230 ---
+  004b0970 FUN_004b0970
+
+--- callers of FUN_0049d560 ---
+  0064ff30 FUN_0064ff30
+  00724dc0 FUN_00724dc0
+  00659960 FUN_00659960
+  0061bbb0 FUN_0061bbb0
+  004af1a0 FUN_004af1a0
+  0073adc0 FUN_0073adc0
+  004a9de0 FUN_004a9de0
+  0062b390 FUN_0062b390
+  004aced0 FUN_004aced0
+  0070bb50 FUN_0070bb50
+  004aba50 FUN_004aba50
+  0070b3e0 FUN_0070b3e0
+  00535270 FUN_00535270
+  00648c10 FUN_00648c10
+
+--- callers of FUN_00699040 ---
+  0074cca0 FUN_0074cca0
+

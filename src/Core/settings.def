@@ -41,6 +41,10 @@ SETTING(bool, dcodeAutoRecover, "DCodeAutoRecover", "1");
 // the receive buffer so the game's checksum rejects it) to exercise the state-6
 // wedge + auto-recovery end-to-end. Fires once per launch while set to 1.
 SETTING(bool, dcodeForceFailureOnce, "DCodeForceFailureOnce", "0");
+// When the game latches its "network profile storage unavailable" flag (which
+// silently stops uploading your profile, so ranked/net-color progress is lost on
+// restart), reset it so uploads resume. See docs/Research/DCodeNetworkStallBug.md.
+SETTING(bool, dcodeTusGateAutoClear, "DCodeTusGateAutoClear", "1");
 // Spectator desync fix: when the spectator's SyncInput would report starvation
 // (input not yet received over the network), substitutes the previous frame's real
 // input instead of letting the game's caller advance the simulation with a fake
