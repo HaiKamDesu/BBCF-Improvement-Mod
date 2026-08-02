@@ -1190,7 +1190,7 @@ void UnlimitedPlaybackWindow::Draw() {
         ImGui::TextUnformatted(L("Setup Time (seconds)").c_str());
         DrawHelpInline(L("Seconds to show a setup countdown after optional snapshot restore before playing the next slot.").c_str());
         ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputFloat("##up_loop_setup_seconds", &setupSeconds, 0.1f, 0.5f, 2)) {
+        if (ImGui::InputFloat("##up_loop_setup_seconds", &setupSeconds, 0.1f, 0.5f, "%.2f")) {
             mgr.SetLoopSetupSeconds(setupSeconds);
             Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds = mgr.GetLoopSetupSeconds();
             Settings::changeSetting("UnlimitedPlaybackLoopSetupSeconds", std::to_string(mgr.GetLoopSetupSeconds()));
@@ -1201,7 +1201,7 @@ void UnlimitedPlaybackWindow::Draw() {
         ImGui::TextUnformatted(L("Ending Time (seconds)").c_str());
         DrawHelpInline(L("Seconds to wait after both players return to idle before starting the next setup.").c_str());
         ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputFloat("##up_loop_ending_seconds", &endingSeconds, 0.1f, 0.5f, 2)) {
+        if (ImGui::InputFloat("##up_loop_ending_seconds", &endingSeconds, 0.1f, 0.5f, "%.2f")) {
             mgr.SetLoopEndingSeconds(endingSeconds);
             Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds = mgr.GetLoopEndingSeconds();
             Settings::changeSetting("UnlimitedPlaybackLoopEndingSeconds", std::to_string(mgr.GetLoopEndingSeconds()));

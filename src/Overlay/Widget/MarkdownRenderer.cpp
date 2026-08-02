@@ -451,9 +451,13 @@ namespace ImGuiMarkdown
 
 				ImGui::Spacing();
 				ImGui::PushStyleColor(ImGuiCol_Text, kHeadingColor);
-				ImGui::SetWindowFontScale(scale);
+				// Since ImGui 1.92 the atlas is dynamic, so headings can be rasterized at their
+				// real size instead of scaling the baked bitmap - PushFont(NULL, size) keeps the
+				// current font and only changes the size. SetWindowFontScale is discouraged now
+				// and produced visibly soft headings.
+				ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * scale);
 				RenderInline(content);
-				ImGui::SetWindowFontScale(1.0f);
+				ImGui::PopFont();
 				ImGui::PopStyleColor();
 				if (headingLevel <= 2)
 					ImGui::Separator();

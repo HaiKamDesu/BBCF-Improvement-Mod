@@ -5,6 +5,13 @@
 
 namespace ImGui
 {
+	// ImGui dropped support for indexing keys by Win32 virtual-key code (obsolete since 1.87,
+	// removed in 1.91.5). Our hotkeys are stored in settings.ini as VK codes via
+	// Settings::getButtonValue, so translate before querying.
+	IMGUI_API ImGuiKey VirtualKeyToImGuiKey(int virtualKey);
+	IMGUI_API bool IsVirtualKeyPressed(int virtualKey, bool repeat = true);
+	IMGUI_API bool IsVirtualKeyDown(int virtualKey);
+
 	IMGUI_API void HoverTooltip(const char* text);
 	IMGUI_API bool ButtonUrl(const std::string& label, const wchar_t* url, const ImVec2& btnSize = ImVec2(0, 0));
 	IMGUI_API void TextAlignedHorizontalCenter(const char* text, ...);

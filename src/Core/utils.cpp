@@ -296,7 +296,17 @@ bool IsTypingInImGuiTextField()
 {
 	// WantTextInput is recomputed every NewFrame() and only set while an InputText
 	// widget is the active item, so this stays false for plain window focus.
-	return ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantTextInput;
+	return IsImGuiContextReady() && ImGui::GetIO().WantTextInput;
+}
+
+bool IsImGuiContextReady()
+{
+	return ImGui::GetCurrentContext() != nullptr;
+}
+
+float GetImGuiDeltaTime()
+{
+	return IsImGuiContextReady() ? ImGui::GetIO().DeltaTime : 0.0f;
 }
 
 std::string utf16_to_utf8(const std::wstring& wstr)

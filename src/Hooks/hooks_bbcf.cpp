@@ -8554,8 +8554,17 @@ EXIT:
 
 int PassKeyboardInputToGame()
 {
-	if (GetForegroundWindow() != g_gameProc.hWndGameWindow ||
-		ImGui::GetIO().WantCaptureKeyboard)
+	if (GetForegroundWindow() != g_gameProc.hWndGameWindow)
+	{
+		return 0;
+	}
+
+	// This hook fires on every keystroke from process start, but the ImGui context is not
+	// created until WindowManager::Initialize runs at the title screen. Touching GetIO()
+	// before that asserts on a NULL context since ImGui 1.60 -- pressing a key to skip the
+	// intro videos was enough to take the game down. (Under 1.53 GImGui pointed at a static
+	// default context, so the early call happened to be harmless.)
+	if (IsImGuiContextReady() && ImGui::GetIO().WantCaptureKeyboard)
 	{
 		return 0;
 	}

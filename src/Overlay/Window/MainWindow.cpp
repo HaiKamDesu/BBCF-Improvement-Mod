@@ -479,7 +479,7 @@ void MainWindow::DrawHitboxOverlaySection() const
 		ImGui::Checkbox(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(Messages.Freeze_frame_tooltip());
-		if (!IsTypingInImGuiTextField() && ImGui::IsKeyPressed(g_modVals.freeze_frame_keycode))
+		if (!IsTypingInImGuiTextField() && ImGui::IsVirtualKeyPressed(g_modVals.freeze_frame_keycode))
 			g_gameVals.isFrameFrozen ^= 1;
 
 		if (g_gameVals.pFrameCount)
@@ -501,7 +501,7 @@ void MainWindow::DrawHitboxOverlaySection() const
 			static int framesToStep = 1;
 			ImGui::HorizontalSpacing();
 			if (ImGui::Button(Messages.Step_frames()) ||
-				(!IsTypingInImGuiTextField() && ImGui::IsKeyPressed(g_modVals.step_frames_keycode)))
+				(!IsTypingInImGuiTextField() && ImGui::IsVirtualKeyPressed(g_modVals.step_frames_keycode)))
 			{
 				g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
 			}

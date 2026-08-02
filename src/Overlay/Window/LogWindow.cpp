@@ -278,7 +278,8 @@ void LogWindow::Draw()
 	{
 		// Clip to the visible lines so a large log stays cheap to draw.
 		const int totalLines = (int)m_lineOffsets.size() + 1;
-		ImGuiListClipper clipper(totalLines);
+		ImGuiListClipper clipper;
+		clipper.Begin(totalLines);
 		while (clipper.Step())
 		{
 			for (int line_no = clipper.DisplayStart; line_no < clipper.DisplayEnd; line_no++)

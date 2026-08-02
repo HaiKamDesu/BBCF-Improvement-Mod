@@ -5809,7 +5809,7 @@ void DrawRankedProgressOverlayStandalone()
 	}
 
 	ImGui::SetWindowSize(ImVec2(g_rankedOverlayTuning.overlayWidth, 118.0f), ImGuiCond_FirstUseEver);
-	if (ImGui::BeginPopupContextWindow("ranked_progress_context", 1, true))
+	if (ImGui::BeginPopupContextWindow("ranked_progress_context", ImGuiPopupFlags_MouseButtonRight))
 	{
 		if (ImGui::MenuItem(L("Ranked ladder").c_str()))
 		{

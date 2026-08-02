@@ -539,7 +539,7 @@ void PaletteEditorWindow::SavePaletteToFile()
 
 	struct TextFilters
 	{
-		static int FilterAllowedChars(ImGuiTextEditCallbackData* data)
+		static int FilterAllowedChars(ImGuiInputTextCallbackData* data)
 		{
 			if (data->EventChar < 256 && strchr(" qwertzuiopasdfghjklyxcvbnmQWERTZUIOPASDFGHJKLYXCVBNM0123456789_.()[]!@&+-'^,;{}$=", (char)data->EventChar))
 				return 0;

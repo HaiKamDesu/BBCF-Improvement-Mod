@@ -228,7 +228,7 @@ namespace {
 	static bool DrawValueWidget(const char* id, float& val)
 	{
 		ImGui::PushItemWidth(-1);
-		const bool changed = ImGui::InputFloat(id, &val, 0.0f, 0.0f, 4);
+		const bool changed = ImGui::InputFloat(id, &val, 0.0f, 0.0f, "%.4f");
 		ImGui::PopItemWidth();
 		return changed;
 	}

@@ -38,7 +38,7 @@ void PaletteSharePopupWindow::Draw()
 	ImGui::OpenPopup(popupTitle);
 
 	const ImVec2 buttonSize = ImVec2(160, 23);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Appearing);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
 	if (ImGui::BeginPopupModal(popupTitle, NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{

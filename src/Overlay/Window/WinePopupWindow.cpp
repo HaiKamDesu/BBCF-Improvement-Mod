@@ -33,7 +33,7 @@ void WinePopupWindow::Draw()
     ImGui::OpenPopup(Messages.Wine_or_Proton_detected());
 
     const ImVec2 buttonSize = ImVec2(120, 23);
-    ImGui::SetNextWindowPosCenter(ImGuiCond_Appearing);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
     if (ImGui::BeginPopupModal(Messages.Wine_or_Proton_detected(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {

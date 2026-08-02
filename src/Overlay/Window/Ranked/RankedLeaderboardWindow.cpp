@@ -480,7 +480,7 @@ namespace
 
 		ImGui::Separator();
 		ImGui::Columns(7, "###LbCols", true);
-		const float fullWidth = ImGui::GetWindowContentRegionWidth();
+		const float fullWidth = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x);
 		ImGui::SetColumnWidth(0, fullWidth * 0.07f); // #
 		ImGui::SetColumnWidth(1, fullWidth * 0.30f); // player
 		ImGui::SetColumnWidth(2, fullWidth * 0.16f); // rank tier

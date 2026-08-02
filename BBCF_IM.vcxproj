@@ -22,7 +22,10 @@
     <ClCompile Include="depends\imgui\imgui.cpp" />
     <ClCompile Include="depends\imgui\imgui_demo.cpp" />
     <ClCompile Include="depends\imgui\imgui_draw.cpp" />
+    <ClCompile Include="depends\imgui\imgui_tables.cpp" />
+    <ClCompile Include="depends\imgui\imgui_widgets.cpp" />
     <ClCompile Include="depends\imgui\imgui_impl_dx9.cpp" />
+    <ClCompile Include="depends\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
     <ClCompile Include="src\Hooks\hooks_battle_input.cpp" />
@@ -150,11 +153,13 @@
     <ClInclude Include="depends\imgui\imconfig.h" />
     <ClInclude Include="depends\imgui\imgui.h" />
     <ClInclude Include="depends\imgui\imgui_impl_dx9.h" />
+    <ClInclude Include="depends\imgui\imgui_impl_win32.h" />
     <ClInclude Include="depends\imgui\imgui_internal.h" />
+    <ClInclude Include="depends\imgui_markdown\imgui_markdown.h" />
     <ClInclude Include="depends\imgui\stb_image.h" />
-    <ClInclude Include="depends\imgui\stb_rect_pack.h" />
-    <ClInclude Include="depends\imgui\stb_textedit.h" />
-    <ClInclude Include="depends\imgui\stb_truetype.h" />
+    <ClInclude Include="depends\imgui\imstb_rectpack.h" />
+    <ClInclude Include="depends\imgui\imstb_textedit.h" />
+    <ClInclude Include="depends\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Core\keycodes.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayList.h" />
     <ClInclude Include="src\Game\ScenesManager\ScenesManager.h" />
@@ -389,7 +394,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>dinput8</TargetName>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\imgui_markdown;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>build\$(Configuration)\</IntDir>
@@ -404,7 +409,7 @@
     <LocalDebuggerCommand>$(BbcfDebuggerCommand)</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>$(BbcfDebuggerArguments)</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(BbcfDebuggerWorkingDirectory)</LocalDebuggerWorkingDirectory>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\imgui_markdown;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\DebugDeploy\</OutDir>
     <IntDir>build\DebugDeploy\</IntDir>
@@ -413,7 +418,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>dinput8</TargetName>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\imgui_markdown;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>build\$(Configuration)\</IntDir>
@@ -429,7 +434,7 @@
     <LocalDebuggerCommand>$(ComSpec)</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>/c exit 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\imgui_markdown;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\Release\</OutDir>
     <IntDir>build\ReleaseDeploy\</IntDir>
