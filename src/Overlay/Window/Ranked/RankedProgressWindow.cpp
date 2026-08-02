@@ -5185,15 +5185,15 @@ namespace
 		}
 
 		ImGui::PushStyleColor(ImGuiCol_Text, mainColor);
-		ImGui::SetWindowFontScale(2.7f);
+		ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 2.7f);
 		DrawCenteredBoldText(drawList, mainText, ImGui::GetColorU32(mainColor), ImGui::GetContentRegionAvail().x);
-		ImGui::SetWindowFontScale(1.0f);
+		ImGui::PopFont();
 		ImGui::PopStyleColor();
 
 		if (outcome.promotionCounterDelta != 0 || outcome.demotionCounterDelta != 0)
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, g_rankedOverlayTuning.predictionReasonColor);
-			ImGui::SetWindowFontScale(0.82f);
+			ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 0.82f);
 			if (outcome.promotionCounterDelta != 0)
 			{
 				char counterText[64] = {};
@@ -5216,7 +5216,7 @@ namespace
 				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + CenteredTextOffsetX(ImGui::GetContentRegionAvail().x, counterText));
 				ImGui::TextUnformatted(counterText);
 			}
-			ImGui::SetWindowFontScale(1.0f);
+			ImGui::PopFont();
 			ImGui::PopStyleColor();
 		}
 

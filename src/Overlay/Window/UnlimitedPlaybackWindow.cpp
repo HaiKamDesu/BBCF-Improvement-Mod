@@ -469,9 +469,9 @@ void CenterNextButtonsRow(float totalWidth) {
 void DrawContextMenuHeader(const char* text) {
     ImGui::Separator();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
-    ImGui::SetWindowFontScale(0.86f);
+    ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 0.86f);
     ImGui::TextUnformatted(text);
-    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PopFont();
     ImGui::PopStyleColor();
 }
 
