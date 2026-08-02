@@ -375,17 +375,24 @@ void SettingsIniWindow::DrawModal()
 			continue;
 
 		ImGui::PushID(category);
-		ImGui::Columns(3, "##settings_cols", false);
-		ImGui::SetColumnWidth(0, 295.0f);
-		ImGui::SetColumnWidth(1, 315.0f);
+		// Tables rather than Columns: SetColumnWidth ran every frame, so dragging a separator was
+		// undone before the next frame drew. Here the pixel widths are only the initial layout.
+		const ImGuiTableFlags settingsTableFlags =
+			ImGuiTableFlags_Resizable |
+			ImGuiTableFlags_BordersInnerV |
+			ImGuiTableFlags_BordersInnerH |
+			ImGuiTableFlags_RowBg;
 
-		ImGui::TextDisabled("Setting");
-		ImGui::NextColumn();
-		ImGui::TextDisabled("Value");
-		ImGui::NextColumn();
-		ImGui::TextDisabled("Notes");
-		ImGui::NextColumn();
-		ImGui::Separator();
+		if (!ImGui::BeginTable("##settings_cols", 3, settingsTableFlags))
+		{
+			ImGui::PopID();
+			continue;
+		}
+
+		ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthFixed, 295.0f);
+		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 315.0f);
+		ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableHeadersRow();
 
 		for (SettingRow& row : m_settingRows)
 		{
@@ -398,6 +405,8 @@ void SettingsIniWindow::DrawModal()
 				continue;
 
 			ImGui::PushID(row.name.c_str());
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
 			ImGui::TextUnformatted(row.displayName.c_str());
 			if (ImGui::BeginPopupContextItem("##reset_ctx"))
 			{
@@ -418,22 +427,21 @@ void SettingsIniWindow::DrawModal()
 			ImGui::SameLine();
 			ImGui::ShowHelpMarker(row.tooltip.c_str());
 			ImGui::TextDisabled("%s", row.name.c_str());
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(1);
 			if (row.draw() && row.isRestartRequired)
 				anyRestartRowChangedThisFrame = true;
-			ImGui::NextColumn();
 
+			ImGui::TableSetColumnIndex(2);
 			if (row.isRestartRequired)
 				ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.25f, 1.0f), "Restart");
 			else
 				ImGui::TextDisabled("Live");
-			ImGui::NextColumn();
-			ImGui::Separator();
+
 			ImGui::PopID();
 		}
 
-		ImGui::Columns(1);
+		ImGui::EndTable();
 		ImGui::Spacing();
 		ImGui::PopID();
 	}
