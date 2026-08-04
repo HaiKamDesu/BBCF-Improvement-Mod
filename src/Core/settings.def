@@ -58,6 +58,14 @@ SETTING(bool, dcodeTusGateAutoClear, "DCodeTusGateAutoClear", "1");
 // at all, falling back to pure vanilla behavior (the original desync bug, unfixed).
 // Read at startup only -- requires a restart to take effect either way.
 SETTING(bool, spectatorSyncHooksEnabled, "SpectatorSyncHooksEnabled", "1");
+// FPS-drop investigation (2026-08-02 Discord reports, unconfirmed as mod-caused):
+// when enabled, measures real frame-to-frame time each match frame and, if a
+// frame exceeds FrameStallThresholdMs, logs a breakdown of how much of that
+// time was spent inside the mod's own EndScene hook code versus outside it
+// (base game/driver/OS) to DEBUG.txt and BBCF_IM\FrameStallIncidents.log.
+// See src/Game/FrameStallDiagnostics.h.
+SETTING(bool, logFrameStalls, "LogFrameStalls", "0");
+SETTING(int, frameStallThresholdMs, "FrameStallThresholdMs", "33");
 // Fallback path for when another resident hooker owns d3d9's Direct3DCreate9Ex export and
 // evicts our detour before the game creates its device (confirmed with NVIDIA Optimus'
 // nvd3d9wrap.dll, which re-applies its own patch ~300ms after ours and drops us out of the

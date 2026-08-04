@@ -2,6 +2,7 @@
 
 #include "Core/interfaces.h"
 #include "Core/logger.h"
+#include "Game/FrameStallDiagnostics.h"
 #include "Game/MatchState.h"
 #include "Hooks/hooks_bbcf.h"
 #include "Hooks/hooks_customGameModes.h"
@@ -349,7 +350,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 	{
 		LOG(1, "[EndSceneProbe] before MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
+	FrameStallDiagnostics::OnFrameBegin();
 	MatchState::OnUpdate();
+	FrameStallDiagnostics::OnAfterMatchStateUpdate();
 	// Runs on every real rendered frame, unlike the battle-frame-counter hook (which
 	// goes idle during the reset fadeout's limbo - see TickTrainingResetSwap's comment).
 	ScrWindow::TickTrainingResetSwap();
@@ -358,6 +361,7 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		LOG(1, "[EndSceneProbe] after MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
 	WindowManager::GetInstance().Render();
+	FrameStallDiagnostics::OnFrameEnd();
 	if (s_endSceneProbeBudget > 0)
 	{
 		LOG(1, "[EndSceneProbe] after WindowManager::Render budget=%d\n", s_endSceneProbeBudget);

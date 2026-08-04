@@ -9,12 +9,15 @@
 #include "Window/Ranked/RankedProgressWindow.h"
 #include "Window/WinePopupWindow.h"
 
+#include "Game/FrameStallWatchdog.h"
+
 #include "Core/info.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Core/RuntimePlatform.h"
 #include "Core/Settings.h"
+#include "Core/SystemSpecsLogger.h"
 #include "Core/WineCheck.h"
 #include "Core/utils.h"
 #include "Web/update_check.h"
@@ -145,6 +148,13 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	m_pLogger = g_imGuiLogger;
 
 	m_pLogger->Log("[system] Initialization starting...\n");
+
+	// So a bug report's DEBUG.txt carries hardware/software context on its own,
+	// without a separate round trip asking the reporter for their specs.
+	LogSystemSpecs(device);
+
+	// No-op unless LogFrameStalls is enabled in settings.ini.
+	FrameStallWatchdog::Start();
 
         m_windowContainer = new WindowContainer();
 
@@ -289,6 +299,8 @@ void WindowManager::Shutdown()
 	}
 
 	LOG(2, "WindowManager::Shutdown\n");
+
+	FrameStallWatchdog::Stop();
 
 	SAFE_DELETE(m_windowContainer);
 	delete m_instance;

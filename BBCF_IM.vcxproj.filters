@@ -103,6 +103,9 @@
     <ClCompile Include="src\Core\Settings.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\SystemSpecsLogger.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Hooks\HookManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -155,6 +158,8 @@
     <ClCompile Include="src\Game\Player.cpp" />
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\MatchState.cpp" />
+    <ClCompile Include="src\Game\FrameStallDiagnostics.cpp" />
+    <ClCompile Include="src\Game\FrameStallWatchdog.cpp" />
     <ClCompile Include="src\Game\NetworkStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\SpectatorSyncDiagnostics.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
@@ -304,6 +309,9 @@
     <ClInclude Include="src\Core\Settings.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\SystemSpecsLogger.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="src\Hooks\HookManager.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -365,6 +373,8 @@
     <ClInclude Include="src\Overlay\Window\IWindow.h" />
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\MatchState.h" />
+    <ClInclude Include="src\Game\FrameStallDiagnostics.h" />
+    <ClInclude Include="src\Game\FrameStallWatchdog.h" />
     <ClInclude Include="src\Game\NetworkStallDiagnostics.h" />
     <ClInclude Include="src\Game\SpectatorSyncDiagnostics.h" />
     <ClInclude Include="src\Network\NetworkManager.h" />
