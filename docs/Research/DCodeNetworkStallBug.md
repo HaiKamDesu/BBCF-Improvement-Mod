@@ -528,3 +528,72 @@ Next capture should tell us: whether the rejected payload was all-zero
 (full-size, bad checksum) — and whether a forced retry succeeds, which
 decides between "transient corruption, watchdog is the full fix" and
 "deterministic corruption, need to look at the sender".
+
+## 2026-08-03: v8.2 report — a SECOND, distinct failure mode; TusGate fix is not universal
+
+Third-party report (`Bug Reports/.../Report 1`, another user, v8.2, session
+2026-08-02 18:46–19:48). Symptom differed slightly from earlier reports: own
+D-Code loaded fine, only the opponent's was invisible; progress still rolled
+back. Log analysis:
+
+- Opponent DOWNLOAD (slot 5) failed 4 times 18:49–18:53, exhausting the
+  existing 3-retry auto-recover budget (working as designed, just
+  insufficient — the underlying transport stayed broken).
+- ~2.5 minutes later, the LOCAL PLAYER's own profile UPLOAD started failing
+  **every single attempt for the remaining ~52 minutes of the session — 7503
+  consecutive failures**, each taking ~3.5s, never once succeeding.
+- **`DAT_00CF77A8` (the TusGate latch from the 2026-08-02 root-cause fix)
+  never set — it logged "available" once at session start and never
+  transitioned again.** The existing `DCodeTusGateAutoClear` fix therefore
+  had literally nothing to do here; it cannot detect or help this failure.
+
+**Static root cause (phases 24–26, DCodeBug24/25/26GhidraReport.txt):** the
+upload strategy's tick method — `uei::ThinkLogicStrategyUploadTUS::vftable+0x1C`
+= `FUN_0042EDD0` — at its very first step (item-state 0), checksums the
+buffer it's about to upload using the *same* `FUN_0040DF10` 16-bit
+ones'-complement check used to validate downloads, **before attempting any
+Steam call**:
+
+```c
+if (*(param_1 + 4) == 0) {
+    iVar1 = FUN_0040df10(*(param_2 + 0xd8), *(param_2 + 0xdc));  // checksum own buffer
+    if (iVar1 == 0) {
+        *(param_1 + 4) = 3;
+        *(param_2 + 4) = 0xb;   // immediate failure, Steam never contacted
+    } else { ... actually call FUN_00434750 (FileShare) ... }
+}
+```
+
+The buffer being checksummed is `netUserData + 0xD0` — traced through
+`FUN_0049D5C0() == FUN_004A0FE0() + 0xD0`, and `FUN_004A0FE0` is the *same*
+netUserData singleton getter (`kNetworkUserDataRva`) used everywhere else in
+this file. **This is not a stack copy or a fresh rebuild — it is the live,
+persistent, in-memory profile blob itself.** Nothing in the traced code path
+ever rewrites this region between attempts, so once it goes
+checksum-invalid, every subsequent retry re-checksums the exact same bytes
+and fails identically, forever, with no possibility of self-healing by
+retrying. This is a fundamentally different shape of problem than the TUS
+latch: that was a state-machine flag we could safely reset to a value the
+game itself produces; this looks like standing corruption of live profile
+data, and we do not yet know what "corrupted" means here (all-zero? garbage?
+subtly-wrong single field?) or whether it is safe to touch.
+
+**Deliberately NOT auto-fixed this round.** Overwriting or "repairing" a
+0x6800-byte live game structure without knowing what's actually wrong with
+it is a materially bigger risk than resetting a boolean latch back to its
+own natural value — a bad guess here could corrupt the profile further or
+introduce new failure modes. Instead, shipped (v8.2 deploy) only detection:
+`ObserveProfileUploads` now tracks a consecutive-failure streak and, on the
+first 3 occurrences of a streak, dumps the own-buffer checksum and a hex
+preview to `DCodeIncidents.log`; further failures in the same streak log only
+a periodic heartbeat (every 200) to avoid repeating the 7503-line flood seen
+in this report's raw log (1.5MB from near-duplicate lines). A `[Upload]
+profile upload recovered after N consecutive failure(s)` line fires if it
+ever does start succeeding again.
+
+Next capture needs the ACTUAL corrupted bytes (now captured automatically)
+to determine: is the buffer all-zero (suggests the same reset/wipe path seen
+elsewhere ran against the wrong region), all-garbage (heap corruption
+elsewhere clobbering it), or plausibly-structured-but-wrong (a stale/partial
+write) — each points to a different, and only then would a targeted repair
+be safe to design.

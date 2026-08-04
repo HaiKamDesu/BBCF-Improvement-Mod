@@ -1,0 +1,439 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== uei::ThinkLogicStrategyBase::vftable at 0085043c =====
+  +0x00 -> 0079E05C __purecall
+  +0x04 -> 004293F0 FUN_004293f0
+  +0x08 -> 004293C0 FUN_004293c0
+  +0x0C -> 00429430 FUN_00429430
+  +0x10 -> 00429070 FUN_00429070
+  +0x14 -> 00429DC0 FUN_00429dc0
+  +0x18 -> 00429DC0 FUN_00429dc0
+  +0x1C -> 00429DC0 FUN_00429dc0
+  +0x20 -> 009A7B5C (not a function entry, stop)
+
+----- DECOMPILE 0079e05c (vtbl+0x00 of uei::ThinkLogicStrategyBase::vftable) -----
+Function: __purecall
+
+/* Library Function - Single Match
+    __purecall
+   
+   Library: Visual Studio 2012 Release */
+
+void __purecall(void)
+
+{
+  code *pcVar1;
+  
+  pcVar1 = (code *)DecodePointer(DAT_0182b6e8);
+  if (pcVar1 != (code *)0x0) {
+    (*pcVar1)();
+  }
+  __NMSG_WRITE(0x19);
+  __set_abort_behavior(0,1);
+                    /* WARNING: Subroutine does not return */
+  _abort();
+}
+
+
+
+----- DECOMPILE 004293f0 (vtbl+0x04 of uei::ThinkLogicStrategyBase::vftable) -----
+Function: FUN_004293f0
+
+void __thiscall FUN_004293f0(int *param_1,undefined4 *param_2)
+
+{
+  *param_2 = 0;
+                    /* WARNING: Could not recover jumptable at 0x00429402. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+  (**(code **)(*param_1 + 0x14))();
+  return;
+}
+
+
+
+----- DECOMPILE 004293c0 (vtbl+0x08 of uei::ThinkLogicStrategyBase::vftable) -----
+Function: FUN_004293c0
+
+void __fastcall FUN_004293c0(int *param_1)
+
+{
+                    /* WARNING: Could not recover jumptable at 0x004293c6. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+  (**(code **)(*param_1 + 0x18))();
+  return;
+}
+
+
+
+----- DECOMPILE 00429430 (vtbl+0x0C of uei::ThinkLogicStrategyBase::vftable) -----
+Function: FUN_00429430
+
+void __fastcall FUN_00429430(int *param_1)
+
+{
+                    /* WARNING: Could not recover jumptable at 0x00429436. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+  (**(code **)(*param_1 + 0x1c))();
+  return;
+}
+
+
+
+----- DECOMPILE 00429070 (vtbl+0x10 of uei::ThinkLogicStrategyBase::vftable) -----
+Function: FUN_00429070
+
+undefined4 * __thiscall FUN_00429070(undefined4 *param_1,byte param_2)
+
+{
+  *param_1 = uei::ThinkLogicStrategyBase::vftable;
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  return param_1;
+}
+
+
+
+----- DECOMPILE 00429dc0 (vtbl+0x14 of uei::ThinkLogicStrategyBase::vftable) -----
+Function: FUN_00429dc0
+
+void FUN_00429dc0(void)
+
+{
+  return;
+}
+
+
+
+===== uei::ThinkLogicStrategyDownloadTUS::vftable at 00850564 =====
+  +0x00 -> 004293D0 FUN_004293d0
+  +0x04 -> 00429410 FUN_00429410
+  +0x08 -> 004293C0 FUN_004293c0
+  +0x0C -> 00429430 FUN_00429430
+  +0x10 -> 00429170 FUN_00429170
+  +0x14 -> 00428AB0 FUN_00428ab0
+  +0x18 -> 00429DC0 FUN_00429dc0
+  +0x1C -> 00428AC0 FUN_00428ac0
+  +0x20 -> 009A7DE0 (not a function entry, stop)
+
+----- DECOMPILE 004293d0 (vtbl+0x00 of uei::ThinkLogicStrategyDownloadTUS::vftable) -----
+Function: FUN_004293d0
+
+undefined4 FUN_004293d0(void)
+
+{
+  return 7;
+}
+
+
+
+----- DECOMPILE 00429410 (vtbl+0x04 of uei::ThinkLogicStrategyDownloadTUS::vftable) -----
+Function: FUN_00429410
+
+void __thiscall FUN_00429410(int *param_1,int param_2)
+
+{
+  *(undefined4 *)(param_2 + 4) = 0;
+                    /* WARNING: Could not recover jumptable at 0x00429423. Too many branches */
+                    /* WARNING: Treating indirect jump as call */
+  (**(code **)(*param_1 + 0x14))();
+  return;
+}
+
+
+
+----- DECOMPILE 00429170 (vtbl+0x10 of uei::ThinkLogicStrategyDownloadTUS::vftable) -----
+Function: FUN_00429170
+
+undefined4 * __thiscall FUN_00429170(undefined4 *param_1,byte param_2)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_00824748;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  local_8 = 0xffffffff;
+  *param_1 = uei::ThinkLogicStrategyBase::vftable;
+  if ((param_2 & 1) != 0) {
+    FID_conflict__free(param_1);
+  }
+  ExceptionList = local_10;
+  return param_1;
+}
+
+
+
+----- DECOMPILE 00428ab0 (vtbl+0x14 of uei::ThinkLogicStrategyDownloadTUS::vftable) -----
+Function: FUN_00428ab0
+
+void __fastcall FUN_00428ab0(int param_1)
+
+{
+  *(undefined4 *)(param_1 + 4) = 0;
+  return;
+}
+
+
+
+----- DECOMPILE 00428ac0 (vtbl+0x1C of uei::ThinkLogicStrategyDownloadTUS::vftable) -----
+Function: FUN_00428ac0
+
+void __thiscall FUN_00428ac0(int param_1,int param_2)
+
+{
+  uint uVar1;
+  int iVar2;
+  undefined1 *puVar3;
+  undefined *puVar4;
+  undefined ***pppuVar5;
+  undefined1 local_120 [24];
+  int local_108;
+  void *local_70;
+  int local_6c;
+  undefined4 local_68;
+  undefined **local_64;
+  undefined4 local_60;
+  undefined4 local_5c;
+  undefined4 local_58;
+  undefined1 local_54;
+  undefined1 local_53 [63];
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082467d;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_14 = uVar1;
+  if (*(int *)(param_1 + 4) == 0) {
+    local_5c = *(undefined4 *)(param_2 + 0xd0);
+    local_58 = *(undefined4 *)(param_2 + 0xd4);
+    pppuVar5 = &local_64;
+    local_60 = 9;
+    local_64 = uei::tl::ReadTusRequestParam::vftable;
+    FUN_00432e10(pppuVar5,uVar1);
+    iVar2 = FUN_00434750(pppuVar5);
+    if (iVar2 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+    else {
+      *(undefined4 *)(param_1 + 4) = 1;
+    }
+    goto LAB_00428ce7;
+  }
+  if (*(int *)(param_1 + 4) != 1) goto LAB_00428ce7;
+  FUN_004284a0();
+  local_70 = (void *)0x0;
+  local_6c = 0;
+  local_68 = 0;
+  local_8 = 4;
+  puVar3 = local_120;
+  FUN_00432e10(puVar3,uVar1);
+  iVar2 = FUN_00433fe0(puVar3);
+  if (iVar2 != 0) {
+    if (local_108 == 0) {
+      if (local_6c - (int)local_70 == *(int *)(param_2 + 0xdc)) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        iVar2 = FUN_0040df10(local_70,local_6c - (int)local_70);
+        if (iVar2 == 0) {
+          FUN_00428950(*(undefined4 *)(param_2 + 0xd0),*(undefined4 *)(param_2 + 0xd4));
+          local_54 = 0;
+          FUN_0079f840(local_53,0,0x3f);
+          FUN_00778d00(&local_64,0x10,&local_54);
+          FUN_00778e00(&local_54,0x40,local_70,local_6c - (int)local_70);
+          iVar2 = FUN_0040df10(local_70,local_6c - (int)local_70);
+          if (iVar2 == 0) {
+            puVar4 = &DAT_008503dc;
+            goto LAB_00428c3a;
+          }
+        }
+        _memcpy_s(*(void **)(param_2 + 0xd8),*(rsize_t *)(param_2 + 0xdc),local_70,
+                  local_6c - (int)local_70);
+        *(undefined4 *)(param_2 + 4) = 7;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        FUN_00428780(&DAT_008503dc);
+        *(undefined4 *)(param_2 + 4) = 9;
+      }
+    }
+    else {
+      puVar4 = &DAT_00850400;
+LAB_00428c3a:
+      *(undefined4 *)(param_1 + 4) = 3;
+      FUN_00428780(puVar4);
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+  }
+  local_8 = 5;
+  if (local_70 != (void *)0x0) {
+    FID_conflict__free(local_70);
+    local_70 = (void *)0x0;
+    local_6c = 0;
+    local_68 = 0;
+  }
+  local_8 = 0xffffffff;
+  FUN_004285e0();
+LAB_00428ce7:
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+===== uei::ThinkLogicStrategyUploadTUS::vftable at 00850588 =====
+  +0x00 -> 004293E0 FUN_004293e0
+  +0x04 -> 00429410 FUN_00429410
+  +0x08 -> 004293C0 FUN_004293c0
+  +0x0C -> 00429430 FUN_00429430
+  +0x10 -> 00429170 FUN_00429170
+  +0x14 -> 00428AB0 FUN_00428ab0
+  +0x18 -> 00429DC0 FUN_00429dc0
+  +0x1C -> 0042EDD0 FUN_0042edd0
+  +0x20 -> 009A7E30 (not a function entry, stop)
+
+----- DECOMPILE 004293e0 (vtbl+0x00 of uei::ThinkLogicStrategyUploadTUS::vftable) -----
+Function: FUN_004293e0
+
+undefined4 FUN_004293e0(void)
+
+{
+  return 8;
+}
+
+
+
+----- DECOMPILE 0042edd0 (vtbl+0x1C of uei::ThinkLogicStrategyUploadTUS::vftable) -----
+Function: FUN_0042edd0
+
+void __thiscall FUN_0042edd0(int param_1,int param_2)
+
+{
+  rsize_t _DstSize;
+  void *_Src;
+  int iVar1;
+  undefined4 *puVar2;
+  void *_Dst;
+  undefined1 *puVar3;
+  undefined ***pppuVar4;
+  undefined1 local_140 [8];
+  undefined **local_138;
+  undefined4 local_134;
+  void *local_130;
+  rsize_t local_12c;
+  undefined4 local_128;
+  undefined4 local_124;
+  int local_120;
+  undefined1 local_11c [24];
+  int local_104;
+  undefined1 local_6c [8];
+  undefined1 local_64 [8];
+  undefined1 local_5c;
+  undefined1 local_5b [63];
+  undefined4 local_1c;
+  undefined4 local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00825207;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_120 = param_1;
+  if (*(int *)(param_1 + 4) == 0) {
+    iVar1 = FUN_0040df10(*(undefined4 *)(param_2 + 0xd8),*(undefined4 *)(param_2 + 0xdc),local_14);
+    if (iVar1 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+    else {
+      iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+      puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_140);
+      local_128 = *puVar2;
+      local_124 = puVar2[1];
+      local_1c = 0x84a9e134;
+      local_18 = 0x7b8315f0;
+      _memcpy_s(local_6c,8,&local_1c,8);
+      _memcpy_s(local_64,8,&local_128,8);
+      local_5c = 0;
+      FUN_0079f840(local_5b,0,0x3f);
+      FUN_00778d00(local_6c,0x10,&local_5c);
+      _DstSize = *(rsize_t *)(param_2 + 0xdc);
+      _Src = *(void **)(param_2 + 0xd8);
+      _Dst = (void *)FUN_00787469(_DstSize);
+      _memcpy_s(_Dst,_DstSize,_Src,_DstSize);
+      FUN_00778ee0(&local_5c,0x40,_Dst,_DstSize);
+      pppuVar4 = &local_138;
+      local_134 = 10;
+      local_138 = uei::tl::WriteTusRequestParam::vftable;
+      local_130 = _Dst;
+      local_12c = _DstSize;
+      FUN_00432e10(pppuVar4);
+      iVar1 = FUN_00434750(pppuVar4);
+      if (iVar1 == 0) {
+        *(undefined4 *)(local_120 + 4) = 3;
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+      else {
+        *(undefined4 *)(local_120 + 4) = 1;
+      }
+      FID_conflict__free(_Dst);
+    }
+  }
+  else if (*(int *)(param_1 + 4) == 1) {
+    FUN_004284a0();
+    local_8 = 2;
+    puVar3 = local_11c;
+    FUN_00432e10(puVar3);
+    iVar1 = FUN_00434060(puVar3);
+    if (iVar1 != 0) {
+      if (local_104 == 0) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        *(undefined4 *)(param_2 + 4) = 8;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        FUN_00428780(&DAT_008506f4);
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+    }
+    local_8 = 0xffffffff;
+    FUN_004285e0();
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+===== uei::ThinkLogicStrategyIdle::vftable at 00850428 =====
+  +0x00 -> 006A9DA0 FUN_006a9da0
+  +0x04 -> 00429DC0 FUN_00429dc0
+  +0x08 -> 00429DC0 FUN_00429dc0
+  +0x0C -> 00429DC0 FUN_00429dc0
+  +0x10 -> 009A7B10 (not a function entry, stop)
+
+----- DECOMPILE 006a9da0 (vtbl+0x00 of uei::ThinkLogicStrategyIdle::vftable) -----
+Function: FUN_006a9da0
+
+undefined4 FUN_006a9da0(void)
+
+{
+  return 0;
+}
+
+
+

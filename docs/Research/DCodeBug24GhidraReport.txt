@@ -1,0 +1,150 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== ALL XREFS TO DAT_00A5A050 (manager base) =====
+  00848319 in FUN_008482f0 (DATA)
+  00848329 in FUN_008482f0 (DATA)
+  00427d3a in FUN_00427cd0 (DATA)
+  00427d0a in FUN_00427cd0 (DATA)
+  0042808d in FUN_00428050 (DATA)
+  00824380 in Unwind@00824380 (DATA)
+  008243be in Unwind@008243be (DATA)
+  008243fe in Unwind@008243fe (DATA)
+  00848363 in FUN_008482f0 (DATA)
+
+===== ALL XREFS TO DAT_00A5A054 (state field, base+4) =====
+
+----- DECOMPILE 008482f0 (touches work manager) -----
+Function: FUN_008482f0
+
+void FUN_008482f0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082438a;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  local_8 = 0;
+  FUN_00429390(DAT_00a5a130,&DAT_00a5a050,DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  DAT_00a5a130 = 0;
+  FUN_00429390(DAT_00a5a134,&DAT_00a5a050);
+  DAT_00a5a134 = 0;
+  FUN_00432e10();
+  FUN_00434d30();
+  local_8 = 0xffffffff;
+  FUN_004279a0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+----- DECOMPILE 00428050 (touches work manager) -----
+Function: FUN_00428050
+
+void __fastcall FUN_00428050(int param_1)
+
+{
+  undefined4 uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_00824408;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a5a138 & 1) == 0) {
+    DAT_00a5a138 = DAT_00a5a138 | 1;
+    local_8 = 0;
+    FUN_004276a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    DAT_00a5a130 = 0;
+    local_8 = local_8 & 0xffffff00;
+    _atexit(FUN_008482f0);
+  }
+  local_8 = 0xffffffff;
+  if (DAT_00a5a070 == '\0') {
+    FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+    uVar1 = FUN_004291d0(1,param_1);
+    *(undefined4 *)(param_1 + 0xe0) = uVar1;
+  }
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+----- DECOMPILE 00427cd0 (touches work manager) -----
+Function: FUN_00427cd0
+
+undefined * FUN_00427cd0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_008243c8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a5a138 & 1) == 0) {
+    DAT_00a5a138 = DAT_00a5a138 | 1;
+    local_8 = 0;
+    FUN_004276a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    DAT_00a5a130 = 0;
+    local_8 = local_8 & 0xffffff00;
+    _atexit(FUN_008482f0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a5a050;
+}
+
+
+
+----- DECOMPILE 008243fe (touches work manager) -----
+Function: Unwind@008243fe
+
+void Unwind_008243fe(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+----- DECOMPILE 008243be (touches work manager) -----
+Function: Unwind@008243be
+
+void Unwind_008243be(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+----- DECOMPILE 00824380 (touches work manager) -----
+Function: Unwind@00824380
+
+void Unwind_00824380(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+===== STRATEGY CLASS FULL VTABLES =====
+--- refs from 00428d70 (FUN_00428d70) ---
+  00428d96 -> uei::ThinkLogicStrategyBase::vftable
+  00428da3 -> uei::ThinkLogicStrategyDownloadTUS::vftable
+
+--- refs from 00428fb0 (FUN_00428fb0) ---
+  00428fd6 -> uei::ThinkLogicStrategyBase::vftable
+  00428fe3 -> uei::ThinkLogicStrategyUploadTUS::vftable
+

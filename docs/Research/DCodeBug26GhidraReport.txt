@@ -1,0 +1,57 @@
+Program: BBCF.exe
+Image base: 00400000
+
+----- DECOMPILE 0049d5c0  -----
+Function: FUN_0049d5c0
+
+int FUN_0049d5c0(void)
+
+{
+  int iVar1;
+  
+  iVar1 = FUN_004a0fe0();
+  return iVar1 + 0xd0;
+}
+
+
+
+----- DECOMPILE 0049a470  -----
+Function: FUN_0049a470
+
+undefined4 FUN_0049a470(undefined4 param_1)
+
+{
+  undefined4 uVar1;
+  
+  uVar1 = FUN_004a0fe0();
+  FUN_00407970(uVar1);
+  return param_1;
+}
+
+
+
+----- DECOMPILE 0049a400  -----
+Function: FUN_0049a400
+
+undefined * FUN_0049a400(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082abbe;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00cad078 & 1) == 0) {
+    DAT_00cad078 = DAT_00cad078 | 1;
+    local_8 = 0;
+    FUN_00496d30(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    _atexit((_func_4879 *)&DAT_008488a0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00cad000;
+}
+
+
+

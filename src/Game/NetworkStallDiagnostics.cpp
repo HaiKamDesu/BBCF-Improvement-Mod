@@ -460,9 +460,40 @@ namespace
 	// ---- Profile upload observation ----
 	// Reads the shared CUMSTask worker: +0x90 nonzero = an upload/share request
 	// (FUN_00423950 path, i.e. our own bbdc.dat going out), +0x94 nonzero = a
-	// download. Purely observational; proves whether uploads resume after recovery.
+	// download.
+	//
+	// 2026-08-03 finding (third-party report, v8.2): uploads can fail FOREVER
+	// without the DAT_00CF77A8 latch (kTusDisabledGateRva) ever setting, so the
+	// TusGate auto-clear cannot help this case. Root cause traced statically
+	// (DCodeBug25/26GhidraReport.txt): the upload strategy's tick method
+	// (uei::ThinkLogicStrategyUploadTUS::vftable+0x1C, FUN_0042EDD0) checksums
+	// the OWN local profile buffer with the same FUN_0040DF10 check used to
+	// validate downloads, BEFORE attempting any Steam call. If that checksum is
+	// already invalid, it sets the shared error state immediately -- no Steam
+	// round-trip happens at all. The buffer is netUserData+0xD0
+	// (FUN_0049D5C0() == FUN_004A0FE0()+0xD0, the SAME live singleton this file
+	// reads everywhere else, not a stack copy) -- i.e. the player's own
+	// in-memory profile blob. Nothing rewrites that region between attempts, so
+	// once it goes checksum-invalid it stays invalid for the rest of the
+	// process, and every retry fails identically forever.
+	//
+	// This is NOT yet an automatic fix: we don't know what makes the buffer
+	// invalid or whether overwriting it live is safe, so for now this only
+	// detects and evidences the condition (dumping the buffer once per streak)
+	// so the next capture can show the actual corrupted bytes. A raw one-line-
+	// per-attempt log of this would be unusable in practice -- the report that
+	// found this had 7503 near-identical failure lines in one session -- so
+	// logging is rate-limited to the first few occurrences plus periodic
+	// heartbeats.
 	uint32_t g_lastUploadReqId = 0;
 	bool g_uploadInFlight = false;
+	int g_uploadConsecutiveFailures = 0;
+	constexpr int kUploadFailureFullLogCount = 3;     // log full detail this many times
+	constexpr int kUploadFailureHeartbeatEvery = 200; // then only a periodic count
+
+	// Own-profile buffer at netUserData+0xD0 (see FUN_0049D5C0 in the comment
+	// above). Distinct from the per-slot room-row blob this file already reads.
+	constexpr uintptr_t kOwnProfileBufferOffset = 0xD0;
 
 	void ObserveProfileUploads(uintptr_t moduleBase, const char* progress)
 	{
@@ -492,13 +523,55 @@ namespace
 		{
 			g_uploadInFlight = true;
 			g_lastUploadReqId = uploadReq;
-			IncidentPrintf("[Upload] profile upload submitted (req=%08X), %s\n", uploadReq, progress ? progress : "");
 		}
 		else if (uploadReq != 0 && g_uploadInFlight && done != 0 && busy == 0)
 		{
 			g_uploadInFlight = false;
-			IncidentPrintf("[Upload] profile upload finished: %s (errFlags=%02X), %s\n",
-				(errFlags & 1) ? "FAILED" : "ok", errFlags, progress ? progress : "");
+			const bool failed = (errFlags & 1) != 0;
+
+			if (!failed)
+			{
+				if (g_uploadConsecutiveFailures > 0)
+				{
+					IncidentPrintf("[Upload] profile upload recovered after %d consecutive failure(s), %s\n",
+						g_uploadConsecutiveFailures, progress ? progress : "");
+				}
+				else
+				{
+					IncidentPrintf("[Upload] profile upload finished ok, %s\n", progress ? progress : "");
+				}
+				g_uploadConsecutiveFailures = 0;
+				return;
+			}
+
+			++g_uploadConsecutiveFailures;
+			const bool logFull = g_uploadConsecutiveFailures <= kUploadFailureFullLogCount ||
+				(g_uploadConsecutiveFailures % kUploadFailureHeartbeatEvery) == 0;
+			if (!logFull)
+			{
+				return;
+			}
+
+			IncidentPrintf("[Upload] !!! profile upload FAILED (errFlags=%02X, streak=%d), %s\n",
+				errFlags, g_uploadConsecutiveFailures, progress ? progress : "");
+
+			if (g_uploadConsecutiveFailures <= kUploadFailureFullLogCount)
+			{
+				const uint8_t* const netUserData =
+					reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
+				const uint8_t* const ownBuffer = netUserData + kOwnProfileBufferOffset;
+				if (!IsBadReadPtr(ownBuffer, kProfileBlobSize))
+				{
+					const uint16_t sum = ProfileChecksum16(ownBuffer, kProfileBlobSize);
+					IncidentPrintf("[Upload] own profile buffer (netUserData+0x%X) checksum16=0x%04X (valid=0xFFFF)\n",
+						static_cast<unsigned>(kOwnProfileBufferOffset), sum);
+					LogBlobHexdump("[Upload] own buffer", ownBuffer, 0x40);
+				}
+				else
+				{
+					IncidentPrintf("[Upload] own profile buffer unreadable\n");
+				}
+			}
 		}
 		else if (uploadReq == 0)
 		{
