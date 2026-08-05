@@ -1,4 +1,6 @@
 #include "crashdump.h"
+#include "info.h"
+#include "BuildInfo.autogen.h"
 #include "interfaces.h"
 #include "logger.h"
 #include "Settings.h"
@@ -42,6 +44,13 @@ static bool EnsureOriginalDinputLoaded()
 HRESULT WINAPI DirectInput8Create(HINSTANCE hinstHandle, DWORD version, const IID& r_iid, LPVOID* outWrapper, LPUNKNOWN pUnk)
 {
 	ForceLog("[Init] Entered DirectInput8Create export");
+	// Build identity: MOD_VERSION_NUM only changes when someone remembers to bump it.
+	// BuildInfo.autogen.h is regenerated unconditionally on every build (BeforeBuild target,
+	// not gated on which source files changed -- see tools/generate_build_info.ps1), so this
+	// always reflects the exact commit/build that produced this binary, never a stale one
+	// left over from an unrelated file's last recompile.
+	ForceLog("[Init] BBCF_IM build %s, commit %s%s, built %s",
+		MOD_VERSION_NUM, BUILD_GIT_HASH, BUILD_GIT_DIRTY ? "-dirty" : "", BUILD_TIMESTAMP);
 
 	// Avoid relying on logging here: this can be called before settings/logger init.
 	if (!EnsureOriginalDinputLoaded())

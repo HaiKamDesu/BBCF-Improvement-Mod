@@ -721,3 +721,40 @@ static constexpr uintptr_t ADDR_PlatLinkColorJumpTable  = 0x001B52B4; // jump ta
 // not a 24-slot character container (it resolves only 2 slots) and must not be written to as if
 // it were; doing so corrupts the heap.
 static constexpr uintptr_t ADDR_PaletteContainerLoad    = 0x001B6310; // FUN_005B6310
+//
+// Palette texture REFRESH (2026-08-05, Taokaka round-start palette investigation).
+// FUN_005B6310's caller (owner+0x830 store; base+0x567F35 in the load routine at ~0x567E00-0x5680C0)
+// is an outer "character render resource" object holding TWO palette-container slots:
+//   owner+0x82C - loaded by a sibling loader FUN_005B6390, refreshed by FUN_005B6980
+//   owner+0x830 - loaded by FUN_005B6310 (the one GetPalBaseAddresses hooks), refreshed by FUN_005B6940
+// Confirmed via disasm: at the GetPalBaseAddresses hook site (0x005B6372, `mov [ecx+830h],eax`),
+// ECX is this same "owner" object - the hook currently only captures EAX (the container, which is
+// what CharPaletteHandle stores as m_pPalBaseAddr), never ECX. Capturing ECX too would give a
+// direct handle to the owner, hence to these refresh functions.
+//
+// FUN_005B6940(this=owner) - gates on `cmp [owner+18h],0; je skip`. If set, calls owner's
+// +0x830 container->vtable[2](owner+4, owner+8, owner+0Ch, 1) then container->vtable[3](0, 0x300).
+// 0x300 = 768 = a full 256-color RGB palette in bytes - this is almost certainly a Lock/Unlock
+// pair (D3D9-style) that pushes the palette bytes at owner+0x830 into whatever the renderer
+// actually samples (a GPU texture, most likely). FUN_005B6980(this=owner) is the analogous
+// refresh for the +0x82C container, gated on [owner+10h], pushing 0x400/0x400 (looks like a
+// larger, fixed-size texture rather than a raw palette - possibly a full sprite-sheet atlas).
+//
+// Working theory: this is why the mod's index-toggle trick (CharPaletteHandle::UpdatePalette
+// hot-swapping the live native color index to force a redraw) is fundamentally a timing gamble
+// rather than a deterministic fix - it relies on the ENGINE noticing the index changed and
+// setting [owner+18h]=1 on its own before our toggle gets corrected back. Confirmed via live
+// debug logs (2026-08-05, 6-match session) that the toggle's own timing is now a rock-solid
+// constant (6 frames every single time, after the grace-period fix), yet Taokaka STILL fails to
+// pick up her custom palette at round start in ~half of matches while Makoto/Hakumen/Ragna never
+// fail - meaning the deciding factor is whether this dirty flag gets set at all for her model,
+// not toggle timing. It reliably gets fixed mid-match by unrelated events (freeze-frame pause/step,
+// landing specific moves), consistent with SOME other state transition eventually setting the flag.
+//
+// Not yet verified live (no way to test outside an actual game session): capturing owner+ECX per
+// player in GetPalBaseAddresses, then after CharPaletteHandle writes new palette bytes, setting
+// [owner+18h]=1 and calling FUN_005B6940(owner) directly would reuse the engine's own proven
+// refresh path deterministically, instead of gambling on the toggle trick. See
+// docs/Research/TaokakaPaletteRefreshInvestigation.md for the plan before implementing.
+static constexpr uintptr_t ADDR_PaletteTextureRefresh_Main = 0x001B6940; // FUN_005B6940 (owner+0x830 container)
+static constexpr uintptr_t ADDR_PaletteTextureRefresh_Alt  = 0x001B6980; // FUN_005B6980 (owner+0x82C container)

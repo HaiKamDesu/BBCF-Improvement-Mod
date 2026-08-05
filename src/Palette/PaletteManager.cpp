@@ -152,6 +152,14 @@ void PaletteManager::ApplyDefaultCustomPalette(CharIndex charIndex, CharPaletteH
 	}
 	else if (strncmp(curPalName, "Random_Exclude_Default", IMPL_PALNAME_LENGTH) == 0)
 	{
+		if (m_customPalettes[charIndex].size() <= 1)
+		{
+			// No real custom palettes to exclude Default from -- dist(1, 0) below would be UB.
+			g_imGuiLogger->Log("[error] '%s' has no custom palettes to pick from for Random_Exclude_Default.\n",
+				getCharacterNameByIndexA(charIndex).c_str());
+			return;
+		}
+
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<int> dist(1, m_customPalettes[charIndex].size()-1); // uniform, unbiased
@@ -784,11 +792,8 @@ void PaletteManager::SetCurrentPalInfo(CharPaletteHandle& palHandle, IMPL_info_t
 
 void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 {
-	// Runs after this frame's draw calls, so it's safe to correct any toggle
-	// artifact UpdatePalette() left behind before it can leak into next frame.
-	P1.CorrectToggleArtifact();
-	P2.CorrectToggleArtifact();
-
+	// UpdatePalette()'s hot-swap artifact is deliberately never corrected -- see
+	// CharPaletteHandle::OnMatchInit. This just clears the once-per-frame update lock.
 	P1.UnlockUpdate();
 	P2.UnlockUpdate();
 }

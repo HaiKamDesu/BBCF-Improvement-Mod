@@ -22,3 +22,6 @@ docs/Research/BBCF-Ghidra-Project/
 # URT automation local outputs.
 tools/urt_automation/runtime/
 /.claude/worktrees
+
+# Regenerated on every build (BeforeBuild target); never stable enough to check in.
+src/Core/BuildInfo.autogen.h

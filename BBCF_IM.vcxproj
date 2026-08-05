@@ -466,6 +466,10 @@
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_build_info.ps1" -OutPath "$(ProjectDir)src\Core\BuildInfo.autogen.h"</Command>
+      <Message>Stamping build identity (commit hash + timestamp)</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDeploy|Win32'">
     <ClCompile>
@@ -490,6 +494,10 @@
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_build_info.ps1" -OutPath "$(ProjectDir)src\Core\BuildInfo.autogen.h"</Command>
+      <Message>Stamping build identity (commit hash + timestamp)</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -522,6 +530,10 @@
       <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_build_info.ps1" -OutPath "$(ProjectDir)src\Core\BuildInfo.autogen.h"</Command>
+      <Message>Stamping build identity (commit hash + timestamp)</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDeploy|Win32'">
     <ClCompile>
@@ -554,6 +566,10 @@
       <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)tools\generate_build_info.ps1" -OutPath "$(ProjectDir)src\Core\BuildInfo.autogen.h"</Command>
+      <Message>Stamping build identity (commit hash + timestamp)</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
