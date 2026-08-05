@@ -78,20 +78,13 @@ SETTING(int, frameStallThresholdMs, "FrameStallThresholdMs", "33");
 // Enum options rendered by SettingsIniWindow.cpp's kSettingEnumMetadata.
 // Read at startup only -- requires a restart to take effect.
 SETTING(int, d3d9IatFallbackHook, "D3D9IatFallbackHook", "1");
-// Force Platinum's random personality/voice pick (Sena/Luna) instead of letting the
-// game roll it: 0 = Default (vanilla RNG), 1 = force Luna, 2 = force Sena. Enum options
-// rendered by SettingsIniWindow.cpp's kSettingEnumMetadata. Overwrites the game's own
-// per-player select-struct field (base+0x164C, see docs/Research) right before it gets
-// copied into the committed selection data, so both the "live" and "committed" copies
-// end up with the forced value. Local override only - see the investigation doc for why
-// cross-client sync isn't guaranteed.
+// Force Platinum's personality/voice (Sena/Luna) for the Platinum YOU control: 0 = Default
+// (vanilla RNG), 1 = force Luna, 2 = force Sena. Enum options rendered by
+// SettingsIniWindow.cpp's kSettingEnumMetadata. Client-side audio-only override (hooks the
+// voice-bank load + play resolvers in hooks_palette.cpp, never writes the game's checksummed
+// select-struct field) - safe offline AND online, works vs modded and modless opponents alike.
+// See docs/Research/PlatinumVoiceChoiceInvestigation.md for the full RE writeup.
 SETTING(int, platinumVoiceChoice, "PlatinumVoiceChoice", "0");
-// Platinum voice override is OFFLINE-ONLY by default. This flag also applies it in ONLINE
-// matches - which is KNOWN TO CAUSE DESYNC ("desync detected", both players kicked from the
-// match). It exists only so the online work can be continued/experimented with; a desync-safe
-// online path is not implemented yet. Leave at 0 unless you know exactly what you are doing.
-// 0 = off (offline only, safe), 1 = also apply online (WILL desync).
-SETTING(bool, platinumVoiceOnlineDesyncUnsafe, "PlatinumVoiceOnlineDesyncUnsafe", "0");
 // Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
 // launch). 0 = old behavior, DEBUG.txt is overwritten every launch.
 SETTING(int, debugLogSessionHistory, "DebugLogSessionHistory", "10");
