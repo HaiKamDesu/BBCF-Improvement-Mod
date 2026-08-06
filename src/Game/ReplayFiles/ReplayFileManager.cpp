@@ -545,7 +545,8 @@ void ReplayFileManager::load_replay_list_from_db(int page, int character1, std::
         new_name = "Save/Replay/tmp/rp" + std::string(2 - min(2, new_name.length()), '0') + new_name + ".dat";
             
         ReplayFile* rp = 0;
-        DownloadUrlBinary(L"http://" + utf8_to_utf16(g_modVals.uploadReplayDataHost) + L":" + std::to_wstring(g_modVals.uploadReplayDataPort) + L"/download/" + utf8_to_utf16(page_filenames[j]), (void**)&rp);
+        std::wstring downloadScheme = g_modVals.uploadReplayDataUseTls ? L"https://" : L"http://";
+        DownloadUrlBinary(downloadScheme + utf8_to_utf16(g_modVals.uploadReplayDataHost) + L":" + std::to_wstring(g_modVals.uploadReplayDataPort) + L"/download/" + utf8_to_utf16(page_filenames[j]), (void**)&rp);
 
         if (rp == 0 || !check_file_validity(rp) || strncmp((char*)rp, "<!", 2) == 0) {
             replay_list->replays[j].data()->valid = false;
@@ -621,12 +622,16 @@ void ReplayFileManager::unpack_replay_buffer() {
     unpack_replay(base + 0x115b470); //&base->static_CBattleReplayDataManager); // moves data from _.replay_buffer to _.replay
 }
 bool ReplayFileManager::validate_url_prefix(char* url) {
-    auto url_replay_db = ("http://" + g_modVals.uploadReplayDataHost);
-    auto len = url_replay_db.size();
-    auto url_replay_db_cs = url_replay_db.c_str();
+    // Accept either scheme for the configured host regardless of UploadReplayDataUseTls -
+    // this is just an allow-list against SSRF/arbitrary links, not a live connection, so
+    // there's no reason to reject a link using the other scheme than what's configured.
+    auto url_replay_db_http = ("http://" + g_modVals.uploadReplayDataHost);
+    auto url_replay_db_https = ("https://" + g_modVals.uploadReplayDataHost);
     auto url_replay_db_cs_2 = "https://bbreplay.ovh";
     auto len2 = 20;
-    if (strncmp(url, url_replay_db_cs, len) == 0 || strncmp(url, url_replay_db_cs_2, len2) == 0) {
+    if (strncmp(url, url_replay_db_http.c_str(), url_replay_db_http.size()) == 0 ||
+        strncmp(url, url_replay_db_https.c_str(), url_replay_db_https.size()) == 0 ||
+        strncmp(url, url_replay_db_cs_2, len2) == 0) {
         return true;
     }
     return false;

@@ -93,6 +93,7 @@ void Settings::applyRuntimeSettings()
 	//CA2W pszwide2(str2.c_str());
 	g_modVals.uploadReplayDataEndpoint = Settings::settingsIni.uploadReplayDataEndpoint;
 	g_modVals.uploadReplayDataPort = Settings::settingsIni.uploadReplayDataPort;
+	g_modVals.uploadReplayDataUseTls = Settings::settingsIni.uploadReplayDataUseTls;
 }
 
 int Settings::readSettingsFilePropertyInt(LPCWSTR key, LPCWSTR defaultVal, LPCWSTR filename)

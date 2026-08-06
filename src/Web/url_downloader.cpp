@@ -146,7 +146,7 @@ int UploadReplayBinary() {
     }
     //ok
     // Step 3: Open the request
-    hRequest = HttpOpenRequest(hConnect, L"POST", urlPath, NULL, NULL, NULL, 0, 0);
+    hRequest = HttpOpenRequest(hConnect, L"POST", urlPath, NULL, NULL, NULL, g_modVals.uploadReplayDataUseTls ? INTERNET_FLAG_SECURE : 0, 0);
     if (!hRequest) {
         DWORD error_num = GetLastError();
         InternetCloseHandle(hConnect);

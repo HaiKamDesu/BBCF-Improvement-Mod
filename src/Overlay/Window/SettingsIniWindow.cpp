@@ -85,6 +85,7 @@ namespace {
 		{ "UploadReplayDataHost", "Replay upload host", "Replay Database", "Server host used for replay database uploads." },
 		{ "UploadReplayDataEndpoint", "Replay upload endpoint", "Replay Database", "HTTP endpoint path used for replay database uploads." },
 		{ "UploadReplayDataPort", "Replay upload port", "Replay Database", "Server port used for replay database uploads." },
+		{ "UploadReplayDataUseTls", "Use HTTPS for replay upload", "Replay Database", "Speaks TLS (HTTPS) to the replay upload host/port instead of plain HTTP. Leave off for the default direct-IP server; turn on if your host/port point at a Cloudflare-fronted domain, which requires TLS on its HTTPS ports (e.g. 443) and will reject plain HTTP with a 400 error otherwise." },
 		{ "autoArchive", "Auto archive replays", "Replay Database", "Automatically archives saved replays when supported by the replay tools." },
 		{ "FrameHistoryWidth", "Frame history width", "Frame History", "Width of each frame history input cell." },
 		{ "FrameHistoryHeight", "Frame history height", "Frame History", "Height of each frame history input cell." },

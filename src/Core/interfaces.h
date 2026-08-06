@@ -114,6 +114,7 @@ struct modValues_t {
 	std::string uploadReplayDataHost; 
 	std::string uploadReplayDataEndpoint;
 	unsigned short uploadReplayDataPort;
+	bool uploadReplayDataUseTls = false;
 	bool uploadReplayDataVeto = false; //this refers to when other players disable replay upload
 	float frame_history_width;
 	float frame_history_height;
