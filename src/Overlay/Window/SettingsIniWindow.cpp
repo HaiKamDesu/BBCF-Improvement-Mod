@@ -100,7 +100,7 @@ namespace {
 		{ "UnlimitedPlaybackLoopRestartLabState", "Restart lab state on loop", "Unlimited Playback", "Reloads lab state when an unlimited playback loop restarts." },
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop restart mode", "Unlimited Playback", "Selects how unlimited playback restarts when looping." },
 		{ "D3D9IatFallbackHook", "D3D9 import-table fallback hook", "Graphics", "Rescues the overlay on PCs where another program (notably NVIDIA Optimus' nvd3d9wrap.dll on dual-GPU laptops) hooks Direct3D before the mod and knocks the mod back out, so the game runs fine but no mod window ever appears. Automatic only acts on affected PCs and does nothing everywhere else - leave it there unless you are debugging. Requires a restart." },
-		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks which voice (Sena or Luna) YOUR Platinum uses instead of the game's random roll. Applies only to the Platinum you control, works both offline and online (client-side audio swap only, never touches synced match state - safe vs modded and modless opponents alike)." },
+		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks which voice (Sena or Luna) YOUR Platinum uses instead of the game's random roll. OFFLINE ONLY (training, vs CPU, replays, local versus) - forced off in online matches pending investigation of a reported match desync that correlated with this override. Applies only to the Platinum you control." },
 	};
 
 	static const SettingMetadata* GetSettingMetadata(const char* iniKey)

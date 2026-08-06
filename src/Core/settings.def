@@ -82,8 +82,10 @@ SETTING(int, d3d9IatFallbackHook, "D3D9IatFallbackHook", "1");
 // (vanilla RNG), 1 = force Luna, 2 = force Sena. Enum options rendered by
 // SettingsIniWindow.cpp's kSettingEnumMetadata. Client-side audio-only override (hooks the
 // voice-bank load + play resolvers in hooks_palette.cpp, never writes the game's checksummed
-// select-struct field) - safe offline AND online, works vs modded and modless opponents alike.
-// See docs/Research/PlatinumVoiceChoiceInvestigation.md for the full RE writeup.
+// select-struct field). OFFLINE ONLY: forced off in ONLINE matches (hooks_palette.cpp,
+// PlatinumVoiceChoiceForSlot) pending investigation of a field-reported match desync that
+// correlated with this override actually changing something online - see the block comment
+// there for details. See docs/Research/PlatinumVoiceChoiceInvestigation.md for the full RE writeup.
 SETTING(int, platinumVoiceChoice, "PlatinumVoiceChoice", "0");
 // Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
 // launch). 0 = old behavior, DEBUG.txt is overwritten every launch.

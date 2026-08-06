@@ -166,19 +166,22 @@ void __declspec(naked) GetPalBaseAddresses()
 // See docs/Research/PlatinumVoiceChoiceInvestigation.md.
 
 // choice enum for a given match slot: 0 = Default (leave the game's RNG pick), 1 = Luna, 2 = Sena.
+//
+// ONLINE FORCED OFF (2026-08-06): a third-party field report (v8.2, Bug Reports/Desync Detected
+// in 8.2) showed a real match desync/hard-disconnect whose only unusual factor was this override
+// actually forcing a different personality online (the only session-wide occurrence of that in
+// the reporter's DEBUG.txt, directly preceding the match's abnormal ~19s end). No write-based
+// mechanism has been found in THIS implementation (in-register substitution only, see block
+// comment above) - unlike the OLD select-struct-writing design, which was separately confirmed to
+// desync by a live test - so the exact mechanism here is unconfirmed. Given a real report is more
+// costly to get wrong than a voice preference is to lose, force vanilla RNG online for everyone
+// until this is understood. Revisit once FrameStallWatchdog data or a repro clears/implicates it.
 static int PlatinumVoiceChoiceForSlot(int slot)
 {
 	const bool online = g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional();
 	if (online)
 	{
-		const bool spectator = g_interfaces.pRoomManager->IsThisPlayerSpectator();
-		const int localSlot = spectator ? -1 : (int)g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex();
-
-		if (!spectator && slot == localSlot)
-			return Settings::settingsIni.platinumVoiceChoice; // our own Platinum -> our setting
-		if (g_interfaces.pOnlinePaletteManager)
-			return g_interfaces.pOnlinePaletteManager->GetPlayerVoiceChoice((uint16_t)slot); // their sent choice (0 if none/mod-less)
-		return 0;
+		return 0; // forced vanilla RNG online - see comment above
 	}
 
 	return (slot == 0) ? Settings::settingsIni.platinumVoiceChoice : 0; // offline: local player is P1
