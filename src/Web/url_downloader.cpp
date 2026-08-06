@@ -119,60 +119,60 @@ int UploadReplayBinary() {
     // Step 1: Open Internet session
     hInternet = InternetOpen(L"im", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
-        // std::cerr << "Failed to open internet session: " << GetLastError() << std::endl;
         DWORD error_num = GetLastError();
-        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to open internet session.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\terror code: %d\n", 
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to open internet session.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
             g_modVals.uploadReplayDataHost.c_str(),
-            g_modVals.uploadReplayDataEndpoint.c_str(), 
+            g_modVals.uploadReplayDataEndpoint.c_str(),
             g_modVals.uploadReplayDataPort,
-            error_num);
+            FormatWindowsError("Failed to open internet session.", error_num).c_str());
         return error_num;
     }
    //ok
    //  Step 2: Connect to the server
+    g_imGuiLogger->Log("[Upload] UploadReplayBinary connecting.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n",
+        g_modVals.uploadReplayDataHost.c_str(),
+        g_modVals.uploadReplayDataEndpoint.c_str(),
+        g_modVals.uploadReplayDataPort);
     hConnect = InternetConnect(hInternet, serverAddress, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) {
-        //std::cerr << "Failed to connect to the server: " << GetLastError() << std::endl;
-        InternetCloseHandle(hInternet);
         DWORD error_num = GetLastError();
-        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to connect to the server.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\terror code: %d\n",
+        InternetCloseHandle(hInternet);
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to connect to the server.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
             g_modVals.uploadReplayDataHost.c_str(),
             g_modVals.uploadReplayDataEndpoint.c_str(),
             g_modVals.uploadReplayDataPort,
-            error_num);
-        return GetLastError();
+            FormatWindowsError("Failed to connect.", error_num).c_str());
+        return error_num;
     }
     //ok
     // Step 3: Open the request
     hRequest = HttpOpenRequest(hConnect, L"POST", urlPath, NULL, NULL, NULL, 0, 0);
     if (!hRequest) {
-        // std::cerr << "Failed to open HTTP request: " << GetLastError() << std::endl;
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hInternet);
-        DWORD error_num = GetLastError();
-        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to open HTTP request.\n\thost: '%s'\n\tendpoint: '%s'\nport: %d\n\terror code: %d\n",
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to open HTTP request.\n\thost: '%s'\n\tendpoint: '%s'\nport: %d\n\t%s\n",
             g_modVals.uploadReplayDataHost.c_str(),
             g_modVals.uploadReplayDataEndpoint.c_str(),
             g_modVals.uploadReplayDataPort,
-            error_num);     
-        return GetLastError();
+            FormatWindowsError("Failed to open HTTP request.", error_num).c_str());
+        return error_num;
     }
 
     //ok
     // Step 4: Set request headers
     LPCWSTR headers = L"Content-Type: application/octet-stream\r\n";//L"Content-Type: multipart/form-data"; //L"Content-Type: application/octet-stream\r\n";
     if (!HttpAddRequestHeaders(hRequest, headers, wcslen(headers), HTTP_ADDREQ_FLAG_REPLACE | HTTP_ADDREQ_FLAG_ADD)) {
-        // std::cerr << "Failed to set request headers: " << GetLastError() << std::endl;
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hRequest);
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hInternet);
-        DWORD error_num = GetLastError();
-        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to set request headers.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\terror code: %d\n",
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to set request headers.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
             g_modVals.uploadReplayDataHost.c_str(),
             g_modVals.uploadReplayDataEndpoint.c_str(),
             g_modVals.uploadReplayDataPort,
-            error_num);
-        return GetLastError();
+            FormatWindowsError("Failed to set request headers.", error_num).c_str());
+        return error_num;
     }
 
 
@@ -194,31 +194,57 @@ int UploadReplayBinary() {
     //ok
     // Step 5: Send the request
     if (!HttpSendRequest(hRequest, NULL, 0, fileData, fileSize)) {
-        //std::cerr << "Failed to send request: " << GetLastError() << std::endl;
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hRequest);
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hInternet);
         delete[] fileData;
-        DWORD error_num = GetLastError();
-        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to send request.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\terror code: %d\n",
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Failed to send request.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
             g_modVals.uploadReplayDataHost.c_str(),
             g_modVals.uploadReplayDataEndpoint.c_str(),
             g_modVals.uploadReplayDataPort,
-            error_num);
-        return GetLastError();
+            FormatWindowsError("Failed to send request.", error_num).c_str());
+        return error_num;
     }
 
-    //ok 
+    //ok
+    delete[] fileData;
 
-    // Step 6: Close handles
+    // Step 6: Check what the server actually said. HttpSendRequest succeeding only means
+    // WinINet got *a* response back - it says nothing about whether the server accepted
+    // the upload (2xx) or rejected/errored on it (4xx/5xx), so that has to be checked explicitly.
+    DWORD statusCode = 0;
+    DWORD statusCodeSize = sizeof(statusCode);
+    HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &statusCode, &statusCodeSize, NULL);
+
+    std::string responseBody;
+    char responseBuffer[2048];
+    DWORD bytesRead = 0;
+    while (InternetReadFile(hRequest, responseBuffer, sizeof(responseBuffer) - 1, &bytesRead) && bytesRead) {
+        responseBuffer[bytesRead] = 0;
+        responseBody += responseBuffer;
+    }
+
     InternetCloseHandle(hRequest);
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
-    delete[] fileData;
-    g_imGuiLogger->Log("UploadReplayBinary successful.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n",
+
+    if (statusCode < 200 || statusCode >= 300) {
+        g_imGuiLogger->Log("[error] UploadReplayBinary failed. Server rejected the upload.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\tHTTP status: %d\n\tresponse body: %s\n",
+            g_modVals.uploadReplayDataHost.c_str(),
+            g_modVals.uploadReplayDataEndpoint.c_str(),
+            g_modVals.uploadReplayDataPort,
+            statusCode,
+            responseBody.c_str());
+        return statusCode;
+    }
+
+    g_imGuiLogger->Log("UploadReplayBinary successful.\n\thost: '%s'\n\tendpoint: '%s'\n\tport: %d\n\tHTTP status: %d\n\tresponse body: %s\n",
         g_modVals.uploadReplayDataHost.c_str(),
         g_modVals.uploadReplayDataEndpoint.c_str(),
-        g_modVals.uploadReplayDataPort);
+        g_modVals.uploadReplayDataPort,
+        statusCode,
+        responseBody.c_str());
     return 0;
 }
 	

@@ -17,6 +17,7 @@
 #include <wininet.h>
 #include <atlstr.h>
 #include <Web/url_downloader.h>
+#include "Overlay/Logger/ImGuiLogger.h"
 #include "ReplayList.h"
 
 namespace fs = std::experimental::filesystem;
@@ -456,26 +457,39 @@ void ReplayFileManager::load_replay_list_from_db(int page, int character1, std::
 
     hInternet = InternetOpen(L"im", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
+        DWORD error_num = GetLastError();
+        g_imGuiLogger->Log("[error] load_replay_list_from_db failed. Failed to open internet session.\n\thost: 'bbreplay.ovh'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
+            urlPath.c_str(), port, FormatWindowsError("Failed to open internet session.", error_num).c_str());
         return;
     }
 
+    g_imGuiLogger->Log("[Upload] load_replay_list_from_db connecting.\n\thost: 'bbreplay.ovh'\n\tendpoint: '%s'\n\tport: %d\n", urlPath.c_str(), port);
     hConnect = InternetConnect(hInternet, serverAddress, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) {
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hInternet);
+        g_imGuiLogger->Log("[error] load_replay_list_from_db failed. Failed to connect to the server.\n\thost: 'bbreplay.ovh'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
+            urlPath.c_str(), port, FormatWindowsError("Failed to connect.", error_num).c_str());
         return;
     }
 
     hRequest = HttpOpenRequest(hConnect, L"GET", utf8_to_utf16(urlPath).data(), NULL, NULL, NULL, INTERNET_FLAG_SECURE, 0);
     if (!hRequest) {
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hInternet);
+        g_imGuiLogger->Log("[error] load_replay_list_from_db failed. Failed to open HTTP request.\n\thost: 'bbreplay.ovh'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
+            urlPath.c_str(), port, FormatWindowsError("Failed to open HTTP request.", error_num).c_str());
         return;
     }
 
     if (!HttpSendRequest(hRequest, NULL, 0, NULL, 0)) {
+        DWORD error_num = GetLastError();
         InternetCloseHandle(hRequest);
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hInternet);
+        g_imGuiLogger->Log("[error] load_replay_list_from_db failed. Failed to send request.\n\thost: 'bbreplay.ovh'\n\tendpoint: '%s'\n\tport: %d\n\t%s\n",
+            urlPath.c_str(), port, FormatWindowsError("Failed to send request.", error_num).c_str());
         return;
     }
 

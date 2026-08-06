@@ -44,3 +44,9 @@ float GetImGuiDeltaTime();
 std::string utf16_to_utf8(const std::wstring & wstr);
 std::wstring utf8_to_utf16(const std::string & utf8_str);
 int SafeDereferencePtr(int* ptr);
+
+/* Renders a Win32/WinINet GetLastError() code into "<prefix> Windows error <code>: <message>."
+   Call GetLastError() immediately after the failing API, before any cleanup call (even a
+   successful InternetCloseHandle/CloseHandle resets it), or the code passed in here will
+   already be wrong. */
+std::string FormatWindowsError(const char* prefix, DWORD errorCode);

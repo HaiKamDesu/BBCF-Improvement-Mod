@@ -5,6 +5,34 @@
 #include <Psapi.h>
 #include <imgui.h>
 
+std::string FormatWindowsError(const char* prefix, DWORD errorCode)
+{
+	char message[512] = {};
+	FormatMessageA(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		nullptr,
+		errorCode,
+		0,
+		message,
+		sizeof(message),
+		nullptr);
+
+	char code[32] = {};
+	std::snprintf(code, sizeof(code), "%lu", errorCode);
+	std::string result = prefix;
+	result += " Windows error ";
+	result += code;
+	if (message[0])
+	{
+		result += ": ";
+		result += message;
+		while (!result.empty() && (result[result.size() - 1] == '\r' || result[result.size() - 1] == '\n' || result[result.size() - 1] == '.'))
+			result.erase(result.size() - 1);
+	}
+	result += ".";
+	return result;
+}
+
 char* GetBbcfBaseAdress() {
 	static char* bbcf_base = NULL;
 
