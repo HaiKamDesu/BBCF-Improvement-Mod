@@ -1270,36 +1270,6 @@ void UnlimitedPlaybackWindow::Draw() {
             }
         }
     }
-    if (mgr.IsLoopPositionSetupActive()) {
-        // Deliberately NOT a modal: a focused ImGui window sets WantCaptureKeyboard, which makes
-        // PassKeyboardInputToGame() freeze the game's keyboard state (hooks_bbcf.cpp) and the
-        // forced reset combo's key releases would never reach the game.
-        const ImGuiIO& io = ImGui::GetIO();
-        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.25f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        if (ImGui::Begin("##up_loop_position_setup_banner", nullptr,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing |
-            ImGuiWindowFlags_NoSavedSettings)) {
-            ImGui::TextUnformatted(L("Setting up loop reset position...").c_str());
-            ImGui::TextUnformatted(L("Inputs are temporarily overridden; this happens once per lab session.").c_str());
-        }
-        ImGui::End();
-    }
-    float loopSetupRemaining = 0.0f;
-    float loopSetupTotal = 0.0f;
-    if (mgr.GetLoopSetupCountdown(&loopSetupRemaining, &loopSetupTotal)) {
-        ImGui::OpenPopup(L("Loop Setup Countdown").c_str());
-    }
-    if (ImGui::BeginPopupModal(L("Loop Setup Countdown").c_str(), nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
-        if (loopSetupTotal > 0.0f && loopSetupRemaining > 0.0f) {
-            const float progress = loopSetupRemaining / loopSetupTotal;
-            ImGui::ProgressBar(progress, ImVec2(360.0f, 0.0f));
-            ImGui::Text("%s", FormatText(L("%.1f seconds").c_str(), loopSetupRemaining).c_str());
-        } else {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
     ImGui::Dummy(ImVec2(0, 8));
     if (ImGui::Button(L("Fix Triggers").c_str())) {
         mgr.ForceResetTriggers();
@@ -1551,6 +1521,41 @@ void UnlimitedPlaybackWindow::Draw() {
         }
         ImGui::SameLine();
         if (ImGui::Button(FormatText("%s##send_slot", L("Cancel").c_str()).c_str())) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void DrawUnlimitedPlaybackLoopSetupIndicatorStandalone() {
+    auto& mgr = UnlimitedPlaybackManager::Instance();
+
+    if (mgr.IsLoopPositionSetupActive()) {
+        // Deliberately NOT a modal: a focused ImGui window sets WantCaptureKeyboard, which makes
+        // PassKeyboardInputToGame() freeze the game's keyboard state (hooks_bbcf.cpp) and the
+        // forced reset combo's key releases would never reach the game.
+        const ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.25f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        if (ImGui::Begin("##up_loop_position_setup_banner", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoSavedSettings)) {
+            ImGui::TextUnformatted(L("Setting up loop reset position...").c_str());
+            ImGui::TextUnformatted(L("Inputs are temporarily overridden; this happens once per lab session.").c_str());
+        }
+        ImGui::End();
+    }
+    float loopSetupRemaining = 0.0f;
+    float loopSetupTotal = 0.0f;
+    if (mgr.GetLoopSetupCountdown(&loopSetupRemaining, &loopSetupTotal)) {
+        ImGui::OpenPopup(L("Loop Setup Countdown").c_str());
+    }
+    if (ImGui::BeginPopupModal(L("Loop Setup Countdown").c_str(), nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (loopSetupTotal > 0.0f && loopSetupRemaining > 0.0f) {
+            const float progress = loopSetupRemaining / loopSetupTotal;
+            ImGui::ProgressBar(progress, ImVec2(360.0f, 0.0f));
+            ImGui::Text("%s", FormatText(L("%.1f seconds").c_str(), loopSetupRemaining).c_str());
+        } else {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

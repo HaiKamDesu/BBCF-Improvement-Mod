@@ -7,9 +7,15 @@
 #include "Window/MainWindow.h"
 #include "Window/NetworkSquareColorWindow.h"
 #include "Window/Ranked/RankedProgressWindow.h"
+#include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
 
 #include "Game/FrameStallWatchdog.h"
+#include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
+
+#if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
+#include "Window/UnlimitedReplayTakeoverWindow.h"
+#endif
 
 #include "Core/info.h"
 #include "Core/interfaces.h"
@@ -393,6 +399,10 @@ void WindowManager::Render()
 	DrawAllWindows();
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
+	DrawUnlimitedPlaybackLoopSetupIndicatorStandalone();
+#if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
+	DrawUnlimitedReplayTakeoverSetupDelayIndicatorStandalone();
+#endif
 	Updater::UpdateCoordinator::GetInstance().DrawSkippedLink();
 
 	g_notificationBar->DrawNotifications();

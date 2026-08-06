@@ -448,6 +448,14 @@ void UnlimitedReplayTakeoverWindow::Draw() {
         ImGui::EndChild();
     }
 
+    ImGui::EndChild();
+    ImGui::Columns(1);
+    ImGui::EndChild();
+}
+
+void DrawUnlimitedReplayTakeoverSetupDelayIndicatorStandalone() {
+    auto& mgr = UnlimitedReplayTakeoverManager::Instance();
+
     const bool setupDelayActive = mgr.IsSetupDelayActive();
     const float total = mgr.GetSetupDelaySeconds();
     const float remaining = mgr.GetSetupDelayRemainingSeconds();
@@ -467,8 +475,4 @@ void UnlimitedReplayTakeoverWindow::Draw() {
         }
         ImGui::EndPopup();
     }
-
-    ImGui::EndChild();
-    ImGui::Columns(1);
-    ImGui::EndChild();
 }
