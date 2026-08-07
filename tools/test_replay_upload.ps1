@@ -51,6 +51,9 @@ $PayloadFilePath       = ""                       # path to a real replay .dat t
 $PayloadSizeBytes      = 65536                    # size of the random main payload when $PayloadFilePath is blank (64KiB = real replay size)
 $AlsoTestSmallRequest  = $true                    # also send a small body first, to see whether failure depends on size
 $SmallPayloadSizeBytes = 1024                     # size of that small test body
+$AlsoTestChunkedSend   = $true                    # also send the full body in small pieces, to see if that survives where one big write does not
+$ChunkSizeBytes        = 1000                     # size of each piece for that chunked test (kept well under a typical 1500-byte MTU)
+$AlsoProbePathMtu      = $true                    # best-effort ping probe to find the largest packet that reaches the host
 $TimeoutSeconds        = 30                       # how long to wait before giving up on a step
 
 # ========================================================================
@@ -65,14 +68,22 @@ function Format-Elapsed([System.Diagnostics.Stopwatch]$sw) {
 }
 
 # Runs one full request. Returns $true if ANY HTTP response came back (even 4xx/5xx), else $false.
-# Never exits the script - both rounds must run so their results can be compared.
-function Invoke-UploadTest([string]$label, [byte[]]$payload) {
+# Never exits the script - every round must run so their results can be compared.
+# $chunkSize 0 = write the whole body in one call (what the mod does today); >0 = write it in
+# pieces that size, with Nagle disabled so each piece leaves as its own small TCP packet. If a
+# path drops full-size packets but passes small ones, only the chunked form survives.
+function Invoke-UploadTest([string]$label, [byte[]]$payload, [int]$chunkSize = 0) {
     Write-Host ""
-    Log "===== $label : $($payload.Length) byte body, tls: $UseTls ====="
+    Log "===== $label : $($payload.Length) byte body, tls: $UseTls, chunk: $(if ($chunkSize -gt 0) { "$chunkSize bytes" } else { 'one write' }) ====="
 
     $client = New-Object System.Net.Sockets.TcpClient
     $client.ReceiveTimeout = $TimeoutSeconds * 1000
     $client.SendTimeout = $TimeoutSeconds * 1000
+    if ($chunkSize -gt 0) {
+        # Without this, TCP coalesces the small writes back into full-size segments and the
+        # test would be indistinguishable from the single-write case.
+        $client.NoDelay = $true
+    }
 
     try {
         $connectSw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -123,8 +134,18 @@ function Invoke-UploadTest([string]$label, [byte[]]$payload) {
         $sendSw = [System.Diagnostics.Stopwatch]::StartNew()
         try {
             $stream.Write($headerBytes, 0, $headerBytes.Length)
-            $stream.Write($payload, 0, $payload.Length)
-            $stream.Flush()
+            if ($chunkSize -gt 0) {
+                $offset = 0
+                while ($offset -lt $payload.Length) {
+                    $n = [Math]::Min($chunkSize, $payload.Length - $offset)
+                    $stream.Write($payload, $offset, $n)
+                    $stream.Flush()
+                    $offset += $n
+                }
+            } else {
+                $stream.Write($payload, 0, $payload.Length)
+                $stream.Flush()
+            }
             # NOTE: this only means the bytes were handed to the OS/TLS buffer. It does NOT mean
             # they reached the server - a body this size fits in local socket buffers and returns
             # instantly even when every packet is being dropped further along the path.
@@ -161,6 +182,35 @@ function Invoke-UploadTest([string]$label, [byte[]]$payload) {
     }
 }
 
+# Best-effort largest-packet probe. Uses ping's exit code rather than its printed text, since
+# that text is localized and unparseable across languages. Returns the largest ICMP payload that
+# got through, or $null if ICMP is blocked outright (in which case this tells us nothing).
+function Get-LargestPingPayload {
+    # If even a tiny ping fails, ICMP is filtered and every larger probe would "fail" too -
+    # reporting that as a small MTU would be flatly wrong.
+    & ping.exe -n 1 -w 3000 $HostName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Log "Path MTU probe: host does not answer ping at all (ICMP filtered) - probe inconclusive, skipping."
+        return $null
+    }
+
+    # 1472 payload + 28 bytes of IP/ICMP header = 1500, the standard Ethernet MTU.
+    $low = 500
+    $high = 1472
+    $best = $null
+    while ($low -le $high) {
+        $mid = [int](($low + $high) / 2)
+        & ping.exe -n 1 -w 3000 -f -l $mid $HostName | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $best = $mid
+            $low = $mid + 1
+        } else {
+            $high = $mid - 1
+        }
+    }
+    return $best
+}
+
 Log "UploadReplayBinary (simulated)."
 Log "`thost: '$HostName'"
 Log "`tendpoint: '$Endpoint'"
@@ -171,7 +221,7 @@ $smallOk = $null
 if ($AlsoTestSmallRequest) {
     $smallPayload = New-Object byte[] $SmallPayloadSizeBytes
     (New-Object System.Random).NextBytes($smallPayload)
-    $smallOk = Invoke-UploadTest "TEST 1 of 2 - small body" $smallPayload
+    $smallOk = Invoke-UploadTest "TEST - small body" $smallPayload
 }
 
 if ($PayloadFilePath -ne "") {
@@ -188,22 +238,59 @@ if ($PayloadFilePath -ne "") {
     $mainPayload = New-Object byte[] $PayloadSizeBytes
     (New-Object System.Random).NextBytes($mainPayload)
 }
-$mainOk = Invoke-UploadTest "TEST 2 of 2 - full-size body" $mainPayload
+$mainOk = Invoke-UploadTest "TEST - full-size body, one write (what the mod does today)" $mainPayload
+
+$chunkedOk = $null
+if ($AlsoTestChunkedSend) {
+    $chunkedOk = Invoke-UploadTest "TEST - full-size body, sent in small pieces" $mainPayload $ChunkSizeBytes
+}
+
+$largestPing = $null
+if ($AlsoProbePathMtu) {
+    Write-Host ""
+    Log "===== Path MTU probe (may take a few seconds) ====="
+    $largestPing = Get-LargestPingPayload
+    if ($largestPing -ne $null) {
+        Log "Largest packet that reached the host: $largestPing byte payload = $($largestPing + 28) byte MTU."
+        if ($largestPing -lt 1472) {
+            Log "That is below the standard 1500 - the path really does have a smaller usable MTU."
+        } else {
+            Log "Full 1500-byte packets reach the host over ICMP."
+        }
+    }
+}
 
 Write-Host ""
 Log "===== SUMMARY ====="
 if ($AlsoTestSmallRequest) {
-    Log "small body ($SmallPayloadSizeBytes bytes): $(if ($smallOk) { 'got a response' } else { 'NO response' })"
+    Log "small body ($SmallPayloadSizeBytes bytes):        $(if ($smallOk) { 'got a response' } else { 'NO response' })"
 }
-Log "full body ($($mainPayload.Length) bytes): $(if ($mainOk) { 'got a response' } else { 'NO response' })"
+Log "full body, one write ($($mainPayload.Length) bytes):  $(if ($mainOk) { 'got a response' } else { 'NO response' })"
+if ($AlsoTestChunkedSend) {
+    Log "full body, $ChunkSizeBytes-byte pieces:            $(if ($chunkedOk) { 'got a response' } else { 'NO response' })"
+}
+if ($largestPing -ne $null) {
+    Log "largest packet reaching the host:      $($largestPing + 28) byte MTU"
+}
 
-if ($AlsoTestSmallRequest -and $smallOk -and -not $mainOk) {
-    Log "=> Size-dependent failure: small requests get through, large ones do not."
-    Log "   That points at the network path dropping bulk data (MTU black hole / DPI), not at the server."
-} elseif ($AlsoTestSmallRequest -and -not $smallOk -and -not $mainOk) {
-    Log "=> Nothing gets a response at all, regardless of size - the host/port is unreachable from here."
-} elseif ($mainOk) {
-    Log "=> Uploads work from this machine with these settings."
+Write-Host ""
+if ($mainOk) {
+    Log "=> Uploads work from this machine as-is. Nothing to fix here."
+} elseif ($chunkedOk) {
+    Log "=> IMPORTANT: the same body fails as one write but succeeds in small pieces."
+    Log "   The path drops full-size packets. This is fixable in the mod by writing the upload"
+    Log "   body in small chunks (HttpSendRequestEx + InternetWriteFile) instead of one big send."
+} elseif ($smallOk) {
+    Log "=> Size-dependent failure: small requests get through, large ones do not, and chunking"
+    Log "   them did not help either. The path is dropping bulk upload traffic to this host."
+    Log "   Worth trying on this machine: lower the network MTU, e.g. for a Wi-Fi adapter -"
+    Log '     netsh interface ipv4 set subinterface "Wi-Fi" mtu=1400 store=persistent'
+    Log '   (run as administrator; use "Ethernet" instead if on a cable). A VPN also usually'
+    Log "   sidesteps it. Nothing the mod can change will help if even small packets cannot"
+    Log "   carry the upload."
+} else {
+    Log "=> Nothing gets a response at all, regardless of size - the host/port is unreachable"
+    Log "   from this machine."
 }
 
 Write-Host ""
