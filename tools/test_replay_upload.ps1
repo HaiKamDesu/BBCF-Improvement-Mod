@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Mimics the mod's UploadReplayBinary call (src/Web/url_downloader.cpp) at the raw socket
-    level, so upload failures can be reproduced and iterated on without rebuilding/redeploying
-    the mod itself.
+    Reproduces the mod's replay upload (UploadReplayBinary in src/Web/url_downloader.cpp) at the
+    raw socket level and runs it through a matrix of variations, so upload failures can be
+    diagnosed without rebuilding or redeploying the mod.
 
 .DESCRIPTION
     The mod does, via WinINet:
@@ -11,64 +11,67 @@
         HttpAddRequestHeaders("Content-Type: application/octet-stream")
         HttpSendRequest(..., 64KiB replay buffer)
 
-    This script opens a raw TCP socket (optionally wrapped in TLS) and writes a hand-built
-    HTTP/1.1 POST byte-for-byte, so it fails/succeeds under the same conditions WinINet would -
-    no higher-level HTTP client behavior (redirects, retries, protocol upgrades) to mask what is
-    actually happening on the wire.
+    This script builds that HTTP/1.1 POST by hand over a raw socket (optionally TLS), so nothing
+    a higher-level HTTP client does (redirects, retries, protocol upgrades) can mask what happens
+    on the wire.
 
-    It runs several rounds and prints a summary that interprets them:
-      - a small body, to prove the host is reachable at all
-      - the full 64KiB body in one write, which is exactly what the mod does
-      - the full body in small pieces, to tell an MTU/packet-size problem apart from a
-        bulk-volume one (if only this form survives, the mod can be fixed by switching to
-        HttpSendRequestEx + InternetWriteFile)
-      - a size sweep, to find the largest body that still gets through
-      - the same small/large pair against an unrelated control server, to tell "this machine
-        cannot do large uploads to anything" apart from "something on the path to THIS host
-        breaks them"
-      - a best-effort path-MTU ping probe
+    WHAT IS ALREADY ESTABLISHED (so these are no longer the open questions):
+      - A replay is always exactly 65536 bytes, and it is mostly empty: across 83 real replays,
+        gzip gives 2285-5131 bytes, and merely dropping trailing zero bytes gives 6811-15379.
+      - On the affected connection, ~1KB bodies reach the server but 64KiB never does. Sending it
+        in 1000-byte pieces changes nothing, and the usable path MTU is 1486, so this is NOT a
+        packet-size/MTU problem and cannot be fixed by writing the body differently.
+      - A DPI-circumvention tool (zapret) being on or off makes no difference (~27KB vs ~25KB).
+      - An unrelated control server accepts the same 64KiB body fine, so the machine itself can
+        do large uploads.
+      - Cloudflare does NOT redirect HTTP to HTTPS here: plain HTTP on port 80 is served directly.
+      - Independent ISP testing shows the cutoff is the ISP's DPI throttling by provider: every
+        Cloudflare (AS13335) endpoint dies at 16KB, while Fastly and Google Cloud are unaffected.
+        Plain-HTTP endpoints consistently survive a bit longer than TLS ones (24KB vs 16-20KB).
+
+    So this matrix exists to pin down the remaining choices: whether plain HTTP on port 80 buys a
+    higher ceiling than TLS on 443, whether the body is being throttled (and would arrive given a
+    much longer timeout) or outright dropped, whether talking to the origin directly avoids it,
+    and confirmation that a gzip-sized body sails through.
 
     IMPORTANT when reading the output: any HTTP response at all counts as reaching the server -
-    even 400, 405 or 500. Those mean the network path works and the server merely disliked the
-    body (expected for random test payloads, which are not valid replays). Only a timeout or
-    connection error means the traffic never completed the round trip.
-
-    If a DPI-circumvention tool (zapret, GoodbyeDPI, ByeDPI, ...) or a VPN is running, note it
-    when reporting results, and ideally run the script both with it on and with it off. Those
-    tools work by actively rewriting outbound packets, which can break sustained uploads while
-    leaving small requests and handshakes working perfectly.
+    even 400, 405 or 500. Those mean the network carried the request and the server merely
+    disliked the body (expected, since these are not valid replays). Only a timeout or connection
+    error means the traffic never completed the round trip.
 
     HOW TO RUN THIS (no console/typing needed):
       1. Change the values in the "SETTINGS" block below if asked to (leave them alone otherwise).
       2. Save the file.
       3. Right-click the file -> "Run with PowerShell" (on some setups this is under a "Show
          more options" submenu on Windows 11).
-      4. A black window will open, run the tests, print a summary, and wait for a key press
-         before closing - so nothing disappears before it can be read/screenshotted.
-         Expect it to take a few minutes: every failing round has to sit through its own
-         ~19 second timeout, so long pauses are normal and not a freeze.
+      4. It prints a result matrix at the end and waits for a key press, so nothing disappears
+         before it can be read or screenshotted.
+         This takes SEVERAL MINUTES - every failing case has to burn its own timeout, and one
+         case deliberately waits up to two minutes. Long pauses are normal, not a freeze.
 #>
 
 # ============================== SETTINGS ==============================
 # Change these values if asked to, then save the file and re-run it.
 
-$HostName              = "replays.blazqueue.com"  # server to test against
-$Port                  = 443                      # port to test against
-$Endpoint              = "/upload"                # request path
-$UseTls                = $true                    # $true = real HTTPS/TLS, $false = plain HTTP
-$PayloadFilePath       = ""                       # path to a real replay .dat to upload, e.g. "D:\...\Save\Replay\archive\foo.dat"
-                                                  # leave blank ("") to send random bytes instead
-$PayloadSizeBytes      = 65536                    # size of the random main payload when $PayloadFilePath is blank (64KiB = real replay size)
-$SmallPayloadSizeBytes = 1024                     # size of the small "is the host reachable at all" body
-$AlsoTestChunkedSend   = $true                    # also send the full body in small pieces
-$ChunkSizeBytes        = 1000                     # size of each piece for that chunked test
-$AlsoProbeBodySizeLimit = $true                   # sweep for the largest body that still gets a response
-$AlsoTestControlHost   = $true                    # repeat small+large against an unrelated server, as a control
-$ControlHostName       = "postman-echo.com"       # that control server (must actually read the body it is sent)
-$ControlPort           = 443
-$ControlEndpoint       = "/post"
-$AlsoProbePathMtu      = $true                    # best-effort ping probe for the largest packet that reaches the host
-$TimeoutSeconds        = 30                       # how long to wait before giving up on a step
+$HostName          = "replays.blazqueue.com"  # the Cloudflare-fronted host the mod uploads to
+$Endpoint          = "/upload"                # request path
+$OriginIp          = "89.167.76.6"            # the server's own address, bypassing Cloudflare
+$OriginPort        = 5000                     # and its port
+$ControlHostName   = "postman-echo.com"       # unrelated server, as a control (must read the body)
+$ControlEndpoint   = "/post"
+
+$PayloadFilePath   = ""                       # optional: a real replay .dat, e.g. "D:\...\Save\Replay\archive\foo.dat"
+                                              # leave blank ("") to use random bytes of the same size
+$FullSizeBytes     = 65536                    # what the mod actually sends (64KiB)
+$SmallSizeBytes    = 1024                     # a body small enough to be known-good
+$GzipSizedBytes    = 5120                     # what a real replay compresses to (measured 2285-5131)
+
+$RunLongTimeoutCase = $true                   # include the "is it throttled or dropped" case (waits up to $LongTimeoutSeconds)
+$RunOriginCases     = $true                   # include the direct-to-origin cases
+$RunControlCase     = $true                   # include the unrelated-control case
+$RunSizeSweep       = $true                   # find the largest body that gets through, over plain HTTP on port 80
+$TimeoutSeconds     = 30                      # normal per-case timeout
+$LongTimeoutSeconds = 120                     # the patient case's timeout
 
 # ========================================================================
 
@@ -81,59 +84,65 @@ function Format-Elapsed([System.Diagnostics.Stopwatch]$sw) {
     return "{0:N3}s" -f $sw.Elapsed.TotalSeconds
 }
 
-# Runs one full request. Returns $true if ANY HTTP response came back (even 4xx/5xx), else $false.
-# Never exits the script - every round must run so their results can be compared.
-# $chunkSize 0 = write the whole body in one call (what the mod does today); >0 = write it in
-# pieces that size, with Nagle disabled so each piece leaves as its own small TCP packet.
-# $quiet suppresses the response dump, for the size sweep where only pass/fail matters.
-function Invoke-UploadTest {
+# Performs one POST and reports what happened. Returns an object rather than a bare bool so the
+# matrix can say WHY something failed - "the OS gave up retransmitting" and "the server never
+# answered in time" look identical in a pass/fail column but mean very different things.
+function Invoke-UploadCase {
     param(
         [string]$label,
         [byte[]]$payload,
+        [string]$targetHost,
+        [int]$targetPort,
+        [string]$targetEndpoint,
+        [bool]$useTls,
         [int]$chunkSize = 0,
-        [string]$targetHost = $HostName,
-        [int]$targetPort = $Port,
-        [string]$targetEndpoint = $Endpoint,
-        [bool]$targetTls = $UseTls,
+        [int]$timeoutSec = 0,
         [switch]$quiet
     )
 
+    if ($timeoutSec -le 0) { $timeoutSec = $TimeoutSeconds }
+    $scheme = if ($useTls) { "https" } else { "http" }
+
     if (-not $quiet) {
         Write-Host ""
-        Log "===== $label : $($payload.Length) byte body, host: $targetHost, tls: $targetTls, chunk: $(if ($chunkSize -gt 0) { "$chunkSize bytes" } else { 'one write' }) ====="
+        Log "===== $label ====="
+        Log "  $scheme`://$targetHost`:$targetPort$targetEndpoint | body $($payload.Length) bytes | $(if ($chunkSize -gt 0) { "$chunkSize-byte pieces" } else { 'one write' }) | timeout ${timeoutSec}s"
     }
 
+    $result = [pscustomobject]@{ Label = $label; Ok = $false; Status = ""; Reason = ""; Seconds = 0.0 }
+    $overall = [System.Diagnostics.Stopwatch]::StartNew()
+
     $client = New-Object System.Net.Sockets.TcpClient
-    $client.ReceiveTimeout = $TimeoutSeconds * 1000
-    $client.SendTimeout = $TimeoutSeconds * 1000
+    $client.ReceiveTimeout = $timeoutSec * 1000
+    $client.SendTimeout = $timeoutSec * 1000
     if ($chunkSize -gt 0) {
-        # Without this, TCP coalesces the small writes back into full-size segments and the
-        # test would be indistinguishable from the single-write case.
+        # Without this, TCP coalesces the small writes back into full-size segments, making the
+        # chunked case indistinguishable from the single-write one.
         $client.NoDelay = $true
     }
 
     try {
         $connectSw = [System.Diagnostics.Stopwatch]::StartNew()
-        # Task.Wait() throws (wrapped in an AggregateException) if the task faults - e.g. connection
-        # refused - rather than just returning false, so that has to be caught here too, not just
-        # the plain timeout-elapsed case where Wait() returns false with no exception.
+        # Task.Wait() throws (wrapped in an AggregateException) when the task faults - connection
+        # refused, for instance - rather than returning false, so both paths need handling.
         try {
             $connectTask = $client.ConnectAsync($targetHost, $targetPort)
-            if (-not $connectTask.Wait($TimeoutSeconds * 1000)) {
-                Log "[error] Failed to connect. Timed out after $(Format-Elapsed $connectSw) (TCP handshake never completed)."
-                return $false
+            if (-not $connectTask.Wait($timeoutSec * 1000)) {
+                $result.Reason = "TCP connect timed out"
+                if (-not $quiet) { Log "[error] $($result.Reason) after $(Format-Elapsed $connectSw)." }
+                return $result
             }
         } catch {
             $inner = $_.Exception.InnerException
-            $msg = if ($inner) { $inner.Message } else { $_.Exception.Message }
-            Log "[error] Failed to connect after $(Format-Elapsed $connectSw). $msg"
-            return $false
+            $result.Reason = "TCP connect failed: $(if ($inner) { $inner.Message } else { $_.Exception.Message })"
+            if (-not $quiet) { Log "[error] $($result.Reason) after $(Format-Elapsed $connectSw)." }
+            return $result
         }
         if (-not $quiet) { Log "TCP connected in $(Format-Elapsed $connectSw)." }
 
         $stream = $client.GetStream()
 
-        if ($targetTls) {
+        if ($useTls) {
             $tlsSw = [System.Diagnostics.Stopwatch]::StartNew()
             try {
                 $sslStream = New-Object System.Net.Security.SslStream($stream, $false)
@@ -141,12 +150,13 @@ function Invoke-UploadTest {
                 $stream = $sslStream
                 if (-not $quiet) { Log "TLS handshake completed in $(Format-Elapsed $tlsSw). Protocol: $($sslStream.SslProtocol)" }
             } catch {
-                Log "[error] TLS handshake failed after $(Format-Elapsed $tlsSw). $($_.Exception.Message)"
-                return $false
+                $result.Reason = "TLS handshake failed: $($_.Exception.Message)"
+                if (-not $quiet) { Log "[error] $($result.Reason)" }
+                return $result
             }
         }
 
-        # Same request shape the mod builds: POST <endpoint>, Content-Type: application/octet-stream.
+        # Same request shape the mod builds.
         $headerText = @(
             "POST $targetEndpoint HTTP/1.1",
             "Host: $targetHost",
@@ -173,15 +183,16 @@ function Invoke-UploadTest {
                 $stream.Write($payload, 0, $payload.Length)
                 $stream.Flush()
             }
-            # NOTE: this only means the bytes were handed to the OS/TLS buffer. It does NOT mean
-            # they reached the server - a body this size fits in local socket buffers and returns
-            # instantly even when every packet is being dropped further along the path.
+            # This only means the bytes reached the local OS/TLS buffer. It does NOT mean they
+            # reached the server: a body this size fits in local socket buffers and reports
+            # success instantly even when every packet is dropped further along the path.
             if (-not $quiet) {
                 Log "Request written ($($headerBytes.Length + $payload.Length) bytes) in $(Format-Elapsed $sendSw) - handed to the OS, delivery not yet confirmed."
             }
         } catch {
-            Log "[error] Failed to write request after $(Format-Elapsed $sendSw). $($_.Exception.Message)"
-            return $false
+            $result.Reason = "write failed: $($_.Exception.Message)"
+            if (-not $quiet) { Log "[error] $($result.Reason) after $(Format-Elapsed $sendSw)." }
+            return $result
         }
 
         $readSw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -194,70 +205,55 @@ function Invoke-UploadTest {
             }
             $body = $reader.ReadToEnd()
 
+            $result.Ok = $true
+            $result.Status = $statusLine
+            $result.Reason = "reached the server"
             if ($quiet) {
-                Log "  $($payload.Length) bytes -> response: $statusLine"
+                Log "  $($payload.Length) bytes -> $statusLine"
             } else {
                 Log "Response received in $(Format-Elapsed $readSw)."
                 Log "Status line: $statusLine"
                 Log "Headers:"
                 $responseHeaders | ForEach-Object { Log "`t$_" }
-                # Truncated on purpose: an echo-style server sends the whole 64KiB body back, and
-                # dumping that buries the summary these results are read from.
-                if ($body.Length -gt 400) {
-                    Log "Body (first 400 of $($body.Length) chars): $($body.Substring(0, 400))"
+                # Truncated on purpose: an echo-style server sends the whole body back, which
+                # would bury the matrix these results are read from.
+                if ($body.Length -gt 300) {
+                    Log "Body (first 300 of $($body.Length) chars): $($body.Substring(0, 300))"
                 } else {
                     Log "Body: $body"
                 }
-                Log "RESULT: reached the server and got a response (any status counts as the network working)."
+                Log "RESULT: reached the server (any status counts - the network carried it)."
             }
-            return $true
+            return $result
         } catch {
-            if ($quiet) {
-                Log "  $($payload.Length) bytes -> NO response after $(Format-Elapsed $readSw)"
+            # Distinguish the OS abandoning the connection from simply not answering in time.
+            # A socket-level error well before the timeout means TCP exhausted its retransmits,
+            # i.e. the data was being dropped, not merely delayed.
+            $elapsed = $readSw.Elapsed.TotalSeconds
+            if ($elapsed -lt ($timeoutSec - 2)) {
+                $result.Reason = "connection died after $([int]$elapsed)s (OS gave up retransmitting - data was dropped)"
             } else {
-                Log "[error] No response. Failed after $(Format-Elapsed $readSw). $($_.Exception.Message)"
+                $result.Reason = "no answer within ${timeoutSec}s (connection alive, response never came)"
+            }
+            if ($quiet) {
+                Log "  $($payload.Length) bytes -> NO response ($($result.Reason))"
+            } else {
+                Log "[error] $($result.Reason)"
                 Log "RESULT: the request never completed a round trip."
             }
-            return $false
+            return $result
         }
     } finally {
+        $overall.Stop()
+        $result.Seconds = [Math]::Round($overall.Elapsed.TotalSeconds, 1)
         $client.Close()
     }
 }
 
-# Best-effort largest-packet probe. Uses ping's exit code rather than its printed text, since
-# that text is localized and unparseable across languages. Returns the largest ICMP payload that
-# got through, or $null if ICMP is blocked outright (in which case this tells us nothing).
-function Get-LargestPingPayload {
-    # If even a tiny ping fails, ICMP is filtered and every larger probe would "fail" too -
-    # reporting that as a small MTU would be flatly wrong.
-    & ping.exe -n 1 -w 3000 $HostName | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Log "Path MTU probe: host does not answer ping at all (ICMP filtered) - probe inconclusive, skipping."
-        return $null
-    }
-
-    # 1472 payload + 28 bytes of IP/ICMP header = 1500, the standard Ethernet MTU.
-    $low = 500
-    $high = 1472
-    $best = $null
-    while ($low -le $high) {
-        $mid = [int](($low + $high) / 2)
-        & ping.exe -n 1 -w 3000 -f -l $mid $HostName | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            $best = $mid
-            $low = $mid + 1
-        } else {
-            $high = $mid - 1
-        }
-    }
-    return $best
-}
-
-# Binary-searches the largest body that still gets a response, between a known-good and a
-# known-bad size. Knowing the cutoff says whether shrinking the upload (e.g. compressing the
-# replay before sending) could realistically get under it.
-function Get-LargestWorkingBody([int]$knownGood, [int]$knownBad) {
+# Binary-searches the largest body that still gets a response. Resolution is 512 bytes; the
+# threshold is not a hard line (it moved between runs), so treat the number as approximate.
+function Get-LargestWorkingBody {
+    param([int]$knownGood, [int]$knownBad, [string]$targetHost, [int]$targetPort, [string]$targetEndpoint, [bool]$useTls)
     $low = $knownGood
     $high = $knownBad
     $best = $knownGood
@@ -265,25 +261,14 @@ function Get-LargestWorkingBody([int]$knownGood, [int]$knownBad) {
         $mid = [int](($low + $high) / 2)
         $probe = New-Object byte[] $mid
         (New-Object System.Random).NextBytes($probe)
-        if (Invoke-UploadTest -label "sweep" -payload $probe -quiet) {
-            $best = $mid
-            $low = $mid + 1
-        } else {
-            $high = $mid - 1
-        }
+        $r = Invoke-UploadCase -label "sweep" -payload $probe -targetHost $targetHost -targetPort $targetPort `
+            -targetEndpoint $targetEndpoint -useTls $useTls -quiet
+        if ($r.Ok) { $best = $mid; $low = $mid + 1 } else { $high = $mid - 1 }
     }
     return $best
 }
 
-Log "UploadReplayBinary (simulated)."
-Log "`thost: '$HostName'"
-Log "`tendpoint: '$Endpoint'"
-Log "`tport: $Port"
-Log "`ttls: $UseTls"
-
-$smallPayload = New-Object byte[] $SmallPayloadSizeBytes
-(New-Object System.Random).NextBytes($smallPayload)
-$smallOk = Invoke-UploadTest -label "TEST - small body" -payload $smallPayload
+# ---------------------------------------------------------------- payloads
 
 if ($PayloadFilePath -ne "") {
     if (-not (Test-Path $PayloadFilePath)) {
@@ -293,92 +278,134 @@ if ($PayloadFilePath -ne "") {
         Read-Host | Out-Null
         exit 1
     }
-    $mainPayload = [System.IO.File]::ReadAllBytes($PayloadFilePath)
-    Log "Main payload loaded from '$PayloadFilePath'."
+    $fullPayload = [System.IO.File]::ReadAllBytes($PayloadFilePath)
+    Log "Full-size payload loaded from '$PayloadFilePath' ($($fullPayload.Length) bytes)."
 } else {
-    $mainPayload = New-Object byte[] $PayloadSizeBytes
-    (New-Object System.Random).NextBytes($mainPayload)
+    $fullPayload = New-Object byte[] $FullSizeBytes
+    (New-Object System.Random).NextBytes($fullPayload)
 }
-$mainOk = Invoke-UploadTest -label "TEST - full-size body, one write (what the mod does today)" -payload $mainPayload
+$smallPayload = New-Object byte[] $SmallSizeBytes
+(New-Object System.Random).NextBytes($smallPayload)
+# Stands in for a gzipped replay. Deliberately NOT actually gzipped here: random bytes do not
+# compress, so compressing the test payload would prove nothing about the real size on the wire.
+$gzipSizedPayload = New-Object byte[] $GzipSizedBytes
+(New-Object System.Random).NextBytes($gzipSizedPayload)
 
-$chunkedOk = $null
-if ($AlsoTestChunkedSend -and -not $mainOk) {
-    $chunkedOk = Invoke-UploadTest -label "TEST - full-size body, sent in small pieces" -payload $mainPayload -chunkSize $ChunkSizeBytes
+# ---------------------------------------------------------------- run the matrix
+
+Log "Replay upload diagnosis matrix."
+Log "  upload host: $HostName$Endpoint"
+Log "  origin:      $OriginIp`:$OriginPort"
+Log "  full body:   $($fullPayload.Length) bytes"
+
+$results = @()
+
+$results += Invoke-UploadCase -label "A. small body over HTTPS:443 (baseline: is the host reachable)" `
+    -payload $smallPayload -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+
+$results += Invoke-UploadCase -label "B. FULL body over HTTPS:443 (mod with UploadReplayDataUseTls=1)" `
+    -payload $fullPayload -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+
+$results += Invoke-UploadCase -label "C. FULL body over plain HTTP:80 (mod's native behavior)" `
+    -payload $fullPayload -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false
+
+if ($RunLongTimeoutCase) {
+    $results += Invoke-UploadCase -label "D. FULL body over plain HTTP:80, waiting up to ${LongTimeoutSeconds}s (throttled, or dropped?)" `
+        -payload $fullPayload -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false `
+        -timeoutSec $LongTimeoutSeconds
 }
 
-$sizeLimit = $null
-if ($AlsoProbeBodySizeLimit -and $smallOk -and -not $mainOk) {
+$results += Invoke-UploadCase -label "E. gzip-sized body ($GzipSizedBytes bytes) over plain HTTP:80 (does compressing fix it)" `
+    -payload $gzipSizedPayload -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false
+
+$results += Invoke-UploadCase -label "F. gzip-sized body ($GzipSizedBytes bytes) over HTTPS:443" `
+    -payload $gzipSizedPayload -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+
+if ($RunOriginCases) {
+    $results += Invoke-UploadCase -label "G. small body straight to the origin IP (is it reachable at all)" `
+        -payload $smallPayload -targetHost $OriginIp -targetPort $OriginPort -targetEndpoint $Endpoint -useTls $false
+    $results += Invoke-UploadCase -label "H. FULL body straight to the origin IP (does bypassing Cloudflare help)" `
+        -payload $fullPayload -targetHost $OriginIp -targetPort $OriginPort -targetEndpoint $Endpoint -useTls $false
+}
+
+if ($RunControlCase) {
+    $results += Invoke-UploadCase -label "I. FULL body to an unrelated control server (can this machine upload 64KiB at all)" `
+        -payload $fullPayload -targetHost $ControlHostName -targetPort 443 -targetEndpoint $ControlEndpoint -useTls $true
+}
+
+$sweepHttp = $null
+if ($RunSizeSweep) {
     Write-Host ""
-    Log "===== Size sweep: largest body that still gets a response (this takes a few minutes) ====="
-    $sizeLimit = Get-LargestWorkingBody $smallPayload.Length $mainPayload.Length
-    Log "Largest body that got a response: about $sizeLimit bytes."
+    Log "===== Size sweep over plain HTTP:80 - largest body that gets through (a few minutes) ====="
+    $sweepHttp = Get-LargestWorkingBody -knownGood $SmallSizeBytes -knownBad $FullSizeBytes `
+        -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false
+    Log "Largest body over plain HTTP:80: about $sweepHttp bytes."
 }
 
-$controlSmallOk = $null
-$controlLargeOk = $null
-if ($AlsoTestControlHost) {
-    Write-Host ""
-    Log "===== Control server ($ControlHostName): is it this host, or every large upload? ====="
-    $controlSmallOk = Invoke-UploadTest -label "CONTROL - small body" -payload $smallPayload `
-        -targetHost $ControlHostName -targetPort $ControlPort -targetEndpoint $ControlEndpoint -targetTls $true
-    $controlLargeOk = Invoke-UploadTest -label "CONTROL - full-size body" -payload $mainPayload `
-        -targetHost $ControlHostName -targetPort $ControlPort -targetEndpoint $ControlEndpoint -targetTls $true
-}
-
-$largestPing = $null
-if ($AlsoProbePathMtu) {
-    Write-Host ""
-    Log "===== Path MTU probe (may take a few seconds) ====="
-    $largestPing = Get-LargestPingPayload
-    if ($largestPing -ne $null) {
-        Log "Largest packet that reached the host: $largestPing byte payload = $($largestPing + 28) byte MTU."
-    }
-}
+# ---------------------------------------------------------------- matrix
 
 Write-Host ""
-Log "===== SUMMARY ====="
-Log "$HostName - small body ($($smallPayload.Length) bytes):   $(if ($smallOk) { 'got a response' } else { 'NO response' })"
-Log "$HostName - full body ($($mainPayload.Length) bytes), one write: $(if ($mainOk) { 'got a response' } else { 'NO response' })"
-if ($chunkedOk -ne $null) {
-    Log "$HostName - full body in $ChunkSizeBytes-byte pieces:  $(if ($chunkedOk) { 'got a response' } else { 'NO response' })"
+Log "===================== RESULTS ====================="
+foreach ($r in $results) {
+    $mark = if ($r.Ok) { "OK  " } else { "FAIL" }
+    Log ("{0} | {1,5}s | {2}" -f $mark, $r.Seconds, $r.Label)
+    Log ("       {0}{1}" -f $r.Reason, $(if ($r.Status) { " -> $($r.Status)" } else { "" }))
 }
-if ($sizeLimit -ne $null) {
-    Log "$HostName - largest body that worked:      about $sizeLimit bytes"
-}
-if ($controlSmallOk -ne $null) {
-    Log "$ControlHostName - small body:            $(if ($controlSmallOk) { 'got a response' } else { 'NO response' })"
-    Log "$ControlHostName - full body:             $(if ($controlLargeOk) { 'got a response' } else { 'NO response' })"
-}
-if ($largestPing -ne $null) {
-    Log "largest packet reaching $HostName`:       $($largestPing + 28) byte MTU"
+if ($sweepHttp -ne $null) {
+    Log ("     | ------ | largest body over plain HTTP:80: about {0} bytes" -f $sweepHttp)
 }
 
+function Res([string]$prefix) { return ($results | Where-Object { $_.Label.StartsWith($prefix) } | Select-Object -First 1) }
+$a = Res "A."; $b = Res "B."; $c = Res "C."; $d = Res "D."; $e = Res "E."; $f = Res "F."; $g = Res "G."; $h = Res "H."; $i = Res "I."
+
 Write-Host ""
-if ($mainOk) {
-    Log "=> Uploads work from this machine as-is. Nothing to fix here."
-} elseif ($chunkedOk) {
-    Log "=> The same body fails as one write but succeeds in small pieces, so the path drops"
-    Log "   full-size packets. This is fixable in the mod, by writing the upload body in small"
-    Log "   chunks (HttpSendRequestEx + InternetWriteFile) instead of one big send."
-} elseif (-not $smallOk) {
-    Log "=> Nothing gets a response at all, regardless of size - the host/port is unreachable"
-    Log "   from this machine."
+Log "===================== READING ====================="
+if (-not $a.Ok) {
+    Log "The host is not reachable from here at all, so nothing below is meaningful."
+} elseif ($b.Ok -and $c.Ok) {
+    Log "Full 64KiB uploads work from this machine. Nothing to fix here."
 } else {
-    Log "=> Large uploads do not complete, and sending them in small pieces did not help either,"
-    Log "   so this is not a packet-size/MTU problem - something is dropping the upload once"
-    Log "   enough data flows."
-    if ($controlSmallOk -and $controlLargeOk) {
-        Log "   The control server DID accept the same large body, so this machine can do large"
-        Log "   uploads in general - it is specific to the path to $HostName."
-    } elseif ($controlSmallOk -and -not $controlLargeOk) {
-        Log "   The control server ALSO refused the large body while accepting the small one, so"
-        Log "   large uploads are broken from this machine generally, not just to $HostName."
-        Log "   That points at this machine's own network: an ISP/DPI filter, or a"
-        Log "   DPI-circumvention tool (zapret, GoodbyeDPI, ByeDPI) rewriting outbound packets."
-        Log "   Try turning any such tool OFF and re-running, and try again over a VPN."
+    if ($e.Ok -or $f.Ok) {
+        Log "* A gzip-sized body DOES get through while the full 64KiB does not."
+        Log "  Compressing the replay before upload would fix this. A replay is 64KiB of mostly"
+        Log "  empty space and gzips to 2-5KB, so it would clear the limit with room to spare."
+        Log "  This needs the server to accept a compressed body, so it is a coordinated change."
     }
-    Log "   No change inside the mod can help with this: the bytes are not reaching the server"
-    Log "   no matter how they are written."
+    if ($c.Ok -and -not $b.Ok) {
+        Log "* Plain HTTP on port 80 works where HTTPS on 443 does not - so set"
+        Log "  UploadReplayDataPort=80 and UploadReplayDataUseTls=0 as an immediate workaround."
+    } elseif (-not $c.Ok -and -not $b.Ok) {
+        Log "* Neither plain HTTP on 80 nor HTTPS on 443 carries the full body, so switching"
+        Log "  scheme or port is not a way out on its own."
+    }
+    if ($d -ne $null) {
+        if ($d.Ok) {
+            Log "* The full body DID arrive when given ${LongTimeoutSeconds}s, so it is being throttled rather than"
+            Log "  dropped - raising the mod's upload timeout would also make this work, just slowly."
+        } else {
+            Log "* Even with ${LongTimeoutSeconds}s the full body never arrived, so it is being dropped, not merely"
+            Log "  slowed. Raising the mod's timeout would not help."
+        }
+    }
+    if ($g -ne $null) {
+        if ($g.Ok -and $h.Ok) {
+            Log "* Talking straight to the origin IP works, including the full body - pointing"
+            Log "  UploadReplayDataHost at the origin and skipping Cloudflare is a workaround here."
+        } elseif ($g.Ok -and -not $h.Ok) {
+            Log "* The origin IP is reachable but still refuses the full body, so Cloudflare is not"
+            Log "  what imposes the limit - the same ceiling applies without it."
+        } elseif (-not $g.Ok) {
+            Log "* The origin IP is not reachable at all from here, which is why it is fronted by"
+            Log "  Cloudflare in the first place - going direct is not an option."
+        }
+    }
+    if ($i -ne $null -and $i.Ok) {
+        Log "* An unrelated server accepted the same 64KiB body, so this machine can upload large"
+        Log "  bodies in general. The limit is tied to the route to this particular host."
+        Log "  Independent testing shows this ISP throttling by hosting provider - every"
+        Log "  Cloudflare endpoint dies around 16KB while Fastly and Google Cloud are unaffected -"
+        Log "  so moving the replay server behind one of those would also sidestep it."
+    }
 }
 
 Write-Host ""
