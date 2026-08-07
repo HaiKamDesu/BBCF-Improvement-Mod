@@ -69,7 +69,10 @@ $GzipSizedBytes    = 5120                     # what a real replay compresses to
 $RunLongTimeoutCase = $true                   # include the "is it throttled or dropped" case (waits up to $LongTimeoutSeconds)
 $RunOriginCases     = $true                   # include the direct-to-origin cases
 $RunControlCase     = $true                   # include the unrelated-control case
-$RunSizeSweep       = $true                   # find the largest body that gets through, over plain HTTP on port 80
+$RunSizeSweep       = $true                   # find the largest body that gets through, over HTTPS:443
+$RunSplitCase       = $true                   # send the full body as several separate connections, each under the limit
+$SplitChunkBytes    = 12000                   # size of each of those pieces (must stay under the ~16KB per-connection limit)
+$GzipSizedTrials    = 3                       # repeat the gzip-sized case this many times, since results vary run to run
 $TimeoutSeconds     = 30                      # normal per-case timeout
 $LongTimeoutSeconds = 120                     # the patient case's timeout
 
@@ -318,8 +321,15 @@ if ($RunLongTimeoutCase) {
 $results += Invoke-UploadCase -label "E. gzip-sized body ($GzipSizedBytes bytes) over plain HTTP:80 (does compressing fix it)" `
     -payload $gzipSizedPayload -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false
 
-$results += Invoke-UploadCase -label "F. gzip-sized body ($GzipSizedBytes bytes) over HTTPS:443" `
-    -payload $gzipSizedPayload -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+# Repeated: this is the case a real fix would rely on, and it has flipped between runs, so one
+# sample is not enough to call it reliable.
+$gzipTlsOkCount = 0
+for ($t = 1; $t -le $GzipSizedTrials; $t++) {
+    $r = Invoke-UploadCase -label "F$t. gzip-sized body ($GzipSizedBytes bytes) over HTTPS:443 (try $t of $GzipSizedTrials)" `
+        -payload $gzipSizedPayload -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+    if ($t -eq 1) { $results += $r } else { $results += $r }
+    if ($r.Ok) { $gzipTlsOkCount++ }
+}
 
 if ($RunOriginCases) {
     $results += Invoke-UploadCase -label "G. small body straight to the origin IP (is it reachable at all)" `
@@ -333,13 +343,42 @@ if ($RunControlCase) {
         -payload $fullPayload -targetHost $ControlHostName -targetPort 443 -targetEndpoint $ControlEndpoint -useTls $true
 }
 
-$sweepHttp = $null
-if ($RunSizeSweep) {
+$splitOk = $null
+$splitDetail = ""
+if ($RunSplitCase) {
+    # The censorship this is up against counts data PER TCP CONNECTION, so the documented way
+    # around it is to spread the payload over several connections that each stay under the limit.
+    # If every piece lands, the mod could upload a replay in parts (with the server reassembling)
+    # even without compressing it.
     Write-Host ""
-    Log "===== Size sweep over plain HTTP:80 - largest body that gets through (a few minutes) ====="
-    $sweepHttp = Get-LargestWorkingBody -knownGood $SmallSizeBytes -knownBad $FullSizeBytes `
-        -targetHost $HostName -targetPort 80 -targetEndpoint $Endpoint -useTls $false
-    Log "Largest body over plain HTTP:80: about $sweepHttp bytes."
+    $pieces = [Math]::Ceiling($fullPayload.Length / $SplitChunkBytes)
+    Log "===== J. FULL body split over $pieces separate connections of $SplitChunkBytes bytes each ====="
+    $allOk = $true
+    $okCount = 0
+    for ($p = 0; $p -lt $pieces; $p++) {
+        $off = $p * $SplitChunkBytes
+        $len = [Math]::Min($SplitChunkBytes, $fullPayload.Length - $off)
+        $piece = New-Object byte[] $len
+        [Array]::Copy($fullPayload, $off, $piece, 0, $len)
+        $r = Invoke-UploadCase -label "  piece $($p + 1)/$pieces" -payload $piece -targetHost $HostName `
+            -targetPort 443 -targetEndpoint $Endpoint -useTls $true -quiet
+        if ($r.Ok) { $okCount++ } else { $allOk = $false }
+    }
+    $splitOk = $allOk
+    $splitDetail = "$okCount of $pieces pieces landed"
+    Log "Split upload: $splitDetail."
+}
+
+$sweepTls = $null
+if ($RunSizeSweep) {
+    # Swept over HTTPS:443, not plain HTTP:80: field runs showed port 80 behaving erratically
+    # (a 5KB body got through with a DPI-bypass tool running and was dropped without it), while
+    # 443 has been consistent, which makes it the meaningful place to measure the ceiling.
+    Write-Host ""
+    Log "===== Size sweep over HTTPS:443 - largest body that gets through (a few minutes) ====="
+    $sweepTls = Get-LargestWorkingBody -knownGood $SmallSizeBytes -knownBad $FullSizeBytes `
+        -targetHost $HostName -targetPort 443 -targetEndpoint $Endpoint -useTls $true
+    Log "Largest body over HTTPS:443: about $sweepTls bytes."
 }
 
 # ---------------------------------------------------------------- matrix
@@ -351,12 +390,18 @@ foreach ($r in $results) {
     Log ("{0} | {1,5}s | {2}" -f $mark, $r.Seconds, $r.Label)
     Log ("       {0}{1}" -f $r.Reason, $(if ($r.Status) { " -> $($r.Status)" } else { "" }))
 }
-if ($sweepHttp -ne $null) {
-    Log ("     | ------ | largest body over plain HTTP:80: about {0} bytes" -f $sweepHttp)
+if ($splitOk -ne $null) {
+    Log ("{0} | ------ | J. FULL body split over separate connections of {1} bytes ({2})" -f $(if ($splitOk) { "OK  " } else { "FAIL" }), $SplitChunkBytes, $splitDetail)
+}
+if ($sweepTls -ne $null) {
+    Log ("     | ------ | largest single body over HTTPS:443: about {0} bytes" -f $sweepTls)
 }
 
 function Res([string]$prefix) { return ($results | Where-Object { $_.Label.StartsWith($prefix) } | Select-Object -First 1) }
-$a = Res "A."; $b = Res "B."; $c = Res "C."; $d = Res "D."; $e = Res "E."; $f = Res "F."; $g = Res "G."; $h = Res "H."; $i = Res "I."
+$a = Res "A."; $b = Res "B."; $c = Res "C."; $d = Res "D."; $e = Res "E."; $g = Res "G."; $h = Res "H."; $i = Res "I."
+# F is run several times; treat it as working only if every try worked, since a fix cannot rely
+# on a case that only sometimes lands.
+$f = [pscustomobject]@{ Ok = ($gzipTlsOkCount -eq $GzipSizedTrials) }
 
 Write-Host ""
 Log "===================== READING ====================="
@@ -365,11 +410,25 @@ if (-not $a.Ok) {
 } elseif ($b.Ok -and $c.Ok) {
     Log "Full 64KiB uploads work from this machine. Nothing to fix here."
 } else {
-    if ($e.Ok -or $f.Ok) {
-        Log "* A gzip-sized body DOES get through while the full 64KiB does not."
-        Log "  Compressing the replay before upload would fix this. A replay is 64KiB of mostly"
-        Log "  empty space and gzips to 2-5KB, so it would clear the limit with room to spare."
+    Log "* gzip-sized body over HTTPS:443 landed $gzipTlsOkCount of $GzipSizedTrials tries."
+    if ($f.Ok) {
+        Log "  A gzip-sized body gets through reliably while the full 64KiB never does."
+        Log "  Compressing the replay before upload would fix this: a replay is 64KiB of mostly"
+        Log "  empty space and gzips to 2-5KB, clearing the limit with room to spare."
         Log "  This needs the server to accept a compressed body, so it is a coordinated change."
+    } elseif ($gzipTlsOkCount -gt 0) {
+        Log "  That is inconsistent, so compressing alone may not be dependable on this connection."
+    }
+    if ($splitOk -ne $null) {
+        if ($splitOk) {
+            Log "* Splitting the full body over separate connections of $SplitChunkBytes bytes DID land every piece."
+            Log "  This matches how the censorship is documented to work - it counts data per TCP"
+            Log "  connection - so uploading a replay in parts would also work, with no compression"
+            Log "  needed. It does need the server to accept and reassemble the parts."
+        } else {
+            Log "* Splitting the full body over separate connections did NOT land every piece"
+            Log "  ($splitDetail), so per-connection fragmentation alone is not a dependable fix here."
+        }
     }
     if ($c.Ok -and -not $b.Ok) {
         Log "* Plain HTTP on port 80 works where HTTPS on 443 does not - so set"
