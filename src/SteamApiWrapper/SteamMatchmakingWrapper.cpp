@@ -7,6 +7,7 @@
 #include "Game/gamestates.h"
 #include "Hooks/hooks_bbcf.h"
 #include "Hooks/RankedAutomationHarness.h"
+#include "Network/LobbyLinkManager.h"
 #include "Network/RankedListConnectionFilter.h"
 
 #include <algorithm>
@@ -397,6 +398,7 @@ void SteamMatchmakingWrapper::LeaveLobby(CSteamID steamIDLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper LeaveLobby\n");
 	RankedListConnectionFilter::GetInstance().OnLeaveLobby(steamIDLobby.ConvertToUint64());
+	LobbyLinkManager::GetInstance().OnLeaveLobby(steamIDLobby.ConvertToUint64());
 	return m_SteamMatchmaking->LeaveLobby(steamIDLobby);
 }
 

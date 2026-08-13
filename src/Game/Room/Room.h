@@ -15,6 +15,8 @@ enum RoomStatus
 enum RoomType : uint8_t
 {
 	RoomType_Ranked = 0x10,
+	// The ordinary player-created online room (match slots + spectators) -- this is what
+	// the community shares invite links to, despite RoomType_Lobby sounding like it.
 	RoomType_MatchSpectate = 0x11,
 	RoomType_Lobby = 0x12,
 	RoomType_FFA = 0x21,

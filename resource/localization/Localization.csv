@@ -915,3 +915,11 @@ Input_buffer_button_tooltip,Opens the input buffer display for this player.,Abre
 Wakeup_control_delay_tooltip,Frame delay added before P2's wakeup timing triggers.,Retraso en frames añadido antes de que se active el tiempo de wakeup de P2.
 Wakeup_control_skew_tooltip,"Random +/- frame variance added on top of the wakeup delay each time.","Variación aleatoria +/- en frames añadida sobre el retraso de wakeup cada vez."
 Wakeup_type_selection_tooltip,"Multi-select which wakeup types P2 can be forced into; one is picked at random among the checked options each time.","Selección múltiple de los tipos de wakeup a los que se puede forzar a P2; se elige uno al azar entre las opciones marcadas cada vez."
+Lobby_link_copied,Room link copied to clipboard.,Enlace de la sala copiado al portapapeles.
+Lobby_link_no_room,"You are not in a room that can be shared. Ranked matches and the replay theater cannot be shared this way.","No estás en una sala que se pueda compartir. Las partidas clasificatorias y el teatro de repeticiones no se pueden compartir de esta forma."
+Lobby_link_clipboard_failed,Could not access the clipboard. Try again in a moment.,No se pudo acceder al portapapeles. Inténtalo de nuevo en un momento.
+Lobby_link_not_found,No BBCF room link found on the clipboard.,No se encontró ningún enlace de sala de BBCF en el portapapeles.
+Lobby_link_already_here,You are already in that room.,Ya estás en esa sala.
+Lobby_link_joining,Opening room link...,Abriendo el enlace de la sala...
+Lobby_link_open_failed,Could not hand the room link to Steam.,No se pudo enviar el enlace de la sala a Steam.
+Lobby_link_join_failed,Could not join that room (%s). The link may be old.,No se pudo unir a esa sala (%s). El enlace puede estar caducado.

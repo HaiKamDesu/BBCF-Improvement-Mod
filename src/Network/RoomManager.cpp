@@ -195,6 +195,15 @@ const char* RoomManager::GetPlayerSteamName(uint64_t steamID) const
 	return m_pSteamFriends->GetFriendPersonaName(steamID);
 }
 
+bool RoomManager::TryGetRoomType(RoomType* outType) const
+{
+	if (!outType || !m_pRoom || IsBadReadPtr(m_pRoom, offsetof(Room, roomType) + sizeof(m_pRoom->roomType)))
+		return false;
+
+	*outType = m_pRoom->roomType;
+	return true;
+}
+
 const std::string RoomManager::GetRoomTypeName() const
 {
 	switch (m_pRoom->roomType)

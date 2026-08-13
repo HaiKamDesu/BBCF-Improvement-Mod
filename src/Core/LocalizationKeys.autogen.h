@@ -2216,6 +2216,30 @@ struct LocalizationKeysAccessor
 
         // Wakeup_type_selection_tooltip
         inline const char* Wakeup_type_selection_tooltip() const { return Get("Wakeup_type_selection_tooltip"); }
+
+        // Lobby_link_copied
+        inline const char* Lobby_link_copied() const { return Get("Lobby_link_copied"); }
+
+        // Lobby_link_no_room
+        inline const char* Lobby_link_no_room() const { return Get("Lobby_link_no_room"); }
+
+        // Lobby_link_clipboard_failed
+        inline const char* Lobby_link_clipboard_failed() const { return Get("Lobby_link_clipboard_failed"); }
+
+        // Lobby_link_not_found
+        inline const char* Lobby_link_not_found() const { return Get("Lobby_link_not_found"); }
+
+        // Lobby_link_already_here
+        inline const char* Lobby_link_already_here() const { return Get("Lobby_link_already_here"); }
+
+        // Lobby_link_joining
+        inline const char* Lobby_link_joining() const { return Get("Lobby_link_joining"); }
+
+        // Lobby_link_open_failed
+        inline const char* Lobby_link_open_failed() const { return Get("Lobby_link_open_failed"); }
+
+        // Lobby_link_join_failed
+        inline const char* Lobby_link_join_failed() const { return Get("Lobby_link_join_failed"); }
 };
 
 

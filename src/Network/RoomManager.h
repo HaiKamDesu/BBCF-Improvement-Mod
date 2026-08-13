@@ -53,6 +53,9 @@ public:
 	uint16_t GetThisPlayerMatchPlayerIndex() const;
 	uint16_t GetPlayerMatchPlayerIndexByRoomMemberIndex(uint16_t index) const;
 	const std::string GetRoomTypeName() const;
+	// Reads the current room's type. Returns false (leaving *outType untouched) when
+	// there is no readable room struct, so callers can't mistake "no room" for a type.
+	bool TryGetRoomType(RoomType* outType) const;
 	std::vector<IMPlayer> GetIMPlayersInCurrentMatch() const;
 	std::vector<IMPlayer> GetIMPlayersInCurrentRoom() const;
 	std::vector<const RoomMemberEntry*> GetOtherRoomMemberEntriesInCurrentMatch() const;

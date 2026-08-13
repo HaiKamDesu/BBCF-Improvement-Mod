@@ -11,6 +11,7 @@
 #include "Window/WinePopupWindow.h"
 
 #include "Game/FrameStallWatchdog.h"
+#include "Network/LobbyLinkManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
@@ -438,6 +439,11 @@ void WindowManager::HandleButtons()
 	{
 		*g_gameVals.pIsHUDHidden ^= 1;
 	}
+
+	// Driven from the render loop rather than the GetFrameCounter hook: that hook only
+	// fires while the match frame counter advances, so it ticks in training but is dead
+	// on the online room screen -- exactly where copying a room link has to work.
+	LobbyLinkManager::GetInstance().Tick();
 }
 
 void WindowManager::DrawAllWindows() const

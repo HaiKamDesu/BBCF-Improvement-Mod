@@ -10,6 +10,14 @@ SETTING(std::string, loadStateKeybind, "LoadStateKeybind", "F9");
 SETTING(std::string, loadReplayStateKeybind, "LoadReplayStateKeybind", "F4");
 SETTING(std::string, freezeFrameKeybind, "freezeFrameKeybind", "C");
 SETTING(std::string, stepFramesKeybind, "stepFramesKeybind", "V");
+// Ctrl+<key> shortcuts for sharing player-created rooms: copy puts a
+// steam://joinlobby link for the room you are in on the clipboard, join opens such a
+// link from the clipboard so the Steam client hands it back to the game. Both require
+// Ctrl held and the game window focused; both are inert while an ImGui text field has
+// keyboard focus. See src/Network/LobbyLinkManager.h.
+SETTING(bool, lobbyLinkHotkeysEnabled, "LobbyLinkHotkeysEnabled", "1");
+SETTING(std::string, copyLobbyLinkKeybind, "CopyLobbyLinkKeybind", "C");
+SETTING(std::string, joinLobbyLinkKeybind, "JoinLobbyLinkKeybind", "V");
 SETTING(std::string, dinputDllWrapper, "DinputDllWrapper", "none");
 SETTING(int, renderwidth, "RenderingWidth", "1920");
 SETTING(int, renderheight, "RenderingHeight", "1080");

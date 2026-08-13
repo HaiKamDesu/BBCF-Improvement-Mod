@@ -90,6 +90,7 @@
     <ClCompile Include="src\Core\Localization.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
+    <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
     <ClCompile Include="src\Overlay\fonts.cpp" />
@@ -242,6 +243,7 @@
     <ClInclude Include="src\Network\NetworkManager.h" />
     <ClInclude Include="src\Network\OnlinePaletteManager.h" />
     <ClInclude Include="src\Network\Packet.h" />
+    <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Network\RoomManager.h" />
     <ClInclude Include="src\Overlay\fonts.h" />
