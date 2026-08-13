@@ -1,5 +1,6 @@
 #include "RankedAutomationHarness.h"
 
+#include "Core/HotkeyManager.h"
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
@@ -933,8 +934,7 @@ namespace
                                 Start("autorun", true);
                         }
 
-                        const int hotkey = Settings::getButtonValue(Settings::settingsIni.rankedAutomationHarnessHotkey);
-                        if (hotkey > 0 && (GetAsyncKeyState(hotkey) & 0x1) != 0)
+                        if (HotkeyManager::ConsumePress(HotkeyManager::Hotkey_RankedAutomation))
                         {
                                 if (m_active)
                                 {

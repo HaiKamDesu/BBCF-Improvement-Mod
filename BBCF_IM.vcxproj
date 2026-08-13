@@ -54,6 +54,7 @@
     <ClCompile Include="src\Game\stages.cpp" />
     <ClCompile Include="src\Network\OnlineGameModeManager.cpp" />
     <ClCompile Include="src\Overlay\NotificationBar\NotificationBar.cpp" />
+    <ClCompile Include="src\Overlay\Widget\HotkeyBindWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\ActiveGameModeWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\MarkdownRenderer.cpp" />
     <ClCompile Include="src\Overlay\Widget\GameModeSelectWidget.cpp" />
@@ -128,6 +129,8 @@
     <ClCompile Include="src\Hooks\HookManager.cpp" />
     <ClCompile Include="src\Core\logger.cpp" />
     <ClCompile Include="src\Core\dllmain.cpp" />
+    <ClCompile Include="src\Core\HotkeyManager.cpp" />
+    <ClCompile Include="src\Core\InputDevices.cpp" />
     <ClCompile Include="src\Core\Settings.cpp" />
     <ClCompile Include="src\Core\SystemSpecsLogger.cpp" />
     <ClCompile Include="src\Palette\impl_templates.cpp" />
@@ -163,7 +166,6 @@
     <ClInclude Include="depends\imgui\imstb_rectpack.h" />
     <ClInclude Include="depends\imgui\imstb_textedit.h" />
     <ClInclude Include="depends\imgui\imstb_truetype.h" />
-    <ClInclude Include="src\Core\keycodes.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayList.h" />
     <ClInclude Include="src\Game\ScenesManager\ScenesManager.h" />
     <ClInclude Include="src\Game\ReplayRewind\ReplayRewind.h" />
@@ -202,6 +204,7 @@
     <ClInclude Include="src\Game\EntityData.h" />
     <ClInclude Include="src\Network\OnlineGameModeManager.h" />
     <ClInclude Include="src\Overlay\NotificationBar\NotificationBar.h" />
+    <ClInclude Include="src\Overlay\Widget\HotkeyBindWidget.h" />
     <ClInclude Include="src\Overlay\Widget\ActiveGameModeWidget.h" />
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
     <ClInclude Include="src\Overlay\Widget\GameModeSelectWidget.h" />
@@ -284,6 +287,8 @@
     <ClInclude Include="src\Palette\impl_format.h" />
     <ClInclude Include="src\Palette\impl_templates.h" />
     <ClInclude Include="src\Core\logger.h" />
+    <ClInclude Include="src\Core\HotkeyManager.h" />
+    <ClInclude Include="src\Core\InputDevices.h" />
     <ClInclude Include="src\Core\Settings.h" />
     <ClInclude Include="src\Core\SystemSpecsLogger.h" />
     <ClInclude Include="src\Game\gamestates.h" />
@@ -331,6 +336,7 @@
       <FileType>Document</FileType>
       <DeploymentContent>false</DeploymentContent>
     </None>
+    <None Include="src\Core\hotkeys.def" />
     <None Include="src\Core\settings.def" />
   </ItemGroup>
   <ItemGroup>

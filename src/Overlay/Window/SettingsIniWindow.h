@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/HotkeyManager.h"
 #include "Core/Settings.h"
 
 #include "imgui.h"

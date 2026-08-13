@@ -5,7 +5,7 @@
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
-#include "Core/XInputRuntime.h"
+#include "Core/HotkeyManager.h"
 #include "Game/gamestates.h"
 
 #include <Windows.h>
@@ -30,33 +30,6 @@ const char* kProfileFormatKindValue = "unlimited_profile";
 const char* kEmbeddedEntryDataKey = "entry_data";
 const char kPlaybackHeaderMagic[4] = { 'U', 'P', 'B', '2' };
 constexpr int kDedicatedRuntimePlaybackSlot = 4;
-constexpr int kControllerBindBase = 0x1000;
-
-struct ControllerBindingDef {
-    int code;
-    WORD mask;         // 0 for analog triggers (L2/R2)
-    bool isLeftTrigger;
-    bool isRightTrigger;
-};
-
-const ControllerBindingDef kControllerBindings[] = {
-    { kControllerBindBase + 0,  XINPUT_GAMEPAD_A,              false, false },
-    { kControllerBindBase + 1,  XINPUT_GAMEPAD_B,              false, false },
-    { kControllerBindBase + 2,  XINPUT_GAMEPAD_X,              false, false },
-    { kControllerBindBase + 3,  XINPUT_GAMEPAD_Y,              false, false },
-    { kControllerBindBase + 4,  XINPUT_GAMEPAD_LEFT_SHOULDER,  false, false },
-    { kControllerBindBase + 5,  XINPUT_GAMEPAD_RIGHT_SHOULDER, false, false },
-    { kControllerBindBase + 6,  XINPUT_GAMEPAD_BACK,           false, false },
-    { kControllerBindBase + 7,  XINPUT_GAMEPAD_START,          false, false },
-    { kControllerBindBase + 8,  XINPUT_GAMEPAD_LEFT_THUMB,     false, false },
-    { kControllerBindBase + 9,  XINPUT_GAMEPAD_RIGHT_THUMB,    false, false },
-    { kControllerBindBase + 10, XINPUT_GAMEPAD_DPAD_UP,        false, false },
-    { kControllerBindBase + 11, XINPUT_GAMEPAD_DPAD_DOWN,      false, false },
-    { kControllerBindBase + 12, XINPUT_GAMEPAD_DPAD_LEFT,      false, false },
-    { kControllerBindBase + 13, XINPUT_GAMEPAD_DPAD_RIGHT,     false, false },
-    { kControllerBindBase + 14, 0,                             true,  false }, // L2 / LT
-    { kControllerBindBase + 15, 0,                             false, true  }, // R2 / RT
-};
 
 std::string FormatLocalized(const char* key, ...) {
     const char* format = L(key).c_str();
@@ -76,32 +49,6 @@ std::string FormatLocalized(const char* key, ...) {
     va_end(args);
     out.resize(static_cast<size_t>(required));
     return out;
-}
-
-bool IsControllerBindCode(int code) {
-    return code >= kControllerBindBase &&
-        code < (kControllerBindBase + static_cast<int>(sizeof(kControllerBindings) / sizeof(kControllerBindings[0])));
-}
-
-bool IsGameWindowFocused() {
-    return g_gameProc.hWndGameWindow && GetForegroundWindow() == g_gameProc.hWndGameWindow;
-}
-
-bool IsControllerBindingDown(const ControllerBindingDef& binding) {
-    for (DWORD userIndex = 0; userIndex < XUSER_MAX_COUNT; ++userIndex) {
-        XINPUT_STATE state = {};
-        if (XInputRuntime::GetState(userIndex, &state) != ERROR_SUCCESS) {
-            continue;
-        }
-        if (binding.isLeftTrigger) {
-            if (state.Gamepad.bLeftTrigger > 128) return true;
-        } else if (binding.isRightTrigger) {
-            if (state.Gamepad.bRightTrigger > 128) return true;
-        } else if ((state.Gamepad.wButtons & binding.mask) != 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
 bool IsLoopCompletionIdleAction(const std::string& currentAction) {
@@ -499,7 +446,6 @@ UnlimitedPlaybackManager::UnlimitedPlaybackManager() {
     for (int i = 0; i < Trigger_Count; ++i) {
         m_triggers[i].enabled = (i != Trigger_KeyPress && i != Trigger_OnLoop);
         m_triggers[i].cooldownFrames = 1;
-        m_triggers[i].keyCode = VK_F6;
     }
 }
 
@@ -510,13 +456,8 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
 
     m_activeProfilePath.clear();
     m_lastLoadedProfileFolder.clear();
-    // Trigger keybind lives in user settings, not in profiles.
-    const int savedKeyCode = Settings::settingsIni.unlimitedPlaybackTriggerKeyCode;
-    if (savedKeyCode != 0) {
-        m_triggers[Trigger_KeyPress].keyCode = savedKeyCode;
-    }
-    const int savedLoopKeyCode = Settings::settingsIni.unlimitedPlaybackLoopKeyCode;
-    m_loopKeyCode = savedLoopKeyCode != 0 ? savedLoopKeyCode : VK_F7;
+    // The playback and loop keybinds live in HotkeyManager (settings.ini, rebindable from the
+    // Settings window like every other hotkey), not in profiles and not here.
     m_loopSetupSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds);
     m_loopEndingSeconds = (std::max)(0.0f, Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds);
     m_loopRestartLabState = Settings::settingsIni.unlimitedPlaybackLoopRestartLabState;
@@ -594,9 +535,8 @@ void UnlimitedPlaybackManager::Tick() {
         return;
     }
 
-    if (!m_keyPressTriggerArmed && !IsTriggerKeyDown(m_triggers[Trigger_KeyPress].keyCode)) {
+    if (!m_keyPressTriggerArmed && !HotkeyManager::IsDown(HotkeyManager::Hotkey_UnlimitedPlaybackTrigger)) {
         LogRuntimeGateState("Tick arming key-press triggers");
-        SyncKeyEdgeState();
         m_keyPressTriggerArmed = true;
         LOG(1, "[UP] Key-press triggers armed.\n");
     }
@@ -671,7 +611,6 @@ void UnlimitedPlaybackManager::ResetTriggerRuntimeState(bool enableRuntime) {
     m_prevOnBlockCondition = false;
     m_prevOnHitCondition = false;
     m_prevThrowTechCondition = false;
-    SyncKeyEdgeState();
     m_keyPressTriggerArmed = false;
     LogRuntimeGateState("ResetTriggerRuntimeState end");
 }
@@ -776,7 +715,6 @@ void UnlimitedPlaybackManager::OnMatchEnd() {
     m_prevOnBlockCondition = false;
     m_prevOnHitCondition = false;
     m_prevThrowTechCondition = false;
-    SyncKeyEdgeState();
     m_keyPressTriggerArmed = false;
     StopLoop(nullptr);
     ClearLoopCustomSnapshot();
@@ -814,14 +752,6 @@ bool UnlimitedPlaybackManager::GetAutoMirrorOnSideSwap() const {
 
 void UnlimitedPlaybackManager::SetAutoMirrorOnSideSwap(bool enabled) {
     m_autoMirrorOnSideSwap = enabled;
-}
-
-int UnlimitedPlaybackManager::GetLoopKeyCode() const {
-    return m_loopKeyCode;
-}
-
-void UnlimitedPlaybackManager::SetLoopKeyCode(int keyCode) {
-    m_loopKeyCode = keyCode != 0 ? keyCode : VK_F7;
 }
 
 float UnlimitedPlaybackManager::GetLoopSetupSeconds() const {
@@ -2173,7 +2103,10 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
 
     bool shouldFire = false;
     switch (trigger) {
-    case Trigger_KeyPress: shouldFire = IsKeyPressedEdge(config.keyCode); break;
+    // ConsumePress, not WasPressed: this runs from a game-frame hook, which can tick more
+    // than once per rendered frame, and one press must fire the trigger once.
+    case Trigger_KeyPress: shouldFire = m_keyPressTriggerArmed &&
+        HotkeyManager::ConsumePress(HotkeyManager::Hotkey_UnlimitedPlaybackTrigger); break;
     case Trigger_Wakeup: shouldFire = ShouldTriggerWakeup(); break;
     case Trigger_Gap: shouldFire = ShouldTriggerGap(); break;
     case Trigger_OnBlock: shouldFire = ShouldTriggerOnBlock(); break;
@@ -2243,7 +2176,7 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
         m_loopPositionSetupSettleTicksLeft = kLoopNativeResetSettleFrames;
     }
 
-    if (IsKeyPressedEdge(m_loopKeyCode)) {
+    if (HotkeyManager::ConsumePress(HotkeyManager::Hotkey_UnlimitedPlaybackLoop)) {
         if (m_loopActive) {
             StopLoop(L("Playback loop stopped.").c_str());
         } else {
@@ -3011,62 +2944,6 @@ std::vector<size_t> UnlimitedPlaybackManager::BuildCandidatesForTrigger(TriggerT
         candidates.push_back(i);
     }
     return candidates;
-}
-
-void UnlimitedPlaybackManager::SyncKeyEdgeState() {
-    for (int vk = 0; vk < 256; ++vk) {
-        m_prevKeyDown[vk] = (GetAsyncKeyState(vk) & 0x8000) != 0;
-    }
-    for (int i = 0; i < static_cast<int>(sizeof(kControllerBindings) / sizeof(kControllerBindings[0])); ++i) {
-        m_prevControllerBindDown[static_cast<size_t>(i)] = IsControllerBindingDown(kControllerBindings[i]);
-    }
-}
-
-bool UnlimitedPlaybackManager::IsTriggerKeyDown(int virtualKey) const {
-    if (!IsGameWindowFocused()) {
-        return false;
-    }
-    if (IsControllerBindCode(virtualKey)) {
-        return IsControllerBindingDown(kControllerBindings[virtualKey - kControllerBindBase]);
-    }
-    if (virtualKey <= 0 || virtualKey >= 256) {
-        return false;
-    }
-    if (IsTypingInImGuiTextField()) {
-        return false;
-    }
-    return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-}
-
-bool UnlimitedPlaybackManager::IsKeyPressedEdge(int virtualKey) {
-    // Typing into an overlay text field must not fire keyboard triggers. Controller
-    // bindings are unaffected -- a gamepad button is never "typing".
-    if (!IsGameWindowFocused() || (!IsControllerBindCode(virtualKey) && IsTypingInImGuiTextField())) {
-        if (IsControllerBindCode(virtualKey)) {
-            const int index = virtualKey - kControllerBindBase;
-            m_prevControllerBindDown[static_cast<size_t>(index)] = false;
-        } else if (virtualKey > 0 && virtualKey < 256) {
-            m_prevKeyDown[virtualKey] = false;
-        }
-        return false;
-    }
-    if (IsControllerBindCode(virtualKey)) {
-        const int index = virtualKey - kControllerBindBase;
-        const bool isDown = IsControllerBindingDown(kControllerBindings[index]);
-        const bool wasDown = m_prevControllerBindDown[static_cast<size_t>(index)];
-        m_prevControllerBindDown[static_cast<size_t>(index)] = isDown;
-        return m_keyPressTriggerArmed && isDown && !wasDown;
-    }
-    if (virtualKey <= 0 || virtualKey >= 256) {
-        return false;
-    }
-    if (!m_keyPressTriggerArmed) {
-        return false;
-    }
-    const bool isDown = (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-    const bool wasDown = m_prevKeyDown[virtualKey];
-    m_prevKeyDown[virtualKey] = isDown;
-    return isDown && !wasDown;
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerWakeup() {

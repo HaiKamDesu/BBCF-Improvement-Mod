@@ -65,8 +65,6 @@ private:
 	// popup. Cleared once consumed or once it ages out.
 	unsigned long long m_pasteJoinTickMs = 0;
 
-	bool m_copyKeyWasDown = false;
-	bool m_joinKeyWasDown = false;
 };
 
 // Parsing helpers, exposed for reuse and so their edge cases are testable by inspection.

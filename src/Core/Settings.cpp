@@ -1,6 +1,6 @@
 #include "Settings.h"
 #include "logger.h"
-#include "keycodes.h"
+#include "HotkeyManager.h"
 #include <regex>
 #include "Core/interfaces.h"
 
@@ -76,11 +76,9 @@ void Settings::applyRuntimeSettings()
 	}
 	g_modVals.enableForeignPalettes = Settings::settingsIni.loadforeignpalettes;
 	g_modVals.allowPaletteDownloads = Settings::settingsIni.allowPaletteDownloads;
-	g_modVals.save_states_save_keycode = Settings::getButtonValue(settingsIni.saveStateKeybind);
-	g_modVals.save_states_load_keycode = Settings::getButtonValue(settingsIni.loadStateKeybind);
-	g_modVals.replay_takeover_load_keycode = Settings::getButtonValue(settingsIni.loadReplayStateKeybind);
-	g_modVals.freeze_frame_keycode = Settings::getButtonValue(Settings::settingsIni.freezeFrameKeybind);
-	g_modVals.step_frames_keycode = Settings::getButtonValue(Settings::settingsIni.stepFramesKeybind);
+	// Hotkeys no longer live in g_modVals: HotkeyManager owns every binding and every
+	// consumer asks it directly, so re-reading them is one call.
+	HotkeyManager::ReloadFromSettings();
 	g_modVals.uploadReplayData = Settings::settingsIni.uploadReplayData;
 	g_modVals.frame_history_width = Settings::settingsIni.FrameHistoryWidth;
 	g_modVals.frame_history_height = Settings::settingsIni.FrameHistoryHeight;
@@ -195,20 +193,11 @@ bool Settings::loadSettingsFile()
 
 	ForceLog("[Init][Settings] raw settings read complete\n");
 
-	// Set buttons back to default if their values are incorrect
-	if (settingsIni.togglebutton.length() != 2 || settingsIni.togglebutton[0] != 'F')
-		settingsIni.togglebutton = "F1";
+	// Hotkey values are no longer validated here. They used to be forced back to F1/F2/F3
+	// whenever they were not exactly "F<digit>", which is what made those three menu keys
+	// impossible to bind to anything else. HotkeyManager parses them instead, and an
+	// unparseable value simply reads as "not bound" rather than being silently overwritten.
 
-	if (settingsIni.toggleOnlineButton.length() != 2 || settingsIni.toggleOnlineButton[0] != 'F')
-		settingsIni.toggleOnlineButton = "F2";
-
-	if (settingsIni.toggleHUDbutton.length() != 2 || settingsIni.toggleHUDbutton[0] != 'F')
-		settingsIni.toggleHUDbutton = "F3";
-
-
-
-	
-	
         if (settingsIni.swapControllerPos)
         {
                 LOG(1, "Settings::loadSettingsFile - SwapControllerPos forced off due to a known startup crash issue.\n");
@@ -251,16 +240,6 @@ void Settings::initSavedSettings()
 	savedSettings.isDuelFieldSprite = false;
 
 	savedSettings.isFiltering = false;
-}
-
-short Settings::getButtonValue(std::string button)
-{
-        auto maybe_keycode = keycode_mapper.find(button);
-        if (maybe_keycode != keycode_mapper.end())
-                return maybe_keycode->second;
-        else
-                return 112;
-
 }
 
 bool Settings::WasDebugLoggingSettingMissing()

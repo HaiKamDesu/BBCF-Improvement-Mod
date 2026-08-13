@@ -3,6 +3,7 @@
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/logger.h"
+#include "Core/HotkeyManager.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Network/RoomManager.h"
@@ -184,10 +185,6 @@ namespace
 		return (*pos > start) ? value : 0;
 	}
 
-	bool IsKeyDown(int virtualKey)
-	{
-		return virtualKey > 0 && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-	}
 }
 
 std::string LobbyLink::FormatJoinUrl(uint64_t lobbyId, uint64_t memberSteamId)
@@ -509,48 +506,16 @@ void LobbyLinkManager::Tick()
 		return;
 	}
 
-	// Only react when the game itself owns the foreground. Without this, GetAsyncKeyState
-	// would see the Ctrl+C the user pressed in Discord and copy over their clipboard.
-	if (GetForegroundWindow() != g_gameProc.hWndGameWindow)
-	{
-		m_copyKeyWasDown = false;
-		m_joinKeyWasDown = false;
-		return;
-	}
-
-	// The mod menu being *open* is fine; the mod menu having a focused text field is not,
-	// or Ctrl+C in a search box would fire the hotkey instead of copying the text.
-	if (IsTypingInImGuiTextField())
-	{
-		m_copyKeyWasDown = false;
-		m_joinKeyWasDown = false;
-		return;
-	}
-
-	if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) == 0)
-	{
-		m_copyKeyWasDown = false;
-		m_joinKeyWasDown = false;
-		return;
-	}
-
-	const int copyKey = Settings::getButtonValue(Settings::settingsIni.copyLobbyLinkKeybind);
-	const int joinKey = Settings::getButtonValue(Settings::settingsIni.joinLobbyLinkKeybind);
-
-	// Own edge tracking rather than GetAsyncKeyState's "pressed since last call" bit,
-	// which is consumed by whichever caller reads it first and would race the other
-	// keybind consumers that poll the same keys.
-	const bool copyDown = IsKeyDown(copyKey);
-	if (copyDown && !m_copyKeyWasDown)
+	// Foreground-window and typing gating, exact modifier matching and press-edge tracking
+	// all live in HotkeyManager now, which is also why the Ctrl these shortcuts need is a
+	// real part of the binding instead of a hardcoded check here.
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_CopyLobbyLink))
 	{
 		CopyCurrentLobbyLink();
 	}
-	m_copyKeyWasDown = copyDown;
 
-	const bool joinDown = IsKeyDown(joinKey);
-	if (joinDown && !m_joinKeyWasDown)
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_JoinLobbyLink))
 	{
 		JoinLobbyFromClipboard();
 	}
-	m_joinKeyWasDown = joinDown;
 }

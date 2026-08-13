@@ -35,7 +35,6 @@ public:
         static bool loadSettingsFile();
         static void initSavedSettings();
         //static void setViewportSize(D3DVIEWPORT9 Viewport);
-        static short getButtonValue(std::string button);
 
         static bool WasDebugLoggingSettingMissing();
 

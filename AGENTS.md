@@ -24,7 +24,8 @@ Keep this file small. It is always loaded; deeper context is opt-in.
 - User normally deploys/runs game manually. Build locally after code edits unless user says not to or environment is unavailable.
 
 ## High-Value Routes
-- Settings/hotkeys: `src/Core/settings.def`, `src/Core/Settings.*`, `resource/settings.ini`.
+- Settings: `src/Core/settings.def`, `src/Core/Settings.*`, `resource/settings.ini`.
+- Hotkeys: action list in `src/Core/hotkeys.def`, polling/parsing in `src/Core/HotkeyManager.*`, controller input in `src/Core/InputDevices.*`, rebind UI in `src/Overlay/Widget/HotkeyBindWidget.*`.
 - Localization/UI copy: `resource/localization/Localization.csv`, generated `src/Core/LocalizationKeys.autogen.h`, `docs/localization.md`.
 - Overlay UI: `src/Overlay/Window*`, `src/Overlay/Widget*`, `src/Overlay/WindowManager.*`.
 - Hooks: `src/Hooks/*`, `notes.h`, `src/Game/GhidraDefs.h`.

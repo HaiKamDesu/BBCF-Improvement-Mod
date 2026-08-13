@@ -44,7 +44,6 @@ public:
     struct TriggerConfig {
         bool enabled = false;
         int cooldownFrames = 1;
-        int keyCode = 0;
         int lastTriggeredFrame = -999999;
     };
 
@@ -91,8 +90,6 @@ public:
     void SetSelectionMode(int mode);
     bool GetAutoMirrorOnSideSwap() const;
     void SetAutoMirrorOnSideSwap(bool enabled);
-    int GetLoopKeyCode() const;
-    void SetLoopKeyCode(int keyCode);
     float GetLoopSetupSeconds() const;
     void SetLoopSetupSeconds(float seconds);
     float GetLoopEndingSeconds() const;
@@ -196,9 +193,6 @@ private:
     void ResetLoopPlaybackCompletionState();
     void ObserveLoopPlaybackActionState();
     bool IsLoopPlaybackAnimationComplete(int currentFrame);
-    bool IsKeyPressedEdge(int virtualKey);
-    void SyncKeyEdgeState();
-    bool IsTriggerKeyDown(int virtualKey) const;
     void ResetTriggerRuntimeState(bool enableRuntime);
     void LogRuntimeGateState(const char* tag) const;
     void LogEntryCacheSummary(const char* tag) const;
@@ -252,8 +246,6 @@ private:
     bool m_prevOnBlockCondition = false;
     bool m_prevOnHitCondition = false;
     bool m_prevThrowTechCondition = false;
-    std::array<bool, 256> m_prevKeyDown = {};
-    std::array<bool, 16> m_prevControllerBindDown = {};
     bool m_keyPressTriggerArmed = false;
     bool m_triggerRuntimeEnabled = true;
     bool m_profileRuntimeSuppressedUntilReset = false;
@@ -275,7 +267,6 @@ private:
     bool m_replayRecordingAsP1 = true;
     int m_replayRecordingRound = 0;
     int m_replayRecordingStartFrame = 0;
-    int m_loopKeyCode = VK_F7;
     float m_loopSetupSeconds = 0.0f;
     float m_loopEndingSeconds = 0.0f;
     bool m_loopRestartLabState = false;

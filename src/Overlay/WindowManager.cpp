@@ -18,7 +18,9 @@
 #include "Window/UnlimitedReplayTakeoverWindow.h"
 #endif
 
+#include "Core/HotkeyManager.h"
 #include "Core/info.h"
+#include "Core/InputDevices.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/logger.h"
@@ -40,9 +42,6 @@
 
 #define DEFAULT_ALPHA 0.87f
 
-int keyToggleMainWindow;
-int keyToggleRoomWindow;
-int keyToggleHud;
 
 // Fixed ImGui coordinate space requested by the 'viewport' setting, or (0,0) to follow the
 // game window's client size. Applied every frame in ApplyViewportOverride().
@@ -232,14 +231,14 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	//ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(DroidSans_compressed_data, DroidSans_compressed_size, 20);
 	// Set up toggle buttons
 
-	keyToggleMainWindow = Settings::getButtonValue(Settings::settingsIni.togglebutton);
-	m_pLogger->Log("[system] Toggling key set to '%s'\n", Settings::settingsIni.togglebutton.c_str());
-
-	keyToggleRoomWindow = Settings::getButtonValue(Settings::settingsIni.toggleOnlineButton);
-	m_pLogger->Log("[system] Online toggling key set to '%s'\n", Settings::settingsIni.toggleOnlineButton.c_str());
-
-	keyToggleHud = Settings::getButtonValue(Settings::settingsIni.toggleHUDbutton);
-	m_pLogger->Log("[system] HUD toggling key set to '%s'\n", Settings::settingsIni.toggleHUDbutton.c_str());
+	HotkeyManager::ReloadFromSettings();
+	for (int i = 0; i < HotkeyManager::Hotkey_Count; ++i)
+	{
+		const HotkeyManager::Action action = (HotkeyManager::Action)i;
+		m_pLogger->Log("[system] Hotkey '%s' bound to '%s'\n",
+			HotkeyManager::DisplayName(action),
+			HotkeyManager::DisplayString(HotkeyManager::GetBinding(action)).c_str());
+	}
 
 	// Load custom palettes
 
@@ -308,6 +307,7 @@ void WindowManager::Shutdown()
 	LOG(2, "WindowManager::Shutdown\n");
 
 	FrameStallWatchdog::Stop();
+	InputDevices::Shutdown();
 
 	SAFE_DELETE(m_windowContainer);
 	delete m_instance;
@@ -419,23 +419,23 @@ void WindowManager::HandleButtons()
 		return;
 	}
 
-	// Never let a rebound letter hotkey fire while the user is typing into a text field.
-	if (IsTypingInImGuiTextField())
-	{
-		return;
-	}
+	// The single poll site for every hotkey in the mod. Everything else in this frame -
+	// the windows drawn below, the playback manager, the lobby link shortcuts - reads the
+	// press edges this call computes, so they all agree on what happened this frame.
+	// Gating (window focus, typing into an overlay text field) lives inside it.
+	HotkeyManager::Update();
 
-	if (ImGui::IsVirtualKeyPressed(keyToggleMainWindow))
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleMainWindow))
 	{
 		m_windowContainer->GetWindow(WindowType_Main)->ToggleOpen();
 	}
 
-	if (ImGui::IsVirtualKeyPressed(keyToggleRoomWindow))
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleOnlineWindow))
 	{
 		m_windowContainer->GetWindow(WindowType_Room)->ToggleOpen();
 	}
 
-	if (ImGui::IsVirtualKeyPressed(keyToggleHud) && g_gameVals.pIsHUDHidden)
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleHud) && g_gameVals.pIsHUDHidden)
 	{
 		*g_gameVals.pIsHUDHidden ^= 1;
 	}

@@ -8,6 +8,7 @@
 #include "Ranked/RankedProgressWindow.h"
 #include "SettingsIniWindow.h"
 
+#include "Core/HotkeyManager.h"
 #include "Core/Settings.h"
 #include "Core/logger.h"
 #include "Core/info.h"
@@ -65,9 +66,12 @@ void MainWindow::BeforeDraw()
 
 void MainWindow::Draw()
 {
-	ImGui::Text(Messages.Toggle_me_with_s(), Settings::settingsIni.togglebutton.c_str());
-	ImGui::Text(Messages.Toggle_Online_with_s(), Settings::settingsIni.toggleOnlineButton.c_str());
-	ImGui::Text(Messages.Toggle_HUD_with_s(), Settings::settingsIni.toggleHUDbutton.c_str());
+	ImGui::Text(Messages.Toggle_me_with_s(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_ToggleMainWindow)).c_str());
+	ImGui::Text(Messages.Toggle_Online_with_s(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_ToggleOnlineWindow)).c_str());
+	ImGui::Text(Messages.Toggle_HUD_with_s(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_ToggleHud)).c_str());
 	ImGui::Separator();
 
 	ImGui::VerticalSpacing(5);
@@ -477,10 +481,9 @@ void MainWindow::DrawHitboxOverlaySection() const
 		ImGui::Checkbox(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(Messages.Freeze_frame_tooltip());
-		// Ctrl must be clear: the frame tools default to C/V, which are also the room-link
-		// copy/join shortcuts (Ctrl+C / Ctrl+V). Without this, sharing a room link from
-		// training mode would freeze the game at the same time.
-		if (!IsTypingInImGuiTextField() && !ImGui::GetIO().KeyCtrl && ImGui::IsVirtualKeyPressed(g_modVals.freeze_frame_keycode))
+		// No Ctrl check needed any more: HotkeyManager matches modifiers exactly, so a plain
+		// "C" freeze binding no longer also fires on the Ctrl+C room-link shortcut.
+		if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_FreezeFrame))
 			g_gameVals.isFrameFrozen ^= 1;
 
 		if (g_gameVals.pFrameCount)
@@ -502,7 +505,7 @@ void MainWindow::DrawHitboxOverlaySection() const
 			static int framesToStep = 1;
 			ImGui::HorizontalSpacing();
 			if (ImGui::Button(Messages.Step_frames()) ||
-				(!IsTypingInImGuiTextField() && !ImGui::GetIO().KeyCtrl && ImGui::IsVirtualKeyPressed(g_modVals.step_frames_keycode)))
+				HotkeyManager::WasPressedOrRepeated(HotkeyManager::Hotkey_StepFrames))
 			{
 				g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
 			}

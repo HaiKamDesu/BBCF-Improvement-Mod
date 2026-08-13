@@ -5,7 +5,8 @@
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
-#include "Core/XInputRuntime.h"
+#include "Core/HotkeyManager.h"
+#include "Overlay/Widget/HotkeyBindWidget.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
@@ -30,35 +31,6 @@ const char* kUnlimitedPlaybackProfileFolder = "BBCF_IM/unlimited_playbacks/profi
 const char* kUnlimitedPlaybackImportFolder = "BBCF_IM/unlimited_playbacks/imports";
 const char* kUnlimitedPlaybackExportFolder = "BBCF_IM/unlimited_playbacks/exports";
 const char* kUnlimitedPlaybackDragDropPayload = "UP_SLOT";
-constexpr int kControllerBindBase = 0x1000;
-
-struct ControllerBindingDef {
-    int code;
-    WORD mask;          // 0 for analog triggers (L2/R2)
-    const char* name;
-    bool isLeftTrigger;
-    bool isRightTrigger;
-};
-
-const ControllerBindingDef kControllerBindings[] = {
-    { kControllerBindBase + 0,  XINPUT_GAMEPAD_A,              "Pad A",     false, false },
-    { kControllerBindBase + 1,  XINPUT_GAMEPAD_B,              "Pad B",     false, false },
-    { kControllerBindBase + 2,  XINPUT_GAMEPAD_X,              "Pad X",     false, false },
-    { kControllerBindBase + 3,  XINPUT_GAMEPAD_Y,              "Pad Y",     false, false },
-    { kControllerBindBase + 4,  XINPUT_GAMEPAD_LEFT_SHOULDER,  "Pad LB",    false, false },
-    { kControllerBindBase + 5,  XINPUT_GAMEPAD_RIGHT_SHOULDER, "Pad RB",    false, false },
-    { kControllerBindBase + 6,  XINPUT_GAMEPAD_BACK,           "Pad Back",  false, false },
-    { kControllerBindBase + 7,  XINPUT_GAMEPAD_START,          "Pad Start", false, false },
-    { kControllerBindBase + 8,  XINPUT_GAMEPAD_LEFT_THUMB,     "Pad LS",    false, false },
-    { kControllerBindBase + 9,  XINPUT_GAMEPAD_RIGHT_THUMB,    "Pad RS",    false, false },
-    { kControllerBindBase + 10, XINPUT_GAMEPAD_DPAD_UP,        "Pad Up",    false, false },
-    { kControllerBindBase + 11, XINPUT_GAMEPAD_DPAD_DOWN,      "Pad Down",  false, false },
-    { kControllerBindBase + 12, XINPUT_GAMEPAD_DPAD_LEFT,      "Pad Left",  false, false },
-    { kControllerBindBase + 13, XINPUT_GAMEPAD_DPAD_RIGHT,     "Pad Right", false, false },
-    { kControllerBindBase + 14, 0,                             "Pad L2",    true,  false },
-    { kControllerBindBase + 15, 0,                             "Pad R2",    false, true  },
-};
-
 std::string NormalizePlaybackFileName(const char* input) {
     std::string out;
     const char* source = input ? input : "";
@@ -114,23 +86,28 @@ const char* LoopResetModeLabel(int mode) {
     }
 }
 
-const char* BindingName(int key) {
-    static char name[64];
-    if (key <= 0) {
-        return L("Unbound").c_str();
+// Renders the shared rebind control for one hotkey action and persists any change straight
+// away. Unlike the Settings window there is no draft/Cancel here: this panel is a live
+// training tool, so a rebind takes effect the moment it is made.
+void DrawPlaybackHotkeyBind(UnlimitedPlaybackManager& mgr, HotkeyManager::Action action) {
+    HotkeyBinding binding = HotkeyManager::GetBinding(action);
+    const HotkeyManager::Action conflict = HotkeyManager::FindConflict(binding, action);
+    std::string warning;
+    if (conflict != HotkeyManager::Hotkey_Count) {
+        warning = FormatText(L("Already used by \"%s\". Pressing it will do both.").c_str(),
+            HotkeyManager::DisplayName(conflict));
+    } else if (HotkeyManager::IsControllerBinding(binding)) {
+        warning = L("Controller button: this also works during a match, so pick one you never press while playing.");
     }
-    for (const auto& binding : kControllerBindings) {
-        if (binding.code == key) {
-            return L(binding.name).c_str();
-        }
+
+    if (ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
+            HotkeyManager::DefaultBindingString(action), warning.c_str())) {
+        HotkeyManager::SetBinding(action, binding);
+        // The playback trigger must not fire on the very press that assigned it.
+        mgr.ForceResetTriggers("");
+        mgr.PushToast(FormatText(L("Mapped bind: %s").c_str(),
+            HotkeyManager::DisplayString(binding).c_str()));
     }
-    const int scanCode = MapVirtualKeyA(static_cast<UINT>(key), MAPVK_VK_TO_VSC);
-    const long lParam = (scanCode << 16);
-    const int len = GetKeyNameTextA(lParam, name, static_cast<int>(sizeof(name)));
-    if (len <= 0) {
-        std::snprintf(name, sizeof(name), L("VK_%d").c_str(), key);
-    }
-    return name;
 }
 
 enum class NativeFileDialogAction {
@@ -286,70 +263,6 @@ bool ConsumeCompletedNativeFileDialog(NativeFileDialogAction* outAction, std::st
 bool NativeFileDialogActive() {
     std::lock_guard<std::mutex> lock(g_nativeFileDialogState.mutex);
     return g_nativeFileDialogState.active;
-}
-
-bool IsGameWindowFocused() {
-    return g_gameProc.hWndGameWindow && GetForegroundWindow() == g_gameProc.hWndGameWindow;
-}
-
-int CaptureNextPressedVirtualKey() {
-    if (!IsGameWindowFocused()) {
-        return 0;
-    }
-    for (int vk = 1; vk < 256; ++vk) {
-        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-            continue;
-        }
-        if (GetAsyncKeyState(vk) & 0x1) {
-            return vk;
-        }
-    }
-    for (const auto& binding : kControllerBindings) {
-        for (DWORD userIndex = 0; userIndex < XUSER_MAX_COUNT; ++userIndex) {
-            XINPUT_STATE state = {};
-            if (XInputRuntime::GetState(userIndex, &state) != ERROR_SUCCESS) {
-                continue;
-            }
-            if (binding.isLeftTrigger) {
-                if (state.Gamepad.bLeftTrigger > 128) return binding.code;
-            } else if (binding.isRightTrigger) {
-                if (state.Gamepad.bRightTrigger > 128) return binding.code;
-            } else if ((state.Gamepad.wButtons & binding.mask) != 0) {
-                return binding.code;
-            }
-        }
-    }
-    return 0;
-}
-
-bool AnyBindableKeyCurrentlyDown() {
-    if (!IsGameWindowFocused()) {
-        return false;
-    }
-    for (int vk = 1; vk < 256; ++vk) {
-        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-            continue;
-        }
-        if (GetAsyncKeyState(vk) & 0x8000) {
-            return true;
-        }
-    }
-    for (const auto& binding : kControllerBindings) {
-        for (DWORD userIndex = 0; userIndex < XUSER_MAX_COUNT; ++userIndex) {
-            XINPUT_STATE state = {};
-            if (XInputRuntime::GetState(userIndex, &state) != ERROR_SUCCESS) {
-                continue;
-            }
-            if (binding.isLeftTrigger) {
-                if (state.Gamepad.bLeftTrigger > 128) return true;
-            } else if (binding.isRightTrigger) {
-                if (state.Gamepad.bRightTrigger > 128) return true;
-            } else if ((state.Gamepad.wButtons & binding.mask) != 0) {
-                return true;
-            }
-        }
-    }
-    return false;
 }
 
 bool DrawContextButton(const char* label, bool enabled) {
@@ -577,10 +490,6 @@ void UnlimitedPlaybackWindow::Draw() {
     static float editEntryWeight = 1.0f;
     static int captureSlot = 1;
     static int sendSlot = 1;
-    static bool keyCaptureMode = false;
-    static bool keyCaptureWaitingRelease = false;
-    static bool loopKeyCaptureMode = false;
-    static bool loopKeyCaptureWaitingRelease = false;
     static bool showProfileCompatibilityPopup = false;
     static bool profileCompatibilityCanForce = false;
     static char pendingProfilePath[MAX_PATH] = {};
@@ -605,43 +514,6 @@ void UnlimitedPlaybackWindow::Draw() {
         !g_interfaces.player1.IsCharDataNullPtr() &&
         !g_interfaces.player2.IsCharDataNullPtr();
 
-    if (keyCaptureMode) {
-        if (keyCaptureWaitingRelease) {
-            if (!AnyBindableKeyCurrentlyDown()) {
-                keyCaptureWaitingRelease = false;
-            }
-        } else {
-            const int mapped = CaptureNextPressedVirtualKey();
-            if (mapped != 0) {
-                mgr.GetTrigger(UnlimitedPlaybackManager::Trigger_KeyPress).keyCode = mapped;
-                Settings::settingsIni.unlimitedPlaybackTriggerKeyCode = mapped;
-                Settings::changeSetting("UnlimitedPlaybackTriggerKeyCode", std::to_string(mapped));
-                // Sync edge state so the key press used for assignment doesn't immediately
-                // fire the trigger. ForceResetTriggers clears m_keyPressTriggerArmed and
-                // calls SyncKeyEdgeState, requiring a full release cycle before triggering.
-                mgr.ForceResetTriggers("");
-                keyCaptureMode = false;
-                mgr.PushToast(FormatText(L("Mapped playback bind: %s").c_str(), BindingName(mapped)));
-            }
-        }
-    }
-    if (loopKeyCaptureMode) {
-        if (loopKeyCaptureWaitingRelease) {
-            if (!AnyBindableKeyCurrentlyDown()) {
-                loopKeyCaptureWaitingRelease = false;
-            }
-        } else {
-            const int mapped = CaptureNextPressedVirtualKey();
-            if (mapped != 0) {
-                mgr.SetLoopKeyCode(mapped);
-                Settings::settingsIni.unlimitedPlaybackLoopKeyCode = mapped;
-                Settings::changeSetting("UnlimitedPlaybackLoopKeyCode", std::to_string(mapped));
-                mgr.ForceResetTriggers("");
-                loopKeyCaptureMode = false;
-                mgr.PushToast(FormatText(L("Mapped loop bind: %s").c_str(), BindingName(mapped)));
-            }
-        }
-    }
     NativeFileDialogAction completedDialogAction = NativeFileDialogAction::None;
     std::string completedDialogPath;
     bool completedDialogCanceled = false;
@@ -1162,12 +1034,7 @@ void UnlimitedPlaybackWindow::Draw() {
             ImGui::SetTooltip("%s", L("Maps the button or key used by the Key Press trigger.").c_str());
         }
         ImGui::SameLine();
-        if (ImGui::Button((keyCaptureMode ? L("Press any key...") : L("Map Playback Bind")).c_str(), ImVec2(170.0f, 0))) {
-            keyCaptureMode = true;
-            keyCaptureWaitingRelease = true;
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", BindingName(triggerConfig.keyCode));
+        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackTrigger);
     }
     if (selectedTrigger == UnlimitedPlaybackManager::Trigger_OnLoop) {
         ImGui::TextDisabled("(?)");
@@ -1175,12 +1042,7 @@ void UnlimitedPlaybackWindow::Draw() {
             ImGui::SetTooltip("%s", L("Maps the button or key used to start and stop loop playback.").c_str());
         }
         ImGui::SameLine();
-        if (ImGui::Button((loopKeyCaptureMode ? L("Press any key...") : L("Map Loop Bind")).c_str(), ImVec2(170.0f, 0))) {
-            loopKeyCaptureMode = true;
-            loopKeyCaptureWaitingRelease = true;
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", BindingName(mgr.GetLoopKeyCode()));
+        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackLoop);
         ImGui::SameLine();
         ImGui::TextColored(mgr.IsLoopActive() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
             "%s",

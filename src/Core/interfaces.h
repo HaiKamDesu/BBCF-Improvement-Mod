@@ -105,11 +105,8 @@ struct gameProc_t
 struct modValues_t {
 	bool enableForeignPalettes = true; 
 	int allowPaletteDownloads = -1;
-	int save_states_save_keycode;
-	int save_states_load_keycode;
-	int replay_takeover_load_keycode;
-	int freeze_frame_keycode;
-	int step_frames_keycode;
+	// Hotkeys used to be mirrored here as virtual-key codes. They now live in
+	// HotkeyManager, which owns modifiers and controller bindings too; ask it instead.
 	int uploadReplayData;
 	std::string uploadReplayDataHost; 
 	std::string uploadReplayDataEndpoint;

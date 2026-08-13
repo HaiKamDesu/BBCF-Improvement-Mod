@@ -923,3 +923,6 @@ Lobby_link_already_here,You are already in that room.,Ya estás en esa sala.
 Lobby_link_joining,Opening room link...,Abriendo el enlace de la sala...
 Lobby_link_open_failed,Could not hand the room link to Steam.,No se pudo enviar el enlace de la sala a Steam.
 Lobby_link_join_failed,Could not join that room (%s). The link may be old.,No se pudo unir a esa sala (%s). El enlace puede estar caducado.
+"Mapped bind: %s","Mapped bind: %s","Asignado: %s"
+"Already used by ""%s"". Pressing it will do both.","Already used by ""%s"". Pressing it will do both.","Ya lo usa ""%s"". Al pulsarlo pasarán las dos cosas."
+"Controller button: this also works during a match, so pick one you never press while playing.","Controller button: this also works during a match, so pick one you never press while playing.","Botón de mando: también funciona durante la partida, así que elige uno que nunca pulses al jugar."

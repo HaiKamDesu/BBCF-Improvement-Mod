@@ -1,7 +1,9 @@
 #include "SettingsIniWindow.h"
 
+#include "Core/HotkeyManager.h"
 #include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
+#include "Overlay/Widget/HotkeyBindWidget.h"
 
 #include <Windows.h>
 
@@ -19,93 +21,122 @@ namespace {
 	};
 
 	static const SettingMetadata kSettingMetadata[] = {
-		{ "ToggleButton", "Main menu hotkey", "Hotkeys", "Function key used to show or hide the main Improvement Mod menu." },
-		{ "ToggleOnlineButton", "Online menu hotkey", "Hotkeys", "Function key used to show or hide the online info window." },
-		{ "ToggleHUDButton", "HUD hotkey", "Hotkeys", "Function key used to toggle the in-game HUD." },
-		{ "SaveStateKeybind", "Save state hotkey", "Hotkeys", "Key used to save replay takeover or training state data." },
-		{ "LoadStateKeybind", "Load state hotkey", "Hotkeys", "Key used to load saved replay takeover or training state data." },
-		{ "LoadReplayStateKeybind", "Load replay state hotkey", "Hotkeys", "Key used to load replay takeover state data." },
-		{ "freezeFrameKeybind", "Freeze frame hotkey", "Hotkeys", "Key used to pause frame stepping tools." },
-		{ "stepFramesKeybind", "Step frame hotkey", "Hotkeys", "Key used to advance one frame while frame stepping is active." },
-		{ "LobbyLinkHotkeysEnabled", "Room link hotkeys", "Hotkeys", "Enables the copy and join room-link shortcuts below. Turn this off if the Ctrl shortcuts get in the way." },
-		{ "CopyLobbyLinkKeybind", "Copy room link hotkey", "Hotkeys", "Key pressed together with Ctrl to copy a shareable link for the room you are currently in. Works in any player-created room; ranked matches and the replay theater cannot be shared." },
-		{ "JoinLobbyLinkKeybind", "Join room link hotkey", "Hotkeys", "Key pressed together with Ctrl to join a room link that is on your clipboard, without going through a browser. Works anywhere as long as the game window is focused." },
-		{ "DinputDllWrapper", "DInput DLL wrapper", "System", "Optional external dinput DLL to load before the mod starts. Use none unless you need a wrapper." },
-		{ "RenderingWidth", "Rendering width", "Graphics", "Backbuffer width used by the mod when a custom viewport mode is active." },
-		{ "RenderingHeight", "Rendering height", "Graphics", "Backbuffer height used by the mod when a custom viewport mode is active." },
-		{ "Viewport", "Viewport mode", "Graphics", "Selects how the game viewport is sized. Some modes use the custom rendering width and height." },
-		{ "AntiAliasing", "Anti-aliasing", "Graphics", "Direct3D anti-aliasing mode override. -1 keeps the game's default behavior." },
-		{ "V-sync", "V-sync", "Graphics", "Enables vertical sync. Disable for lower latency; enable to reduce tearing." },
-		{ "MenuSize", "Menu size", "Interface", "Changes the default overlay menu scale and minimum window size." },
-		{ "Notifications", "Notifications", "Interface", "Shows mod notification popups and status messages." },
-		{ "CheckUpdates", "Check for updates", "Interface", "Checks GitHub releases for a newer Improvement Mod version." },
-		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes DEBUG.txt with detailed runtime information for troubleshooting." },
-		{ "DCodeAutoRecover", "D-Code auto recovery", "Debug", "Detects the D-Code fetch wedge (profile payload rejected / stalled), dumps evidence to BBCF_IM, and forces the game's own retry path. Max 3 retries per slot per session." },
-		{ "SpectatorSyncHooksEnabled", "Spectator desync fix", "Debug", "While spectating, repeats the players' last known inputs for a moment when new ones haven't arrived yet, instead of letting the game guess with empty inputs (which permanently desyncs the spectated match). Only affects spectator mode. Turn off to fall back to vanilla (unfixed) behavior. Requires a game restart to take effect." },
-		{ "DCodeForceFailureOnce", "Force D-Code failure (test)", "Debug", "TEST ONLY: corrupts the first in-flight profile fetch after launch so the game rejects it, to verify D-Code failure detection and auto recovery. Fires once per launch while enabled." },
-		{ "DebugLogSessionHistory", "Debug log session history", "Debug", "Number of previous sessions' DEBUG.txt files kept in BBCF_IM\\DebugHistory (rotated at launch). 0 overwrites DEBUG.txt every launch like before." },
-		{ "DCodeTusGateAutoClear", "Recover profile uploads", "Ranked", "When the game latches its network-profile-storage-unavailable flag, reset it so your profile keeps uploading. Without this, D-Codes stop appearing and any ranked/net-color progress earned afterwards is lost when you restart." },
-		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows the ranked progress overlay while ranked data is available." },
-		{ "ShowSquareColorProgress", "Show square color progress", "Ranked", "Shows square color progress information when available." },
-		{ "ShowRankedPrediction", "Show ranked prediction", "Ranked", "Shows the rank change prediction overlay during ranked matches." },
-		{ "RankedProgressShowMatches", "Show match count", "Ranked", "Shows total matches in the ranked progress overlay." },
-		{ "RankedProgressShowWins", "Show wins", "Ranked", "Shows wins in the ranked progress overlay." },
-		{ "RankedProgressShowLosses", "Show losses", "Ranked", "Shows losses in the ranked progress overlay." },
-		{ "RankedProgressShowWinrate", "Show winrate", "Ranked", "Shows winrate percentage in the ranked progress overlay." },
-		{ "RankedProgressShowCharacterLeaderboardPlacement", "Show character leaderboard place", "Ranked", "Shows character leaderboard placement in the ranked progress overlay." },
-		{ "RankedProgressShowGlobalLeaderboardPlacement", "Show global leaderboard place", "Ranked", "Shows global leaderboard placement in the ranked progress overlay." },
-		{ "RankedAutomationHarnessEnabled", "Enable ranked automation harness", "Ranked Debug", "Enables ranked UI automation test hooks. Intended for development and testing." },
-		{ "RankedAutomationHarnessHotkey", "Ranked automation hotkey", "Ranked Debug", "Hotkey used to trigger the ranked automation harness." },
-		{ "RankedAutomationHarnessAutorun", "Ranked automation autorun", "Ranked Debug", "Runs the ranked automation harness automatically when its conditions are met." },
-		{ "RankedAutomationHarnessQuitOnFinish", "Quit after ranked automation", "Ranked Debug", "Closes the game when the ranked automation harness finishes." },
-		{ "URT_RE_TraceEnabled", "Replay takeover trace", "Replay Takeover Debug", "Writes replay takeover reverse-engineering trace logs." },
-		{ "URT_RE_TraceLevel", "Replay takeover trace level", "Replay Takeover Debug", "Controls replay takeover trace verbosity. Higher values write more detail." },
-		{ "URT_RE_MaxFileMB", "Replay takeover trace max file MB", "Replay Takeover Debug", "Maximum size of a replay takeover trace log before rotation." },
-		{ "URT_RE_MaxBackups", "Replay takeover trace backups", "Replay Takeover Debug", "Number of old replay takeover trace logs kept during rotation." },
-		{ "URT_RE_AllowSizeMismatchProbe", "Allow size mismatch probe", "Replay Takeover Debug", "Allows replay takeover probe paths even when state sizes do not match. Development only." },
-		{ "URT_RE_AllowUnsafeProbeLoad", "Allow unsafe probe load", "Replay Takeover Debug", "Allows unsafe replay takeover probe loads. Development only; can crash." },
-		{ "EnableInDevelopmentFeatures", "Enable in-development features", "System", "Shows experimental features that may be incomplete or unstable." },
-		{ "EnableRankedListConnectionFilter", "Ranked list connection filter", "Ranked", "Enables connection-quality filtering in the ranked list filter window." },
-		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked", "Opens the ranked list filter window when the ranked player list is visible." },
-		{ "ShowRankedListHiddenPopup", "Show hidden players popup", "Ranked", "Remembers whether the hidden-players popup was left open, so it reopens automatically next time." },
-		{ "RankedListSortMode", "Ranked list sort mode", "Ranked", "Sort mode used by the ranked list filter window." },
-		{ "RankedListNetworkFilter", "Ranked list network filter", "Ranked", "Hides ranked list players whose Delay rating (0-4) is below this level. 0 shows everyone; players without a measured rating stay visible until it resolves." },
-		{ "HideUnmetRequirementRooms", "Hide unmet-requirement rooms", "Ranked", "Hides rooms whose minimum connection quality your measured Delay rating does not meet, so everything left in the ranked list is actually joinable." },
-		{ "LoadForeignPalettesToggleDefault", "Load foreign palettes by default", "Palettes", "Default state for loading opponent or foreign custom palettes." },
-		{ "AllowPaletteDownloads", "Allow palette downloads", "Palettes", "Allows opponents to save your visible custom palette from the match UI. -1 = not chosen yet (the mod asks once in-game), 0 = no, 1 = yes." },
-		{ "SwapControllerPos", "Swap controller positions", "Controller", "Swaps local controller positions. Disabled on startup if known crash risk is detected." },
-		{ "EnableControllerHooks", "Enable controller hooks", "Controller", "Enables controller setting hooks used by the mod's controller tools." },
-		{ "ForceEnableControllerSettingHooks", "Force controller hooks", "Controller", "Overrides Wine/Proton safety detection and forces controller hooks on." },
-		{ "PrimaryKeyboardDeviceId", "Primary keyboard device", "Controller", "Raw input device id treated as the primary keyboard." },
-		{ "IgnoredKeyboardIds", "Ignored keyboards", "Controller", "Comma-separated keyboard device ids ignored by keyboard separation tools." },
-		{ "KeyboardRenameMap", "Keyboard rename map", "Controller", "Saved display names for detected keyboard devices." },
-		{ "KeyboardMappings", "Keyboard mappings", "Controller", "Serialized keyboard-to-player mappings for local keyboard separation." },
-		{ "AutomaticallyUpdateControllers", "Auto update controllers", "Controller", "Refreshes controller assignments automatically when devices or Steam Input state changes." },
-		{ "AutoRefreshSteamGraceMs", "Steam refresh grace time", "Controller", "Delay before controller auto-refresh reacts to Steam Input changes." },
-		{ "AutoRefreshFollowupDelayMs", "Refresh follow-up delay", "Controller", "Delay before a follow-up controller refresh after the first refresh." },
-		{ "AutoRefreshTimerIntervalMs", "Refresh timer interval", "Controller", "Polling interval used by controller auto-refresh." },
-		{ "UploadReplayData", "Upload replay data", "Replay Database", "Controls replay upload consent. -1 means ask, 0 disables, 1 enables." },
-		{ "UploadReplayDataHost", "Replay upload host", "Replay Database", "Server host used for replay database uploads." },
-		{ "UploadReplayDataEndpoint", "Replay upload endpoint", "Replay Database", "HTTP endpoint path used for replay database uploads." },
-		{ "UploadReplayDataPort", "Replay upload port", "Replay Database", "Server port used for replay database uploads." },
-		{ "UploadReplayDataUseTls", "Use HTTPS for replay upload", "Replay Database", "Speaks TLS (HTTPS) to the replay upload host/port instead of plain HTTP. Leave off for the default direct-IP server; turn on if your host/port point at a Cloudflare-fronted domain, which requires TLS on its HTTPS ports (e.g. 443) and will reject plain HTTP with a 400 error otherwise." },
-		{ "autoArchive", "Auto archive replays", "Replay Database", "Automatically archives saved replays when supported by the replay tools." },
-		{ "FrameHistoryWidth", "Frame history width", "Frame History", "Width of each frame history input cell." },
-		{ "FrameHistoryHeight", "Frame history height", "Frame History", "Height of each frame history input cell." },
-		{ "FrameHistorySpacing", "Frame history spacing", "Frame History", "Spacing between frame history input cells." },
-		{ "FrameHistoryAutoReset", "Frame history auto reset", "Frame History", "Resets frame history automatically when the configured reset condition is met." },
-		{ "FrameHistoryEnabled", "Enable frame history", "Frame History", "Shows the frame history overlay." },
-		{ "FrameHistoryCountEmptyFrames", "Count empty frame history frames", "Frame History", "Includes frames with no input in frame history counts." },
-		{ "Language", "Language", "Interface", "Language code used by the overlay localization system." },
-		{ "UnlimitedPlaybackTriggerKeyCode", "Unlimited playback trigger key", "Unlimited Playback", "Virtual key code used to trigger unlimited playback actions." },
-		{ "UnlimitedPlaybackLoopKeyCode", "Unlimited playback loop key", "Unlimited Playback", "Virtual key code used to toggle unlimited playback loop mode." },
-		{ "UnlimitedPlaybackLoopSetupSeconds", "Loop setup seconds", "Unlimited Playback", "Seconds before loop start reserved for setup." },
-		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop ending seconds", "Unlimited Playback", "Seconds near loop end reserved before restart." },
-		{ "UnlimitedPlaybackLoopRestartLabState", "Restart lab state on loop", "Unlimited Playback", "Reloads lab state when an unlimited playback loop restarts." },
-		{ "UnlimitedPlaybackLoopRestartMode", "Loop restart mode", "Unlimited Playback", "Selects how unlimited playback restarts when looping." },
-		{ "D3D9IatFallbackHook", "D3D9 import-table fallback hook", "Graphics", "Rescues the overlay on PCs where another program (notably NVIDIA Optimus' nvd3d9wrap.dll on dual-GPU laptops) hooks Direct3D before the mod and knocks the mod back out, so the game runs fine but no mod window ever appears. Automatic only acts on affected PCs and does nothing everywhere else - leave it there unless you are debugging. Requires a restart." },
-		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks which voice (Sena or Luna) YOUR Platinum uses instead of the game's random roll. OFFLINE ONLY (training, vs CPU, replays, local versus) - forced off in online matches pending investigation of a reported match desync that correlated with this override. Applies only to the Platinum you control." },
+		{ "LobbyLinkHotkeysEnabled", "Room link hotkeys", "Hotkeys", "Master switch for the two room-link shortcuts below. Turn it off if those key combinations get in the way of something else." },
+		{ "DinputDllWrapper", "Extra input DLL to load", "System", "For people who already use another input tool (a stick remapper, a wrapper) that also installs itself as dinput8.dll. Put its filename here so both it and the mod load. Leave it on \"none\" unless someone told you otherwise - a wrong name here can stop the game starting." },
+		{ "RenderingWidth", "Custom render width", "Graphics", "How wide the game renders internally when Viewport mode is set to use a custom size. Set it below 1280x768 to trade image quality for framerate on a weak PC. Ignored unless the viewport mode uses it." },
+		{ "RenderingHeight", "Custom render height", "Graphics", "How tall the game renders internally when Viewport mode is set to use a custom size. Set it below 1280x768 to trade image quality for framerate on a weak PC. Ignored unless the viewport mode uses it." },
+		{ "Viewport", "Viewport mode", "Graphics", "How the picture is sized inside the window. Leave it on the default unless the game looks stretched or you are deliberately rendering at a lower resolution for performance." },
+		{ "AntiAliasing", "Anti-aliasing", "Graphics", "Smooths jagged edges, at some cost to framerate. -1 leaves the game to decide, which is what almost everyone wants. Higher numbers mean more smoothing; your graphics card may ignore values it does not support." },
+		{ "V-sync", "V-sync", "Graphics", "Locks the game's drawing to your monitor's refresh rate. On: no screen tearing. Off: slightly less input lag. Fighting game players usually leave it off." },
+		{ "MenuSize", "Menu size", "Interface", "How large the mod's own menus and text are. Turn it up if the menus are hard to read on a big screen or at high resolution." },
+		{ "Notifications", "Notifications", "Interface", "The small messages the mod pops up in the corner (palette loaded, update available, room link copied). Turn off if you find them distracting." },
+		{ "CheckUpdates", "Check for updates", "Interface", "Checks once at startup whether a newer version of the mod has been released, and tells you if so. It never installs anything without asking." },
+		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes a detailed DEBUG.txt log next to the game. Leave this on: if anything ever goes wrong, that file is what lets the mod's developers work out why. It costs almost nothing." },
+		{ "DCodeAutoRecover", "Fix stuck player profiles", "Debug", "Sometimes the game gets permanently stuck fetching another player's profile, and their D-Code and stats never appear for the rest of the session. This notices that and nudges the game into trying again. Leave it on." },
+		{ "SpectatorSyncHooksEnabled", "Spectator desync fix", "Debug", "While spectating, briefly repeats the players' last known inputs when new ones have not arrived yet, instead of letting the game guess with empty ones - guessing permanently desyncs the match you are watching. Only affects spectating. Requires a restart." },
+		{ "DCodeForceFailureOnce", "Break profile fetch (testing)", "Debug", "TESTING ONLY. Deliberately breaks the first profile fetch after launch so the fix above can be verified. There is no reason to turn this on unless a developer asked you to." },
+		{ "DebugLogSessionHistory", "Keep old debug logs", "Debug", "How many previous sessions' debug logs to keep in the BBCF_IM folder. Useful when a problem happened a few sessions ago and you only noticed later. 0 keeps only the most recent one." },
+		{ "DCodeTusGateAutoClear", "Keep saving ranked progress", "Ranked", "Now and then the game quietly decides it cannot save your online profile any more. When that happens your D-Code stops showing up and any ranked or net-colour progress you earn afterwards is lost when you close the game. This turns saving back on. Leave it on." },
+		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows a small overlay with your ranked stats while you are in ranked." },
+		{ "ShowSquareColorProgress", "Show net colour progress", "Ranked", "Shows how close you are to the next net colour (the coloured square next to your name)." },
+		{ "ShowRankedPrediction", "Show ranked prediction", "Ranked", "Before a ranked match, shows how much rank you stand to gain or lose." },
+		{ "RankedProgressShowMatches", "Show match count", "Ranked", "Include your total number of matches in the ranked overlay." },
+		{ "RankedProgressShowWins", "Show wins", "Ranked", "Include your win count in the ranked overlay." },
+		{ "RankedProgressShowLosses", "Show losses", "Ranked", "Include your loss count in the ranked overlay." },
+		{ "RankedProgressShowWinrate", "Show winrate", "Ranked", "Include your win percentage in the ranked overlay." },
+		{ "RankedProgressShowCharacterLeaderboardPlacement", "Show character leaderboard place", "Ranked", "Include your position on your character's leaderboard in the ranked overlay." },
+		{ "RankedProgressShowGlobalLeaderboardPlacement", "Show global leaderboard place", "Ranked", "Include your position on the overall leaderboard in the ranked overlay." },
+		{ "RankedAutomationHarnessEnabled", "Ranked automation (developer tool)", "Ranked Debug", "A tool that drives the ranked menus by itself for testing. Not something you need; leave it off." },
+		{ "RankedAutomationHarnessAutorun", "Start automation automatically", "Ranked Debug", "Starts the ranked automation tool by itself once it can. Developer tool; leave it off." },
+		{ "RankedAutomationHarnessQuitOnFinish", "Close game after automation", "Ranked Debug", "Closes the game when the ranked automation tool finishes its run. Developer tool; leave it off." },
+		{ "URT_RE_TraceEnabled", "Replay takeover logging", "Replay Takeover Debug", "Writes very detailed logs about replay takeover. Only useful if a developer is investigating a replay takeover problem for you; it makes large files." },
+		{ "URT_RE_TraceLevel", "Replay takeover log detail", "Replay Takeover Debug", "How much detail the replay takeover log records. Higher means more. Only matters when the log above is on." },
+		{ "URT_RE_MaxFileMB", "Replay takeover log size limit", "Replay Takeover Debug", "How large the replay takeover log may grow (in megabytes) before it is rotated. Only matters when the log above is on." },
+		{ "URT_RE_MaxBackups", "Replay takeover logs kept", "Replay Takeover Debug", "How many old replay takeover logs to keep. Only matters when the log above is on." },
+		{ "URT_RE_AllowSizeMismatchProbe", "Allow mismatched replay data (unsafe)", "Replay Takeover Debug", "Developer option that lets replay takeover use data that does not look right. Leave it off; turning it on can misbehave." },
+		{ "URT_RE_AllowUnsafeProbeLoad", "Allow unsafe replay load (unsafe)", "Replay Takeover Debug", "Developer option that skips replay takeover's safety checks. Leave it off; turning it on can crash the game." },
+		{ "EnableInDevelopmentFeatures", "Show unfinished features", "System", "Reveals features that are still being worked on. They may be incomplete, ugly, or broken. Fine to explore, just do not rely on them." },
+		{ "EnableRankedListConnectionFilter", "Filter ranked list by connection", "Ranked", "Lets you hide players in the ranked list whose connection to you is poor." },
+		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked", "Shows the small filter window next to the ranked player list." },
+		{ "ShowRankedListHiddenPopup", "Show hidden players popup", "Ranked", "Remembers whether the \"hidden players\" popup was left open, so it comes back next time." },
+		{ "RankedListSortMode", "Ranked list sort mode", "Ranked", "How the ranked player list is ordered." },
+		{ "RankedListNetworkFilter", "Minimum connection quality", "Ranked", "Hides ranked players whose connection rating to you is below this level. 0 shows everyone. Players whose rating has not been measured yet stay visible until it is." },
+		{ "HideUnmetRequirementRooms", "Hide rooms you cannot join", "Ranked", "Hides rooms that demand a better connection than yours, so everything left in the list is actually joinable." },
+		{ "LoadForeignPalettesToggleDefault", "Show other players' palettes by default", "Palettes", "Whether custom colours made by other players are shown when you start the game. You can still flip this per session from the palette menu." },
+		{ "AllowPaletteDownloads", "Let others save your palette", "Palettes", "Whether other players can save the custom colours they see you using. \"Not chosen yet\" means the mod will ask you once in-game." },
+		{ "SwapControllerPos", "Swap player 1 and 2 controllers", "Controller", "Swaps which physical controller counts as player 1 and which as player 2. Currently forced off at startup because it can crash the game; turn it on again during a session if you need it." },
+		{ "EnableControllerHooks", "Controller tools", "Controller", "Powers the mod's controller features (assignment, keyboard separation). Turn it off only if you suspect them of causing trouble." },
+		{ "ForceEnableControllerSettingHooks", "Force controller tools on Linux/Steam Deck", "Controller", "The mod switches the controller tools off automatically under Wine/Proton because they misbehave there. This forces them back on. Expect problems." },
+		{ "PrimaryKeyboardDeviceId", "Main keyboard", "Controller", "Which physical keyboard counts as the main one when you have more than one plugged in. Set this from the controller menu rather than by hand." },
+		{ "IgnoredKeyboardIds", "Ignored keyboards", "Controller", "Keyboards the mod should pretend do not exist - handy for a wireless dongle or a laptop's built-in keyboard. Set this from the controller menu rather than by hand." },
+		{ "KeyboardRenameMap", "Keyboard names", "Controller", "The friendly names you gave your keyboards. Set from the controller menu; not meant to be edited here." },
+		{ "KeyboardMappings", "Keyboard assignments", "Controller", "Which keyboard is assigned to which player for local two-player-on-keyboards. Set from the controller menu; not meant to be edited here." },
+		{ "AutomaticallyUpdateControllers", "Detect controllers automatically", "Controller", "Re-checks your controllers by itself when you plug one in, unplug one, or Steam changes something. Leave it on unless it is causing hitches." },
+		{ "AutoRefreshSteamGraceMs", "Controller detection: Steam delay", "Controller", "How long to wait (in milliseconds) after Steam reports a controller change before reacting. Raise it if controllers get detected wrongly right after Steam does something. Only matters with automatic detection on." },
+		{ "AutoRefreshFollowupDelayMs", "Controller detection: second check delay", "Controller", "How long to wait (in milliseconds) before double-checking controllers after the first check. Only matters with automatic detection on." },
+		{ "AutoRefreshTimerIntervalMs", "Controller detection: check interval", "Controller", "How often (in milliseconds) to look for controller changes. Lower reacts faster but does slightly more work each second." },
+		{ "UploadReplayData", "Share replays with the database", "Replay Database", "Whether your finished matches are uploaded to the community replay database. \"Ask\" means the mod asks you once in-game." },
+		{ "UploadReplayDataHost", "Replay database address", "Replay Database", "Which server replays are sent to. Do not change this unless you are running your own replay server." },
+		{ "UploadReplayDataEndpoint", "Replay database upload path", "Replay Database", "The upload path on the replay server. Do not change this unless you are running your own replay server." },
+		{ "UploadReplayDataPort", "Replay database port", "Replay Database", "The port on the replay server. Do not change this unless you are running your own replay server." },
+		{ "UploadReplayDataUseTls", "Use a secure connection for replays", "Replay Database", "Turn this on only if your replay server address is a domain name that requires HTTPS. The default server does not; turning it on for that one breaks uploads." },
+		{ "autoArchive", "Auto-archive replays", "Replay Database", "Automatically files away your saved replays. Note that this can silently produce no files at all depending on how the game is set up." },
+		{ "FrameHistoryWidth", "Input display: cell width", "Frame History", "How wide each square is in the input history display." },
+		{ "FrameHistoryHeight", "Input display: cell height", "Frame History", "How tall each square is in the input history display." },
+		{ "FrameHistorySpacing", "Input display: spacing", "Frame History", "How much gap there is between squares in the input history display." },
+		{ "FrameHistoryAutoReset", "Input display: clear automatically", "Frame History", "Clears the input history by itself between attempts, so each try starts from a clean slate." },
+		{ "FrameHistoryEnabled", "Show input history", "Frame History", "Shows a strip of your recent inputs on screen, one square per frame." },
+		{ "FrameHistoryCountEmptyFrames", "Input display: count idle frames", "Frame History", "Also counts frames where you pressed nothing. Off makes the display more compact; on makes the timing between inputs literal." },
+		{ "Language", "Language", "Interface", "The language the mod's own menus are shown in. This does not change the game's language." },
+		{ "UnlimitedPlaybackLoopSetupSeconds", "Loop: setup time", "Unlimited Playback", "How many seconds of breathing room you get at the start of each loop, before playback begins, so you can get into position." },
+		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop: wind-down time", "Unlimited Playback", "How many seconds to wait at the end of each loop before it restarts." },
+		{ "UnlimitedPlaybackLoopRestartLabState", "Loop: reload training state", "Unlimited Playback", "Reloads your saved training state every time the loop restarts, so positions and health are identical each repetition." },
+		{ "UnlimitedPlaybackLoopRestartMode", "Loop: restart position", "Unlimited Playback", "Where the characters are put when the loop restarts - middle of the stage, a corner, or your own saved snapshot." },
+		{ "D3D9IatFallbackHook", "Overlay rescue mode", "Graphics", "For the rare PC where the mod loads but no mod window ever appears, usually a dual-graphics laptop where NVIDIA's software gets in the way first. Automatic fixes it on affected PCs and does nothing on all the others - leave it there. Requires a restart." },
+		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks whether YOUR Platinum speaks as Sena or Luna instead of the game rolling for it. Offline only (training, versus CPU, replays, local versus) - it is switched off in online matches while a reported desync is investigated. Only affects the Platinum you control." },
 	};
+
+	// The draft being edited, so a hotkey's bind widget can warn about a collision with
+	// another hotkey the user has changed but not saved yet. Set by BuildRows; only ever one
+	// Settings modal exists.
+	static settingsIni_t* g_draft = nullptr;
+
+	// Hotkey rows take their display name and tooltip from hotkeys.def rather than the table
+	// above, so the action list stays in one place.
+	static std::string HotkeyConflictWarning(HotkeyManager::Action action, const HotkeyBinding& binding)
+	{
+		if (!binding.IsBound())
+			return "";
+
+		if (g_draft)
+		{
+#define HOTKEY(_id, _var, _ini, _default, _display, _tooltip) \
+			if (!HotkeyManager::CanShareBinding(action, HotkeyManager::Hotkey_##_id) && \
+				HotkeyManager::BindingsEqual(binding, HotkeyManager::BindingFromString(g_draft->_var))) \
+				return std::string("Already used by \"") + _display + "\". Pressing it will do both.";
+#include "Core/hotkeys.def"
+#undef HOTKEY
+		}
+
+		if (HotkeyManager::IsControllerBinding(binding))
+			return "Controller button: this also works during a match, so pick one you never "
+				"press while playing.";
+
+		return "";
+	}
+
+	static bool DrawHotkeyValueWidget(HotkeyManager::Action action, std::string& bindingText)
+	{
+		HotkeyBinding binding = HotkeyManager::BindingFromString(bindingText);
+		const std::string warning = HotkeyConflictWarning(action, binding);
+
+		if (!ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
+			HotkeyManager::DefaultBindingString(action), warning.c_str()))
+			return false;
+
+		bindingText = HotkeyManager::BindingToString(binding);
+		return true;
+	}
 
 	static const SettingMetadata* GetSettingMetadata(const char* iniKey)
 	{
@@ -162,7 +193,17 @@ namespace {
 		{ 2, "Sena" },
 	};
 
+	// Both of these are consent settings whose -1 means "the mod has not asked you yet", which
+	// is impossible to guess from a number box.
+	static const SettingEnumOption kAskNoYesOptions[] = {
+		{ -1, "Ask me in-game" },
+		{ 0, "No" },
+		{ 1, "Yes" },
+	};
+
 	static const SettingEnumMetadata kSettingEnumMetadata[] = {
+		{ "AllowPaletteDownloads", kAskNoYesOptions, _countof(kAskNoYesOptions) },
+		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
 		{ "D3D9IatFallbackHook", kD3D9IatFallbackHookOptions, _countof(kD3D9IatFallbackHookOptions) },
 	};
@@ -234,6 +275,17 @@ namespace {
 	{
 		if (const SettingEnumMetadata* enumMetadata = GetSettingEnumMetadata(iniKey))
 			return DrawEnumValueWidget(id, val, *enumMetadata);
+		return DrawValueWidget(id, val);
+	}
+
+	// Defined below with the other value widgets; needed here for the non-hotkey fallback.
+	static bool DrawValueWidget(const char* id, std::string& val);
+
+	static bool DrawValueWidgetForSetting(const char* iniKey, const char* id, std::string& val)
+	{
+		const HotkeyManager::Action action = HotkeyManager::ActionFromIniKey(iniKey);
+		if (action != HotkeyManager::Hotkey_Count)
+			return DrawHotkeyValueWidget(action, val);
 		return DrawValueWidget(id, val);
 	}
 
@@ -318,14 +370,20 @@ void SettingsIniWindow::BuildRows()
 	m_settingsFilter.Clear();
 	m_settingRows.clear();
 	m_needsRestart = false;
+	g_draft = &m_settingsDraft;
 
 #define SETTING(_type, _var, _inistring, _defaultval) \
 	const SettingMetadata* metadata_##_var = GetSettingMetadata(_inistring); \
+	const HotkeyManager::Action hotkey_##_var = HotkeyManager::ActionFromIniKey(_inistring); \
+	const bool isHotkey_##_var = hotkey_##_var != HotkeyManager::Hotkey_Count; \
 	m_settingRows.push_back({ \
 		_inistring, \
-		metadata_##_var ? metadata_##_var->displayName : _inistring, \
-		metadata_##_var ? metadata_##_var->category : "Other", \
-		metadata_##_var ? metadata_##_var->tooltip : "No description available.", \
+		isHotkey_##_var ? HotkeyManager::DisplayName(hotkey_##_var) \
+			: (metadata_##_var ? metadata_##_var->displayName : _inistring), \
+		isHotkey_##_var ? "Hotkeys" \
+			: (metadata_##_var ? metadata_##_var->category : "Other"), \
+		isHotkey_##_var ? HotkeyManager::Tooltip(hotkey_##_var) \
+			: (metadata_##_var ? metadata_##_var->tooltip : "No description available."), \
 		_defaultval, \
 		[this]() -> bool { \
 			char buf[128] = "##"; \
@@ -388,6 +446,19 @@ void SettingsIniWindow::DrawModal()
 			continue;
 
 		ImGui::PushID(category);
+
+		if (_stricmp(category, "Hotkeys") == 0)
+		{
+			if (ImGui::Button("Reset all hotkeys to defaults"))
+			{
+#define HOTKEY(_id, _var, _ini, _default, _display, _tooltip) m_settingsDraft._var = _default;
+#include "Core/hotkeys.def"
+#undef HOTKEY
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("Nothing is saved until you press Save at the bottom.");
+		}
+
 		// Tables rather than Columns: SetColumnWidth ran every frame, so dragging a separator was
 		// undone before the next frame drew. Here the pixel widths are only the initial layout.
 		const ImGuiTableFlags settingsTableFlags =
@@ -402,8 +473,8 @@ void SettingsIniWindow::DrawModal()
 			continue;
 		}
 
-		ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthFixed, 295.0f);
-		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 315.0f);
+		ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthFixed, 265.0f);
+		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 345.0f);
 		ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableHeadersRow();
 

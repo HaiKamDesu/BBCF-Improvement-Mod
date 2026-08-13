@@ -100,6 +100,12 @@
     <ClCompile Include="src\Core\dllmain.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\HotkeyManager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\InputDevices.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\Settings.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -182,6 +188,7 @@
     <ClCompile Include="src\SteamApiWrapper\steamApiWrappers.cpp" />
     <ClCompile Include="src\Overlay\Widget\StageSelectWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\GameModeSelectWidget.cpp" />
+    <ClCompile Include="src\Overlay\Widget\HotkeyBindWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\ActiveGameModeWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\MarkdownRenderer.cpp" />
     <ClCompile Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.cpp" />
@@ -307,6 +314,12 @@
     </ClInclude>
     <ClInclude Include="src\D3D9EXWrapper\d3d9.h" />
     <ClInclude Include="src\Core\info.h" />
+    <ClInclude Include="src\Core\HotkeyManager.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\InputDevices.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="src\Core\Settings.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -400,6 +413,7 @@
     <ClInclude Include="src\SteamApiWrapper\steamApiWrappers.h" />
     <ClInclude Include="src\Overlay\Widget\StageSelectWidget.h" />
     <ClInclude Include="src\Overlay\Widget\GameModeSelectWidget.h" />
+    <ClInclude Include="src\Overlay\Widget\HotkeyBindWidget.h" />
     <ClInclude Include="src\Overlay\Widget\ActiveGameModeWidget.h" />
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />
@@ -431,7 +445,6 @@
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
     <ClInclude Include="src\Overlay\Window\ReplayDBPopupWindow.h" />
     <ClInclude Include="src\Overlay\Window\PaletteSharePopupWindow.h" />
-    <ClInclude Include="src\Core\keycodes.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayList.h" />
     <ClInclude Include="src\Overlay\Window\FrameHistory\FrameHistory.h" />
     <ClInclude Include="src\Overlay\Window\FrameHistory\FrameHistoryWindow.h" />
@@ -481,6 +494,7 @@
     <None Include="resource\settings.ini">
       <Filter>resource</Filter>
     </None>
+    <None Include="src\Core\hotkeys.def" />
     <None Include="src\Core\settings.def" />
     <None Include="resource\palettes.ini" />
     <None Include=".gitignore" />

@@ -2240,6 +2240,15 @@ struct LocalizationKeysAccessor
 
         // Lobby_link_join_failed
         inline const char* Lobby_link_join_failed() const { return Get("Lobby_link_join_failed"); }
+
+        // Mapped bind: %s
+        inline const char* Mapped_bind_s() const { return Get("Mapped bind: %s"); }
+
+        // Already used by "%s". Pressing it will do both.
+        inline const char* Already_used_by_s_Pressing_it_will_do_both() const { return Get("Already used by \"%s\". Pressing it will do both."); }
+
+        // Controller button: this also works during a match, so pick one you never press while playing.
+        inline const char* Controller_button_this_also_works_during_a_match_so_pick_one_you_never_press_while_playing() const { return Get("Controller button: this also works during a match, so pick one you never press while playing."); }
 };
 
 

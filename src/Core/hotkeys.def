@@ -1,0 +1,67 @@
+// X-Macro file listing every rebindable hotkey action.
+//
+// format: HOTKEY(id, settingsIniVar, iniName, defaultBinding, displayName, tooltip)
+//
+//   id             - enum suffix, becomes HotkeyManager::Hotkey_<id>
+//   settingsIniVar - the std::string member in settings.def that stores this binding.
+//                    settings.def stays the single storage/serialization mechanism; this
+//                    file only adds the metadata the binding UI and the poll loop need.
+//   iniName        - settings.ini key, must match the settings.def entry
+//   defaultBinding - what "Reset to default" restores, in the format HotkeyManager parses
+//   displayName    - shown in the Settings window
+//   tooltip        - written for a player, not a programmer: say what the hotkey DOES, not
+//                    how it is implemented. No jargon, no file paths, no VK codes.
+//
+// Order here is the order the Hotkeys section lists them in.
+
+HOTKEY(ToggleMainWindow, togglebutton, "ToggleButton", "F1",
+	"Open/close the mod menu",
+	"Shows or hides the Improvement Mod's main menu, where every other feature lives. If you ever lose track of the menu, this is the key that brings it back.")
+
+HOTKEY(ToggleOnlineWindow, toggleOnlineButton, "ToggleOnlineButton", "F2",
+	"Open/close the online window",
+	"Shows or hides the online info window, which lists who is in the room with you and their connection details.")
+
+HOTKEY(ToggleHud, toggleHUDbutton, "ToggleHUDButton", "F3",
+	"Hide/show the game HUD",
+	"Hides or restores the game's own health bars, timer and meter. Handy for clean screenshots and video recording.")
+
+HOTKEY(SaveState, saveStateKeybind, "SaveStateKeybind", "F5",
+	"Save training state",
+	"Saves the current moment of a training session - positions, health, meter, everything - so you can jump back to it later.")
+
+HOTKEY(LoadState, loadStateKeybind, "LoadStateKeybind", "F9",
+	"Load training state",
+	"Jumps back to the moment you last saved with the save training state hotkey. Press it repeatedly to drill the same situation over and over.")
+
+HOTKEY(LoadReplayState, loadReplayStateKeybind, "LoadReplayStateKeybind", "F4",
+	"Load replay takeover state",
+	"While watching a replay, jumps back to the saved moment so you can take over and try something different from there.")
+
+HOTKEY(FreezeFrame, freezeFrameKeybind, "freezeFrameKeybind", "C",
+	"Pause / unpause the match",
+	"Freezes the action so you can look at a single frame. Press again to let the match run normally.")
+
+HOTKEY(StepFrames, stepFramesKeybind, "stepFramesKeybind", "V",
+	"Advance one frame",
+	"While the match is frozen, moves forward exactly one frame. Hold it to creep forward slowly through a sequence.")
+
+HOTKEY(CopyLobbyLink, copyLobbyLinkKeybind, "CopyLobbyLinkKeybind", "Ctrl+C",
+	"Copy room invite link",
+	"Copies a link to the room you are currently in, so you can paste it to a friend and they can join in one click. Works in player-made rooms only - ranked matches and the replay theater cannot be shared this way.")
+
+HOTKEY(JoinLobbyLink, joinLobbyLinkKeybind, "JoinLobbyLinkKeybind", "Ctrl+V",
+	"Join copied room link",
+	"Joins a room invite link that you have copied from Discord or anywhere else, without needing to open a browser. Copy the link, tab into the game, press this.")
+
+HOTKEY(UnlimitedPlaybackTrigger, unlimitedPlaybackTriggerKey, "UnlimitedPlaybackTriggerKeyCode", "F6",
+	"Start recorded playback",
+	"Makes the training dummy immediately play back the sequence you recorded in the Unlimited Playback window.")
+
+HOTKEY(UnlimitedPlaybackLoop, unlimitedPlaybackLoopKey, "UnlimitedPlaybackLoopKeyCode", "F7",
+	"Start/stop playback loop",
+	"Turns the recorded playback loop on or off, so the dummy keeps repeating your recorded sequence until you stop it.")
+
+HOTKEY(RankedAutomation, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8",
+	"Ranked automation harness",
+	"Starts or stops the ranked automation test tool. This is a development aid; leave it alone unless you were asked to use it.")

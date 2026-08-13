@@ -10,14 +10,15 @@ SETTING(std::string, loadStateKeybind, "LoadStateKeybind", "F9");
 SETTING(std::string, loadReplayStateKeybind, "LoadReplayStateKeybind", "F4");
 SETTING(std::string, freezeFrameKeybind, "freezeFrameKeybind", "C");
 SETTING(std::string, stepFramesKeybind, "stepFramesKeybind", "V");
-// Ctrl+<key> shortcuts for sharing player-created rooms: copy puts a
-// steam://joinlobby link for the room you are in on the clipboard, join opens such a
-// link from the clipboard so the Steam client hands it back to the game. Both require
-// Ctrl held and the game window focused; both are inert while an ImGui text field has
-// keyboard focus. See src/Network/LobbyLinkManager.h.
+// Shortcuts for sharing player-created rooms: copy puts a steam://joinlobby link for the
+// room you are in on the clipboard, join opens such a link from the clipboard so the Steam
+// client hands it back to the game. Both are inert while an ImGui text field has keyboard
+// focus. See src/Network/LobbyLinkManager.h.
+// Ctrl used to be hardcoded in the polling code and the value here was a bare letter;
+// HotkeyManager::ReloadFromSettings migrates such values by re-adding the Ctrl.
 SETTING(bool, lobbyLinkHotkeysEnabled, "LobbyLinkHotkeysEnabled", "1");
-SETTING(std::string, copyLobbyLinkKeybind, "CopyLobbyLinkKeybind", "C");
-SETTING(std::string, joinLobbyLinkKeybind, "JoinLobbyLinkKeybind", "V");
+SETTING(std::string, copyLobbyLinkKeybind, "CopyLobbyLinkKeybind", "Ctrl+C");
+SETTING(std::string, joinLobbyLinkKeybind, "JoinLobbyLinkKeybind", "Ctrl+V");
 SETTING(std::string, dinputDllWrapper, "DinputDllWrapper", "none");
 SETTING(int, renderwidth, "RenderingWidth", "1920");
 SETTING(int, renderheight, "RenderingHeight", "1080");
@@ -144,8 +145,12 @@ SETTING(bool, frameHistoryAutoReset, "FrameHistoryAutoReset", "1");
 SETTING(bool, frameHistoryEnabled, "FrameHistoryEnabled", "0");
 SETTING(bool, frameHistoryCountEmptyFrames, "FrameHistoryCountEmptyFrames", "0");
 SETTING(std::string, language, "Language", "en");
-SETTING(int, unlimitedPlaybackTriggerKeyCode, "UnlimitedPlaybackTriggerKeyCode", "0");
-SETTING(int, unlimitedPlaybackLoopKeyCode, "UnlimitedPlaybackLoopKeyCode", "0");
+// Hotkey bindings. Format is parsed by HotkeyManager (see src/Core/hotkeys.def for the
+// action list): "F6", "Ctrl+Shift+P", "Pad:5:XI0" for a controller button, empty for
+// unbound. Bare numbers are still accepted for the two entries below, which stored raw
+// virtual-key codes before 8.4.
+SETTING(std::string, unlimitedPlaybackTriggerKey, "UnlimitedPlaybackTriggerKeyCode", "F6");
+SETTING(std::string, unlimitedPlaybackLoopKey, "UnlimitedPlaybackLoopKeyCode", "F7");
 SETTING(float, unlimitedPlaybackLoopSetupSeconds, "UnlimitedPlaybackLoopSetupSeconds", "0.0");
 SETTING(float, unlimitedPlaybackLoopEndingSeconds, "UnlimitedPlaybackLoopEndingSeconds", "0.0");
 SETTING(bool, unlimitedPlaybackLoopRestartLabState, "UnlimitedPlaybackLoopRestartLabState", "0");

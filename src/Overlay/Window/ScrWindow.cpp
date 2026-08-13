@@ -1,5 +1,6 @@
 #include "ScrWindow.h"
 
+#include "Core/HotkeyManager.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/Settings.h"
@@ -1561,7 +1562,7 @@ void ScrWindow::DrawSaveStates() {
             static float wait_before_exec_s = 0;
 
             if (ImGui::Button("Save snapshot") ||
-                (!IsTypingInImGuiTextField() && ImGui::IsVirtualKeyPressed(g_modVals.save_states_save_keycode))) {
+                HotkeyManager::WasPressed(HotkeyManager::Hotkey_SaveState)) {
                 SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
                 if (apparatus) {
                     apparatus->save_snapshot(0);
@@ -1570,12 +1571,12 @@ void ScrWindow::DrawSaveStates() {
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Save_snapshot_tooltip());
             ImGui::SameLine();
-            ImGui::ShowHelpMarker("You can use a hotkey to activate it, default is F5 but can be changed in settings.ini between F1-9.");
+            ImGui::ShowHelpMarker("You can also use a hotkey for this. Set it under Hotkeys in the mod's Settings window - any key, key combination, or a spare controller button.");
             ImGui::SameLine();
             const bool has_snapshot = snap_apparatus && snap_apparatus->snapshot_count != 0;
             if (has_snapshot) {
                 if (ImGui::Button("Load snapshot") ||
-                    (!IsTypingInImGuiTextField() && ImGui::IsVirtualKeyPressed(g_modVals.save_states_load_keycode))) {
+                    HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadState)) {
                     SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
                     if (apparatus) {
                         apparatus->load_snapshot(0);
@@ -2173,7 +2174,7 @@ void ScrWindow::DrawReplayTakeover() {
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
             if ((ImGui::Button("Load Replay State") ||
-                (!IsTypingInImGuiTextField() && ImGui::IsVirtualKeyPressed(g_modVals.replay_takeover_load_keycode)))
+                HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadReplayState))
                 && snap_apparatus_takeover->snapshot_count > 0) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
                     snap_apparatus_takeover->load_snapshot(0);
