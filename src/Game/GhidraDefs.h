@@ -740,21 +740,23 @@ static constexpr uintptr_t ADDR_PaletteContainerLoad    = 0x001B6310; // FUN_005
 // refresh for the +0x82C container, gated on [owner+10h], pushing 0x400/0x400 (looks like a
 // larger, fixed-size texture rather than a raw palette - possibly a full sprite-sheet atlas).
 //
-// Working theory: this is why the mod's index-toggle trick (CharPaletteHandle::UpdatePalette
-// hot-swapping the live native color index to force a redraw) is fundamentally a timing gamble
-// rather than a deterministic fix - it relies on the ENGINE noticing the index changed and
-// setting [owner+18h]=1 on its own before our toggle gets corrected back. Confirmed via live
-// debug logs (2026-08-05, 6-match session) that the toggle's own timing is now a rock-solid
-// constant (6 frames every single time, after the grace-period fix), yet Taokaka STILL fails to
-// pick up her custom palette at round start in ~half of matches while Makoto/Hakumen/Ragna never
-// fail - meaning the deciding factor is whether this dirty flag gets set at all for her model,
-// not toggle timing. It reliably gets fixed mid-match by unrelated events (freeze-frame pause/step,
-// landing specific moves), consistent with SOME other state transition eventually setting the flag.
+// DO NOT CALL THESE. Tried and rejected, 2026-08-07 -- kept documented only so the next person
+// does not rediscover them and repeat it. Capturing ECX (the owner) in GetPalBaseAddresses,
+// setting [owner+18h]=1 and calling FUN_005B6940(owner) directly was implemented and live-tested.
+// It made things strictly worse:
+//   - FUN_005B6940 has exactly ONE call site in the whole binary (0x005680BE, in the character
+//     load routine). The engine never calls it more than once per character per match, and the
+//     vtable[2] parameters it reads from owner+4/+8/+0Ch are engine state the mod never
+//     initializes. Calling it repeatedly (the palette editor's hover preview does so many times
+//     per second) left Platinum permanently stuck on wrong colors with no self-correction.
+//   - Restricting it to one call per match did not help either: Kokonoe then failed to redraw
+//     100% of the time, and the diagnostic that "proved" a per-character rendering difference was
+//     confounded -- the only character we wrote [owner+18h] on was the one that broke.
 //
-// Not yet verified live (no way to test outside an actual game session): capturing owner+ECX per
-// player in GetPalBaseAddresses, then after CharPaletteHandle writes new palette bytes, setting
-// [owner+18h]=1 and calling FUN_005B6940(owner) directly would reuse the engine's own proven
-// refresh path deterministically, instead of gambling on the toggle trick. See
-// docs/Research/TaokakaPaletteRefreshInvestigation.md for the plan before implementing.
+// The premise behind all of this was wrong anyway. The redraw failure it was chasing was caused by
+// the mod itself: a per-frame correction of UpdatePalette()'s index toggle, added in v8.2, undid
+// the index change the engine's redraw depends on. Removing that per-frame correction fixed it,
+// confirmed by the reporter across ~22 matches on v8.1. See
+// docs/Research/TaokakaPaletteRefreshInvestigation.md for the full history.
 static constexpr uintptr_t ADDR_PaletteTextureRefresh_Main = 0x001B6940; // FUN_005B6940 (owner+0x830 container)
 static constexpr uintptr_t ADDR_PaletteTextureRefresh_Alt  = 0x001B6980; // FUN_005B6980 (owner+0x82C container)

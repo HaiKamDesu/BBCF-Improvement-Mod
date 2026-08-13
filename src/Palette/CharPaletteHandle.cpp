@@ -180,39 +180,32 @@ void CharPaletteHandle::OnMatchInit()
 {
 	int rawIndex = *m_pCurPalIndex;
 
-	// The native color byte may still be sitting on last match's toggle-pair artifact left by
-	// UpdatePalette()'s hot-swap redraw trick. We deliberately do NOT correct that byte in game
-	// memory (earlier versions did, restoring it here and once per frame via
-	// CorrectToggleArtifact) -- upstream never corrects it either, and a full year of upstream
-	// play never reported this class of bug. A 2026-08-05 investigation found that reverting the
-	// byte races the engine's own redraw: the engine appears to need to *observe* the toggled
-	// value to notice the palette changed and refresh the character's texture, and correcting it
-	// back -- even a few frames later -- intermittently won the race and left the redraw never
-	// happening (worst on Taokaka; see docs/Research/TaokakaPaletteRefreshInvestigation.md).
-	// Instead, if this looks like our own artifact, use the logical value we remembered
-	// ourselves for OUR OWN bookkeeping (which palettes.ini slot to look up, where to read the
-	// "Default" backup from) -- the live byte is left exactly as the engine wants it.
-	int logicalIndex = rawIndex;
+	// If the raw slot is sitting on the toggle pair our own last hot-swap created, the
+	// player didn't pick a new native color -- it's just our redraw trick's leftover
+	// state. Restore the slot they actually chose instead of trusting the artifact.
+	//
+	// This correction happens here and ONLY here. Correcting it anywhere else (in particular
+	// once per frame, which v8.2 did) breaks the engine's redraw -- see
+	// docs/Research/TaokakaPaletteRefreshInvestigation.md.
 	if (m_lastLogicalPalIndex >= 0 &&
 		(rawIndex == m_lastTogglePairA || rawIndex == m_lastTogglePairB) &&
 		rawIndex != m_lastLogicalPalIndex)
 	{
-		LOG(1, "CharPaletteHandle::OnMatchInit raw slot %d looks like our own toggle artifact, using remembered logical slot %d for lookups (native byte left untouched)\n",
-			rawIndex, m_lastLogicalPalIndex);
-		logicalIndex = m_lastLogicalPalIndex;
+		LOG(1, "CharPaletteHandle::OnMatchInit detected toggle artifact (raw=%d), restoring logical slot %d\n", rawIndex, m_lastLogicalPalIndex);
+		rawIndex = m_lastLogicalPalIndex;
+		*m_pCurPalIndex = rawIndex;
 	}
 
-	m_origPalIndex = logicalIndex;
-	m_lastLogicalPalIndex = logicalIndex;
+	m_origPalIndex = rawIndex;
+	m_lastLogicalPalIndex = rawIndex;
 
-	LOG(1, "CharPaletteHandle::OnMatchInit raw native color slot = %d, logical slot = %d (pCurPalIndex=%p)\n",
-		rawIndex, logicalIndex, (void*)m_pCurPalIndex);
+	LOG(1, "CharPaletteHandle::OnMatchInit raw native color slot = %d (pCurPalIndex=%p)\n", m_origPalIndex, (void*)m_pCurPalIndex);
 
-	BackupOrigPal(logicalIndex);
+	BackupOrigPal();
 
 	m_selectedCustomPalIndex = 0;
 
-	m_switchPalIndex1 = logicalIndex;
+	m_switchPalIndex1 = rawIndex;
 
 	m_switchPalIndex2 = m_switchPalIndex1 == MAX_PAL_INDEX
 		? m_switchPalIndex1 - 1
@@ -348,7 +341,7 @@ void CharPaletteHandle::ReplaceAllPalFiles(IMPL_data_t* newPaletteData, int palI
 	}
 }
 
-void CharPaletteHandle::BackupOrigPal(int palIndex)
+void CharPaletteHandle::BackupOrigPal()
 {
 	LOG(2, "CharPaletteHandle::BackupOrigPal\n");
 
@@ -364,7 +357,7 @@ void CharPaletteHandle::BackupOrigPal(int palIndex)
 	for (int i = 0; i < TOTAL_PALETTE_FILES; i++)
 	{
 		char* pResolvedSrc = nullptr;
-		if (!TryGetPalFileAddr(palIndex, i, &pResolvedSrc))
+		if (!TryGetPalFileAddr(*m_pCurPalIndex, i, &pResolvedSrc))
 		{
 			LOG(1, "CharPaletteHandle::BackupOrigPal aborted because palette file %d became invalid during backup\n", i);
 			return;
@@ -393,10 +386,6 @@ void CharPaletteHandle::UpdatePalette()
 	*m_pCurPalIndex = *m_pCurPalIndex == m_switchPalIndex1
 		? m_switchPalIndex2
 		: m_switchPalIndex1;
-
-	// This byte is left exactly as toggled -- see OnMatchInit for why we never correct it back.
-
-	LOG(1, "CharPaletteHandle::UpdatePalette flipped native color slot to %d\n", *m_pCurPalIndex);
 
 	LockUpdate();
 }

@@ -792,8 +792,10 @@ void PaletteManager::SetCurrentPalInfo(CharPaletteHandle& palHandle, IMPL_info_t
 
 void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 {
-	// UpdatePalette()'s hot-swap artifact is deliberately never corrected -- see
-	// CharPaletteHandle::OnMatchInit. This just clears the once-per-frame update lock.
+	// Clears the once-per-frame update lock, nothing else. Do NOT correct UpdatePalette()'s
+	// toggle artifact from here -- v8.2 did and it broke the engine's redraw. The artifact is
+	// corrected in CharPaletteHandle::OnMatchInit only. See
+	// docs/Research/TaokakaPaletteRefreshInvestigation.md.
 	P1.UnlockUpdate();
 	P2.UnlockUpdate();
 }
