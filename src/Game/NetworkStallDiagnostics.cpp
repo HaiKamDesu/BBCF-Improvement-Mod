@@ -519,14 +519,20 @@ namespace
 		const uint8_t busy = worker[0x1D];
 		const uint8_t errFlags = worker[0xC0];
 
-		if (uploadReq != 0 && !g_uploadInFlight)
+		// The worker doesn't clear its request-id field (+0x90) once a transfer
+		// completes, so without the uploadReq != g_lastUploadReqId check below,
+		// every subsequent poll would re-see the same "done, not busy" request
+		// and log a fresh finished/recovered line forever (observed live:
+		// 16000+ near-identical "finished ok" lines in one session, continuously
+		// growing DCodeIncidents.log). Only react to a request once.
+		if (uploadReq != 0 && !g_uploadInFlight && uploadReq != g_lastUploadReqId)
 		{
 			g_uploadInFlight = true;
-			g_lastUploadReqId = uploadReq;
 		}
 		else if (uploadReq != 0 && g_uploadInFlight && done != 0 && busy == 0)
 		{
 			g_uploadInFlight = false;
+			g_lastUploadReqId = uploadReq;
 			const bool failed = (errFlags & 1) != 0;
 
 			if (!failed)
