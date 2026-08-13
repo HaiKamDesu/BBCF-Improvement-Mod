@@ -193,7 +193,11 @@
       "Bash(sed -n '160,200' src/Network/RoomManager.cpp)",
       "Bash(grep -rn \"0x00[0-9A-Fa-f]\\\\{4,6\\\\}\" src/Game/ReplayRewind/)",
       "Bash(unzip -l \"bin/Debug/BBCF.IM.win-x86.v8.1.zip\")",
-      "Bash(grep -vE \"^ntdll|Symbol search|Deferred|SRV\\\\*|Loading|\\\\.\\\\.\\\\.\\\\.\\\\.\\\\.$\")"
+      "Bash(grep -vE \"^ntdll|Symbol search|Deferred|SRV\\\\*|Loading|\\\\.\\\\.\\\\.\\\\.\\\\.\\\\.$\")",
+      "Bash(ls -la '/mnt/d/User/Downloads/IM Debugging/Palette Bugs/Palette slot 1 not loading apparently/Report 2/V8.1/DEBUG.txt')",
+      "Bash(wc -l '/mnt/d/User/Downloads/IM Debugging/Palette Bugs/Palette slot 1 not loading apparently/Report 2/V8.1/DEBUG.txt')",
+      "Bash(echo \"=== ApplyDefaultCustomPalette lines ===\")",
+      "Bash(grep -n ApplyDefaultCustomPalette '/mnt/d/User/Downloads/IM Debugging/Palette Bugs/Palette slot 1 not loading apparently/Report 2/V8.1/DEBUG.txt')"
     ]
   }
 }
