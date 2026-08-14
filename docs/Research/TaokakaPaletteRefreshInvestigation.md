@@ -549,3 +549,66 @@ Training → pick color `N` → character select → pick `N+1` → you should b
 show `RestoreNativePalIndex (CharacterSelect) native color slot X -> N` on entering character
 select, then `OnMatchInit raw native color slot = N+1`. Also re-test Okammunist's original case:
 training, change matchup *without* reselecting a color, and confirm the palette does not drift.
+
+## Comparison with upstream (librebranch), 2026-08-14
+
+Checked `sync/libreofficecalc-master` directly. Upstream's `OnMatchInit` is:
+
+```cpp
+void CharPaletteHandle::OnMatchInit()
+{
+    m_origPalIndex = *m_pCurPalIndex;   // trusts the byte, no heuristic
+    ...
+}
+```
+
+**Upstream never had bug 2.** It has no artifact detection at all, so a genuine color pick is never
+second-guessed. The bug was introduced entirely by `c8c9b19` — it is ours, not inherited.
+
+**Upstream has not solved Okammunist's bug either** — it simply has it. Upstream's only index
+restore is in `OnMatchRematch`, so the toggle artifact still leaks into the next `OnMatchInit` on
+any path that isn't a rematch, which is exactly what Okammunist reported.
+
+So "just do what upstream does" would fix bug 2 and reintroduce Okammunist's. The shipped fix is a
+strict superset of upstream: identical index handling, plus the character-select restore, which
+covers the leak upstream still has. Diffing our palette core against upstream with comments
+stripped, the only behavioral additions are `RestoreNativePalIndex` (+ its `OnCharacterSelect` and
+`OnMatchRematch` callers), `m_origPalIndex = -1`, and the pre-existing `TryGetPalFileAddr`
+null-safety hardening.
+
+## Verification sweep
+
+Live-confirmed from `DEBUG.txt` (2026-08-14 01:41–01:43), three consecutive color changes:
+
+```
+01:41:40 GetGameStateCharacterSelect          (no restore -- no match yet, m_origPalIndex == -1)
+01:41:59 OnMatchInit raw native color slot = 5   -> ini entry='0-KokoLoremaster'
+01:42:01 RestoreNativePalIndex (CharacterSelect) native color slot 6 -> 5
+01:42:19 OnMatchInit raw native color slot = 6   -> ini entry='Xmas'
+01:42:33 RestoreNativePalIndex (CharacterSelect) native color slot 7 -> 6
+01:43:03 OnMatchInit raw native color slot = 7   -> ini entry=''
+```
+
+Paths audited:
+
+| Path | Result |
+|---|---|
+| First launch, no match yet | Guarded by `m_origPalIndex == -1`; live-confirmed no-op |
+| Color change via character select | Live-confirmed correct three times running |
+| Rematch (skips character select) | `OnMatchRematch` restores, identical to upstream |
+| Online | Both handles restored. Necessary, not merely safe: `OnlinePaletteManager` applies the opponent's palette through `ReplacePaletteFile` → `UpdatePalette`, so P2's index carries our toggle too. Character-select entry precedes any incoming pick. **Not live-tested.** |
+| Palette editor mid-match | Toggles freely during the match; cleaned at the next character select |
+| Platinum item fix | Reads `*m_pCurPalIndex` only, untouched |
+| Hook cadence | `GetGameStateCharacterSelect` fires once per state transition (3 firings / 3 visits), not per frame — the property whose absence made `b657331` fail |
+
+Two hazards found and handled while auditing:
+
+- `ApplyDefaultCustomPalette` indexed `m_paletteSlots[charIndex][curPalIndex]` with no bounds check,
+  where `curPalIndex` is a value read straight out of game memory and is `-1` before a match has
+  initialized. Out-of-range now returns early instead of reading out of bounds.
+- `CharPaletteHandle` has no constructor and several raw members without initializers. Safe in
+  practice only because `interfaces_t g_interfaces = {}` is a zero-initialized global, which is what
+  makes the `m_pCurPalIndex == nullptr` guard meaningful. Worth not relying on indefinitely.
+
+Not live-tested: online/ranked, and the rematch path. `CharPaletteHandle::SetPaletteIndex` has no
+callers and is dead code (pre-existing).

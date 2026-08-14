@@ -130,7 +130,17 @@ void PaletteManager::ApplyDefaultCustomPalette(CharIndex charIndex, CharPaletteH
 	if (charIndex > getCharactersCount())
 		return;
 
+	// curPalIndex is the game's native color index, read straight out of game memory, and is also
+	// -1 until a match has initialized. m_paletteSlots holds MAX_NUM_OF_PAL_SLOTS entries, so an
+	// out-of-range value here would be an out-of-bounds vector read.
 	const int curPalIndex = charPalHandle.GetOrigPalIndex();
+	if (curPalIndex < 0 || curPalIndex >= MAX_NUM_OF_PAL_SLOTS)
+	{
+		LOG(1, "ApplyDefaultCustomPalette skipped: native color slot %d out of range for %s\n",
+			curPalIndex, getCharacterNameByIndexA(charIndex).c_str());
+		return;
+	}
+
 	const char* curPalName = m_paletteSlots[charIndex][curPalIndex].c_str();
 
 	LOG(1, "ApplyDefaultCustomPalette char=%s slot=%d -> ini entry='%s'\n",
