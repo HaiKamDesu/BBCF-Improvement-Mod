@@ -58,6 +58,9 @@ public:
 	void OnMatchInit(Player& playerOne, Player& playerTwo);
 
 	void OnMatchRematch(Player& playerOne, Player& playerTwo);
+	// Call it when the game enters character select. Undoes UpdatePalette()'s color-index toggle
+	// while the player still cannot have picked a new color -- see the definition before moving.
+	void OnCharacterSelect(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo);
 	void OnMatchEnd(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo);
 
 private:

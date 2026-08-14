@@ -867,8 +867,32 @@ void PaletteManager::OnMatchRematch(Player& playerOne, Player& playerTwo)
 	playerTwo.GetPalHandle().SetPointerBasePal(nullptr);
 }
 
+// Entering character select is the one moment that is genuinely after a match and before the
+// player can pick a new color, so it is where UpdatePalette()'s toggle gets undone.
+//
+// The color index the mod holds (`m_pCurPalIndex`) points into the game's *pending* config block
+// at charSelectBlock+8 -- the same block character select writes into. The game copies that block
+// to its committed copy in the routine at BBCF.exe 0x0047D910 (`rep movs` of 8 dwords from
+// [edx+0x1648] to [edx+0x24D8]), which is where the mod's GetPaletteIndexPointers hook sits, and
+// which runs on the versus screen. So the ordering across a color change is:
+//
+//   match ends -> CHARACTER SELECT (restore here) -> player picks -> versus screen (game commits)
+//
+// Restoring any later than character select destroys the player's pick; restoring per frame
+// during the match cancels the redraw the toggle exists to force. See
+// docs/Research/TaokakaPaletteRefreshInvestigation.md.
+void PaletteManager::OnCharacterSelect(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo)
+{
+	playerOne.RestoreNativePalIndex("CharacterSelect");
+	playerTwo.RestoreNativePalIndex("CharacterSelect");
+}
+
 void PaletteManager::OnMatchEnd(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo)
 {
+	// Do NOT undo the redraw toggle here. This runs from the GetGameStateVersusScreen hook,
+	// which in BBCF comes AFTER character select, not when a match ends -- restoring the previous
+	// match's color at this point overwrites the color the player just picked, moments before the
+	// game commits it. That is done in OnCharacterSelect instead.
 	playerOne.SetPointerBasePal(nullptr);
 	playerTwo.SetPointerBasePal(nullptr);
 }

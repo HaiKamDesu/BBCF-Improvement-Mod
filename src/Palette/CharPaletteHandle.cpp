@@ -178,26 +178,15 @@ void CharPaletteHandle::ReplaceSinglePalFile(const char* newPalData, PaletteFile
 
 void CharPaletteHandle::OnMatchInit()
 {
+	// The byte read here is trusted as-is: whatever it says is the color the player picked.
+	// That only holds because RestoreNativePalIndex() puts UpdatePalette()'s toggle back before
+	// the player can reach character select again, so no artifact of ours can still be in it.
+	// Never reintroduce a heuristic that tries to tell a leftover toggle apart from a real pick
+	// -- the two are the same byte value with the same history, and guessing wrong silently
+	// applies the wrong palette. See docs/Research/TaokakaPaletteRefreshInvestigation.md.
 	int rawIndex = *m_pCurPalIndex;
 
-	// If the raw slot is sitting on the toggle pair our own last hot-swap created, the
-	// player didn't pick a new native color -- it's just our redraw trick's leftover
-	// state. Restore the slot they actually chose instead of trusting the artifact.
-	//
-	// This correction happens here and ONLY here. Correcting it anywhere else (in particular
-	// once per frame, which v8.2 did) breaks the engine's redraw -- see
-	// docs/Research/TaokakaPaletteRefreshInvestigation.md.
-	if (m_lastLogicalPalIndex >= 0 &&
-		(rawIndex == m_lastTogglePairA || rawIndex == m_lastTogglePairB) &&
-		rawIndex != m_lastLogicalPalIndex)
-	{
-		LOG(1, "CharPaletteHandle::OnMatchInit detected toggle artifact (raw=%d), restoring logical slot %d\n", rawIndex, m_lastLogicalPalIndex);
-		rawIndex = m_lastLogicalPalIndex;
-		*m_pCurPalIndex = rawIndex;
-	}
-
 	m_origPalIndex = rawIndex;
-	m_lastLogicalPalIndex = rawIndex;
 
 	LOG(1, "CharPaletteHandle::OnMatchInit raw native color slot = %d (pCurPalIndex=%p)\n", m_origPalIndex, (void*)m_pCurPalIndex);
 
@@ -211,9 +200,6 @@ void CharPaletteHandle::OnMatchInit()
 		? m_switchPalIndex1 - 1
 		: m_switchPalIndex1 + 1;
 
-	m_lastTogglePairA = m_switchPalIndex1;
-	m_lastTogglePairB = m_switchPalIndex2;
-
 	// Clear palette info
 	IMPL_info_t palInfo = { "Default" };
 	SetCurrentPalInfo(&palInfo);
@@ -222,6 +208,33 @@ void CharPaletteHandle::OnMatchInit()
 void CharPaletteHandle::OnMatchRematch()
 {
 	// In case of a rematch we want to start with the original palindex
+	RestoreNativePalIndex("OnMatchRematch");
+}
+
+// Undoes UpdatePalette()'s hot-swap, putting the player's real native color back into game memory.
+//
+// This is the ONLY thing that keeps the native color byte honest, and WHEN it runs is the whole
+// problem. Callers are PaletteManager::OnCharacterSelect and OnMatchRematch, and nothing else:
+//   - Per frame (what v8.2 did) cancels the index change before the engine has observed it, and
+//     the character never redraws with the new palette.
+//   - On the versus screen (where PaletteManager::OnMatchEnd runs) is already too late: in BBCF
+//     that screen comes AFTER character select, so the player's new pick is sitting in the
+//     pending block and this would overwrite it moments before the game commits it.
+//   - At the next OnMatchInit is later still, and worse: a genuine pick that lands on the
+//     previous match's toggle pair is bit-for-bit identical to a leftover artifact, so every
+//     attempt to tell them apart there misfired and applied the wrong palette.
+// Character select is the one point that is after the match and before any new pick.
+void CharPaletteHandle::RestoreNativePalIndex(const char* reason)
+{
+	if (m_pCurPalIndex == nullptr || m_origPalIndex < 0)
+		return;
+
+	if (*m_pCurPalIndex == m_origPalIndex)
+		return;
+
+	LOG(1, "CharPaletteHandle::RestoreNativePalIndex (%s) native color slot %d -> %d\n",
+		reason, *m_pCurPalIndex, m_origPalIndex);
+
 	*m_pCurPalIndex = m_origPalIndex;
 }
 

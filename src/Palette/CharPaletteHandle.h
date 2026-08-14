@@ -23,7 +23,10 @@ class CharPaletteHandle
 	friend class PaletteManager;
 
 	int* m_pCurPalIndex;
-	int m_origPalIndex;
+	// -1 until OnMatchInit has read the player's real color. Teardown must not write a color
+	// back before then: match-end can fire without a preceding match-init (menu transitions),
+	// and an uninitialized value would be written straight into the game's color byte.
+	int m_origPalIndex = -1;
 	const char* m_pPalBaseAddr;
 	IMPL_data_t m_origPalBackup;
 	IMPL_data_t m_currentPalData;
@@ -31,18 +34,6 @@ class CharPaletteHandle
 	int m_switchPalIndex2;
 	int m_selectedCustomPalIndex;
 	bool m_updateLocked;
-
-	// UpdatePalette() hot-swaps *m_pCurPalIndex between m_switchPalIndex1/2 to force a
-	// redraw, which permanently mutates the native slot value in game memory. These
-	// remember the last pair we toggled and which slot of it was the player's real
-	// choice, so OnMatchInit can tell "our own toggle artifact" apart from a genuine
-	// new native color pick.
-	//
-	// The artifact is corrected in OnMatchInit and NOWHERE ELSE. Do not add a per-frame
-	// correction -- see docs/Research/TaokakaPaletteRefreshInvestigation.md.
-	int m_lastLogicalPalIndex = -1;
-	int m_lastTogglePairA = -1;
-	int m_lastTogglePairB = -1;
 
 public:
 	void SetPointerPalIndex(int* pPalIdx);
@@ -65,6 +56,10 @@ private:
 	void ReplacePalData(IMPL_data_t* newPaletteData);
 	void OnMatchInit();
 	void OnMatchRematch();
+	// Puts the player's real native color back after UpdatePalette()'s redraw toggle. Character
+	// select is the only valid moment for this -- read the comment on the definition before
+	// moving it or adding a caller.
+	void RestoreNativePalIndex(const char* reason);
 	void LockUpdate();
 	void UnlockUpdate();
 	int GetSelectedCustomPalIndex();

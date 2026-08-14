@@ -760,3 +760,29 @@ static constexpr uintptr_t ADDR_PaletteContainerLoad    = 0x001B6310; // FUN_005
 // docs/Research/TaokakaPaletteRefreshInvestigation.md for the full history.
 static constexpr uintptr_t ADDR_PaletteTextureRefresh_Main = 0x001B6940; // FUN_005B6940 (owner+0x830 container)
 static constexpr uintptr_t ADDR_PaletteTextureRefresh_Alt  = 0x001B6980; // FUN_005B6980 (owner+0x82C container)
+
+// Character-select config commit (0x0047D910), established 2026-08-14 from tools/bbcf_disasm.txt.
+// This is the routine the mod's GetPaletteIndexPointers hook already sits inside, at 0x0047D92D.
+// It copies the PENDING (character-select) config over the COMMITTED (in-match) copy:
+//
+//   [edx+0x0118] -> [edx+0x16B8]   0x1C4 dwords   P1 character config
+//   [edx+0x1648] -> [edx+0x24D8]   8 dwords       P1 palette/color block   <- hook is here
+//   [edx+0x0828] -> [edx+0x1DC8]   0x1C4 dwords   P2 character config
+//   [edx+0x1668] -> [edx+0x24F8]   8 dwords       P2 palette/color block
+//
+// The native color index lives at +8 inside each 8-dword block, so what CharPaletteHandle holds
+// as m_pCurPalIndex is edx+0x1650 (P1) / edx+0x1670 (P2) -- i.e. the PENDING copy, the same words
+// character select writes into. This routine runs on the versus screen.
+//
+// Load-bearing consequence: BBCF's versus screen comes AFTER character select, so the ordering
+// across a color change is
+//     match ends -> character select (player picks) -> versus screen (this copy) -> match init
+// and anything the mod writes to the pending block after character select silently destroys the
+// player's pick. UpdatePalette()'s redraw toggle must therefore be undone on entry to character
+// select and nowhere later. See PaletteManager::OnCharacterSelect and
+// docs/Research/TaokakaPaletteRefreshInvestigation.md.
+static constexpr uintptr_t ADDR_CharSelectConfigCommit = 0x0007D910; // FUN_0047D910
+static constexpr uintptr_t OFFSET_PendingPalBlockP1    = 0x1648;     // +8 = native color index
+static constexpr uintptr_t OFFSET_PendingPalBlockP2    = 0x1668;
+static constexpr uintptr_t OFFSET_CommittedPalBlockP1  = 0x24D8;
+static constexpr uintptr_t OFFSET_CommittedPalBlockP2  = 0x24F8;

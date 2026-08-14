@@ -93,7 +93,20 @@ void __declspec(naked)GetGameStateCharacterSelect()
 {
 	LOG_ASM(2, "GetGameStateCharacterSelect\n");
 
-	//
+	__asm pushad
+
+	// The only point that is both after the match and before the player can pick a new color, so
+	// it is where UpdatePalette()'s index toggle gets undone. Doing it on the versus screen
+	// instead (where PaletteManager::OnMatchEnd runs) overwrites the pick the player just made.
+	if (g_interfaces.pPaletteManager != nullptr)
+	{
+		g_interfaces.pPaletteManager->OnCharacterSelect(
+			g_interfaces.player1.GetPalHandle(),
+			g_interfaces.player2.GetPalHandle()
+		);
+	}
+
+	__asm popad
 
 	__asm
 	{

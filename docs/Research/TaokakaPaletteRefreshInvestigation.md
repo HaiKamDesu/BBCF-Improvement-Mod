@@ -5,11 +5,11 @@
 Four different approaches have been tried here and each failed in a *different* way. This doc
 exists so nobody (human or agent) re-derives and re-tries an approach we already know is broken.
 
-**STATUS AS OF 2026-08-13: RESOLVED — the mod caused this bug. See "Resolution" at the bottom of
-this document before reading anything else here.** Everything between this line and that section
-is the record of a four-attempt investigation that chased a phantom. The conclusions in Attempts
-1–4, including the ones labelled "conclusive," did not survive. They are kept verbatim, wrong
-parts included, so nobody repeats them.
+**STATUS AS OF 2026-08-14: RESOLVED — two separate bugs, both caused by the mod, both fixed. Read
+"Resolution" and "Bug 2" at the bottom of this document before anything else here.** Everything
+between this line and those sections is the record of a four-attempt investigation that chased a
+phantom. The conclusions in Attempts 1–4, including the ones labelled "conclusive," did not
+survive. They are kept verbatim, wrong parts included, so nobody repeats them.
 
 All addresses below are **static VAs** (image base `0x00400000` unless noted). Subtract the
 appropriate base for the `bbcf_base_adress + RVA` form used by `GhidraDefs.h` and the hook code.
@@ -402,23 +402,11 @@ Purely from field evidence — no disassembly, no new RE:
 
 1. **Palettes randomly do not apply at round start** — caused by `b657331`, v8.2 only, **fixed by
    this revert**.
-2. **Occasionally loads palette 1 when palette 2 was picked** — a *different*, pre-existing bug.
-   Present on v8.1, roughly once in 22+ matches, and confirmed in lobbies as well as ranked, so it
-   is not ranked-specific. **Still open, not addressed here.** Conflating it with bug 1 is most of
-   why this investigation went wrong: a redraw failure shows the *default* colors, whereas loading
-   a different custom palette means wrong *data* was selected. They cannot share a root cause.
-
-   Relevant mapping for whoever picks this up: `m_paletteSlots[char][N]` holds `palettes.ini` slot
-   `N+1`, and the engine's native color index is 0-based (`MAX_PAL_INDEX 23`), so ini slot 1 =
-   native index 0. For "picked 2, got 1", `GetOrigPalIndex()` must have returned 0 instead of 1 —
-   which points upstream of `palettes.ini` entirely. Note also that `m_origPalIndex` is declared
-   without an initializer while the toggle fields next to it are explicitly `= -1`.
-
-   To diagnose: one `DEBUG.txt` from a session where it actually happens, plus the clock time. The
-   line `ApplyDefaultCustomPalette char=X slot=N -> ini entry='...'` settles it in one read — if it
-   shows `slot=0 -> 'ConceptTao'` while the player is on color 2, the native index read wrong; if it
-   shows the right slot and the wrong palette is still on screen, the problem is downstream in
-   `SwitchPalette`. Logs rotate (`DebugLogSessionHistory=10`), so it must be collected promptly.
+2. **Picking a new color gives you the previous one** — a *different*, pre-existing bug, present
+   since v7.3 and **not** fixed by the revert. Root-caused and fixed separately; see
+   "Bug 2" below. Conflating it with bug 1 is most of why this investigation went wrong: a redraw
+   failure shows the *default* colors, whereas loading a different custom palette means wrong
+   *data* was selected. They cannot share a root cause.
 
 ## Okammunist's bug is not regressed by this
 
@@ -457,3 +445,107 @@ Verified against his files and confirmed in his `DEBUG.txt` (42 `[error]` lines 
 
 His Taokaka set itself is clean: `ConceptTao` and `RTL` both load, correct headers, no duplicate
 palette names anywhere (which matters, since `FindCustomPalIndex` returns the first name match).
+
+---
+
+# Bug 2 (2026-08-14): picking a new color gives you the previous one — fixed
+
+## Symptom
+
+Pick native color `N` for a match, return to character select, pick `N+1` — you play as `N`, with
+`N`'s `palettes.ini` binding applied. Reported independently by three people, each describing it
+differently, which is why it took so long to see it was one bug:
+
+- **Okammunist:** "I had color 7 set for custom color, gave me color 6" — and it showed on his
+  opponent's stream too, because the wrong index is written into live game memory, so the game's
+  own netcode syncs it.
+- **Cuack:** "entré a training, color 2, volví a char select, puse color 3, sigue color 2", plus
+  "cuando escojo un color y después cambio a otro, queda en el primer color" and "usar el color
+  vanilla lo resetea".
+- **Scumplank:** "instead of 2 it loaded 1", roughly once in 22+ matches — rare for him only
+  because he rarely changed color between matches.
+
+Present in **v7.3 through v8.2 and the v8.1 revert**, i.e. every release containing `c8c9b19`.
+
+## Root cause
+
+`c8c9b19`'s artifact heuristic in `CharPaletteHandle::OnMatchInit`. `OnMatchInit` recorded a toggle
+pair of `(rawIndex, rawIndex + 1)` and the "logical" slot, then on the *next* match treated any raw
+value inside that pair that differed from the remembered logical slot as its own leftover toggle
+and overwrote it.
+
+A genuine pick of `N+1` after a match on `N` satisfies that test exactly. The heuristic cannot
+distinguish the two cases, because they are the same byte value with the same history — which the
+Attempt 2 section above had already concluded, but only about Attempt 2's variant, missing that
+`c8c9b19` had the identical flaw.
+
+Confirmed on Kam's machine with the repro above:
+
+```
+01:16:03  CharPaletteHandle::OnMatchInit raw native color slot = 5      <- pair becomes (5,6)
+01:16:33  CharPaletteHandle::OnMatchInit detected toggle artifact (raw=6), restoring logical slot 5
+01:16:33  ApplyDefaultCustomPalette char=Kokonoe slot=5 -> ini entry='0-KokoLoremaster'
+```
+
+## Fix
+
+Stop leaving the artifact in memory, and delete the heuristic entirely.
+
+`CharPaletteHandle::RestoreNativePalIndex()` puts `m_origPalIndex` back into `*m_pCurPalIndex`, and
+`m_lastLogicalPalIndex` / `m_lastTogglePairA` / `m_lastTogglePairB` are gone. `OnMatchInit` simply
+trusts the byte it reads.
+
+**Where that restore runs is the entire problem, and the first attempt got it wrong.** It was
+initially placed in `PaletteManager::OnMatchEnd`, which sounds right and is not: `OnMatchEnd` is
+hooked on `GetGameStateVersusScreen`, and in BBCF the versus screen comes *after* character select.
+Live test showed the restore firing at 01:27:44 — 13 seconds after the player entered character
+select and picked their new color — overwriting that pick in the same millisecond the game
+committed it:
+
+```
+01:27:31  GetGameStateCharacterSelect                                   <- player picks color 07
+01:27:44  GetGameStateVersusScreen
+01:27:44  RestoreNativePalIndex (OnMatchEnd) native color slot 6 -> 5   <- destroys the pick
+01:27:44  GetPaletteIndexPointers                                       <- game commits pending copy
+01:27:49  OnMatchInit raw native color slot = 5
+```
+
+The disassembly explains why the timing is so tight. The mod's `GetPaletteIndexPointers` hook sits
+at `0x0047D92D`, inside a routine (`0x0047D910`) that copies the pending character-select config
+over the committed in-match copy:
+
+```
+[edx+0x0118] -> [edx+0x16B8]   0x1C4 dwords   P1 character config
+[edx+0x1648] -> [edx+0x24D8]   8 dwords       P1 palette/color block   <- hook is here
+[edx+0x0828] -> [edx+0x1DC8]   0x1C4 dwords   P2 character config
+[edx+0x1668] -> [edx+0x24F8]   8 dwords       P2 palette/color block
+```
+
+The color index is at `+8` inside each 8-dword block, so `m_pCurPalIndex` is `edx+0x1650` (P1) —
+the **pending** copy, the same words character select writes into. Anything the mod writes there
+after character select is destroyed-by-us data.
+
+So the correct and only moment is **entry to character select**: after the match, before any new
+pick. `PaletteManager::OnCharacterSelect` is called from the existing `GetGameStateCharacterSelect`
+hook; `OnMatchRematch` keeps its own restore for the rematch path, which skips character select.
+
+Ordering that has to hold:
+
+```
+match ends -> CHARACTER SELECT (restore here) -> player picks -> versus screen (commit) -> match init
+```
+
+- **Per frame** (v8.2 / `b657331`) cancels the index change before the engine observes it — bug 1.
+- **On the versus screen** overwrites the player's pick — the failed first attempt above.
+- **At the next `OnMatchInit`** is later still, and needs the heuristic that caused bug 2.
+
+`m_origPalIndex` is initialized to `-1` and the restore no-ops on `-1` or a null index pointer,
+since the member was previously uninitialized and character select can be reached without a
+preceding match init.
+
+## How to verify
+
+Training → pick color `N` → character select → pick `N+1` → you should be `N+1`. `DEBUG.txt` should
+show `RestoreNativePalIndex (CharacterSelect) native color slot X -> N` on entering character
+select, then `OnMatchInit raw native color slot = N+1`. Also re-test Okammunist's original case:
+training, change matchup *without* reselecting a color, and confirm the palette does not drift.
