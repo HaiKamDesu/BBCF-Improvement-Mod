@@ -1,4 +1,5 @@
 #include "ControllerOverrideManager.h"
+#include "InputDevices.h"
 
 #include "dllmain.h"
 #include "logger.h"
@@ -1976,6 +1977,15 @@ std::string ControllerOverrideManager::VirtualKeyToLabel(uint32_t virtualKey)
 
 extern "C" void HandleControllerWndProcMessage(UINT msg, WPARAM wParam, LPARAM lParam)
 {
+        // Delivered before the controller-hooks gate below on purpose. The hotkey
+        // device layer is live whenever a hotkey is bound to a pad, which is
+        // independent of whether the controller override feature is enabled, and
+        // this notification is how it learns about hot-plugs without polling.
+        if (msg == WM_DEVICECHANGE)
+        {
+                InputDevices::NotifyDeviceChange();
+        }
+
         if (!IsControllerHooksRuntimeAllowed())
         {
                 return;

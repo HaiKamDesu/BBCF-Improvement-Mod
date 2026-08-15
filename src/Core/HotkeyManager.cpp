@@ -107,6 +107,7 @@ namespace
 	// prompt is open, the device layer is never polled at all, so a keyboard-only setup pays
 	// nothing for this feature.
 	bool g_anyDeviceBinding = false;
+	bool g_anyDirectInputBinding = false;
 
 	bool g_capturing = false;
 	bool g_captureKeyBaseline[256] = {};
@@ -114,12 +115,20 @@ namespace
 	void RefreshDeviceBindingFlag()
 	{
 		g_anyDeviceBinding = false;
+		g_anyDirectInputBinding = false;
 		for (int i = 0; i < HotkeyManager::Hotkey_Count; ++i)
-			if (g_actions[i].binding.source == HotkeyBinding::Source_Device)
-			{
-				g_anyDeviceBinding = true;
-				return;
-			}
+		{
+			if (g_actions[i].binding.source != HotkeyBinding::Source_Device)
+				continue;
+
+			g_anyDeviceBinding = true;
+			// Only a binding that names a DirectInput device justifies paying for
+			// DirectInput enumeration; XInput pads are polled directly. Keeping
+			// these separate is what stops a single controller bind from costing
+			// a periodic ~100ms freeze on machines with a large device tree.
+			if (!InputDevices::IsXInputDeviceId(g_actions[i].binding.deviceId))
+				g_anyDirectInputBinding = true;
+		}
 	}
 
 	const char* KeyNameFromVirtualKey(int virtualKey)
@@ -439,7 +448,7 @@ void HotkeyManager::Update()
 		ReloadFromSettings();
 
 	if (g_anyDeviceBinding || g_capturing)
-		InputDevices::Update();
+		InputDevices::Update(g_anyDirectInputBinding);
 
 	const bool focused = IsGameWindowFocused();
 	const bool typing = IsTypingInImGuiTextField();

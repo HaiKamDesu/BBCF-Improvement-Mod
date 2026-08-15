@@ -5,10 +5,13 @@
 #include "logger.h"
 #include "XInputRuntime.h"
 
+#include "Game/FrameStallDiagnostics.h"
+
 #include <dinput.h>
 #include <Xinput.h>
 #include <Windows.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -16,12 +19,12 @@
 
 namespace
 {
-	// Re-enumerating DirectInput devices costs a few milliseconds, so it happens on a timer
-	// rather than every frame - and the timer is much shorter while a rebind prompt is open,
-	// where plugging a stick in and having it work seconds later is the whole point, than it
-	// is during normal play, where a stall is worse than noticing a hotplug late.
-	constexpr DWORD kEnumIntervalCapturingMs = 1000;
-	constexpr DWORD kEnumIntervalIdleMs = 15000;
+	// Safety net only. Hot-plug is normally driven by WM_DEVICECHANGE
+	// (NotifyDeviceChange), so this exists purely for the case where that message
+	// never arrives - the WndProc hook failing to install, for instance. Long on
+	// purpose: walking the device tree is the expensive thing this module does,
+	// and only bindings that name a DirectInput device ever reach it at all.
+	constexpr DWORD kEnumFallbackIntervalMs = 60000;
 
 	// XInputGetState on an empty slot is measurably slow on some systems, so slots that
 	// answered "nothing plugged in" are only re-checked occasionally rather than every frame.
@@ -98,6 +101,11 @@ namespace
 	bool g_dinputInitFailed = false;
 	DWORD g_lastEnumTick = 0;
 	bool g_everEnumerated = false;
+	// Set when a rebind prompt opens, so the device list is refreshed exactly once
+	// for that prompt instead of on a repeating interval.
+	bool g_captureEnumPending = false;
+	// Set from the window message pump when Windows reports a device change.
+	std::atomic<bool> g_deviceChangePending{ false };
 	XPadState g_pads[XUSER_MAX_COUNT];
 	std::map<std::string, DIDeviceState> g_diDevices;
 	bool g_capturing = false;
@@ -281,6 +289,13 @@ namespace
 
 	void EnumerateDevices()
 	{
+		// Walks the machine's whole HID device tree. Normally a few milliseconds;
+		// measured at ~100ms on a machine carrying a large set of virtual devices,
+		// where it was a visible freeze every time it ran. If that ever happens
+		// again this names itself in the log instead of looking like a mystery
+		// stall somewhere in the game.
+		FrameStallDiagnostics::ScopedOperation op("InputDevices::EnumerateDevices", 5.0);
+
 		EnsureDirectInput();
 		if (!g_dinput)
 			return;
@@ -439,18 +454,47 @@ namespace
 	}
 }
 
-void InputDevices::Update()
+bool InputDevices::IsXInputDeviceId(const std::string& deviceId)
+{
+	return IsXInputId(deviceId);
+}
+
+void InputDevices::NotifyDeviceChange()
+{
+	// Called from the window procedure, so it must not block: this only raises a
+	// flag and the next Update() on the render thread does the actual work.
+	g_deviceChangePending.store(true, std::memory_order_relaxed);
+}
+
+void InputDevices::Update(bool needDirectInputDevices)
 {
 	std::lock_guard<std::recursive_mutex> lock(g_mutex);
 	if (g_shutdown)
 		return;
 
 	const DWORD now = GetTickCount();
-	const DWORD enumInterval = g_capturing ? kEnumIntervalCapturingMs : kEnumIntervalIdleMs;
-	if (!g_everEnumerated || (now - g_lastEnumTick) >= enumInterval)
+
+	// DirectInput enumeration is by far the most expensive thing this module does:
+	// it walks the machine's whole HID device tree, which costs a few milliseconds
+	// normally but was measured at ~100ms on a machine carrying a large set of
+	// virtual devices. Two rules keep it off the frame path:
+	//
+	//   1. Only enumerate when a binding actually reads the DirectInput device
+	//      list. XInput pads are served from the XInput poll below and never touch
+	//      it, so a pad-bound hotkey costs nothing here.
+	//   2. During a rebind prompt, enumerate once when the prompt opens rather
+	//      than on a repeating interval. Re-walking the tree every second made the
+	//      prompt itself stutter on the same machine, and a device plugged in
+	//      *while* the prompt is open is a rare enough case to not pay for.
+	const bool deviceChanged = g_deviceChangePending.exchange(false, std::memory_order_relaxed);
+	const bool refreshNow = g_captureEnumPending || !g_everEnumerated || deviceChanged;
+	const bool refreshDue = needDirectInputDevices && (now - g_lastEnumTick) >= kEnumFallbackIntervalMs;
+
+	if ((needDirectInputDevices || g_capturing) && (refreshNow || refreshDue))
 	{
 		g_lastEnumTick = now;
 		g_everEnumerated = true;
+		g_captureEnumPending = false;
 		EnumerateDevices();
 	}
 
@@ -540,6 +584,7 @@ void InputDevices::BeginCapture()
 {
 	std::lock_guard<std::recursive_mutex> lock(g_mutex);
 	g_capturing = true;
+	g_captureEnumPending = true;
 
 	// Snapshot rather than "wait for everything to be released": a hitbox with a resting
 	// trigger axis or a stuck POV would otherwise make the capture prompt hang forever.

@@ -52,7 +52,23 @@ namespace InputDevices
 	// Polls every connected device. Only call it when something actually needs device input
 	// (a binding uses one, or a rebind prompt is listening): enumeration and polling are
 	// cheap but not free, and this runs on the render thread of a 60fps fighting game.
-	void Update();
+	// needDirectInputDevices: whether any live binding actually targets a
+	// DirectInput device. XInput bindings ("XI*") are served entirely from the
+	// XInput poll and never consult the DirectInput device list, so enumerating
+	// DirectInput for them is pure cost - and on machines with a large device
+	// tree (virtual pads, virtual displays) a single EnumDevices call can take
+	// 100ms and visibly freeze the game. A rebind prompt still enumerates, but
+	// once when it opens rather than on a repeating interval. See the 2026-08
+	// FPS-drop investigation.
+	void Update(bool needDirectInputDevices);
+
+	// True when the id refers to an XInput pad rather than a DirectInput device.
+	bool IsXInputDeviceId(const std::string& deviceId);
+
+	// Call on WM_DEVICECHANGE. Marks the DirectInput device list stale so the
+	// next Update() refreshes it, which is how hot-plug is noticed - rather than
+	// re-walking the device tree on a timer and hoping to catch it.
+	void NotifyDeviceChange();
 	void Shutdown();
 
 	std::vector<DeviceInfo> GetDevices();
