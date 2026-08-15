@@ -10,6 +10,7 @@
 #include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
 
+#include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
 #include "Network/LobbyLinkManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
@@ -365,6 +366,16 @@ void WindowManager::Render()
 	LOG(7, "WindowManager::Render\n");
 
 	HandleButtons();
+
+	// Overlay self-A/B (OverlayAbTestSeconds): drop the entire ImGui pass for
+	// this frame. Hotkeys above still run, so the mod stays usable; only the
+	// build/submit of the overlay's draw data is removed. NewFrame and Render
+	// are skipped together, which is the one thing ImGui requires - never one
+	// without the other. Inert unless the setting is set.
+	if (FrameStallDiagnostics::OverlayAbSkipActive())
+	{
+		return;
+	}
 
 	// Must be set before NewFrame so hit-testing and rendering share the same
 	// coordinate space; overriding DisplaySize after NewFrame offsets mouse hitboxes

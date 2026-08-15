@@ -1,6 +1,14 @@
+.echo ===== MODULES =====
+lm
 .echo ===== CRASH CONTEXT =====
 .ecxr
-kb 60
+r
+.echo ===== FAULTING STACK =====
+kb 100
+.echo ===== AUTO ANALYSIS =====
+!analyze -v
+.echo ===== HEAP SUMMARY =====
+!heap -s
 .echo ===== ALL THREAD STACKS =====
 ~*kb 40
 .echo ===== DONE =====

@@ -75,6 +75,29 @@ SETTING(bool, spectatorSyncHooksEnabled, "SpectatorSyncHooksEnabled", "1");
 // See src/Game/FrameStallDiagnostics.h.
 SETTING(bool, logFrameStalls, "LogFrameStalls", "0");
 SETTING(int, frameStallThresholdMs, "FrameStallThresholdMs", "33");
+// How often the "load-replay" Steam launch parameter is polled, in milliseconds.
+// This used to run on every rendered frame (~60 ISteamApps IPC calls/second) to read a
+// value that only ever changes when the game is launched from a replay link, so it was
+// pure background load on Steam's IPC pipe for the entire session.
+//
+// It is a setting rather than a hardcoded interval because of the 2026-08 FPS-drop
+// reports: those stalls are the game blocking inside steamclient.dll, with the mod
+// absent from the call path, which is what mod-generated Steam traffic would look like
+// from the outside. 0 restores the old every-frame behaviour, so a reporter can A/B the
+// two without swapping builds. See ReplayFileManager::check_and_load_replay_steam.
+SETTING(int, replayLaunchParamPollMs, "ReplayLaunchParamPollMs", "2000");
+// Self-A/B for the overlay's per-frame cost, in seconds (0 = off).
+//
+// WindowManager::Render builds and submits an ImGui frame on every rendered frame even
+// when no overlay window is open. The CPU side of that measures ~0.2ms, but the GPU cost
+// of the extra render pass is not measured anywhere - and a sustained framerate loss is
+// exactly the symptom that a >33ms stall log cannot see.
+//
+// When set, the overlay pass is switched on and off every N seconds and the [FrameRate]
+// summary is emitted once per switch, tagged with which arm it covered. That yields both
+// arms interleaved within one session on the same hardware, instead of asking a reporter
+// to run two sessions and hoping conditions matched.
+SETTING(int, overlayAbTestSeconds, "OverlayAbTestSeconds", "0");
 // Fallback path for when another resident hooker owns d3d9's Direct3DCreate9Ex export and
 // evicts our detour before the game creates its device (confirmed with NVIDIA Optimus'
 // nvd3d9wrap.dll, which re-applies its own patch ~300ms after ours and drops us out of the

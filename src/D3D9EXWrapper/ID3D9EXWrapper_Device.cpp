@@ -159,6 +159,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::Reset(D3DPRESENT_PARAMETERS* pPresent
 HRESULT APIENTRY Direct3DDevice9ExWrapper::Present(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
 {
 	LOG(7, "Present\n");
+	// Timed so vsync/driver waiting can be separated from the rest of the
+	// frame in FrameStallIncidents.log - see FrameStallDiagnostics.h.
+	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
 	return m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 }
 
@@ -351,16 +354,24 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		LOG(1, "[EndSceneProbe] before MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
 	FrameStallDiagnostics::OnFrameBegin();
-	MatchState::OnUpdate();
-	FrameStallDiagnostics::OnAfterMatchStateUpdate();
-	// Runs on every real rendered frame, unlike the battle-frame-counter hook (which
-	// goes idle during the reset fadeout's limbo - see TickTrainingResetSwap's comment).
-	ScrWindow::TickTrainingResetSwap();
+	{
+		FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_MatchState);
+		MatchState::OnUpdate();
+	}
+	{
+		FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_EndSceneMisc);
+		// Runs on every real rendered frame, unlike the battle-frame-counter hook (which
+		// goes idle during the reset fadeout's limbo - see TickTrainingResetSwap's comment).
+		ScrWindow::TickTrainingResetSwap();
+	}
 	if (s_endSceneProbeBudget > 0)
 	{
 		LOG(1, "[EndSceneProbe] after MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
-	WindowManager::GetInstance().Render();
+	{
+		FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_OverlayRender);
+		WindowManager::GetInstance().Render();
+	}
 	FrameStallDiagnostics::OnFrameEnd();
 	if (s_endSceneProbeBudget > 0)
 	{
@@ -870,6 +881,8 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::ComposeRects(IDirect3DSurface9* pSrc,
 HRESULT APIENTRY Direct3DDevice9ExWrapper::PresentEx(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
 {
 	LOG(7, "PresentEx 0x%p 0x%p\n", pSourceRect, pDestRect);
+	// Same accounting as Present() above; BBCF uses the Ex path in practice.
+	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
 	return m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
 }
 

@@ -7,6 +7,7 @@
 #include "D3D9EXWrapper/ID3D9Wrapper_Sprite.h"
 #include "D3D9EXWrapper/ID3DXWrapper_Effect.h"
 #include "D3D9EXWrapper/ID3D9EXWrapper.h"
+#include "Game/FrameStallDiagnostics.h"
 #include "Hooks/hooks_bbcf.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "SteamApiWrapper/steamApiWrappers.h"
@@ -1257,7 +1258,17 @@ void __cdecl hook_SteamAPI_RunCallbacks()
 		return;
 	}
 
-	orig_SteamAPI_RunCallbacks();
+	// This hook runs on the render thread but outside EndScene, so without
+	// the timing below it lands in the frame-stall report's unattributed
+	// remainder - which is exactly where report 2's ~119ms stalls ended up.
+	// Steam's own callback dispatch and our added work are timed separately:
+	// the former is not our cost, but it can block, so it needs its own line.
+	{
+		FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_SteamNative);
+		orig_SteamAPI_RunCallbacks();
+	}
+
+	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_SteamPump);
 
 	// Cheap 5-byte compare; reports at most a handful of times.
 	CheckD3DWatchdogs();

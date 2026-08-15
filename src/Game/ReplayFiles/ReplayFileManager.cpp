@@ -1,5 +1,7 @@
 #include "ReplayFileManager.h"
+#include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Game/FrameStallDiagnostics.h"
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
@@ -650,11 +652,33 @@ void ReplayFileManager::check_and_load_replay_steam()
             && (GetGameSceneStatus() >= 9)){//this code checks if the scene is already initialized and running 
         static char filename[256] = "./Save/Replay/replay00.dat";
 
-
+        // Throttle: this is an IPC round trip into the Steam client, and it used to run on
+        // every rendered frame to read a launch parameter that changes at most once per
+        // process. ReplayLaunchParamPollMs = 0 restores the old every-frame behaviour so a
+        // reporter can A/B it against mod-generated Steam IPC load (see settings.def).
+        const int pollIntervalMs = Settings::settingsIni.replayLaunchParamPollMs;
+        if (pollIntervalMs > 0)
+        {
+            static ULONGLONG s_lastPollTickMs = 0;
+            const ULONGLONG nowTickMs = GetTickCount64();
+            if (s_lastPollTickMs != 0 &&
+                (nowTickMs - s_lastPollTickMs) < static_cast<ULONGLONG>(pollIntervalMs))
+            {
+                return;
+            }
+            s_lastPollTickMs = nowTickMs;
+        }
 
         ISteamApps* apps = *(ISteamApps**)((char*)base + 0x005d3230); // base->static_SteamInterfaces.apps
-        const char* param = apps->GetLaunchQueryParam("load-replay");
-        ReplayFileManager g_rep_manager;
+
+        const char* param = nullptr;
+        {
+            // Timed separately from the rest of MatchState::OnUpdate: if the mod's own
+            // Steam traffic is what contends the IPC pipe, this call is where it would
+            // first show up as a stall on our side.
+            FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_SteamAppsPoll);
+            param = apps->GetLaunchQueryParam("load-replay");
+        }
         //ImGui::Text("steam test param %p %s", param, param);
 
         bool param_changed = false;
@@ -668,10 +692,15 @@ void ReplayFileManager::check_and_load_replay_steam()
         if (param_changed) {
             DWORD n = 256;
 
+            // Local instance, as before - but built only when the parameter actually
+            // changed rather than once per call, since constructing it was pure waste on
+            // every frame that had nothing to do.
+            ReplayFileManager replayManager;
+
             InternetCanonicalizeUrlA(param, filename, &n, ICU_DECODE);
-            if (g_rep_manager.validate_url_prefix(filename)) { //Makes sure the urls are only from the upload endpoint and bbreplay.ovh for now due to safety.
-                if (g_rep_manager.download_replay(filename, NULL)) {
-                    g_rep_manager.unpack_replay_buffer();
+            if (replayManager.validate_url_prefix(filename)) { //Makes sure the urls are only from the upload endpoint and bbreplay.ovh for now due to safety.
+                if (replayManager.download_replay(filename, NULL)) {
+                    replayManager.unpack_replay_buffer();
                     ScenesManager::PlayLoadedReplay();
                 };
             }
