@@ -217,11 +217,9 @@ void MainWindow::DrawUtilButtons() const
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.States_window_tooltip());
 
-	// TAS mode. Not localized yet: the whole TAS window is still English-only, so a
-	// half-translated entry point would read worse than a consistent one.
 	TasManager& tas = TasManager::Instance();
 	ImGui::SameLine();
-	if (ImGui::Button(tas.IsActive() ? "Exit TAS mode" : "Enter TAS mode", BTN_SIZE))
+	if (ImGui::Button(tas.IsActive() ? L("Exit TAS mode").c_str() : L("Enter TAS mode").c_str(), BTN_SIZE))
 	{
 		if (tas.IsActive())
 		{
@@ -236,7 +234,7 @@ void MainWindow::DrawUtilButtons() const
 		}
 	}
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Frame-by-frame TAS movie editor. Training mode only.");
+	ImGui::ShowHelpMarker(Messages.Frame_by_frame_TAS_movie_editor_Training_mode_only());
 
 	if (!tas.IsActive() && !tas.GetError().empty())
 	{

@@ -926,3 +926,79 @@ Lobby_link_join_failed,Could not join that room (%s). The link may be old.,No se
 "Mapped bind: %s","Mapped bind: %s","Asignado: %s"
 "Already used by ""%s"". Pressing it will do both.","Already used by ""%s"". Pressing it will do both.","Ya lo usa ""%s"". Al pulsarlo pasarán las dos cosas."
 "Controller button: this also works during a match, so pick one you never press while playing.","Controller button: this also works during a match, so pick one you never press while playing.","Botón de mando: también funciona durante la partida, así que elige uno que nunca pulses al jugar."
+TAS mode is not active.,TAS mode is not active.,El modo TAS no está activo.
+Enter TAS mode,Enter TAS mode,Activar modo TAS
+Exit TAS mode,Exit TAS mode,Salir del modo TAS
+Frame-by-frame TAS movie editor. Training mode only.,Frame-by-frame TAS movie editor. Training mode only.,Editor de películas TAS frame a frame. Solo en modo entrenamiento.
+Open TAS mode from the F1 main window.,Open TAS mode from the F1 main window.,Abre el modo TAS desde la ventana principal (F1).
+TAS mode: frame editor for training matches,TAS mode: frame editor for training matches,Modo TAS: editor de frames para partidas de entrenamiento
+Export:,Export:,Exportar:
+Include initial conditions,Include initial conditions,Incluir condiciones iniciales
+Export .txt,Export .txt,Exportar .txt
+Import:,Import:,Importar:
+Select .txt file,Select .txt file,Selecciona un archivo .txt
+Current frame: %u,Current frame: %u,Frame actual: %u
+Base frame: %s%u,Base frame: %s%u,Frame base: %s%u
+not saved / ,not saved / ,sin guardar / 
+Input progress: %u / %u,Input progress: %u / %u,Progreso de entrada: %u / %u
+Rerecord count: %u,Rerecord count: %u,Regrabaciones: %u
+Auto load base state and freeze after playback,Auto load base state and freeze after playback,Cargar el estado base y congelar al terminar la reproducción
+Save base state,Save base state,Guardar estado base
+Load base state,Load base state,Cargar estado base
+Resume game,Resume game,Reanudar el juego
+Stop playback,Stop playback,Detener reproducción
+Preview playback,Preview playback,Reproducir vista previa
+Presentation playback,Presentation playback,Reproducir presentación
+Reset movie,Reset movie,Reiniciar película
+Movie frames: %u,Movie frames: %u,Frames de la película: %u
+Movie edit frame: %u,Movie edit frame: %u,Frame de edición: %u
+Input commands,Input commands,Comandos de entrada
+"Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.","Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.","Ejemplos: 5C, 4C, 28D, 623C, 656 (carrera). Cada dígito ocupa un frame; 66 son dos frames manteniendo 6, mientras que 656 hace una carrera."
+Parse input,Parse input,Procesar entrada
+Frame count,Frame count,Número de frames
+Advance N frames,Advance N frames,Avanzar N frames
+Rewind N frames,Rewind N frames,Retroceder N frames
+Reset parsed input,Reset parsed input,Reiniciar entrada procesada
+Current input: P1=%u P2=%u,Current input: P1=%u P2=%u,Entrada actual: P1=%u P2=%u
+Instructions,Instructions,Instrucciones
+1. Enter a training match and save a base state.,1. Enter a training match and save a base state.,1. Entra en una partida de entrenamiento y guarda un estado base.
+"2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.","2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.","2. Usa las direcciones del teclado numérico y los botones; por ejemplo, 623C significa 6, 2 y luego 3+C."
+3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.,3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.,3. Indica un número de frames y usa Avanzar N frames. Las entradas se aplican frame a frame.
+"4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.","4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.","4. La vista previa empieza al instante y se congela al final de la película para seguir editando frames. La presentación oculta la interfaz TAS, mantiene neutral 60 frames, reproduce la película y luego mantiene neutral 240 frames."
+"5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.","5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.","5. Retroceder N frames recarga el estado base, reproduce hasta el objetivo y borra todos los frames posteriores."
+6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.,6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.,6. Exportar crea un .txt numerado si el nombre está vacío. Importar elige un .txt de la carpeta actual del juego. Guarda el estado base correspondiente tras importar.
+Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.,Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.,Direcciones: 7 8 9 / 4 5 6 / 1 2 3; 5 es neutral. Los comandos procesados mantienen neutral tras su último frame.
+TAS mode is available only during a training match.,TAS mode is available only during a training match.,El modo TAS solo está disponible durante una partida de entrenamiento.
+TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.,TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.,El modo TAS necesita los hooks de mando. Activa EnableControllerHooks en settings.ini y reinicia el juego.
+Preview finished and paused at the movie end.,Preview finished and paused at the movie end.,La vista previa terminó y se detuvo al final de la película.
+Edit movie input first.,Edit movie input first.,Edita primero la entrada de la película.
+Cannot advance frames during playback.,Cannot advance frames during playback.,No se pueden avanzar frames durante la reproducción.
+Save a base state before editing movie input.,Save a base state before editing movie input.,Guarda un estado base antes de editar la entrada de la película.
+Movie frame count exceeds the addressable size limit.,Movie frame count exceeds the addressable size limit.,El número de frames de la película supera el límite direccionable.
+Parsed inputs reset to neutral.,Parsed inputs reset to neutral.,Entradas procesadas reiniciadas a neutral.
+Movie reset.,Movie reset.,Película reiniciada.
+Cannot rewind frames during playback.,Cannot rewind frames during playback.,No se pueden retroceder frames durante la reproducción.
+Save a base state before rewinding.,Save a base state before rewinding.,Guarda un estado base antes de retroceder.
+Rewound to base and truncated the movie.,Rewound to base and truncated the movie.,Se retrocedió al estado base y se recortó la película.
+Rewinding and truncating the movie.,Rewinding and truncating the movie.,Retrocediendo y recortando la película.
+Enter a training match and enable TAS mode first.,Enter a training match and enable TAS mode first.,Entra primero en una partida de entrenamiento y activa el modo TAS.
+Base-state save failed.,Base-state save failed.,No se pudo guardar el estado base.
+No native base state is available.,No native base state is available.,No hay ningún estado base nativo disponible.
+Native base-state load failed.,Native base-state load failed.,No se pudo cargar el estado base nativo.
+Could not open the TAS file for writing.,Could not open the TAS file for writing.,No se pudo abrir el archivo TAS para escritura.
+Failed while writing the TAS file.,Failed while writing the TAS file.,Error al escribir el archivo TAS.
+Exported %s.,Exported %s.,Se exportó %s.
+Could not open the selected TAS file.,Could not open the selected TAS file.,No se pudo abrir el archivo TAS seleccionado.
+The TAS file is empty.,The TAS file is empty.,El archivo TAS está vacío.
+The V1 TAS file has an invalid frame count.,The V1 TAS file has an invalid frame count.,El archivo TAS V1 tiene un número de frames no válido.
+The V2 TAS file has an invalid frame count.,The V2 TAS file has an invalid frame count.,El archivo TAS V2 tiene un número de frames no válido.
+The V2 TAS file is missing frame data.,The V2 TAS file is missing frame data.,Al archivo TAS V2 le faltan datos de frames.
+The V2 TAS file contains an invalid frame.,The V2 TAS file contains an invalid frame.,El archivo TAS V2 contiene un frame no válido.
+The V2 TAS file contains an invalid frame index.,The V2 TAS file contains an invalid frame index.,El archivo TAS V2 contiene un índice de frame no válido.
+The V2 TAS file contains an invalid input.,The V2 TAS file contains an invalid input.,El archivo TAS V2 contiene una entrada no válida.
+The V2 TAS file contains no frame data.,The V2 TAS file contains no frame data.,El archivo TAS V2 no contiene datos de frames.
+The TAS file has an unknown format.,The TAS file has an unknown format.,El archivo TAS tiene un formato desconocido.
+The V1 TAS file contains an invalid frame.,The V1 TAS file contains an invalid frame.,El archivo TAS V1 contiene un frame no válido.
+Imported %s. Save a matching base state before playback.,Imported %s. Save a matching base state before playback.,Se importó %s. Guarda el estado base correspondiente antes de reproducir.
+"Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.","Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.","Entrada de P1 no válida. Usa ejemplos como 5C, 28D, 623C o 656."
+"Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.","Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.","Entrada de P2 no válida. Usa ejemplos como 5C, 28D, 623C o 656."

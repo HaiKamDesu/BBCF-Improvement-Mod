@@ -1624,7 +1624,7 @@ void ScrWindow::DrawSaveStates() {
                 }
             }
 
-            ImGui::TextDisabled("Open TAS mode from the F1 main window.");
+            ImGui::TextDisabled("%s", L("Open TAS mode from the F1 main window.").c_str());
         }
         else {
             ImGui::Text("You must be in a mode where state can be saved");

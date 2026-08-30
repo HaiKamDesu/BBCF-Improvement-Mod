@@ -1,6 +1,7 @@
 #include "TasWindow.h"
 
 #include "Core/HotkeyManager.h"
+#include "Core/Localization.h"
 #include "Core/interfaces.h"
 #include "Game/TasManager.h"
 #include "Game/gamestates.h"
@@ -77,8 +78,8 @@ void TasWindow::Draw() {
         if (IsOpen()) {
             Close();
         }
-        ImGui::TextUnformatted("TAS mode is not active.");
-        if (ImGui::Button("Enter TAS mode")) {
+        ImGui::TextUnformatted(L("TAS mode is not active.").c_str());
+        if (ImGui::Button(L("Enter TAS mode").c_str())) {
             manager.Enter();
         }
         if (!manager.GetError().empty()) {
@@ -87,25 +88,25 @@ void TasWindow::Draw() {
         return;
     }
 
-    ImGui::TextUnformatted("TAS mode: frame editor for training matches");
+    ImGui::TextUnformatted(L("TAS mode: frame editor for training matches").c_str());
     const bool playbackRunning = manager.IsPlaybackRunning();
     ImGui::NewLine();
-    ImGui::TextUnformatted("Export:");
+    ImGui::TextUnformatted(L("Export:").c_str());
     ImGui::SameLine();
-    ImGui::Checkbox("Include initial conditions##tas_export_conditions", &m_includeInitialConditions);
+    ImGui::Checkbox((L("Include initial conditions") + "##tas_export_conditions").c_str(), &m_includeInitialConditions);
     ImGui::SameLine();
     ImGui::InputText("##tas_export_filename", m_exportFileName, sizeof(m_exportFileName));
     ImGui::SameLine();
-    if (ImGui::Button("Export .txt##tas_export") && !playbackRunning) {
+    if (ImGui::Button((L("Export .txt") + "##tas_export").c_str()) && !playbackRunning) {
         std::string path = m_exportFileName[0] ? m_exportFileName : NextTasFileName();
         if (path.size() < 4 || path.substr(path.size() - 4) != ".txt") path += ".txt";
         manager.ExportMovie(path, m_includeInitialConditions);
         RefreshTasFiles(&m_importFiles);
     }
     ImGui::NewLine();
-    ImGui::TextUnformatted("Import:");
+    ImGui::TextUnformatted(L("Import:").c_str());
     ImGui::SameLine();
-    if (ImGui::BeginCombo("##tas_import_file", m_selectedImportFile.empty() ? "Select .txt file" : m_selectedImportFile.c_str())) {
+    if (ImGui::BeginCombo("##tas_import_file", m_selectedImportFile.empty() ? L("Select .txt file").c_str() : m_selectedImportFile.c_str())) {
         RefreshTasFiles(&m_importFiles);
         for (const std::string& file : m_importFiles) {
             const bool selected = file == m_selectedImportFile;
@@ -115,33 +116,33 @@ void TasWindow::Draw() {
         ImGui::EndCombo();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Import##tas_import") && !playbackRunning && !m_selectedImportFile.empty()) {
+    if (ImGui::Button((L("Import") + "##tas_import").c_str()) && !playbackRunning && !m_selectedImportFile.empty()) {
         manager.ImportMovie(m_selectedImportFile);
     }
     ImGui::Separator();
-    ImGui::Text("Current frame: %u", manager.GetCurrentFrame());
-    ImGui::Text("Base frame: %s%u", manager.HasBaseSnapshot() ? "" : "not saved / ", manager.GetBaseFrame());
-    ImGui::Text("Input progress: %u / %u",
+    ImGui::Text(Messages.Current_frame_u(), manager.GetCurrentFrame());
+    ImGui::Text(Messages.Base_frame_s_u(), manager.HasBaseSnapshot() ? "" : L("not saved / ").c_str(), manager.GetBaseFrame());
+    ImGui::Text(Messages.Input_progress_u_u(),
         static_cast<unsigned int>(manager.GetCursor()),
         static_cast<unsigned int>(manager.GetFrameCount()));
-    ImGui::Text("Rerecord count: %u", manager.GetRerecordCount());
+    ImGui::Text(Messages.Rerecord_count_u(), manager.GetRerecordCount());
     bool autoLoad = manager.IsAutoLoadAfterPlayback();
-    if (ImGui::Checkbox("Auto load base state and freeze after playback", &autoLoad)) {
+    if (ImGui::Checkbox(L("Auto load base state and freeze after playback").c_str(), &autoLoad)) {
         manager.SetAutoLoadAfterPlayback(autoLoad);
     }
-    if (ImGui::Button("Save base state")) {
+    if (ImGui::Button(L("Save base state").c_str())) {
         manager.SaveBaseSnapshot();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Load base state")) {
+    if (ImGui::Button(L("Load base state").c_str())) {
         manager.LoadBaseSnapshot();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Resume game")) {
+    if (ImGui::Button(L("Resume game").c_str())) {
         manager.ResumeGame();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Exit TAS mode")) {
+    if (ImGui::Button(L("Exit TAS mode").c_str())) {
         manager.Exit();
         Close();
         return;
@@ -149,30 +150,30 @@ void TasWindow::Draw() {
 
     ImGui::SameLine();
     if (manager.IsPlaying()) {
-        if (ImGui::Button("Stop playback")) {
+        if (ImGui::Button(L("Stop playback").c_str())) {
             manager.StopPlayback();
         }
     } else {
-        if (ImGui::Button("Preview playback")) {
+        if (ImGui::Button(L("Preview playback").c_str())) {
             manager.StartPlayback(false);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Presentation playback")) {
+        if (ImGui::Button(L("Presentation playback").c_str())) {
             manager.StartPlayback(true);
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Reset movie")) {
+    if (ImGui::Button(L("Reset movie").c_str())) {
         manager.ResetMovie();
     }
-    ImGui::Text("Movie frames: %u", static_cast<unsigned int>(manager.GetRecordedFrameCount()));
+    ImGui::Text(Messages.Movie_frames_u(), static_cast<unsigned int>(manager.GetRecordedFrameCount()));
     if (manager.IsEditingRecording()) {
-        ImGui::Text("Movie edit frame: %u", static_cast<unsigned int>(manager.GetCursor()));
+        ImGui::Text(Messages.Movie_edit_frame_u(), static_cast<unsigned int>(manager.GetCursor()));
     }
 
     ImGui::Separator();
-    ImGui::TextUnformatted("Input commands");
-    ImGui::TextUnformatted("Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.");
+    ImGui::TextUnformatted(L("Input commands").c_str());
+    ImGui::TextWrapped("%s", Messages.Examples_5C_4C_28D_623C_656_dash_Each_digit_uses_one_frame_66_means_two_frames_holding_6_while_656_performs_a_dash());
 
     if (ImGui::InputText("P1##tas_p1", m_p1Input, sizeof(m_p1Input))) {
         manager.SetP1Text(m_p1Input);
@@ -181,17 +182,17 @@ void TasWindow::Draw() {
         manager.SetP2Text(m_p2Input);
     }
 
-    if (ImGui::Button("Parse input")) {
+    if (ImGui::Button(L("Parse input").c_str())) {
         manager.SetInputText(m_p1Input, m_p2Input);
     }
     ImGui::SameLine();
-    ImGui::InputInt("Frame count##tas_frame_count", &m_frameCount);
+    ImGui::InputInt((L("Frame count") + "##tas_frame_count").c_str(), &m_frameCount);
     if (m_frameCount < 1) {
         m_frameCount = 1;
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Advance N frames") && !playbackRunning) {
+    if (ImGui::Button(L("Advance N frames").c_str()) && !playbackRunning) {
         if (manager.IsEditingRecording()) {
             manager.EditAndAdvanceFrames(m_frameCount);
         } else {
@@ -199,26 +200,26 @@ void TasWindow::Draw() {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Rewind N frames") && !playbackRunning) {
+    if (ImGui::Button(L("Rewind N frames").c_str()) && !playbackRunning) {
         manager.RewindFrames(m_frameCount);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Reset parsed input")) {
+    if (ImGui::Button(L("Reset parsed input").c_str())) {
         manager.ResetParsedInputs();
     }
 
     const TasFrameInput input = manager.GetCurrentInput();
-    ImGui::Text("Current input: P1=%u P2=%u", input.p1, input.p2);
+    ImGui::Text(Messages.Current_input_P1_u_P2_u(), input.p1, input.p2);
 
     ImGui::Separator();
-    ImGui::TextUnformatted("Instructions");
-    ImGui::TextWrapped("1. Enter a training match and save a base state.");
-    ImGui::TextWrapped("2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.");
-    ImGui::TextWrapped("3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.");
-    ImGui::TextWrapped("4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.");
-    ImGui::TextWrapped("5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.");
-    ImGui::TextWrapped("6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.");
-    ImGui::TextWrapped("Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.");
+    ImGui::TextUnformatted(L("Instructions").c_str());
+    ImGui::TextWrapped("%s", L("1. Enter a training match and save a base state.").c_str());
+    ImGui::TextWrapped("%s", L("2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.").c_str());
+    ImGui::TextWrapped("%s", L("3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.").c_str());
+    ImGui::TextWrapped("%s", L("4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.").c_str());
+    ImGui::TextWrapped("%s", L("5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.").c_str());
+    ImGui::TextWrapped("%s", L("6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.").c_str());
+    ImGui::TextWrapped("%s", L("Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.").c_str());
 
     if (!manager.GetStatus().empty()) {
         ImGui::TextWrapped("%s", manager.GetStatus().c_str());

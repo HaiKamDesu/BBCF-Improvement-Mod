@@ -2249,6 +2249,234 @@ struct LocalizationKeysAccessor
 
         // Controller button: this also works during a match, so pick one you never press while playing.
         inline const char* Controller_button_this_also_works_during_a_match_so_pick_one_you_never_press_while_playing() const { return Get("Controller button: this also works during a match, so pick one you never press while playing."); }
+
+        // TAS mode is not active.
+        inline const char* TAS_mode_is_not_active() const { return Get("TAS mode is not active."); }
+
+        // Enter TAS mode
+        inline const char* Enter_TAS_mode() const { return Get("Enter TAS mode"); }
+
+        // Exit TAS mode
+        inline const char* Exit_TAS_mode() const { return Get("Exit TAS mode"); }
+
+        // Frame-by-frame TAS movie editor. Training mode only.
+        inline const char* Frame_by_frame_TAS_movie_editor_Training_mode_only() const { return Get("Frame-by-frame TAS movie editor. Training mode only."); }
+
+        // Open TAS mode from the F1 main window.
+        inline const char* Open_TAS_mode_from_the_F1_main_window() const { return Get("Open TAS mode from the F1 main window."); }
+
+        // TAS mode: frame editor for training matches
+        inline const char* TAS_mode_frame_editor_for_training_matches() const { return Get("TAS mode: frame editor for training matches"); }
+
+        // Export:
+        inline const char* Export_2() const { return Get("Export:"); }
+
+        // Include initial conditions
+        inline const char* Include_initial_conditions() const { return Get("Include initial conditions"); }
+
+        // Export .txt
+        inline const char* Export_txt() const { return Get("Export .txt"); }
+
+        // Import:
+        inline const char* Import_2() const { return Get("Import:"); }
+
+        // Select .txt file
+        inline const char* Select_txt_file() const { return Get("Select .txt file"); }
+
+        // Current frame: %u
+        inline const char* Current_frame_u() const { return Get("Current frame: %u"); }
+
+        // Base frame: %s%u
+        inline const char* Base_frame_s_u() const { return Get("Base frame: %s%u"); }
+
+        // not saved / 
+        inline const char* not_saved() const { return Get("not saved / "); }
+
+        // Input progress: %u / %u
+        inline const char* Input_progress_u_u() const { return Get("Input progress: %u / %u"); }
+
+        // Rerecord count: %u
+        inline const char* Rerecord_count_u() const { return Get("Rerecord count: %u"); }
+
+        // Auto load base state and freeze after playback
+        inline const char* Auto_load_base_state_and_freeze_after_playback() const { return Get("Auto load base state and freeze after playback"); }
+
+        // Save base state
+        inline const char* Save_base_state() const { return Get("Save base state"); }
+
+        // Load base state
+        inline const char* Load_base_state() const { return Get("Load base state"); }
+
+        // Resume game
+        inline const char* Resume_game() const { return Get("Resume game"); }
+
+        // Stop playback
+        inline const char* Stop_playback() const { return Get("Stop playback"); }
+
+        // Preview playback
+        inline const char* Preview_playback() const { return Get("Preview playback"); }
+
+        // Presentation playback
+        inline const char* Presentation_playback() const { return Get("Presentation playback"); }
+
+        // Reset movie
+        inline const char* Reset_movie() const { return Get("Reset movie"); }
+
+        // Movie frames: %u
+        inline const char* Movie_frames_u() const { return Get("Movie frames: %u"); }
+
+        // Movie edit frame: %u
+        inline const char* Movie_edit_frame_u() const { return Get("Movie edit frame: %u"); }
+
+        // Input commands
+        inline const char* Input_commands() const { return Get("Input commands"); }
+
+        // Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.
+        inline const char* Examples_5C_4C_28D_623C_656_dash_Each_digit_uses_one_frame_66_means_two_frames_holding_6_while_656_performs_a_dash() const { return Get("Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash."); }
+
+        // Parse input
+        inline const char* Parse_input() const { return Get("Parse input"); }
+
+        // Frame count
+        inline const char* Frame_count_2() const { return Get("Frame count"); }
+
+        // Advance N frames
+        inline const char* Advance_N_frames() const { return Get("Advance N frames"); }
+
+        // Rewind N frames
+        inline const char* Rewind_N_frames() const { return Get("Rewind N frames"); }
+
+        // Reset parsed input
+        inline const char* Reset_parsed_input() const { return Get("Reset parsed input"); }
+
+        // Current input: P1=%u P2=%u
+        inline const char* Current_input_P1_u_P2_u() const { return Get("Current input: P1=%u P2=%u"); }
+
+        // Instructions
+        inline const char* Instructions() const { return Get("Instructions"); }
+
+        // 1. Enter a training match and save a base state.
+        inline const char* _1_Enter_a_training_match_and_save_a_base_state() const { return Get("1. Enter a training match and save a base state."); }
+
+        // 2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.
+        inline const char* _2_Use_numpad_directions_and_buttons_for_example_623C_means_6_2_then_3_C() const { return Get("2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C."); }
+
+        // 3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.
+        inline const char* _3_Set_a_frame_count_and_use_Advance_N_Frames_Inputs_are_applied_frame_by_frame() const { return Get("3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame."); }
+
+        // 4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.
+        inline const char* _4_Preview_starts_immediately_and_freezes_at_the_movie_end_for_continued_frame_editing_Presentation_hides_TAS_UI_holds_neutral_for_60_game_frames_plays_the_movie_then_holds_neutral_for_240_frames() const { return Get("4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames."); }
+
+        // 5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.
+        inline const char* _5_Rewind_N_Frames_reloads_the_base_state_replays_to_the_target_and_deletes_all_later_movie_frames() const { return Get("5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames."); }
+
+        // 6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.
+        inline const char* _6_Export_creates_a_numbered_txt_file_when_the_filename_is_empty_Import_selects_a_txt_file_from_the_current_game_directory_Save_the_matching_base_state_after_import() const { return Get("6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import."); }
+
+        // Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.
+        inline const char* Directions_7_8_9_4_5_6_1_2_3_5_means_neutral_Parsed_commands_hold_neutral_after_their_final_frame() const { return Get("Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame."); }
+
+        // TAS mode is available only during a training match.
+        inline const char* TAS_mode_is_available_only_during_a_training_match() const { return Get("TAS mode is available only during a training match."); }
+
+        // TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.
+        inline const char* TAS_mode_needs_the_controller_hooks_Enable_EnableControllerHooks_in_settings_ini_and_restart_the_game() const { return Get("TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game."); }
+
+        // Preview finished and paused at the movie end.
+        inline const char* Preview_finished_and_paused_at_the_movie_end() const { return Get("Preview finished and paused at the movie end."); }
+
+        // Edit movie input first.
+        inline const char* Edit_movie_input_first() const { return Get("Edit movie input first."); }
+
+        // Cannot advance frames during playback.
+        inline const char* Cannot_advance_frames_during_playback() const { return Get("Cannot advance frames during playback."); }
+
+        // Save a base state before editing movie input.
+        inline const char* Save_a_base_state_before_editing_movie_input() const { return Get("Save a base state before editing movie input."); }
+
+        // Movie frame count exceeds the addressable size limit.
+        inline const char* Movie_frame_count_exceeds_the_addressable_size_limit() const { return Get("Movie frame count exceeds the addressable size limit."); }
+
+        // Parsed inputs reset to neutral.
+        inline const char* Parsed_inputs_reset_to_neutral() const { return Get("Parsed inputs reset to neutral."); }
+
+        // Movie reset.
+        inline const char* Movie_reset() const { return Get("Movie reset."); }
+
+        // Cannot rewind frames during playback.
+        inline const char* Cannot_rewind_frames_during_playback() const { return Get("Cannot rewind frames during playback."); }
+
+        // Save a base state before rewinding.
+        inline const char* Save_a_base_state_before_rewinding() const { return Get("Save a base state before rewinding."); }
+
+        // Rewound to base and truncated the movie.
+        inline const char* Rewound_to_base_and_truncated_the_movie() const { return Get("Rewound to base and truncated the movie."); }
+
+        // Rewinding and truncating the movie.
+        inline const char* Rewinding_and_truncating_the_movie() const { return Get("Rewinding and truncating the movie."); }
+
+        // Enter a training match and enable TAS mode first.
+        inline const char* Enter_a_training_match_and_enable_TAS_mode_first() const { return Get("Enter a training match and enable TAS mode first."); }
+
+        // Base-state save failed.
+        inline const char* Base_state_save_failed() const { return Get("Base-state save failed."); }
+
+        // No native base state is available.
+        inline const char* No_native_base_state_is_available() const { return Get("No native base state is available."); }
+
+        // Native base-state load failed.
+        inline const char* Native_base_state_load_failed() const { return Get("Native base-state load failed."); }
+
+        // Could not open the TAS file for writing.
+        inline const char* Could_not_open_the_TAS_file_for_writing() const { return Get("Could not open the TAS file for writing."); }
+
+        // Failed while writing the TAS file.
+        inline const char* Failed_while_writing_the_TAS_file() const { return Get("Failed while writing the TAS file."); }
+
+        // Exported %s.
+        inline const char* Exported_s() const { return Get("Exported %s."); }
+
+        // Could not open the selected TAS file.
+        inline const char* Could_not_open_the_selected_TAS_file() const { return Get("Could not open the selected TAS file."); }
+
+        // The TAS file is empty.
+        inline const char* The_TAS_file_is_empty() const { return Get("The TAS file is empty."); }
+
+        // The V1 TAS file has an invalid frame count.
+        inline const char* The_V1_TAS_file_has_an_invalid_frame_count() const { return Get("The V1 TAS file has an invalid frame count."); }
+
+        // The V2 TAS file has an invalid frame count.
+        inline const char* The_V2_TAS_file_has_an_invalid_frame_count() const { return Get("The V2 TAS file has an invalid frame count."); }
+
+        // The V2 TAS file is missing frame data.
+        inline const char* The_V2_TAS_file_is_missing_frame_data() const { return Get("The V2 TAS file is missing frame data."); }
+
+        // The V2 TAS file contains an invalid frame.
+        inline const char* The_V2_TAS_file_contains_an_invalid_frame() const { return Get("The V2 TAS file contains an invalid frame."); }
+
+        // The V2 TAS file contains an invalid frame index.
+        inline const char* The_V2_TAS_file_contains_an_invalid_frame_index() const { return Get("The V2 TAS file contains an invalid frame index."); }
+
+        // The V2 TAS file contains an invalid input.
+        inline const char* The_V2_TAS_file_contains_an_invalid_input() const { return Get("The V2 TAS file contains an invalid input."); }
+
+        // The V2 TAS file contains no frame data.
+        inline const char* The_V2_TAS_file_contains_no_frame_data() const { return Get("The V2 TAS file contains no frame data."); }
+
+        // The TAS file has an unknown format.
+        inline const char* The_TAS_file_has_an_unknown_format() const { return Get("The TAS file has an unknown format."); }
+
+        // The V1 TAS file contains an invalid frame.
+        inline const char* The_V1_TAS_file_contains_an_invalid_frame() const { return Get("The V1 TAS file contains an invalid frame."); }
+
+        // Imported %s. Save a matching base state before playback.
+        inline const char* Imported_s_Save_a_matching_base_state_before_playback() const { return Get("Imported %s. Save a matching base state before playback."); }
+
+        // Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.
+        inline const char* Invalid_P1_input_Use_examples_such_as_5C_28D_623C_or_656() const { return Get("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656."); }
+
+        // Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.
+        inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_or_656() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656."); }
 };
 
 

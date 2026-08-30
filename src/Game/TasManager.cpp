@@ -2,6 +2,7 @@
 
 #include "Core/ControllerOverrideManager.h"
 #include "Core/interfaces.h"
+#include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Game/gamestates.h"
 #include "Game/CharData.h"
@@ -13,6 +14,7 @@
 #include <Windows.h>
 
 #include <cctype>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -109,14 +111,14 @@ void TasManager::Enter() {
         return;
     }
     if (!IsInTrainingMatch()) {
-        SetError("TAS mode is available only during a training match.");
+        SetError(L("TAS mode is available only during a training match.").c_str());
         return;
     }
     // Every TAS input goes through OverrideBattleInputPacked, which only reaches the game
     // via the BattleInputWrite hook. That hook is skipped when controller hooks are
     // disabled, so without it playback would run and silently do nothing.
     if (!IsBattleInputHookInstalled()) {
-        SetError("TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.");
+        SetError(L("TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.").c_str());
         return;
     }
 
@@ -295,7 +297,7 @@ void TasManager::Update() {
                 // Preview is an editing pass. Freeze on the resulting state so
                 // the next frame can be authored without losing the combo.
                 StopPlayback(false);
-                m_status = "Preview finished and paused at the movie end.";
+                m_status = L("Preview finished and paused at the movie end.");
             }
         } else {
             FinishMovieRun(false);
@@ -338,7 +340,7 @@ void TasManager::StartPresentationLeadOut() {
 
 void TasManager::StartPlayback(bool presentationMode) {
     if (!m_active || m_movie.empty()) {
-        SetError("Edit movie input first.");
+        SetError(L("Edit movie input first.").c_str());
         return;
     }
 
@@ -388,11 +390,11 @@ void TasManager::StopPlayback(bool completed) {
 
 void TasManager::EditAndAdvanceFrames(int count) {
     if (IsPlaybackRunning()) {
-        SetError("Cannot advance frames during playback.");
+        SetError(L("Cannot advance frames during playback.").c_str());
         return;
     }
     if (!m_active || !HasBaseSnapshot() || count <= 0) {
-        SetError("Save a base state before editing movie input.");
+        SetError(L("Save a base state before editing movie input.").c_str());
         return;
     }
     if (!m_inputsParsed && !ParseInputs()) {
@@ -401,7 +403,7 @@ void TasManager::EditAndAdvanceFrames(int count) {
 
     const size_t frameCount = static_cast<size_t>(count);
     if (frameCount > (std::numeric_limits<size_t>::max)() - m_playhead) {
-        SetError("Movie frame count exceeds the addressable size limit.");
+        SetError(L("Movie frame count exceeds the addressable size limit.").c_str());
         return;
     }
     const size_t end = m_playhead + frameCount;
@@ -435,7 +437,7 @@ void TasManager::ResetParsedInputs() {
     }
     m_commandCursor = 0;
     m_error.clear();
-    m_status = "Parsed inputs reset to neutral.";
+    m_status = L("Parsed inputs reset to neutral.");
 }
 
 void TasManager::ResetMovie() {
@@ -454,7 +456,7 @@ void TasManager::ResetMovie() {
     m_truncateOnReplayFinish = false;
     m_runState = TasRunState::Idle;
     m_error.clear();
-    m_status = "Movie reset.";
+    m_status = L("Movie reset.");
 }
 
 bool TasManager::AdvanceOneFrame() {
@@ -466,7 +468,7 @@ bool TasManager::AdvanceFrames(int count) {
         return true;
     }
     if (IsPlaybackRunning()) {
-        SetError("Cannot advance frames during playback.");
+        SetError(L("Cannot advance frames during playback.").c_str());
         return false;
     }
     EditAndAdvanceFrames(count);
@@ -478,11 +480,11 @@ bool TasManager::RewindFrames(int count) {
         return true;
     }
     if (IsPlaybackRunning()) {
-        SetError("Cannot rewind frames during playback.");
+        SetError(L("Cannot rewind frames during playback.").c_str());
         return false;
     }
     if (!m_active || !HasBaseSnapshot()) {
-        SetError("Save a base state before rewinding.");
+        SetError(L("Save a base state before rewinding.").c_str());
         return false;
     }
 
@@ -496,11 +498,11 @@ bool TasManager::RewindFrames(int count) {
         m_movie.clear();
         m_runTarget = 0;
         m_runState = TasRunState::Idle;
-        m_status = "Rewound to base and truncated the movie.";
+        m_status = L("Rewound to base and truncated the movie.");
         return true;
     }
     m_truncateOnReplayFinish = true;
-    m_status = "Rewinding and truncating the movie.";
+    m_status = L("Rewinding and truncating the movie.");
     return BeginMovieRun(TasRunState::ReplayingMovie, target);
 }
 
@@ -516,7 +518,7 @@ void TasManager::ResumeGame() {
 
 bool TasManager::SaveBaseSnapshot() {
     if (!m_active || !IsInTrainingMatch()) {
-        SetError("Enter a training match and enable TAS mode first.");
+        SetError(L("Enter a training match and enable TAS mode first.").c_str());
         return false;
     }
     if (!m_snapshotOwner || !m_snapshotOwner->check_if_valid(
@@ -525,7 +527,7 @@ bool TasManager::SaveBaseSnapshot() {
         m_snapshotOwner = new SnapshotApparatus();
     }
     if (!m_snapshotOwner->save_snapshot(nullptr)) {
-        SetError("Base-state save failed.");
+        SetError(L("Base-state save failed.").c_str());
         return false;
     }
 
@@ -544,13 +546,13 @@ bool TasManager::SaveBaseSnapshot() {
 
 bool TasManager::LoadBaseSnapshot() {
     if (!m_active || !IsInTrainingMatch() || !HasBaseSnapshot()) {
-        SetError("No native base state is available.");
+        SetError(L("No native base state is available.").c_str());
         return false;
     }
     ClearInputOverride();
     m_presentationFramesRemaining = 0;
     if (!m_snapshotOwner->load_snapshot(0)) {
-        SetError("Native base-state load failed.");
+        SetError(L("Native base-state load failed.").c_str());
         return false;
     }
 
@@ -571,7 +573,7 @@ bool TasManager::ExportMovie(const std::string& path, bool includeInitialConditi
     }
     std::ofstream output(path.c_str(), std::ios::out | std::ios::trunc);
     if (!output) {
-        SetError("Could not open the TAS file for writing.");
+        SetError(L("Could not open the TAS file for writing.").c_str());
         return false;
     }
     output << kTasMovieHeaderV2 << '\n';
@@ -591,11 +593,15 @@ bool TasManager::ExportMovie(const std::string& path, bool includeInitialConditi
                << " | P2=" << HumanInput(m_movie[i].p2) << '\n';
     }
     if (!output) {
-        SetError("Failed while writing the TAS file.");
+        SetError(L("Failed while writing the TAS file.").c_str());
         return false;
     }
     m_error.clear();
-    m_status = "Exported " + path + ".";
+    {
+        char formatted[512];
+        std::snprintf(formatted, sizeof(formatted), Messages.Exported_s(), path.c_str());
+        m_status = formatted;
+    }
     LOG(1, "[TAS] exported movie path=%s frames=%u\n", path.c_str(), static_cast<unsigned int>(m_movie.size()));
     return true;
 }
@@ -603,12 +609,12 @@ bool TasManager::ExportMovie(const std::string& path, bool includeInitialConditi
 bool TasManager::ImportMovie(const std::string& path) {
     std::ifstream input(path.c_str());
     if (!input) {
-        SetError("Could not open the selected TAS file.");
+        SetError(L("Could not open the selected TAS file.").c_str());
         return false;
     }
     std::string header;
     if (!std::getline(input, header)) {
-        SetError("The TAS file is empty.");
+        SetError(L("The TAS file is empty.").c_str());
         return false;
     }
     if (!header.empty() && header.back() == '\r') header.pop_back();
@@ -616,12 +622,12 @@ bool TasManager::ImportMovie(const std::string& path) {
     size_t declaredCount = 0;
     if (header == kTasMovieHeaderV1) {
         if (!(input >> framesLabel >> declaredCount) || framesLabel != "frames" || declaredCount == 0) {
-            SetError("The V1 TAS file has an invalid frame count.");
+            SetError(L("The V1 TAS file has an invalid frame count.").c_str());
             return false;
         }
     } else if (header == kTasMovieHeaderV2) {
         if (!(input >> framesLabel >> declaredCount) || framesLabel != "frames" || declaredCount == 0) {
-            SetError("The V2 TAS file has an invalid frame count.");
+            SetError(L("The V2 TAS file has an invalid frame count.").c_str());
             return false;
         }
         std::string line;
@@ -642,45 +648,50 @@ bool TasManager::ImportMovie(const std::string& path) {
             std::vector<TasFrameInput> imported;
             for (size_t expected = 0; expected < declaredCount; ++expected) {
                 if (expected != 0 && !std::getline(input, line)) {
-                    SetError("The V2 TAS file is missing frame data.");
+                    SetError(L("The V2 TAS file is missing frame data.").c_str());
                     return false;
                 }
                 if (!line.empty() && line.back() == '\r') line.pop_back();
                 const size_t firstBar = line.find(" | P1=");
                 const size_t secondBar = line.find(" | P2=", firstBar == std::string::npos ? 0 : firstBar + 6);
                 if (firstBar == std::string::npos || secondBar == std::string::npos) {
-                    SetError("The V2 TAS file contains an invalid frame.");
+                    SetError(L("The V2 TAS file contains an invalid frame.").c_str());
                     return false;
                 }
                 std::istringstream indexStream(line.substr(0, firstBar));
                 size_t index = 0;
                 if (!(indexStream >> index) || index != expected) {
-                    SetError("The V2 TAS file contains an invalid frame index.");
+                    SetError(L("The V2 TAS file contains an invalid frame index.").c_str());
                     return false;
                 }
                 const std::string p1Text = line.substr(firstBar + 6, secondBar - (firstBar + 6));
                 const std::string p2Text = line.substr(secondBar + 6);
                 uint16_t p1 = 0, p2 = 0;
                 if (!ParseHumanInput(p1Text, &p1) || !ParseHumanInput(p2Text, &p2)) {
-                    SetError("The V2 TAS file contains an invalid input.");
+                    SetError(L("The V2 TAS file contains an invalid input.").c_str());
                     return false;
                 }
                 imported.push_back(TasFrameInput{p1, p2});
             }
             if (imported.size() != declaredCount) {
-                SetError("The V2 TAS file is missing frame data.");
+                SetError(L("The V2 TAS file is missing frame data.").c_str());
                 return false;
             }
             ClearInputOverride(); ClearSnapshot(); m_movie.swap(imported);
             m_playhead = 0; m_runTarget = 0; m_presentationFramesRemaining = 0;
             m_presentationMode = false; m_truncateOnReplayFinish = false; m_runState = TasRunState::Idle;
-            m_error.clear(); m_status = "Imported " + path + ". Save a matching base state before playback.";
+            m_error.clear(); {
+        char formatted[512];
+        std::snprintf(formatted, sizeof(formatted),
+            Messages.Imported_s_Save_a_matching_base_state_before_playback(), path.c_str());
+        m_status = formatted;
+    }
             return true;
         }
-        SetError("The V2 TAS file contains no frame data.");
+        SetError(L("The V2 TAS file contains no frame data.").c_str());
         return false;
     } else {
-        SetError("The TAS file has an unknown format.");
+        SetError(L("The TAS file has an unknown format.").c_str());
         return false;
     }
     std::vector<TasFrameInput> imported;
@@ -689,14 +700,19 @@ bool TasManager::ImportMovie(const std::string& path) {
         size_t index = 0; unsigned int p1 = 0, p2 = 0;
         if (!(input >> index >> p1 >> p2) || index != expectedIndex || p1 > UINT16_MAX || p2 > UINT16_MAX ||
             (p1 & 0xF) < 1 || (p1 & 0xF) > 9 || (p2 & 0xF) < 1 || (p2 & 0xF) > 9) {
-            SetError("The V1 TAS file contains an invalid frame."); return false;
+            SetError(L("The V1 TAS file contains an invalid frame.").c_str()); return false;
         }
         imported.push_back(TasFrameInput{static_cast<uint16_t>(p1), static_cast<uint16_t>(p2)});
     }
     ClearInputOverride(); ClearSnapshot(); m_movie.swap(imported);
     m_playhead = 0; m_runTarget = 0; m_presentationFramesRemaining = 0;
     m_presentationMode = false; m_truncateOnReplayFinish = false; m_runState = TasRunState::Idle;
-    m_error.clear(); m_status = "Imported " + path + ". Save a matching base state before playback.";
+    m_error.clear(); {
+        char formatted[512];
+        std::snprintf(formatted, sizeof(formatted),
+            Messages.Imported_s_Save_a_matching_base_state_before_playback(), path.c_str());
+        m_status = formatted;
+    }
     LOG(1, "[TAS] imported movie path=%s frames=%u\n", path.c_str(), static_cast<unsigned int>(m_movie.size()));
     return true;
 }
@@ -736,11 +752,11 @@ bool TasManager::ParseInputs() {
     std::vector<uint16_t> p1;
     std::vector<uint16_t> p2;
     if (!ParseOne(m_p1Text, &p1)) {
-        SetError("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.");
+        SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
         return false;
     }
     if (!ParseOne(m_p2Text, &p2)) {
-        SetError("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.");
+        SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
         return false;
     }
 
