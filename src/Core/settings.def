@@ -19,6 +19,11 @@ SETTING(std::string, stepFramesKeybind, "stepFramesKeybind", "V");
 SETTING(bool, lobbyLinkHotkeysEnabled, "LobbyLinkHotkeysEnabled", "1");
 SETTING(std::string, copyLobbyLinkKeybind, "CopyLobbyLinkKeybind", "Ctrl+C");
 SETTING(std::string, joinLobbyLinkKeybind, "JoinLobbyLinkKeybind", "Ctrl+V");
+// TAS mode frame-editor shortcuts. Only active while the TAS window is open; see
+// src/Game/TasManager.h and src/Overlay/Window/TasWindow.cpp.
+SETTING(std::string, tasParseKeybind, "TasParseKeybind", "I");
+SETTING(std::string, tasRewindKeybind, "TasRewindKeybind", "J");
+SETTING(std::string, tasAdvanceKeybind, "TasAdvanceKeybind", "L");
 SETTING(std::string, dinputDllWrapper, "DinputDllWrapper", "none");
 SETTING(int, renderwidth, "RenderingWidth", "1920");
 SETTING(int, renderheight, "RenderingHeight", "1080");

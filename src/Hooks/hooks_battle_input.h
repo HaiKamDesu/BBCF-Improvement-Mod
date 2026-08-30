@@ -53,3 +53,11 @@ InputState GetLastObservedBattleInput(uint32_t playerIndex);
 
 // Returns the last value that was written back into the game (after overrides).
 InputState GetLastAppliedBattleInput(uint32_t playerIndex);
+// True once Hook_BattleInput() has successfully patched the game. Everything that
+// injects input (TAS mode) is inert without it, and the hook is skipped entirely when
+// the controller-hook runtime gate is off, so callers should check before promising the
+// user that their inputs will be played back.
+bool IsBattleInputHookInstalled();
+
+uint16_t GetLastObservedBattleInputPacked(uint32_t playerIndex);
+uint16_t GetLastAppliedBattleInputPacked(uint32_t playerIndex);

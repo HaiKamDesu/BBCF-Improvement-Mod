@@ -28,6 +28,7 @@
     <ClCompile Include="depends\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
+    <ClCompile Include="src\Game\TasManager.cpp" />
     <ClCompile Include="src\Hooks\hooks_battle_input.cpp" />
     <ClCompile Include="src\Hooks\RankedAutomationHarness.cpp" />
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\FrameAdvantageWindow.cpp" />
@@ -66,6 +67,7 @@
     <ClCompile Include="src\Overlay\Window\ReplayRewindWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\RoomWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\TasWindow.cpp" />
     <ClCompile Include="src\Palette\CharPaletteHandle.cpp" />
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\Jonb\JonbReader.cpp" />
@@ -180,6 +182,7 @@
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
     <ClInclude Include="src\Game\GhidraDefs.h" />
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotApparatus.h" />
+    <ClInclude Include="src\Game\TasManager.h" />
     <ClInclude Include="src\Game\ReplayTakeover\ReplayTakeoverFeatureFlags.h" />
     <ClInclude Include="src\Overlay\Window\ComboDataWindow.h" />
     <ClInclude Include="src\Overlay\Window\FrameAdvantage\PlayerExtendedData.h" />
@@ -217,6 +220,7 @@
     <ClInclude Include="src\Overlay\Window\ReplayRewindWindow.h" />
     <ClInclude Include="src\Overlay\Window\RoomWindow.h" />
     <ClInclude Include="src\Overlay\Window\ScrWindow.h" />
+    <ClInclude Include="src\Overlay\Window\TasWindow.h" />
     <ClInclude Include="src\Palette\CharPaletteHandle.h" />
     <ClInclude Include="src\Game\Jonb\JonbEntry.h" />
     <ClInclude Include="src\Game\Jonb\JonbReader.h" />

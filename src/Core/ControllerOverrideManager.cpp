@@ -1850,6 +1850,12 @@ uint32_t ControllerOverrideManager::PackSystemInputWord(const SystemInputBytes& 
         return v;
 }
 
+uint32_t ControllerOverrideManager::PackBattleInputForSystem(uint16_t packedInput)
+{
+        InputState state = InputState::FromPackedValue(packedInput);
+        return PackSystemInputWord(BuildSystemInputBytes(state));
+}
+
 KeyboardMapping KeyboardMapping::CreateDefault()
 {
     KeyboardMapping mapping{};

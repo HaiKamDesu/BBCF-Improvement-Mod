@@ -1623,6 +1623,8 @@ void ScrWindow::DrawSaveStates() {
                     this->is_setup_time_running = false;
                 }
             }
+
+            ImGui::TextDisabled("Open TAS mode from the F1 main window.");
         }
         else {
             ImGui::Text("You must be in a mode where state can be saved");

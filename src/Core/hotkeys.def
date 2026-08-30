@@ -65,3 +65,15 @@ HOTKEY(UnlimitedPlaybackLoop, unlimitedPlaybackLoopKey, "UnlimitedPlaybackLoopKe
 HOTKEY(RankedAutomation, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8",
 	"Ranked automation harness",
 	"Starts or stops the ranked automation test tool. This is a development aid; leave it alone unless you were asked to use it.")
+
+HOTKEY(TasParse, tasParseKeybind, "TasParseKeybind", "I",
+	"TAS: apply typed inputs",
+	"In TAS mode, reads the numpad-notation inputs you typed into the TAS window and appends them to the movie.")
+
+HOTKEY(TasRewind, tasRewindKeybind, "TasRewindKeybind", "J",
+	"TAS: step back one frame",
+	"In TAS mode, rewinds the movie by one frame so you can re-record from just before a mistake.")
+
+HOTKEY(TasAdvance, tasAdvanceKeybind, "TasAdvanceKeybind", "L",
+	"TAS: step forward one frame",
+	"In TAS mode, plays the movie forward by exactly one frame.")

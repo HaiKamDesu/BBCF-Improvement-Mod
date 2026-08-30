@@ -670,6 +670,9 @@ void ReplayFileManager::check_and_load_replay_steam()
         }
 
         ISteamApps* apps = *(ISteamApps**)((char*)base + 0x005d3230); // base->static_SteamInterfaces.apps
+        if (apps == nullptr) {
+            return;
+        }
 
         const char* param = nullptr;
         {
@@ -679,13 +682,18 @@ void ReplayFileManager::check_and_load_replay_steam()
             FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_SteamAppsPoll);
             param = apps->GetLaunchQueryParam("load-replay");
         }
+        if (param == nullptr || param[0] == '\0') {
+            return;
+        }
         //ImGui::Text("steam test param %p %s", param, param);
 
         bool param_changed = false;
         static char last_param[256] = "";
         if (strcmp(param, last_param) != 0) {
             strncpy(last_param, param, sizeof(last_param) - 1);
+            last_param[sizeof(last_param) - 1] = '\0';
             strncpy(filename, param, sizeof(filename) - 1);
+            filename[sizeof(filename) - 1] = '\0';
             param_changed = true;
 
         }

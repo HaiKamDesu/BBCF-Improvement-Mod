@@ -179,6 +179,7 @@ public:
 
         static std::string WideToUtf8(const std::wstring& value);
         static uint32_t PackSystemInputWord(const SystemInputBytes& bytes);
+        static uint32_t PackBattleInputForSystem(uint16_t packedInput);
 
         uint32_t BuildSystemInputWord(SystemControllerSlot slot) const;
         bool HasSystemOverride(SystemControllerSlot slot) const;

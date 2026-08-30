@@ -118,19 +118,27 @@ void MatchState::OnUpdate()
 		}
 	}
 
-	g_interfaces.pPaletteManager->OnUpdate(
-		g_interfaces.player1.GetPalHandle(),
-		g_interfaces.player2.GetPalHandle()
-	);
-	g_interfaces.pPaletteManager->ClearPlatinumItemPaletteLink(
-		g_interfaces.player1,
-		g_interfaces.player2
-	);
-	if (g_interfaces.pOnlinePaletteManager)
+	// The render hook can run during teardown or while managers are still being
+	// assembled. Keep the per-frame path inert until its owned managers exist.
+	if (g_interfaces.pPaletteManager != nullptr)
+	{
+		g_interfaces.pPaletteManager->OnUpdate(
+			g_interfaces.player1.GetPalHandle(),
+			g_interfaces.player2.GetPalHandle()
+		);
+		g_interfaces.pPaletteManager->ClearPlatinumItemPaletteLink(
+			g_interfaces.player1,
+			g_interfaces.player2
+		);
+	}
+	if (g_interfaces.pOnlinePaletteManager != nullptr)
 	{
 		g_interfaces.pOnlinePaletteManager->OnUpdate();
 	}
-	g_interfaces.pReplayRewindManager->OnUpdate();
+	if (g_interfaces.pReplayRewindManager != nullptr)
+	{
+		g_interfaces.pReplayRewindManager->OnUpdate();
+	}
 	g_rep_manager.check_and_load_replay_steam();
 }
 

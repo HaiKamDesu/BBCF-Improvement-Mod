@@ -16,6 +16,7 @@
 #include "Core/utils.h"
 #include "Core/Localization.h"
 #include "Game/gamestates.h"
+#include "Game/TasManager.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Window/ControllerSettings/ControllerSettingsSection.h"
 #include "Overlay/Widget/ActiveGameModeWidget.h"
@@ -215,6 +216,32 @@ void MainWindow::DrawUtilButtons() const
 	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.States_window_tooltip());
+
+	// TAS mode. Not localized yet: the whole TAS window is still English-only, so a
+	// half-translated entry point would read worse than a consistent one.
+	TasManager& tas = TasManager::Instance();
+	ImGui::SameLine();
+	if (ImGui::Button(tas.IsActive() ? "Exit TAS mode" : "Enter TAS mode", BTN_SIZE))
+	{
+		if (tas.IsActive())
+		{
+			tas.Exit();
+			m_pWindowContainer->GetWindow(WindowType_Tas)->Close();
+		}
+		else
+		{
+			tas.Enter();
+			if (tas.IsActive())
+				m_pWindowContainer->GetWindow(WindowType_Tas)->Open();
+		}
+	}
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker("Frame-by-frame TAS movie editor. Training mode only.");
+
+	if (!tas.IsActive() && !tas.GetError().empty())
+	{
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", tas.GetError().c_str());
+	}
 }
 
 void MainWindow::DrawCurrentPlayersCount() const

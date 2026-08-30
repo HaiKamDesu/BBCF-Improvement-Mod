@@ -2,6 +2,8 @@
 #include "HookManager.h"
 #include "Core/logger.h"
 #include "Core/RuntimePlatform.h"
+#include "Core/interfaces.h"
+#include "Game/gamestates.h"
 
 #include <array>
 
@@ -23,12 +25,26 @@ namespace
         bool active = false;
         uint16_t packedValue = INPUT_DIRECTION_NEUTRAL;
         uint32_t framesRemaining = 0; // 0 = infinite
+        uint32_t lastConsumedFrame = 0;
+        bool hasConsumedFrame = false;
     };
-
     std::array<OverrideState, MAX_BATTLE_PLAYERS> g_overrideState{};
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastObservedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
     std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastAppliedPacked{ INPUT_DIRECTION_NEUTRAL, INPUT_DIRECTION_NEUTRAL };
 
+    struct BattleInputDiagnosticEntry
+    {
+        uint32_t rawSlot = UINT32_MAX;
+        uintptr_t targetAddress = 0;
+        uint16_t lastPacked = UINT16_MAX;
+        uint32_t remaining = 32;
+        bool initialized = false;
+    };
+
+    // Keep P1/P2 candidates separate by the actual writer slot and destination.
+    std::array<BattleInputDiagnosticEntry, 8> g_battleInputDiagnostics{};
+    std::array<uint16_t, MAX_BATTLE_PLAYERS> g_lastLoggedOverride{ UINT16_MAX, UINT16_MAX };
+    uint32_t g_overrideLogBudget = 64;
 
     uint16_t BuildDirectionFromState(const InputState& state)
     {
@@ -48,31 +64,104 @@ namespace
         return INPUT_DIRECTION_NEUTRAL;
     }
 
-    uint16_t __cdecl ProcessBattleInput(uint16_t packedInput, uint32_t playerIndex)
+    uint16_t __cdecl ProcessBattleInput(
+        uint16_t packedInput,
+        uint32_t playerIndex,
+        uintptr_t targetAddress,
+        uint16_t previousValue)
     {
-        if (playerIndex >= MAX_BATTLE_PLAYERS)
+        // This normalization remains for the existing override API only. Diagnostics
+        // retain the raw writer slot and destination so P2 can be identified directly.
+        const size_t normalizedPlayer = playerIndex == 0 ? 0 : 1;
+
+        g_lastObservedPacked[normalizedPlayer] = packedInput;
+        if (g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_Training)
         {
-            return packedInput;
+            BattleInputDiagnosticEntry* diagnostic = nullptr;
+            for (auto& entry : g_battleInputDiagnostics)
+            {
+                if (entry.initialized &&
+                    entry.rawSlot == playerIndex &&
+                    entry.targetAddress == targetAddress)
+                {
+                    diagnostic = &entry;
+                    break;
+                }
+            }
+
+            if (!diagnostic)
+            {
+                for (auto& entry : g_battleInputDiagnostics)
+                {
+                    if (!entry.initialized)
+                    {
+                        entry.initialized = true;
+                        entry.rawSlot = playerIndex;
+                        entry.targetAddress = targetAddress;
+                        diagnostic = &entry;
+                        break;
+                    }
+                }
+            }
+
+            if (diagnostic &&
+                diagnostic->remaining > 0 &&
+                packedInput != diagnostic->lastPacked)
+            {
+                --diagnostic->remaining;
+                diagnostic->lastPacked = packedInput;
+                LOG(1,
+                    "[TAS][BattleInputProbe] raw_slot=%u target=0x%08X previous=%u observed=%u frame=%u remaining=%u\n",
+                    playerIndex,
+                    static_cast<unsigned int>(targetAddress),
+                    previousValue,
+                    packedInput,
+                    g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0,
+                    diagnostic->remaining);
+            }
         }
 
-        g_lastObservedPacked[playerIndex] = packedInput;
-
-        OverrideState& overrideState = g_overrideState[playerIndex];
+        OverrideState& overrideState = g_overrideState[normalizedPlayer];
         if (overrideState.active)
         {
-            packedInput = overrideState.packedValue;
-
-            if (overrideState.framesRemaining > 0)
+            // A finite override lasts for complete game frames. The same input
+            // can be written more than once during one frame.
+            const uint32_t currentFrame = g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0;
+            if (overrideState.framesRemaining > 0 &&
+                overrideState.hasConsumedFrame &&
+                overrideState.lastConsumedFrame != currentFrame)
             {
-                overrideState.framesRemaining--;
+                --overrideState.framesRemaining;
                 if (overrideState.framesRemaining == 0)
                 {
                     overrideState.active = false;
                 }
             }
+
+            if (overrideState.active)
+            {
+                const uint16_t originalInput = packedInput;
+                packedInput = overrideState.packedValue;
+                overrideState.lastConsumedFrame = currentFrame;
+                overrideState.hasConsumedFrame = true;
+                if (g_overrideLogBudget > 0 &&
+                    g_lastLoggedOverride[normalizedPlayer] != packedInput)
+                {
+                    --g_overrideLogBudget;
+                    g_lastLoggedOverride[normalizedPlayer] = packedInput;
+                    LOG(1,
+                        "[TAS][BattleOverride] raw_slot=%u target=0x%08X original=%u applied=%u frame=%u remaining=%u\n",
+                        playerIndex,
+                        static_cast<unsigned int>(targetAddress),
+                        originalInput,
+                        packedInput,
+                        currentFrame,
+                        overrideState.framesRemaining);
+                }
+            }
         }
 
-        g_lastAppliedPacked[playerIndex] = packedInput;
+        g_lastAppliedPacked[normalizedPlayer] = packedInput;
         return packedInput;
     }
 
@@ -97,7 +186,7 @@ InputState InputState::FromPackedValue(uint16_t packed)
 {
     InputState state{};
 
-    switch (packed % 10)
+    switch (packed & 0xF)
     {
     case 1:
         state.down = true;
@@ -159,6 +248,8 @@ void OverrideBattleInputPacked(uint32_t playerIndex, uint16_t packedValue, uint3
     overrideState.active = true;
     overrideState.packedValue = packedValue;
     overrideState.framesRemaining = framesToHold;
+    overrideState.lastConsumedFrame = 0;
+    overrideState.hasConsumedFrame = false;
 }
 
 void ClearBattleInputOverride(uint32_t playerIndex)
@@ -171,6 +262,8 @@ void ClearBattleInputOverride(uint32_t playerIndex)
     OverrideState& overrideState = g_overrideState[playerIndex];
     overrideState.active = false;
     overrideState.framesRemaining = 0;
+    overrideState.lastConsumedFrame = 0;
+    overrideState.hasConsumedFrame = false;
     overrideState.packedValue = INPUT_DIRECTION_NEUTRAL;
 }
 
@@ -204,25 +297,37 @@ InputState GetLastAppliedBattleInput(uint32_t playerIndex)
     return InputState::FromPackedValue(g_lastAppliedPacked[playerIndex]);
 }
 
+uint16_t GetLastObservedBattleInputPacked(uint32_t playerIndex)
+{
+    return playerIndex < MAX_BATTLE_PLAYERS ? g_lastObservedPacked[playerIndex] : INPUT_DIRECTION_NEUTRAL;
+}
+
+uint16_t GetLastAppliedBattleInputPacked(uint32_t playerIndex)
+{
+    return playerIndex < MAX_BATTLE_PLAYERS ? g_lastAppliedPacked[playerIndex] : INPUT_DIRECTION_NEUTRAL;
+}
+
 void __declspec(naked) BattleInputWrite_Hook()
 {
     __asm {
-        // AX contains original input (packed)
-        // EBX = player index
-        // ESI = address to write into
-
+        // This hook runs at the common tail of both player iterations.
+        // EBX = player index (0 or 1), ESI = final packed-input word.
         push ecx
         push edx
+        movzx eax, word ptr[esi]
+        push eax // previousValue
+        push esi // targetAddress
         push ebx // playerIndex
         push eax // packedInput
         call ProcessBattleInput
-        add esp, 8
+        add esp, 16
+        mov word ptr[esi], ax
         pop edx
         pop ecx
 
         // ORIGINAL instructions:
-        movzx edi, ax
-        mov[esi], di
+        mov edi, dword ptr[ebp-8]
+        mov ecx, esi
 
         jmp battleInputWrite_JmpBack
     }
@@ -235,13 +340,13 @@ bool Hook_BattleInput()
         return false;
     }
 
-    // Pattern from the confirmed CE hook:
-    // 0F B7 F8 66 89 3E E9 ?? ?? ?? ??
+    // Common tail of the two-player loop at static 0x0055A333. The call
+    // displacement is wildcarded; the overwrite covers two whole instructions.
     battleInputWrite_JmpBack = HookManager::SetHook(
         "BattleInputWrite",
-        "\x0F\xB7\xF8\x66\x89\x3E\xE9",
-        "xxxxxxx",
-        6,
+        "\x8B\x7D\xF8\x8B\xCE\xE8\x00\x00\x00\x00\x8B\x45\xF0\x81\x45\xF4\x78\x49\x02\x00\x83\xC0\x04\x43\x83\xC6\x1C",
+        "xxxxxx????xxxxxxxxxxxxxxxxx",
+        5,
         &BattleInputWrite_Hook
     );
 
@@ -253,4 +358,9 @@ bool Hook_BattleInput()
 
     LOG(1, "BattleInputWrite hook installed OK\n");
     return true;
+}
+
+bool IsBattleInputHookInstalled()
+{
+    return battleInputWrite_JmpBack != 0;
 }
