@@ -3687,6 +3687,24 @@ void BeginRankedSlotWriteTrace(uint32_t slotAddr, const char* reason)
 		return;
 	}
 
+	// Its own setting rather than riding on EnableInDevelopmentFeatures. This is the only place
+	// the guard page is ever armed, so refusing here keeps the VEH unregistered and the page
+	// untouched - the whole instrument costs nothing when it is off.
+	//
+	// It needs its own switch because it is not a diagnostic, it is a reverse-engineering
+	// instrument, and an expensive one: PAGE_GUARD faults on every access to that page from every
+	// thread, each answered by a single-step trap and a re-arm, and it keeps re-arming until it
+	// observes a value change. A run that never sees one does not stop. One session logged
+	// 7,392,120 guard hits and 0 value changes, which is a hard FPS drop for the whole session and
+	// a hang risk during scene transitions, where several threads touch the page at once and
+	// nothing here is synchronised. Tying that to "show me unfinished features" meant nobody could
+	// use that setting and still play ranked.
+	if (!Settings::settingsIni.rankedSlotWriteTraceEnabled)
+	{
+		EndRankedSlotWriteTrace("write_trace_disabled");
+		return;
+	}
+
 	uint32_t slotLo = 0;
 	uint32_t slotHi = 0;
 	if (!ReadRankedTrackedSlotPair(slotAddr, &slotLo, &slotHi))

@@ -56,6 +56,7 @@ namespace {
 		{ "URT_RE_AllowSizeMismatchProbe", "Allow mismatched replay data (unsafe)", "Replay Takeover Debug", "Developer option that lets replay takeover use data that does not look right. Leave it off; turning it on can misbehave." },
 		{ "URT_RE_AllowUnsafeProbeLoad", "Allow unsafe replay load (unsafe)", "Replay Takeover Debug", "Developer option that skips replay takeover's safety checks. Leave it off; turning it on can crash the game." },
 		{ "EnableInDevelopmentFeatures", "Show unfinished features", "System", "Reveals features that are still being worked on. They may be incomplete, ugly, or broken. Fine to explore, just do not rely on them." },
+		{ "RankedSlotWriteTrace", "Trace ranked LP writes (slow)", "Ranked Debug", "Developer tool that watches the memory holding your ranked points to find what writes it. It makes the game run extremely slowly and can hang it during screen transitions. Leave it off unless a developer asked you to turn it on." },
 		{ "EnableRankedListConnectionFilter", "Filter ranked list by connection", "Ranked", "Lets you hide players in the ranked list whose connection to you is poor." },
 		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked", "Shows the small filter window next to the ranked player list." },
 		{ "ShowRankedListHiddenPopup", "Show hidden players popup", "Ranked", "Remembers whether the \"hidden players\" popup was left open, so it comes back next time." },

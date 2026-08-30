@@ -129,6 +129,12 @@ SETTING(int, urtReTraceMaxBackups, "URT_RE_MaxBackups", "3");
 SETTING(bool, urtReAllowSizeMismatchProbe, "URT_RE_AllowSizeMismatchProbe", "0");
 SETTING(bool, urtReAllowUnsafeProbeLoad, "URT_RE_AllowUnsafeProbeLoad", "0");
 SETTING(bool, enableInDevelopmentFeatures, "EnableInDevelopmentFeatures", "0");
+// Arms a PAGE_GUARD + single-step trap on the page holding the ranked LP slot to find who writes
+// it. Reverse-engineering instrument, not a diagnostic: every access to that page by any thread
+// costs two kernel exception dispatches, and it re-arms until it sees a value change. A session
+// that never sees one logs millions of guard hits and drops the game to a slideshow. It used to
+// ride on EnableInDevelopmentFeatures, which made that whole setting unusable during ranked play.
+SETTING(bool, rankedSlotWriteTraceEnabled, "RankedSlotWriteTrace", "0");
 SETTING(bool, enableRankedListConnectionFilter, "EnableRankedListConnectionFilter", "0");
 SETTING(bool, showRankedListFilterWindow, "ShowRankedListFilterWindow", "1");
 SETTING(bool, showRankedListHiddenPopup, "ShowRankedListHiddenPopup", "0");
