@@ -356,7 +356,7 @@ Hide unreachable players from ranked list,Hide unreachable players from ranked l
 %d hidden,%d hidden,%d ocultos
 Hidden players,Hidden players,Jugadores ocultos
 Show hidden players window,Show hidden players window,Mostrar ventana de jugadores ocultos
-"Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.","Abre automáticamente una ventana con los jugadores ocultos por el filtro de conexión mientras la lista clasificatoria está abierta. Cerrar esa ventana equivale a desmarcar esta opción."
+Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.,Automatically opens a window listing players hidden by the connection filter while the ranked list is open. Closing that window is the same as unchecking this.,Abre automáticamente una ventana con los jugadores ocultos por el filtro de conexión mientras la lista clasificatoria está abierta. Cerrar esa ventana equivale a desmarcar esta opción.
 No players are currently hidden.,No players are currently hidden.,No hay jugadores ocultos actualmente.
 below network filter,below network filter,por debajo del filtro de red
 network requirements not met,network requirements not met,requisitos de red no cumplidos
@@ -366,7 +366,7 @@ All,All,Todos
 2 and above,2 and above,2 o más
 3 and above,3 and above,3 o más
 4 only,4 only,Solo 4
-"Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.","Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.","Oculta a los jugadores cuya calificación de Delay (0-4) está por debajo del nivel seleccionado. Los jugadores cuya calificación aún no se ha medido permanecen visibles hasta que se resuelve; las filas se ocultan y restauran en vivo según cambian las calificaciones."
+Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.,Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.,Oculta a los jugadores cuya calificación de Delay (0-4) está por debajo del nivel seleccionado. Los jugadores cuya calificación aún no se ha medido permanecen visibles hasta que se resuelve; las filas se ocultan y restauran en vivo según cambian las calificaciones.
 Hide rooms with unmet network requirements,Hide rooms with unmet network requirements,Ocultar salas con requisitos de red no cumplidos
 "Some rooms require a minimum connection quality and show ""The room's connectivity requirements are not met"" when you try to enter. This hides those rooms once your Delay rating to them is measured, so everything left in the list is actually joinable.","Some rooms require a minimum connection quality and show ""The room's connectivity requirements are not met"" when you try to enter. This hides those rooms once your Delay rating to them is measured, so everything left in the list is actually joinable.","Algunas salas exigen una calidad de conexión mínima y muestran ""No se cumplen los requisitos de conectividad de la sala"" al intentar entrar. Esto oculta esas salas una vez medida tu calificación de Delay hacia ellas, de modo que todo lo que queda en la lista es realmente accesible."
 Ranked List Config,Ranked List Config,Configuración de lista clasificatoria
@@ -477,13 +477,13 @@ Hero rules,Hero rules,Reglas Hero
 Kisshin rules,Kisshin rules,Reglas Kisshin
 Hades rules,Hades rules,Reglas Hades
 Ruler rules,Ruler rules,Reglas Ruler
-"%s - %s","%s - %s","%s - %s"
-"%s (%s)","%s (%s)","%s (%s)"
-"%+d LP","%+d LP","%+d LP"
-" (%+d Promotion Counter)"," (%+d Promotion Counter)"," (%+d Contador de ascenso)"
-"%+d LP (%+d Promotion Counter)","%+d LP (%+d Promotion Counter)","%+d LP (%+d Contador de ascenso)"
-"%+d LP (+1 Demotion Counter)","%+d LP (+1 Demotion Counter)","%+d LP (+1 Contador de descenso)"
-" or higher."," or higher."," o superior."
+%s - %s,%s - %s,%s - %s
+%s (%s),%s (%s),%s (%s)
+%+d LP,%+d LP,%+d LP
+ (%+d Promotion Counter), (%+d Promotion Counter), (%+d Contador de ascenso)
+%+d LP (%+d Promotion Counter),%+d LP (%+d Promotion Counter),%+d LP (%+d Contador de ascenso)
+%+d LP (+1 Demotion Counter),%+d LP (+1 Demotion Counter),%+d LP (+1 Contador de descenso)
+ or higher., or higher., o superior.
 or higher.,or higher.,o superior.
 "If you reach %u LP, you'll rank up to %s.","If you reach %u LP, you'll rank up to %s.","Si llegas a %u LP, subirás a %s."
 "At this rank, a win against a lower rank can fill the LP bar, but the rank-up only happens when you beat %s or higher.","At this rank, a win against a lower rank can fill the LP bar, but the rank-up only happens when you beat %s or higher.","En este rango, ganar contra un rango más bajo puede llenar la barra de LP, pero solo subirás si le ganas a %s o superior."
@@ -772,7 +772,7 @@ Opponent color,Opponent color,Color del rival
 Top color,Top color,Color máximo
 Bottom color,Bottom color,Color mínimo
 Color changes at %u / %u and counter resets to %u after a color change.,Color changes at %u / %u and counter resets to %u after a color change.,El color cambia en %u / %u y el contador vuelve a %u tras un cambio de color.
-"Wins increase the counter; losses decrease it. Same-color matches are the ones that move square color.","Wins increase the counter; losses decrease it. Same-color matches are the ones that move square color.","Las victorias suben el contador; las derrotas lo bajan. Las partidas contra el mismo color son las que mueven el color de square."
+Wins increase the counter; losses decrease it. Same-color matches are the ones that move square color.,Wins increase the counter; losses decrease it. Same-color matches are the ones that move square color.,Las victorias suben el contador; las derrotas lo bajan. Las partidas contra el mismo color son las que mueven el color de square.
 Update available,Update available,Actualización disponible
 BBCF Improvement Mod %s is available,BBCF Improvement Mod %s is available,BBCF Improvement Mod %s está disponible
 Development update channel,Development update channel,Canal de actualizaciones de desarrollo
@@ -843,14 +843,14 @@ Enable_framedata_tooltip,Opens a HUD window showing real-time frame advantage.,A
 Advantage_stagger_hit_tooltip,Also counts stagger/ukemi hit states in the frame advantage calculation.,También cuenta los estados de tambaleo/ukemi al golpear en el cálculo de la ventaja de frames.
 Palette_editor_tooltip,Opens the palette editor to customize character colors.,Abre el editor de paletas para personalizar los colores del personaje.
 Enable_hitbox_overlay_tooltip,Draws hitboxes/hurtboxes over the characters.,Dibuja las cajas de golpe/impacto sobre los personajes.
-Draw_hitbox_hurtbox_tooltip,"Toggles drawing hit/hurt boxes specifically (vs just the overlay window).","Activa o desactiva el dibujo de las cajas de golpe/impacto específicamente (en vez de solo la ventana de superposición)."
+Draw_hitbox_hurtbox_tooltip,Toggles drawing hit/hurt boxes specifically (vs just the overlay window).,Activa o desactiva el dibujo de las cajas de golpe/impacto específicamente (en vez de solo la ventana de superposición).
 Freeze_frame_tooltip,Pauses the game's frame progression. Also bound to a hotkey.,Pausa el avance de frames del juego. También está asignado a una tecla rápida.
 Reset_frame_counter_tooltip,Resets the frame counter to 0.,Reinicia el contador de frames a 0.
 Step_frames_tooltip,"While frame-frozen, advances the game by the configured number of frames.","Mientras los frames están congelados, avanza el juego la cantidad de frames configurada."
 Step_frames_count_tooltip,"Number of frames ""Step Frames"" advances at a time.","Cantidad de frames que avanza ""Step Frames"" cada vez."
 Hide_HUD_tooltip,Hides the in-game HUD.,Oculta el HUD dentro del juego.
 Releases_checker_tooltip,Opens the release/update checker window.,Abre la ventana de verificación de actualizaciones/lanzamientos.
-Swap_coordinates_tooltip,"Immediately swaps P1 and P2 positions and facing (training mode only).","Intercambia inmediatamente las posiciones y direcciones de P1 y P2 (solo en modo entrenamiento)."
+Swap_coordinates_tooltip,Immediately swaps P1 and P2 positions and facing (training mode only).,Intercambia inmediatamente las posiciones y direcciones de P1 y P2 (solo en modo entrenamiento).
 Enable_wakeup_delay_override_tooltip,Lets you override P2's wakeup timing/type below.,Permite anular el tiempo/tipo de recuperación (wakeup) de P2 abajo.
 Force_load_p2_script_tooltip,"Re-parses P2's state script data from memory, refreshing the states list.","Vuelve a analizar los datos del script de estados de P2 desde la memoria, actualizando la lista de estados."
 Naoto_EN_specials_tooltip,Force-enables Naoto's EN (Drive) specials on P2.,Fuerza la activación de los especiales EN (Drive) de Naoto en P2.
@@ -866,7 +866,7 @@ Set_wakeup_action_tooltip,Registers the selected state as P2's forced wakeup act
 Set_gap_action_tooltip,Registers the selected state as P2's forced action the instant blockstun ends.,Registra el estado seleccionado como la acción forzada de P2 en el instante en que termina el blockstun.
 Set_tech_action_tooltip,Registers the selected state as P2's forced action after a successful throw tech.,Registra el estado seleccionado como la acción forzada de P2 tras escapar exitosamente de un agarre.
 Use_state_tooltip,Immediately forces P2 into the currently selected state.,Fuerza inmediatamente a P2 al estado actualmente seleccionado.
-Reset_states_tooltip,"Reverts any patched state scripts and clears all gap/wakeup/onhit/tech registers.","Revierte cualquier script de estado modificado y borra todos los registros de gap/wakeup/onhit/tech."
+Reset_states_tooltip,Reverts any patched state scripts and clears all gap/wakeup/onhit/tech registers.,Revierte cualquier script de estado modificado y borra todos los registros de gap/wakeup/onhit/tech.
 Add_wakeup_action_tooltip,Adds the selected state to the wakeup action's random pool.,Agrega el estado seleccionado al grupo aleatorio de la acción de wakeup.
 Add_gap_action_tooltip,Adds the selected state to the gap action's random pool.,Agrega el estado seleccionado al grupo aleatorio de la acción de gap.
 Save_playback_tooltip,Saves the current recorded playback to the file path below.,Guarda la grabación actual en la ruta de archivo de abajo.
@@ -879,11 +879,11 @@ Playback_set_onblock_tooltip,Registers this playback slot as the on-block action
 Playback_set_onhit_tooltip,Registers this playback slot as the (experimental) on-hit action.,Registra esta ranura de grabación como la acción (experimental) al golpear.
 Playback_set_tech_tooltip,Registers this playback slot as the throw-tech action.,Registra esta ranura de grabación como la acción de tech de agarre.
 Playback_reset_tooltip,Clears this slot's gap/wakeup/onblock/onhit/tech role assignments.,Borra las asignaciones de rol gap/wakeup/onblock/onhit/tech de esta ranura.
-Playback_buffer_frames_tooltip,"Input-buffer window in frames for this slot (currently only affects wakeup actions).","Ventana de buffer de entradas en frames para esta ranura (actualmente solo afecta las acciones de wakeup)."
+Playback_buffer_frames_tooltip,Input-buffer window in frames for this slot (currently only affects wakeup actions).,Ventana de buffer de entradas en frames para esta ranura (actualmente solo afecta las acciones de wakeup).
 Open_playback_editor_tooltip,Opens the frame-by-frame playback editor.,Abre el editor de grabaciones cuadro por cuadro.
-Gap_random_slots_tooltip,"Picks a random slot (from the ones checked below) as the gap action each time.","Elige una ranura aleatoria (entre las marcadas abajo) como la acción de gap cada vez."
+Gap_random_slots_tooltip,Picks a random slot (from the ones checked below) as the gap action each time.,Elige una ranura aleatoria (entre las marcadas abajo) como la acción de gap cada vez.
 Gap_random_slot_include_tooltip,Includes this slot in the random gap-action pool.,Incluye esta ranura en el grupo aleatorio de la acción de gap.
-Wakeup_random_slots_tooltip,"Picks a random slot (from the ones checked below) as the wakeup action each time.","Elige una ranura aleatoria (entre las marcadas abajo) como la acción de wakeup cada vez."
+Wakeup_random_slots_tooltip,Picks a random slot (from the ones checked below) as the wakeup action each time.,Elige una ranura aleatoria (entre las marcadas abajo) como la acción de wakeup cada vez.
 Wakeup_random_slot_include_tooltip,Includes this slot in the random wakeup-action pool.,Incluye esta ranura en el grupo aleatorio de la acción de wakeup.
 Save_snapshot_tooltip,"Saves a full game-state snapshot (positions, health, meter, etc).","Guarda una instantánea completa del estado del juego (posiciones, vida, meter, etc)."
 Load_snapshot_tooltip,Restores the previously saved snapshot.,Restaura la instantánea guardada previamente.
@@ -903,9 +903,9 @@ Replay_db_save_archive_tooltip,Downloads the selected database replay into your 
 Replay_filename_path_tooltip,Path or URL of a replay file to load.,Ruta o URL de un archivo de repetición para cargar.
 Replay_filename_load_tooltip,Loads (or downloads) the replay file specified above.,Carga (o descarga) el archivo de repetición especificado arriba.
 Replay_play_restart_tooltip,Plays or restarts the loaded replay.,Reproduce o reinicia la repetición cargada.
-Replay_autoplay_tooltip,"Automatically plays the next replay in the list once the current one finishes.","Reproduce automáticamente la siguiente repetición de la lista cuando termina la actual."
+Replay_autoplay_tooltip,Automatically plays the next replay in the list once the current one finishes.,Reproduce automáticamente la siguiente repetición de la lista cuando termina la actual.
 Unlimited_replay_takeover_tooltip,Opens the unlimited replay takeover window (experimental).,Abre la ventana de toma de control ilimitada de repeticiones (experimental).
-Takeover_as_p1_tooltip,"Switches to training mode and lets you take control of P1's recorded inputs mid-replay.","Cambia a modo entrenamiento y te permite tomar control de las entradas grabadas de P1 en medio de la repetición."
+Takeover_as_p1_tooltip,Switches to training mode and lets you take control of P1's recorded inputs mid-replay.,Cambia a modo entrenamiento y te permite tomar control de las entradas grabadas de P1 en medio de la repetición.
 Takeover_as_p2_tooltip,Same as Takeover as P1 but for P2.,Igual que Tomar control como P1 pero para P2.
 Load_replay_state_tooltip,Restores the pre-takeover snapshot and re-arms the loaded playback.,Restaura la instantánea previa a la toma de control y rearma la grabación cargada.
 Return_to_replay_tooltip,Stops the takeover and returns to Replay Theater mode.,Detiene la toma de control y vuelve al modo Teatro de Repeticiones.
@@ -913,61 +913,29 @@ Rematch_settings_tooltip,Sets the online room's rematch count rule.,Establece la
 Combo_data_button_tooltip,Opens the combo data window.,Abre la ventana de datos de combos.
 Input_buffer_button_tooltip,Opens the input buffer display for this player.,Abre la visualización del buffer de entradas para este jugador.
 Wakeup_control_delay_tooltip,Frame delay added before P2's wakeup timing triggers.,Retraso en frames añadido antes de que se active el tiempo de wakeup de P2.
-Wakeup_control_skew_tooltip,"Random +/- frame variance added on top of the wakeup delay each time.","Variación aleatoria +/- en frames añadida sobre el retraso de wakeup cada vez."
-Wakeup_type_selection_tooltip,"Multi-select which wakeup types P2 can be forced into; one is picked at random among the checked options each time.","Selección múltiple de los tipos de wakeup a los que se puede forzar a P2; se elige uno al azar entre las opciones marcadas cada vez."
+Wakeup_control_skew_tooltip,Random +/- frame variance added on top of the wakeup delay each time.,Variación aleatoria +/- en frames añadida sobre el retraso de wakeup cada vez.
+Wakeup_type_selection_tooltip,Multi-select which wakeup types P2 can be forced into; one is picked at random among the checked options each time.,Selección múltiple de los tipos de wakeup a los que se puede forzar a P2; se elige uno al azar entre las opciones marcadas cada vez.
 Lobby_link_copied,Room link copied to clipboard.,Enlace de la sala copiado al portapapeles.
-Lobby_link_no_room,"You are not in a room that can be shared. Ranked matches and the replay theater cannot be shared this way.","No estás en una sala que se pueda compartir. Las partidas clasificatorias y el teatro de repeticiones no se pueden compartir de esta forma."
+Lobby_link_no_room,You are not in a room that can be shared. Ranked matches and the replay theater cannot be shared this way.,No estás en una sala que se pueda compartir. Las partidas clasificatorias y el teatro de repeticiones no se pueden compartir de esta forma.
 Lobby_link_clipboard_failed,Could not access the clipboard. Try again in a moment.,No se pudo acceder al portapapeles. Inténtalo de nuevo en un momento.
 Lobby_link_not_found,No BBCF room link found on the clipboard.,No se encontró ningún enlace de sala de BBCF en el portapapeles.
 Lobby_link_already_here,You are already in that room.,Ya estás en esa sala.
 Lobby_link_joining,Opening room link...,Abriendo el enlace de la sala...
 Lobby_link_open_failed,Could not hand the room link to Steam.,No se pudo enviar el enlace de la sala a Steam.
 Lobby_link_join_failed,Could not join that room (%s). The link may be old.,No se pudo unir a esa sala (%s). El enlace puede estar caducado.
-"Mapped bind: %s","Mapped bind: %s","Asignado: %s"
+Mapped bind: %s,Mapped bind: %s,Asignado: %s
 "Already used by ""%s"". Pressing it will do both.","Already used by ""%s"". Pressing it will do both.","Ya lo usa ""%s"". Al pulsarlo pasarán las dos cosas."
 "Controller button: this also works during a match, so pick one you never press while playing.","Controller button: this also works during a match, so pick one you never press while playing.","Botón de mando: también funciona durante la partida, así que elige uno que nunca pulses al jugar."
 TAS mode is not active.,TAS mode is not active.,El modo TAS no está activo.
 Enter TAS mode,Enter TAS mode,Activar modo TAS
 Exit TAS mode,Exit TAS mode,Salir del modo TAS
-Frame-by-frame TAS movie editor. Training mode only.,Frame-by-frame TAS movie editor. Training mode only.,Editor de películas TAS frame a frame. Solo en modo entrenamiento.
-Open TAS mode from the F1 main window.,Open TAS mode from the F1 main window.,Abre el modo TAS desde la ventana principal (F1).
-TAS mode: frame editor for training matches,TAS mode: frame editor for training matches,Modo TAS: editor de frames para partidas de entrenamiento
 Export:,Export:,Exportar:
 Include initial conditions,Include initial conditions,Incluir condiciones iniciales
-Export .txt,Export .txt,Exportar .txt
 Import:,Import:,Importar:
-Select .txt file,Select .txt file,Selecciona un archivo .txt
-Current frame: %u,Current frame: %u,Frame actual: %u
-Base frame: %s%u,Base frame: %s%u,Frame base: %s%u
-not saved / ,not saved / ,sin guardar / 
-Input progress: %u / %u,Input progress: %u / %u,Progreso de entrada: %u / %u
-Rerecord count: %u,Rerecord count: %u,Regrabaciones: %u
-Auto load base state and freeze after playback,Auto load base state and freeze after playback,Cargar el estado base y congelar al terminar la reproducción
 Save base state,Save base state,Guardar estado base
-Load base state,Load base state,Cargar estado base
 Resume game,Resume game,Reanudar el juego
 Stop playback,Stop playback,Detener reproducción
-Preview playback,Preview playback,Reproducir vista previa
-Presentation playback,Presentation playback,Reproducir presentación
 Reset movie,Reset movie,Reiniciar película
-Movie frames: %u,Movie frames: %u,Frames de la película: %u
-Movie edit frame: %u,Movie edit frame: %u,Frame de edición: %u
-Input commands,Input commands,Comandos de entrada
-"Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.","Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.","Ejemplos: 5C, 4C, 28D, 623C, 656 (carrera). Cada dígito ocupa un frame; 66 son dos frames manteniendo 6, mientras que 656 hace una carrera."
-Parse input,Parse input,Procesar entrada
-Frame count,Frame count,Número de frames
-Advance N frames,Advance N frames,Avanzar N frames
-Rewind N frames,Rewind N frames,Retroceder N frames
-Reset parsed input,Reset parsed input,Reiniciar entrada procesada
-Current input: P1=%u P2=%u,Current input: P1=%u P2=%u,Entrada actual: P1=%u P2=%u
-Instructions,Instructions,Instrucciones
-1. Enter a training match and save a base state.,1. Enter a training match and save a base state.,1. Entra en una partida de entrenamiento y guarda un estado base.
-"2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.","2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.","2. Usa las direcciones del teclado numérico y los botones; por ejemplo, 623C significa 6, 2 y luego 3+C."
-3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.,3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.,3. Indica un número de frames y usa Avanzar N frames. Las entradas se aplican frame a frame.
-"4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.","4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.","4. La vista previa empieza al instante y se congela al final de la película para seguir editando frames. La presentación oculta la interfaz TAS, mantiene neutral 60 frames, reproduce la película y luego mantiene neutral 240 frames."
-"5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.","5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.","5. Retroceder N frames recarga el estado base, reproduce hasta el objetivo y borra todos los frames posteriores."
-6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.,6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.,6. Exportar crea un .txt numerado si el nombre está vacío. Importar elige un .txt de la carpeta actual del juego. Guarda el estado base correspondiente tras importar.
-Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.,Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.,Direcciones: 7 8 9 / 4 5 6 / 1 2 3; 5 es neutral. Los comandos procesados mantienen neutral tras su último frame.
 TAS mode is available only during a training match.,TAS mode is available only during a training match.,El modo TAS solo está disponible durante una partida de entrenamiento.
 TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.,TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.,El modo TAS necesita los hooks de mando. Activa EnableControllerHooks en settings.ini y reinicia el juego.
 Preview finished and paused at the movie end.,Preview finished and paused at the movie end.,La vista previa terminó y se detuvo al final de la película.
@@ -1002,3 +970,124 @@ The V1 TAS file contains an invalid frame.,The V1 TAS file contains an invalid f
 Imported %s. Save a matching base state before playback.,Imported %s. Save a matching base state before playback.,Se importó %s. Guarda el estado base correspondiente antes de reproducir.
 "Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.","Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.","Entrada de P1 no válida. Usa ejemplos como 5C, 28D, 623C o 656."
 "Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.","Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.","Entrada de P2 no válida. Usa ejemplos como 5C, 28D, 623C o 656."
+Frame %u,Frame %u,Frame %u
+%u frames,%u frames,%u frames
+1 frame,1 frame,1 frame
+Rerecords: %u,Rerecords: %u,Regrabaciones: %u
+Saved at frame %u,Saved at frame %u,Guardado en el frame %u
+Commit %u frames,Commit %u frames,Confirmar %u frames
+Commit 1 frame,Commit 1 frame,Confirmar 1 frame
+Typed but not committed yet: %u,Typed but not committed yet: %u,Escrito pero aún sin confirmar: %u
+Editing,Editing,Editando
+Preview,Preview,Vista previa
+Presentation,Presentation,Presentación
+Replaying,Replaying,Reproduciendo
+No base state,No base state,Sin estado base
+Base state,Base state,Estado base
+"Set the match up the way you want the combo to start, then save a base state.","Set the match up the way you want the combo to start, then save a base state.",Prepara la partida tal como quieres que empiece el combo y guarda un estado base.
+"Captures positions, health, meter and everything else as the starting point of the combo. Every playback and every rewind returns here, so save it before you type any input.","Captures positions, health, meter and everything else as the starting point of the combo. Every playback and every rewind returns here, so save it before you type any input.","Captura posiciones, vida, medidor y todo lo demás como punto de partida del combo. Cada reproducción y cada retroceso vuelven aquí, así que guárdalo antes de escribir ninguna entrada."
+Every playback and every rewind restores this moment.,Every playback and every rewind restores this moment.,Cada reproducción y cada retroceso restauran este momento.
+Re-save,Re-save,Volver a guardar
+"Replaces the base state with the current moment. The movie you have recorded is kept, but it will no longer line up with the new starting point.","Replaces the base state with the current moment. The movie you have recorded is kept, but it will no longer line up with the new starting point.","Reemplaza el estado base por el momento actual. La película grabada se conserva, pero dejará de encajar con el nuevo punto de partida."
+Jumps the match back to the base state without touching the movie.,Jumps the match back to the base state without touching the movie.,Devuelve la partida al estado base sin tocar la película.
+Timeline,Timeline,Línea de tiempo
+No frames yet. Type a command below and commit it to start the combo.,No frames yet. Type a command below and commit it to start the combo.,Aún no hay frames. Escribe un comando abajo y confírmalo para empezar el combo.
+Click to rewind here. Every frame after it is deleted.,Click to rewind here. Every frame after it is deleted.,Haz clic para retroceder aquí. Se borran todos los frames posteriores.
+Not played yet.,Not played yet.,Aún no reproducido.
+"Top row P1, bottom row P2. Highlighted column is the playhead; orange means a button is pressed.","Top row P1, bottom row P2. Highlighted column is the playhead; orange means a button is pressed.","Fila superior P1, fila inferior P2. La columna resaltada es el cabezal; el naranja indica un botón pulsado."
+Add input,Add input,Añadir entrada
+invalid,invalid,no válido
+"Numpad notation: 5 is neutral, 623C is three frames. One digit is one frame.","Numpad notation: 5 is neutral, 623C is three frames. One digit is one frame.","Notación de teclado numérico: 5 es neutral, 623C son tres frames. Un dígito es un frame."
+"Directions use the numpad layout, 7 8 9 over 4 5 6 over 1 2 3, with 5 as neutral. Letters A B C D attach to the direction right before them, so 623C is 6, then 2, then 3 with C held. Press Help for the full reference.","Directions use the numpad layout, 7 8 9 over 4 5 6 over 1 2 3, with 5 as neutral. Letters A B C D attach to the direction right before them, so 623C is 6, then 2, then 3 with C held. Press Help for the full reference.","Las direcciones siguen el teclado numérico: 7 8 9 sobre 4 5 6 sobre 1 2 3, con 5 como neutral. Las letras A B C D se unen a la dirección inmediatamente anterior, así que 623C es 6, luego 2 y luego 3 con C mantenida. Pulsa Ayuda para la referencia completa."
+"Appends the typed input to the timeline and plays those frames. This is the main action: type, commit, repeat.","Appends the typed input to the timeline and plays those frames. This is the main action: type, commit, repeat.","Añade la entrada escrita a la línea de tiempo y reproduce esos frames. Esta es la acción principal: escribir, confirmar, repetir."
+Advance,Advance,Avanzar
+"Plays this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves.","Plays this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves.",Reproduce esta cantidad de frames usando lo que quede de la entrada escrita y luego neutral. Úsalo para esperar entre golpes.
+"Steps this many frames back to re-record. The frames after the new position are deleted, and the rerecord counter goes up.","Steps this many frames back to re-record. The frames after the new position are deleted, and the rerecord counter goes up.",Retrocede esta cantidad de frames para regrabar. Se borran los frames posteriores a la nueva posición y sube el contador de regrabaciones.
+Playback,Playback,Reproducción
+"Restores the base state, plays the whole combo, then freezes on the last frame so you can keep adding to it.","Restores the base state, plays the whole combo, then freezes on the last frame so you can keep adding to it.","Restaura el estado base, reproduce el combo entero y se congela en el último frame para que puedas seguir añadiendo."
+"For recording video: hides this window, holds neutral for 60 frames, plays the combo, then holds neutral for 240 frames. Press the TAS parse hotkey to stop it early.","For recording video: hides this window, holds neutral for 60 frames, plays the combo, then holds neutral for 240 frames. Press the TAS parse hotkey to stop it early.","Para grabar vídeo: oculta esta ventana, mantiene neutral 60 frames, reproduce el combo y luego mantiene neutral 240 frames. Pulsa la tecla de procesar TAS para detenerlo antes."
+Unfreezes the match so you can move around normally. The movie is kept.,Unfreezes the match so you can move around normally. The movie is kept.,Descongela la partida para que puedas moverte con normalidad. La película se conserva.
+Deletes every recorded frame and returns to the base state. The base state itself is kept.,Deletes every recorded frame and returns to the base state. The base state itself is kept.,Borra todos los frames grabados y vuelve al estado base. El estado base se conserva.
+Return to base state when playback finishes,Return to base state when playback finishes,Volver al estado base al terminar la reproducción
+"After a preview ends, jump straight back to the start of the combo instead of staying on the final frame.","After a preview ends, jump straight back to the start of the combo instead of staying on the final frame.","Cuando termina una vista previa, vuelve directamente al inicio del combo en lugar de quedarse en el último frame."
+Movie file,Movie file,Archivo de película
+"Save the combo to a .txt file in the game folder, or load one back.","Save the combo to a .txt file in the game folder, or load one back.","Guarda el combo en un archivo .txt de la carpeta del juego, o carga uno."
+Help,Help,Ayuda
+"Files live in the game folder, next to BBCF.exe.","Files live in the game folder, next to BBCF.exe.","Los archivos están en la carpeta del juego, junto a BBCF.exe."
+tas_movie_1.txt (auto),tas_movie_1.txt (auto),tas_movie_1.txt (automático)
+"Writes the characters and starting positions into the file as a comment, so you can tell later what the combo was built on.","Writes the characters and starting positions into the file as a comment, so you can tell later what the combo was built on.","Escribe los personajes y las posiciones iniciales en el archivo como comentario, para que luego sepas sobre qué se construyó el combo."
+Save to file,Save to file,Guardar en archivo
+Load,Load,Cargar
+Select a .txt file,Select a .txt file,Selecciona un archivo .txt
+A movie file does not contain the base state. Save a matching one after loading.,A movie file does not contain the base state. Save a matching one after loading.,Un archivo de película no contiene el estado base. Guarda uno equivalente después de cargarlo.
+Load from file,Load from file,Cargar desde archivo
+How the TAS editor works,How the TAS editor works,Cómo funciona el editor TAS
+Notation,Notation,Notación
+"Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash.","Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash.","Las direcciones siguen el teclado numérico: 7 8 9 arriba, 4 5 6 en medio, 1 2 3 abajo y 5 como neutral. Cada dígito es un frame, así que 66 mantiene adelante dos frames y 656 es una carrera."
+"A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.","A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.","A B C D se unen a la dirección inmediatamente anterior: 623C son tres frames, el último 3 con C mantenida. Los espacios, comas y guiones se ignoran, así que 236 - 236C se lee igual que 236236C."
+Building a combo,Building a combo,Construir un combo
+1. Set the match up the way the combo should start and save a base state.,1. Set the match up the way the combo should start and save a base state.,1. Prepara la partida como debe empezar el combo y guarda un estado base.
+2. Type a command and press Commit. The frames are added to the timeline and played.,2. Type a command and press Commit. The frames are added to the timeline and played.,2. Escribe un comando y pulsa Confirmar. Los frames se añaden a la línea de tiempo y se reproducen.
+3. Repeat. Use Advance to wait a number of frames without pressing anything.,3. Repeat. Use Advance to wait a number of frames without pressing anything.,3. Repite. Usa Avanzar para esperar unos frames sin pulsar nada.
+"4. If a frame was wrong, press Rewind or click that frame in the timeline, then commit the replacement.","4. If a frame was wrong, press Rewind or click that frame in the timeline, then commit the replacement.","4. Si un frame estaba mal, pulsa Retroceder o haz clic en ese frame de la línea de tiempo y confirma el reemplazo."
+Rewinding deletes every frame after the point you go back to. That is what makes it a re-record rather than an undo.,Rewinding deletes every frame after the point you go back to. That is what makes it a re-record rather than an undo.,Retroceder borra todos los frames posteriores al punto al que vuelves. Eso es lo que lo convierte en una regrabación y no en un deshacer.
+Hotkeys,Hotkeys,Atajos de teclado
+The three TAS hotkeys can be rebound in the Hotkeys section of the Settings.ini window. They do nothing while you are typing in a text field.,The three TAS hotkeys can be rebound in the Hotkeys section of the Settings.ini window. They do nothing while you are typing in a text field.,Los tres atajos TAS se pueden reasignar en la sección Atajos de la ventana Settings.ini. No hacen nada mientras escribes en un campo de texto.
+Parse: reads the text fields into the queue.,Parse: reads the text fields into the queue.,Procesar: lee los campos de texto y los pone en la cola.
+Step forward: same as Advance.,Step forward: same as Advance.,Paso adelante: igual que Avanzar.
+Step back: same as Rewind.,Step back: same as Rewind.,Paso atrás: igual que Retroceder.
+TAS combo editor,TAS combo editor,Editor de combos TAS
+"numpad notation, e.g. 623C","numpad notation, e.g. 623C","notación de teclado numérico, p. ej. 623C"
+leave empty for neutral,leave empty for neutral,déjalo vacío para neutral
+"Movies are plain text. They store the inputs only, not the base state.","Movies are plain text. They store the inputs only, not the base state.","Las películas son texto plano. Guardan solo las entradas, no el estado base."
+Save TAS movie,Save TAS movie,Guardar película TAS
+Load TAS movie,Load TAS movie,Cargar película TAS
+TAS Movie (*.txt),TAS Movie (*.txt),Película TAS (*.txt)
+Waiting for the file picker...,Waiting for the file picker...,Esperando al selector de archivos...
+TAS input list,TAS input list,Lista de entradas TAS
+Follow playhead,Follow playhead,Seguir el cabezal
+Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays.,Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays.,Mantiene la lista desplazada al frame actual. Desactívalo para leer la película mientras se reproduce.
+Click to watch from this frame. Nothing is deleted.,Click to watch from this frame. Nothing is deleted.,Haz clic para ver desde este frame. No se borra nada.
+Seeking...,Seeking...,Buscando...
+At the start of the movie.,At the start of the movie.,Al inicio de la película.
+Cannot seek during playback.,Cannot seek during playback.,No se puede buscar durante la reproducción.
+Save a base state before seeking.,Save a base state before seeking.,Guarda un estado base antes de buscar.
+Jump to the start,Jump to the start,Ir al inicio
+Jump to the end,Jump to the end,Ir al final
+Back 10 frames,Back 10 frames,Retroceder 10 frames
+Back 1 frame,Back 1 frame,Retroceder 1 frame
+Forward 1 frame,Forward 1 frame,Avanzar 1 frame
+Forward 10 frames,Forward 10 frames,Avanzar 10 frames
+"Play the combo from the start, then freeze on the last frame","Play the combo from the start, then freeze on the last frame",Reproduce el combo desde el inicio y se congela en el último frame
+Drag to move through the combo. Release to jump there.,Drag to move through the combo. Release to jump there.,Arrastra para moverte por el combo. Suelta para saltar allí.
+Seeking: %u / %u,Seeking: %u / %u,Buscando: %u / %u
+Frame %u of %u,Frame %u of %u,Frame %u de %u
+Input list,Input list,Lista de entradas
+"Opens the whole movie as a vertical list, one row per frame. It is a separate window so you can make it tall and put it wherever you like.","Opens the whole movie as a vertical list, one row per frame. It is a separate window so you can make it tall and put it wherever you like.","Abre la película entera como una lista vertical, una fila por frame. Es una ventana aparte para que puedas hacerla alta y colocarla donde quieras."
+Moving around never deletes anything. Frames are only replaced when you commit new input.,Moving around never deletes anything. Frames are only replaced when you commit new input.,Moverse nunca borra nada. Los frames solo se reemplazan cuando confirmas nuevas entradas.
+"Adds this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves. To move around without changing anything, use the transport buttons above.","Adds this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves. To move around without changing anything, use the transport buttons above.","Añade esta cantidad de frames usando lo que quede de la entrada escrita y luego neutral. Úsalo para esperar entre golpes. Para moverte sin cambiar nada, usa los botones de transporte de arriba."
+Overwrite the rest of the combo?,Overwrite the rest of the combo?,¿Sobrescribir el resto del combo?
+You are at frame %u of %u. Committing here replaces the %u frames after it.,You are at frame %u of %u. Committing here replaces the %u frames after it.,Estás en el frame %u de %u. Confirmar aquí reemplaza los %u frames posteriores.
+This is how re-recording works: the new input becomes the end of the combo.,This is how re-recording works: the new input becomes the end of the combo.,Así funciona la regrabación: la nueva entrada pasa a ser el final del combo.
+Seek complete.,Seek complete.,Búsqueda completada.
+"Seeking reloads a savestate and replays the stored input from there. Keyframes are taken every 60 frames so a nearby jump only replays a little; jumping far back replays from the start, which takes about a second per 60 frames.","Seeking reloads a savestate and replays the stored input from there. Keyframes are taken every 60 frames so a nearby jump only replays a little; jumping far back replays from the start, which takes about a second per 60 frames.","Buscar recarga un estado guardado y reproduce desde ahí la entrada almacenada. Se toman fotogramas clave cada 60 frames, así que un salto cercano reproduce poco; saltar muy atrás reproduce desde el inicio, lo que tarda alrededor de un segundo por cada 60 frames."
+Forward 1 frame. Past the end of the combo this adds an idle frame.,Forward 1 frame. Past the end of the combo this adds an idle frame.,"Avanzar 1 frame. Más allá del final del combo, esto añade un frame inactivo."
+Forward 10 frames. Past the end of the combo this adds idle frames.,Forward 10 frames. Past the end of the combo this adds idle frames.,"Avanzar 10 frames. Más allá del final del combo, esto añade frames inactivos."
+neutral,neutral,neutral
+move,move,mov.
+button,button,botón
+Double-click to retype this frame.,Double-click to retype this frame.,Doble clic para reescribir este frame.
+Click to watch from here. Drag to move. Right-click for more.,Click to watch from here. Drag to move. Right-click for more.,Haz clic para ver desde aquí. Arrastra para mover. Clic derecho para más opciones.
+%u frames selected,%u frames selected,%u frames seleccionados
+Move %u frames,Move %u frames,Mover %u frames
+Go to this frame,Go to this frame,Ir a este frame
+Frames,Frames,Frames
+Insert neutral above,Insert neutral above,Insertar neutral arriba
+Insert neutral below,Insert neutral below,Insertar neutral abajo
+Duplicate,Duplicate,Duplicar
+Undone.,Undone.,Deshecho.
+Redone.,Redone.,Rehecho.
+"Play from the current frame to the end, then freeze there. At the end of the combo it plays from the start instead.","Play from the current frame to the end, then freeze there. At the end of the combo it plays from the start instead.","Reproduce desde el frame actual hasta el final y se congela ahí. Al final del combo, reproduce desde el inicio."
+TAS Combo tool,TAS Combo tool,Herramienta de combos TAS
+Exit TAS Combo tool,Exit TAS Combo tool,Salir de la herramienta de combos TAS
+"Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.","Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.","Editor de combos frame a frame: construye un combo entrada por entrada, retrocede y regraba cualquier parte y luego reprodúcelo entero. Solo en modo entrenamiento."

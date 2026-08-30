@@ -6,6 +6,7 @@
 #include "Core/logger.h"
 #include "Game/gamestates.h"
 #include "Game/CharData.h"
+#include "Game/SnapshotApparatus/SnapshotSlotPool.h"
 #include "Game/characters.h"
 #include "Hooks/hooks_battle_input.h"
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
@@ -19,6 +20,17 @@
 #include <limits>
 #include <sstream>
 namespace {
+// One savestate is 10.06 MiB and the game's ring holds ten, so a state per frame is not on
+// the table (a single second of frames would be 600 MB in a 2 GB address space). Keyframes
+// every kKeyframeInterval frames make a nearby seek cheap; anything further back replays
+// from the base state, which is correct either way, just slower.
+constexpr unsigned int kKeyframeInterval = 60;
+constexpr int kTasBaseSlot = 0;
+constexpr int kTasSlotRequest = 5; // base + four keyframes
+// Deep enough to walk back a bad editing session, small enough to stay trivial in memory:
+// a 10,000 frame movie is 40 KB, so this ceiling is a couple of megabytes at worst.
+constexpr size_t kUndoDepth = 64;
+
 // TAS Movie length is not artificially capped.
 constexpr unsigned int kPresentationLeadInFrames = 60;
 constexpr unsigned int kPresentationLeadOutFrames = 240;
@@ -36,12 +48,7 @@ uint16_t ButtonValue(char button) {
 }
 
 std::string HumanInput(uint16_t packed) {
-    std::string result(1, static_cast<char>('0' + (packed & 0x0F)));
-    if (packed & 16) result += 'A';
-    if (packed & 32) result += 'B';
-    if (packed & 64) result += 'C';
-    if (packed & 128) result += 'D';
-    return result;
+    return TasManager::FormatInput(packed);
 }
 
 bool ParseHumanInput(const std::string& text, uint16_t* result) {
@@ -97,7 +104,76 @@ void TasManager::ClearInputOverride() {
     m_scheduledInput = TasFrameInput{};
 }
 
+int TasManager::GetKeyframeCount() const {
+    int count = 0;
+    for (const Keyframe& keyframe : m_keyframes) {
+        if (keyframe.valid) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void TasManager::InvalidateKeyframesAfter(size_t frame) {
+    for (Keyframe& keyframe : m_keyframes) {
+        if (keyframe.valid && keyframe.movieFrame > frame) {
+            keyframe.valid = false;
+        }
+    }
+}
+
+void TasManager::ClearKeyframes() {
+    // One logical slot goes to the base state; the rest become the keyframe ring.
+    m_keyframes.assign(kTasSlotRequest > 1 ? kTasSlotRequest - 1 : 0, Keyframe{});
+    m_nextKeyframeSlot = 0;
+}
+
+int TasManager::FindKeyframeFor(size_t targetFrame) const {
+    int best = -1;
+    size_t bestFrame = 0;
+    for (size_t i = 0; i < m_keyframes.size(); ++i) {
+        const Keyframe& keyframe = m_keyframes[i];
+        if (!keyframe.valid || keyframe.movieFrame > targetFrame) {
+            continue;
+        }
+        if (best == -1 || keyframe.movieFrame > bestFrame) {
+            best = static_cast<int>(i);
+            bestFrame = keyframe.movieFrame;
+        }
+    }
+    return best;
+}
+
+void TasManager::CaptureKeyframeIfDue() {
+    if (m_keyframes.empty() || !m_snapshotOwner || m_playhead == 0) {
+        return;
+    }
+    if (m_playhead % kKeyframeInterval != 0) {
+        return;
+    }
+    // Already covered by an existing keyframe at this exact frame.
+    for (const Keyframe& keyframe : m_keyframes) {
+        if (keyframe.valid && keyframe.movieFrame == m_playhead) {
+            return;
+        }
+    }
+
+    const size_t slot = m_nextKeyframeSlot % m_keyframes.size();
+    if (!m_snapshotOwner->save_snapshot_index(static_cast<int>(slot) + 1)) {
+        LOG(1, "[TAS] keyframe capture failed at frame %u\n", static_cast<unsigned int>(m_playhead));
+        return;
+    }
+    m_keyframes[slot].movieFrame = m_playhead;
+    m_keyframes[slot].valid = true;
+    m_nextKeyframeSlot = slot + 1;
+    LOG(1, "[TAS] keyframe slot=%u movieFrame=%u\n",
+        static_cast<unsigned int>(slot), static_cast<unsigned int>(m_playhead));
+}
+
 void TasManager::ClearSnapshot() {
+    // Dropping the apparatus releases its reserved slots, so every keyframe held in them
+    // is gone too. Covers import, exit and any base-state reset.
+    ClearKeyframes();
     delete m_snapshotBuffer;
     m_snapshotBuffer = nullptr;
     m_snapshotSize = 0;
@@ -128,7 +204,6 @@ void TasManager::Enter() {
     m_runTarget = 0;
     m_presentationFramesRemaining = 0;
     m_presentationMode = false;
-    m_truncateOnReplayFinish = false;
     m_lastScheduledFrame = 0;
     m_movie.clear();
     m_commandFrames.clear();
@@ -179,7 +254,6 @@ void TasManager::Exit() {
     m_runTarget = 0;
     m_presentationFramesRemaining = 0;
     m_presentationMode = false;
-    m_truncateOnReplayFinish = false;
     m_lastScheduledFrame = 0;
     m_movie.clear();
     m_commandFrames.clear();
@@ -232,10 +306,6 @@ bool TasManager::BeginMovieRun(TasRunState state, size_t target) {
 void TasManager::FinishMovieRun(bool completed) {
     ClearInputOverride();
     m_runTarget = m_playhead;
-    if (m_truncateOnReplayFinish) {
-        m_movie.resize(m_playhead);
-        m_truncateOnReplayFinish = false;
-    }
     m_runState = completed ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
     LOG(1, "[TAS] run finished completed=%d playhead=%u movie=%u frame=%u\n",
         completed ? 1 : 0, static_cast<unsigned int>(m_playhead),
@@ -288,6 +358,7 @@ void TasManager::Update() {
 
     ++m_playhead;
     m_lastScheduledFrame = currentFrame + 1;
+    CaptureKeyframeIfDue();
     if (m_playhead >= m_runTarget || m_playhead >= m_movie.size()) {
         const bool completed = m_runState == TasRunState::PlayingMovie && m_playhead >= m_movie.size();
         if (completed) {
@@ -344,12 +415,17 @@ void TasManager::StartPlayback(bool presentationMode) {
         return;
     }
 
-    if (!LoadBaseSnapshot()) {
-        return;
+    // Preview picks up from wherever the playhead is, so you can watch just the tail of a
+    // combo you are working on. Presentation is a recording of the whole thing, and playing
+    // from the very end has nowhere to go, so both of those restart from the base state.
+    const bool restartFromBase = presentationMode || m_playhead >= m_movie.size();
+    if (restartFromBase) {
+        if (!LoadBaseSnapshot()) {
+            return;
+        }
+        m_playhead = 0;
     }
-    m_playhead = 0;
     m_presentationMode = presentationMode;
-    m_truncateOnReplayFinish = false;
 
     m_playbackUiHidden = presentationMode;
     auto* frameHistory = WindowManager::GetInstance().GetWindowContainer()
@@ -406,9 +482,18 @@ void TasManager::EditAndAdvanceFrames(int count) {
         SetError(L("Movie frame count exceeds the addressable size limit.").c_str());
         return;
     }
+    PushUndoState();
     const size_t end = m_playhead + frameCount;
     if (m_playhead < m_movie.size()) {
+        // This is the destructive edit the UI warns about: everything after the playhead
+        // is replaced, which is exactly what makes it a rerecord rather than an undo.
+        LOG(1, "[TAS] overwrite at frame %u: movie %u -> %u frames\n",
+            static_cast<unsigned int>(m_playhead),
+            static_cast<unsigned int>(m_movie.size()),
+            static_cast<unsigned int>(end));
         m_movie.resize(m_playhead);
+        InvalidateKeyframesAfter(m_playhead);
+        ++m_rerecordCount;
     }
     if (m_movie.size() < end) {
         m_movie.resize(end, TasFrameInput{});
@@ -422,6 +507,162 @@ void TasManager::EditAndAdvanceFrames(int count) {
     }
     BeginMovieRun(TasRunState::ReplayingMovie, end);
     m_error.clear();
+}
+
+bool TasManager::CanEditMovie() const {
+    return m_active && !IsPlaybackRunning();
+}
+
+void TasManager::PushUndoState() {
+    m_undoStack.push_back(MovieState{ m_movie, m_playhead });
+    if (m_undoStack.size() > kUndoDepth) {
+        m_undoStack.erase(m_undoStack.begin());
+    }
+    m_redoStack.clear();
+}
+
+void TasManager::ResyncAfterEdit(size_t firstChangedFrame) {
+    InvalidateKeyframesAfter(firstChangedFrame);
+
+    if (m_playhead > m_movie.size()) {
+        m_playhead = m_movie.size();
+    }
+    // Frames the match has already played were rewritten, so the state on screen was produced
+    // by input that no longer exists. Replay to the same position from the stored movie.
+    if (firstChangedFrame < m_playhead && HasBaseSnapshot()) {
+        SeekToFrame(m_playhead);
+    }
+}
+
+bool TasManager::InsertNeutralFrames(size_t index, size_t count) {
+    if (!CanEditMovie() || count == 0) {
+        return false;
+    }
+    if (index > m_movie.size()) {
+        index = m_movie.size();
+    }
+    PushUndoState();
+    m_movie.insert(m_movie.begin() + static_cast<ptrdiff_t>(index), count, TasFrameInput{});
+    if (index <= m_playhead) {
+        m_playhead += count;
+    }
+    LOG(1, "[TAS] insert %u neutral frame(s) at %u -> %u frames\n",
+        static_cast<unsigned int>(count), static_cast<unsigned int>(index),
+        static_cast<unsigned int>(m_movie.size()));
+    ResyncAfterEdit(index);
+    m_error.clear();
+    return true;
+}
+
+bool TasManager::DeleteFrames(size_t index, size_t count) {
+    if (!CanEditMovie() || count == 0 || index >= m_movie.size()) {
+        return false;
+    }
+    count = (std::min)(count, m_movie.size() - index);
+    PushUndoState();
+    m_movie.erase(m_movie.begin() + static_cast<ptrdiff_t>(index),
+        m_movie.begin() + static_cast<ptrdiff_t>(index + count));
+    if (m_playhead > index) {
+        m_playhead -= (std::min)(count, m_playhead - index);
+    }
+    LOG(1, "[TAS] delete %u frame(s) at %u -> %u frames\n",
+        static_cast<unsigned int>(count), static_cast<unsigned int>(index),
+        static_cast<unsigned int>(m_movie.size()));
+    ResyncAfterEdit(index);
+    m_error.clear();
+    return true;
+}
+
+bool TasManager::MoveFrames(size_t fromIndex, size_t count, size_t toIndex, size_t* outNewIndex) {
+    if (!CanEditMovie() || count == 0 || fromIndex >= m_movie.size()) {
+        return false;
+    }
+    count = (std::min)(count, m_movie.size() - fromIndex);
+    if (toIndex > m_movie.size()) {
+        toIndex = m_movie.size();
+    }
+    // Dropping inside the block being moved, or exactly where it already is, is a no-op.
+    if (toIndex >= fromIndex && toIndex <= fromIndex + count) {
+        return false;
+    }
+
+    PushUndoState();
+    const std::vector<TasFrameInput> block(m_movie.begin() + static_cast<ptrdiff_t>(fromIndex),
+        m_movie.begin() + static_cast<ptrdiff_t>(fromIndex + count));
+    m_movie.erase(m_movie.begin() + static_cast<ptrdiff_t>(fromIndex),
+        m_movie.begin() + static_cast<ptrdiff_t>(fromIndex + count));
+
+    const size_t insertAt = toIndex > fromIndex ? toIndex - count : toIndex;
+    m_movie.insert(m_movie.begin() + static_cast<ptrdiff_t>(insertAt), block.begin(), block.end());
+
+    if (outNewIndex) {
+        *outNewIndex = insertAt;
+    }
+    LOG(1, "[TAS] move %u frame(s) from %u to %u\n",
+        static_cast<unsigned int>(count), static_cast<unsigned int>(fromIndex),
+        static_cast<unsigned int>(insertAt));
+    ResyncAfterEdit((std::min)(fromIndex, insertAt));
+    m_error.clear();
+    return true;
+}
+
+bool TasManager::SetFrameInput(size_t index, TasFrameInput input) {
+    if (!CanEditMovie() || index >= m_movie.size()) {
+        return false;
+    }
+    PushUndoState();
+    m_movie[index] = input;
+    ResyncAfterEdit(index);
+    m_error.clear();
+    return true;
+}
+
+bool TasManager::DuplicateFrames(size_t index, size_t count) {
+    if (!CanEditMovie() || count == 0 || index >= m_movie.size()) {
+        return false;
+    }
+    count = (std::min)(count, m_movie.size() - index);
+    PushUndoState();
+    const std::vector<TasFrameInput> block(m_movie.begin() + static_cast<ptrdiff_t>(index),
+        m_movie.begin() + static_cast<ptrdiff_t>(index + count));
+    m_movie.insert(m_movie.begin() + static_cast<ptrdiff_t>(index + count), block.begin(), block.end());
+    ResyncAfterEdit(index + count);
+    m_error.clear();
+    return true;
+}
+
+bool TasManager::Undo() {
+    if (!CanEditMovie() || m_undoStack.empty()) {
+        return false;
+    }
+    m_redoStack.push_back(MovieState{ m_movie, m_playhead });
+    const MovieState state = m_undoStack.back();
+    m_undoStack.pop_back();
+    m_movie = state.movie;
+    m_playhead = (std::min)(state.playhead, m_movie.size());
+    ClearKeyframes();
+    if (HasBaseSnapshot()) {
+        SeekToFrame(m_playhead);
+    }
+    m_status = L("Undone.");
+    return true;
+}
+
+bool TasManager::Redo() {
+    if (!CanEditMovie() || m_redoStack.empty()) {
+        return false;
+    }
+    m_undoStack.push_back(MovieState{ m_movie, m_playhead });
+    const MovieState state = m_redoStack.back();
+    m_redoStack.pop_back();
+    m_movie = state.movie;
+    m_playhead = (std::min)(state.playhead, m_movie.size());
+    ClearKeyframes();
+    if (HasBaseSnapshot()) {
+        SeekToFrame(m_playhead);
+    }
+    m_status = L("Redone.");
+    return true;
 }
 
 void TasManager::ResetParsedInputs() {
@@ -450,10 +691,12 @@ void TasManager::ResetMovie() {
     }
     ClearInputOverride();
     m_movie.clear();
+    ClearKeyframes();
+    m_undoStack.clear();
+    m_redoStack.clear();
     m_playhead = 0;
     m_runTarget = 0;
     m_commandCursor = 0;
-    m_truncateOnReplayFinish = false;
     m_runState = TasRunState::Idle;
     m_error.clear();
     m_status = L("Movie reset.");
@@ -475,34 +718,96 @@ bool TasManager::AdvanceFrames(int count) {
     return m_error.empty();
 }
 
-bool TasManager::RewindFrames(int count) {
+bool TasManager::SeekToFrame(size_t targetFrame) {
+    if (IsPlaying()) {
+        SetError(L("Cannot seek during playback.").c_str());
+        return false;
+    }
+    if (!m_active || !HasBaseSnapshot()) {
+        SetError(L("Save a base state before seeking.").c_str());
+        return false;
+    }
+    if (targetFrame > m_movie.size()) {
+        targetFrame = m_movie.size();
+    }
+    const int keyframe = FindKeyframeFor(targetFrame);
+    if (keyframe >= 0 && m_keyframes[keyframe].movieFrame > 0) {
+        // Restart from the nearest keyframe and re-simulate only the remainder.
+        if (m_snapshotOwner->load_snapshot_index(keyframe + 1)) {
+            ClearInputOverride();
+            m_playhead = m_keyframes[keyframe].movieFrame;
+            m_runTarget = m_playhead;
+            m_lastScheduledFrame = GetCurrentFrame();
+            g_gameVals.isFrameFrozen = true;
+            g_gameVals.framesToReach = GetCurrentFrame();
+            if (m_playhead == targetFrame) {
+                m_runState = TasRunState::PausedAtMovieFrame;
+                m_status = L("Seek complete.");
+                return true;
+            }
+            m_status = L("Seeking...");
+            return BeginMovieRun(TasRunState::ReplayingMovie, targetFrame);
+        }
+        LOG(1, "[TAS] keyframe load failed, falling back to the base state\n");
+    }
+
+    if (!LoadBaseSnapshot()) {
+        return false;
+    }
+
+    // LoadBaseSnapshot leaves the playhead at 0, which is already the answer for a seek
+    // to the start; anything further is re-simulated from the stored input.
+    if (targetFrame == 0) {
+        ClearInputOverride();
+        m_runTarget = 0;
+        m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
+        m_status = L("At the start of the movie.");
+        return true;
+    }
+
+    m_status = L("Seeking...");
+    return BeginMovieRun(TasRunState::ReplayingMovie, targetFrame);
+}
+
+bool TasManager::SeekRelative(int delta) {
+    if (delta == 0) {
+        return true;
+    }
+    if (delta > 0) {
+        return AdvanceOrExtend(delta);
+    }
+
+    const size_t amount = static_cast<size_t>(-static_cast<long long>(delta));
+    const size_t target = amount >= m_playhead ? 0 : m_playhead - amount;
+    if (target == m_playhead) {
+        return true;
+    }
+    return SeekToFrame(target);
+}
+
+bool TasManager::AdvanceOrExtend(int count) {
     if (count <= 0) {
         return true;
     }
     if (IsPlaybackRunning()) {
-        SetError(L("Cannot rewind frames during playback.").c_str());
+        SetError(L("Cannot seek during playback.").c_str());
         return false;
     }
     if (!m_active || !HasBaseSnapshot()) {
-        SetError(L("Save a base state before rewinding.").c_str());
+        SetError(L("Save a base state before seeking.").c_str());
         return false;
     }
 
-    const size_t amount = static_cast<size_t>(count);
-    const size_t target = amount >= m_playhead ? 0 : m_playhead - amount;
-    if (!LoadBaseSnapshot()) {
-        return false;
+    const size_t target = m_playhead + static_cast<size_t>(count);
+    if (target > m_movie.size()) {
+        // Running off the end is not an error: the combo simply gets that many idle frames,
+        // which is what waiting looks like in a movie.
+        m_movie.resize(target, TasFrameInput{});
     }
-    m_playhead = 0;
-    if (target == 0) {
-        m_movie.clear();
-        m_runTarget = 0;
-        m_runState = TasRunState::Idle;
-        m_status = L("Rewound to base and truncated the movie.");
-        return true;
-    }
-    m_truncateOnReplayFinish = true;
-    m_status = L("Rewinding and truncating the movie.");
+
+    // Forward movement never needs a reload - the match is already at m_playhead, so the
+    // frames in between are simply played out from here.
+    m_status.clear();
     return BeginMovieRun(TasRunState::ReplayingMovie, target);
 }
 
@@ -525,13 +830,16 @@ bool TasManager::SaveBaseSnapshot() {
         g_interfaces.player1.GetData(), g_interfaces.player2.GetData())) {
         delete m_snapshotOwner;
         m_snapshotOwner = new SnapshotApparatus();
+        m_snapshotOwner->ReserveSlots("tas_editor", kTasSlotRequest);
+        ClearKeyframes();
     }
-    if (!m_snapshotOwner->save_snapshot(nullptr)) {
+    if (!m_snapshotOwner->save_snapshot_index(kTasBaseSlot)) {
         SetError(L("Base-state save failed.").c_str());
         return false;
     }
 
     m_snapshotSize = m_snapshotOwner->get_last_saved_snapshot_size();
+    ClearKeyframes();
     m_baseFrame = GetCurrentFrame();
     m_playhead = 0;
     m_runTarget = 0;
@@ -551,12 +859,11 @@ bool TasManager::LoadBaseSnapshot() {
     }
     ClearInputOverride();
     m_presentationFramesRemaining = 0;
-    if (!m_snapshotOwner->load_snapshot(0)) {
+    if (!m_snapshotOwner->load_snapshot_index(kTasBaseSlot)) {
         SetError(L("Native base-state load failed.").c_str());
         return false;
     }
 
-    ++m_rerecordCount;
     m_playhead = 0;
     m_runTarget = 0;
     m_lastScheduledFrame = GetCurrentFrame();
@@ -679,7 +986,7 @@ bool TasManager::ImportMovie(const std::string& path) {
             }
             ClearInputOverride(); ClearSnapshot(); m_movie.swap(imported);
             m_playhead = 0; m_runTarget = 0; m_presentationFramesRemaining = 0;
-            m_presentationMode = false; m_truncateOnReplayFinish = false; m_runState = TasRunState::Idle;
+            m_presentationMode = false; m_runState = TasRunState::Idle;
             m_error.clear(); {
         char formatted[512];
         std::snprintf(formatted, sizeof(formatted),
@@ -706,7 +1013,7 @@ bool TasManager::ImportMovie(const std::string& path) {
     }
     ClearInputOverride(); ClearSnapshot(); m_movie.swap(imported);
     m_playhead = 0; m_runTarget = 0; m_presentationFramesRemaining = 0;
-    m_presentationMode = false; m_truncateOnReplayFinish = false; m_runState = TasRunState::Idle;
+    m_presentationMode = false; m_runState = TasRunState::Idle;
     m_error.clear(); {
         char formatted[512];
         std::snprintf(formatted, sizeof(formatted),
@@ -717,7 +1024,7 @@ bool TasManager::ImportMovie(const std::string& path) {
     return true;
 }
 
-bool TasManager::ParseOne(const std::string& text, std::vector<uint16_t>* out) const {
+bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>* out) {
     if (!out) {
         return false;
     }
@@ -751,11 +1058,11 @@ bool TasManager::ParseOne(const std::string& text, std::vector<uint16_t>* out) c
 bool TasManager::ParseInputs() {
     std::vector<uint16_t> p1;
     std::vector<uint16_t> p2;
-    if (!ParseOne(m_p1Text, &p1)) {
+    if (!TryParseCommand(m_p1Text, &p1)) {
         SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
         return false;
     }
-    if (!ParseOne(m_p2Text, &p2)) {
+    if (!TryParseCommand(m_p2Text, &p2)) {
         SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
         return false;
     }
@@ -776,6 +1083,19 @@ bool TasManager::SetInputText(const std::string& p1, const std::string& p2) {
     m_p1Text = p1;
     m_p2Text = p2;
     return ParseInputs();
+}
+
+std::string TasManager::FormatInput(uint16_t packed) {
+    std::string result(1, static_cast<char>('0' + (packed & 0x0F)));
+    if (packed & 16) result += 'A';
+    if (packed & 32) result += 'B';
+    if (packed & 64) result += 'C';
+    if (packed & 128) result += 'D';
+    return result;
+}
+
+TasFrameInput TasManager::GetMovieFrame(size_t index) const {
+    return index < m_movie.size() ? m_movie[index] : TasFrameInput{};
 }
 
 TasFrameInput TasManager::GetCommandInput() const {

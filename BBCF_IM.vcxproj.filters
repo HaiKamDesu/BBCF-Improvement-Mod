@@ -195,6 +195,7 @@
     <ClCompile Include="src\Game\Scr\ScrStateReader.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\TasWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\TasInputListWindow.cpp" />
     <ClCompile Include="src\Game\ReplayStates\FrameState.cpp" />
     <ClCompile Include="src\Game\ReplayFiles\ReplayFileManager.cpp" />
     <ClCompile Include="src\Game\Playbacks\PlaybackManager.cpp" />
@@ -210,6 +211,7 @@
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\PlayerExtendedData.cpp" />
     <ClCompile Include="src\Overlay\Window\ComboDataWindow.cpp" />
     <ClCompile Include="src\Game\SnapshotApparatus\SnapshotApparatus.cpp" />
+    <ClCompile Include="src\Game\SnapshotApparatus\SnapshotSlotPool.cpp" />
     <ClCompile Include="src\Network\ReplayUploadManager.cpp" />
     <ClCompile Include="src\Overlay\Window\ReplayDBPopupWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\PaletteSharePopupWindow.cpp" />
@@ -223,6 +225,7 @@
     <ClCompile Include="src\Hooks\hooks_battle_input.cpp" />
     <ClCompile Include="src\Hooks\RankedAutomationHarness.cpp" />
     <ClCompile Include="src\Core\Localization.cpp" />
+    <ClCompile Include="src\Core\NativeFileDialog.cpp" />
     <ClCompile Include="src\Updater\FileUtil.cpp">
       <Filter>src\Updater</Filter>
     </ClCompile>
@@ -425,6 +428,7 @@
     <ClInclude Include="src\Game\EntityData.h" />
     <ClInclude Include="src\Overlay\Window\ScrWindow.h" />
     <ClInclude Include="src\Overlay\Window\TasWindow.h" />
+    <ClInclude Include="src\Overlay\Window\TasInputListWindow.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayFile.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayFileManager.h" />
     <ClInclude Include="src\Game\Scr\CmdList.h" />
@@ -444,6 +448,7 @@
     <ClInclude Include="src\Overlay\Window\ComboDataWindow.h" />
     <ClInclude Include="src\Game\GhidraDefs.h" />
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotApparatus.h" />
+    <ClInclude Include="src\Game\SnapshotApparatus\SnapshotSlotPool.h" />
     <ClInclude Include="src\Game\TasManager.h" />
     <ClInclude Include="src\Game\ReplayTakeover\ReplayTakeoverFeatureFlags.h" />
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
@@ -459,6 +464,7 @@
     <ClInclude Include="src\Hooks\hooks_battle_input.h" />
     <ClInclude Include="src\Hooks\RankedAutomationHarness.h" />
     <ClInclude Include="src\Core\Localization.h" />
+    <ClInclude Include="src\Core\NativeFileDialog.h" />
     <ClInclude Include="src\Palette\impl_templates.h" />
     <ClInclude Include="src\Updater\FileUtil.h">
       <Filter>src\Updater</Filter>

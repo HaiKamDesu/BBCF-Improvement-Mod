@@ -38,6 +38,7 @@
     <ClCompile Include="src\Overlay\Window\PaletteSharePopupWindow.cpp" />
     <ClCompile Include="src\Network\ReplayUploadManager.cpp" />
     <ClCompile Include="src\Game\SnapshotApparatus\SnapshotApparatus.cpp" />
+    <ClCompile Include="src\Game\SnapshotApparatus\SnapshotSlotPool.cpp" />
     <ClCompile Include="src\Overlay\Window\ComboDataWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\PlayerExtendedData.cpp" />
     <ClCompile Include="src\Game\Jonb\JonbDBReader.cpp" />
@@ -68,6 +69,7 @@
     <ClCompile Include="src\Overlay\Window\RoomWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\TasWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\TasInputListWindow.cpp" />
     <ClCompile Include="src\Palette\CharPaletteHandle.cpp" />
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\Jonb\JonbReader.cpp" />
@@ -91,6 +93,7 @@
     <ClCompile Include="src\Core\XInputRuntime.cpp" />
     <ClCompile Include="src\Core\DirectInputWrapper.cpp" />
     <ClCompile Include="src\Core\Localization.cpp" />
+    <ClCompile Include="src\Core\NativeFileDialog.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
@@ -182,6 +185,7 @@
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
     <ClInclude Include="src\Game\GhidraDefs.h" />
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotApparatus.h" />
+    <ClInclude Include="src\Game\SnapshotApparatus\SnapshotSlotPool.h" />
     <ClInclude Include="src\Game\TasManager.h" />
     <ClInclude Include="src\Game\ReplayTakeover\ReplayTakeoverFeatureFlags.h" />
     <ClInclude Include="src\Overlay\Window\ComboDataWindow.h" />
@@ -221,6 +225,7 @@
     <ClInclude Include="src\Overlay\Window\RoomWindow.h" />
     <ClInclude Include="src\Overlay\Window\ScrWindow.h" />
     <ClInclude Include="src\Overlay\Window\TasWindow.h" />
+    <ClInclude Include="src\Overlay\Window\TasInputListWindow.h" />
     <ClInclude Include="src\Palette\CharPaletteHandle.h" />
     <ClInclude Include="src\Game\Jonb\JonbEntry.h" />
     <ClInclude Include="src\Game\Jonb\JonbReader.h" />
@@ -247,6 +252,7 @@
     <ClInclude Include="src\Core\XInputRuntime.h" />
     <ClInclude Include="src\Core\dllmain.h" />
     <ClInclude Include="src\Core\Localization.h" />
+    <ClInclude Include="src\Core\NativeFileDialog.h" />
     <ClInclude Include="src\Network\NetworkManager.h" />
     <ClInclude Include="src\Network\OnlinePaletteManager.h" />
     <ClInclude Include="src\Network\Packet.h" />

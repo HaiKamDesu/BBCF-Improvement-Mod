@@ -16,7 +16,6 @@
 #include "Core/utils.h"
 #include "Core/Localization.h"
 #include "Game/gamestates.h"
-#include "Game/TasManager.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Window/ControllerSettings/ControllerSettingsSection.h"
 #include "Overlay/Widget/ActiveGameModeWidget.h"
@@ -217,29 +216,6 @@ void MainWindow::DrawUtilButtons() const
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.States_window_tooltip());
 
-	TasManager& tas = TasManager::Instance();
-	ImGui::SameLine();
-	if (ImGui::Button(tas.IsActive() ? L("Exit TAS mode").c_str() : L("Enter TAS mode").c_str(), BTN_SIZE))
-	{
-		if (tas.IsActive())
-		{
-			tas.Exit();
-			m_pWindowContainer->GetWindow(WindowType_Tas)->Close();
-		}
-		else
-		{
-			tas.Enter();
-			if (tas.IsActive())
-				m_pWindowContainer->GetWindow(WindowType_Tas)->Open();
-		}
-	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(Messages.Frame_by_frame_TAS_movie_editor_Training_mode_only());
-
-	if (!tas.IsActive() && !tas.GetError().empty())
-	{
-		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", tas.GetError().c_str());
-	}
 }
 
 void MainWindow::DrawCurrentPlayersCount() const

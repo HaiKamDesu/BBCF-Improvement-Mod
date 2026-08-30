@@ -2263,8 +2263,60 @@ SnapshotApparatus::SnapshotApparatus() {
 		LOG(1, "[Snapshot] ctor end this=%p snapshot_count=%u last_saved_snapshot_size=%d\n", this, this->snapshot_count, this->last_saved_snapshot_size);
 	}
 
+SnapshotApparatus::~SnapshotApparatus() {
+	if (slots_reserved) {
+		SnapshotSlotPool::Release(slot_base, slot_count);
+		slots_reserved = false;
+	}
+}
+
+bool SnapshotApparatus::ReserveSlots(const char* owner, int count) {
+	if (slots_reserved) {
+		SnapshotSlotPool::Release(slot_base, slot_count);
+		slots_reserved = false;
+	}
+
+	const int base = SnapshotSlotPool::Acquire(owner, count);
+	if (base < 0) {
+		// Keep the historical shared-ring behaviour rather than failing the feature.
+		slot_base = 0;
+		slot_count = SnapshotSlotPool::kSlotCount;
+		LOG(1, "[Snapshot] %s could not reserve %d slot(s); sharing the ring\n", owner ? owner : "?", count);
+		return false;
+	}
+
+	slot_base = base;
+	slot_count = count;
+	slots_reserved = true;
+	LOG(1, "[Snapshot] %s reserved slots %d..%d | ring: %s\n",
+		owner ? owner : "?", slot_base, slot_base + slot_count - 1,
+		SnapshotSlotPool::DescribeUsage().c_str());
+	return true;
+}
+
+int SnapshotApparatus::slot_for(unsigned int logicalIndex) const {
+	return slot_base + static_cast<int>(logicalIndex % static_cast<unsigned int>(slot_count));
+}
+
+int SnapshotApparatus::last_saved_slot() const {
+	if (this->snapshot_count == 0) {
+		return -1;
+	}
+	return static_cast<int>((this->snapshot_count - 1) % static_cast<unsigned int>(slot_count));
+}
+
 bool SnapshotApparatus::save_snapshot(Snapshot** pbuf_mine)
 {/* leave pbuf_mine as zero to not involve out own buffers and just the "built in" snapshot buffer of 10*/
+	return save_into_slot(this->slot_for(this->snapshot_count), pbuf_mine);
+}
+
+bool SnapshotApparatus::save_snapshot_index(int logicalIndex)
+{
+	return save_into_slot(this->slot_for(static_cast<unsigned int>(logicalIndex < 0 ? 0 : logicalIndex)), nullptr);
+}
+
+bool SnapshotApparatus::save_into_slot(int target_slot, Snapshot** pbuf_mine)
+{
 	LOG(1, "[Snapshot] save_snapshot begin this=%p snapshot_count=%u pbuf_mine=%p\n", this, this->snapshot_count, pbuf_mine);
 	LogSnapshotRuntimeContext("save_snapshot");
 	char* base_addr = GetBbcfBaseAdress();
@@ -2281,8 +2333,7 @@ bool SnapshotApparatus::save_snapshot(Snapshot** pbuf_mine)
 		return false;
 	}
 
-	unsigned char** pbuf = &snap_manager->_saved_states_related_struct[this->snapshot_count%10]._ptr_buf_saved_frame;
-	//snap_manager->_saved_states_related_struct[this->snapshot_count % 10]._framecount = *g_gameVals.pFrameCount;
+	unsigned char** pbuf = &snap_manager->_saved_states_related_struct[target_slot]._ptr_buf_saved_frame;
 	//unsigned char** pbuf = (unsigned char**)&snap_manager->_saved_states_related_struct[0]._ptr_buf_saved_frame;
 	int checksum = 0;
 	int counter_of_some_sort = 1;
@@ -2295,11 +2346,11 @@ bool SnapshotApparatus::save_snapshot(Snapshot** pbuf_mine)
 		__except (EXCEPTION_EXECUTE_HANDLER) {
 			LOG(1, "[Snapshot] save_snapshot warning: free_buffer exception code=0x%08X (slot=%d)\n",
 				GetExceptionCode(),
-				this->snapshot_count % 10);
+				target_slot);
 			*pbuf = 0;
 		}
 	}
-	LOG(1, "[Snapshot] save_snapshot slot=%u pbuf(before)=%p\n", this->snapshot_count % 10, *pbuf);
+	LOG(1, "[Snapshot] save_snapshot slot=%d pbuf(before)=%p\n", target_slot, *pbuf);
 	this->callbacks_ptr->save_game_state((unsigned char**)pbuf,
 		&sizeofstate, //&counter_of_some_sort, I still dont know for sure if this is supposed to be the counter or the sie 
 		&checksum); //I assume this is supposed to be checksum but idk
@@ -2309,10 +2360,10 @@ bool SnapshotApparatus::save_snapshot(Snapshot** pbuf_mine)
 		this->last_saved_snapshot_size = 0;
 		return false;
 	}
-	LOG(1, "[Snapshot] save_snapshot ok: slot=%d size=%d\n", this->snapshot_count % 10, sizeofstate);
+	LOG(1, "[Snapshot] save_snapshot ok: slot=%d size=%d\n", target_slot, sizeofstate);
 	this->last_saved_snapshot_size = sizeofstate;
-	snap_manager->_saved_states_related_struct[this->snapshot_count % 10].field2_0x8 = sizeofstate;
-	snap_manager->_saved_states_related_struct[this->snapshot_count % 10]._framecount = *g_gameVals.pFrameCount;
+	snap_manager->_saved_states_related_struct[target_slot].field2_0x8 = sizeofstate;
+	snap_manager->_saved_states_related_struct[target_slot]._framecount = *g_gameVals.pFrameCount;
 	this->snapshot_count += 1;
 	if (pbuf_mine != 0 && *pbuf_mine != 0 && *pbuf != 0) {
 		memset(*pbuf_mine, 0, kSnapshotBytes);
@@ -2388,7 +2439,7 @@ bool SnapshotApparatus::load_snapshot_sized(const void* buf, size_t buf_size)
 		LOG(1, "[Snapshot] load_snapshot_sized failed: no internal snapshot available\n");
 		return false;
 	}
-	const int slot_index = (this->snapshot_count == 0) ? 0 : ((this->snapshot_count - 1) % 10);
+	const int slot_index = (this->snapshot_count == 0) ? this->slot_for(0) : this->slot_for(this->snapshot_count - 1);
 	auto& slot_state = snap_manager->_saved_states_related_struct[slot_index];
 	LOG(1, "[Snapshot] load_snapshot_sized slot_index=%d slot_ptr=%p field2_0x8=%d framecount=%u\n",
 		slot_index,
@@ -2549,7 +2600,9 @@ bool SnapshotApparatus::load_snapshot_prealloc(int index)
 	else {
 		return false;
 	}
-	unsigned char* dest_buf = (unsigned char*)snap_manager->_saved_states_related_struct[(snapshot_count - 1) % 10]._ptr_buf_saved_frame;
+	// Unused today, but remapped with the rest so it cannot become a way to reach outside
+	// this apparatus's reserved range.
+	unsigned char* dest_buf = (unsigned char*)snap_manager->_saved_states_related_struct[this->slot_for(this->snapshot_count == 0 ? 0 : this->snapshot_count - 1)]._ptr_buf_saved_frame;
 	//!!!!UNCOMMENT LATER WHEN STATIC EXISTS
 	//void* buf = &snapshot_replay_pre_allocated[index % SNAPSHOT_PREALLOC_SIZE];
 	//if (buf != 0) {
@@ -2599,27 +2652,28 @@ bool SnapshotApparatus::load_snapshot_index(int index) {
 		LOG(1, "[Snapshot] load_snapshot_index failed: no snapshot manager\n");
 		return false;
 	}
-	unsigned char* dest_buf = (unsigned char*)snap_manager->_saved_states_related_struct[(index ) % 10]._ptr_buf_saved_frame;
-	const int slot_size = snap_manager->_saved_states_related_struct[(index) % 10].field2_0x8;
-	const unsigned int slot_framecount = snap_manager->_saved_states_related_struct[(index) % 10]._framecount;
+	const int physical_slot = this->slot_for(static_cast<unsigned int>(index < 0 ? 0 : index));
+	unsigned char* dest_buf = (unsigned char*)snap_manager->_saved_states_related_struct[physical_slot]._ptr_buf_saved_frame;
+	const int slot_size = snap_manager->_saved_states_related_struct[physical_slot].field2_0x8;
+	const unsigned int slot_framecount = snap_manager->_saved_states_related_struct[physical_slot]._framecount;
 	if (!dest_buf) {
-		LOG(1, "[Snapshot] load_snapshot_index failed: null dest buffer at slot=%d\n", index % 10);
+		LOG(1, "[Snapshot] load_snapshot_index failed: null dest buffer at slot=%d\n", physical_slot);
 		return false;
 	}
 	if (slot_size <= 0 || slot_size > 0xA10000) {
 		LOG(1,
 			"[Snapshot] load_snapshot_index failed: invalid slot metadata slot=%d size=%d framecount=%u\n",
-			index % 10,
+			physical_slot,
 			slot_size,
 			slot_framecount);
 		return false;
 	}
 	LOG(1, "[Snapshot] load_snapshot_index slot=%d dest_buf=%p field2_0x8=%d framecount=%u\n",
-		index % 10,
+		physical_slot,
 		dest_buf,
 		slot_size,
 		slot_framecount);
-	LogSlotNeighborhood(snap_manager, index % 10);
+	LogSlotNeighborhood(snap_manager, physical_slot);
 	LogMemRegionInfo("load_snapshot_index/dest_buf", dest_buf);
 	LogMemRegionInfo("load_snapshot_index/callbacks_ptr", this->callbacks_ptr);
 	if (this->callbacks_ptr) {

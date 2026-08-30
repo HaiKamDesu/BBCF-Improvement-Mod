@@ -1,5 +1,7 @@
 #include "LogWindow.h"
 
+#include "Core/NativeFileDialog.h"
+
 #include "Core/Localization.h"
 #include "Core/logger.h"
 
@@ -22,69 +24,7 @@ namespace
 	const size_t kMaxBufferBytes = 2 * 1024 * 1024;
 	const size_t kRetainBufferBytes = 1536 * 1024;
 
-	// Save-dialog state, following the known-safe pattern from
-	// UnlimitedPlaybackWindow: the Win32 dialog runs on its own thread with
-	// OFN_NOCHANGEDIR and working-directory restore, and the render thread
-	// only consumes the result.
-	struct SaveDialogState
-	{
-		std::mutex mutex;
-		bool active = false;
-		bool completed = false;
-		bool succeeded = false;
-		std::string path;
-	};
-
-	SaveDialogState g_saveDialogState;
-
-	void StartDebugLogSaveDialogAsync()
-	{
-		{
-			std::lock_guard<std::mutex> lock(g_saveDialogState.mutex);
-			if (g_saveDialogState.active)
-				return;
-			g_saveDialogState.active = true;
-			g_saveDialogState.completed = false;
-			g_saveDialogState.succeeded = false;
-			g_saveDialogState.path.clear();
-		}
-
-		std::thread([]() {
-			char selectedPath[MAX_PATH] = "DEBUG.txt";
-			char originalWorkingDirectory[MAX_PATH] = {};
-			OPENFILENAMEA ofn;
-			std::memset(&ofn, 0, sizeof(ofn));
-			GetCurrentDirectoryA(MAX_PATH, originalWorkingDirectory);
-
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = nullptr;
-			ofn.lpstrFile = selectedPath;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.lpstrFilter = "Text File (*.txt)\0*.txt\0All Files\0*.*\0";
-			ofn.lpstrDefExt = "txt";
-			ofn.lpstrTitle = "Save debug log";
-			ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-
-			const bool dialogConfirmed = GetSaveFileNameA(&ofn) == TRUE;
-
-			if (originalWorkingDirectory[0] != '\0')
-			{
-				SetCurrentDirectoryA(originalWorkingDirectory);
-			}
-
-			bool copied = false;
-			if (dialogConfirmed)
-			{
-				copied = CopyFileA(kDebugFilePath, selectedPath, FALSE) == TRUE;
-			}
-
-			std::lock_guard<std::mutex> lock(g_saveDialogState.mutex);
-			g_saveDialogState.path = dialogConfirmed ? selectedPath : "";
-			g_saveDialogState.succeeded = copied;
-			g_saveDialogState.completed = dialogConfirmed; // silent on cancel
-			g_saveDialogState.active = false;
-		}).detach();
-	}
+	constexpr const char* kFileDialogOwner = "log_window";
 }
 
 void LogWindow::BeforeDraw()
@@ -197,30 +137,29 @@ void LogWindow::PollDebugFile()
 
 void LogWindow::DrawSaveAsButton()
 {
+	NativeFileDialog::Result result;
+	if (NativeFileDialog::Consume(kFileDialogOwner, &result) && result.accepted)
 	{
-		std::lock_guard<std::mutex> lock(g_saveDialogState.mutex);
-		if (g_saveDialogState.active)
-		{
-			ImGui::BeginDisabled();
-			ImGui::Button(Messages.Save_as());
-			ImGui::EndDisabled();
-			return;
-		}
-
-		if (g_saveDialogState.completed)
-		{
-			if (g_saveDialogState.succeeded)
-				m_logger.Log("[system] Debug log saved to '%s'\n", g_saveDialogState.path.c_str());
-			else
-				m_logger.Log("[error] Failed to save debug log to '%s'\n", g_saveDialogState.path.c_str());
-			g_saveDialogState.completed = false;
-		}
+		// The copy happens here rather than on the dialog thread, so the only thing the
+		// worker ever does is ask the user for a path.
+		if (CopyFileA(kDebugFilePath, result.path.c_str(), FALSE) == TRUE)
+			m_logger.Log("[system] Debug log saved to '%s'\n", result.path.c_str());
+		else
+			m_logger.Log("[error] Failed to save debug log to '%s'\n", result.path.c_str());
 	}
 
+	ImGui::BeginDisabled(NativeFileDialog::IsOpen());
 	if (ImGui::Button(Messages.Save_as()))
 	{
-		StartDebugLogSaveDialogAsync();
+		NativeFileDialog::Request request;
+		request.save = true;
+		request.title = "Save debug log";
+		request.filters.push_back({ "Text File (*.txt)", "*.txt" });
+		request.defaultExtension = "txt";
+		request.initialPath = "DEBUG.txt";
+		NativeFileDialog::Open(kFileDialogOwner, request);
 	}
+	ImGui::EndDisabled();
 }
 
 void LogWindow::Draw()

@@ -1032,8 +1032,8 @@ struct LocalizationKeysAccessor
         // %+d LP
         inline const char* d_LP() const { return Get("%+d LP"); }
 
-        //  (%+d Promotion Counter)
-        inline const char* d_Promotion_Counter() const { return Get(" (%+d Promotion Counter)"); }
+        // (%+d Promotion Counter)
+        inline const char* d_Promotion_Counter() const { return Get("(%+d Promotion Counter)"); }
 
         // %+d LP (%+d Promotion Counter)
         inline const char* d_LP_d_Promotion_Counter() const { return Get("%+d LP (%+d Promotion Counter)"); }
@@ -1041,8 +1041,8 @@ struct LocalizationKeysAccessor
         // %+d LP (+1 Demotion Counter)
         inline const char* d_LP_1_Demotion_Counter() const { return Get("%+d LP (+1 Demotion Counter)"); }
 
-        //  or higher.
-        inline const char* or_higher() const { return Get(" or higher."); }
+        // or higher.
+        inline const char* or_higher() const { return Get("or higher."); }
 
         // or higher.
         inline const char* or_higher_2() const { return Get("or higher."); }
@@ -2259,53 +2259,17 @@ struct LocalizationKeysAccessor
         // Exit TAS mode
         inline const char* Exit_TAS_mode() const { return Get("Exit TAS mode"); }
 
-        // Frame-by-frame TAS movie editor. Training mode only.
-        inline const char* Frame_by_frame_TAS_movie_editor_Training_mode_only() const { return Get("Frame-by-frame TAS movie editor. Training mode only."); }
-
-        // Open TAS mode from the F1 main window.
-        inline const char* Open_TAS_mode_from_the_F1_main_window() const { return Get("Open TAS mode from the F1 main window."); }
-
-        // TAS mode: frame editor for training matches
-        inline const char* TAS_mode_frame_editor_for_training_matches() const { return Get("TAS mode: frame editor for training matches"); }
-
         // Export:
         inline const char* Export_2() const { return Get("Export:"); }
 
         // Include initial conditions
         inline const char* Include_initial_conditions() const { return Get("Include initial conditions"); }
 
-        // Export .txt
-        inline const char* Export_txt() const { return Get("Export .txt"); }
-
         // Import:
         inline const char* Import_2() const { return Get("Import:"); }
 
-        // Select .txt file
-        inline const char* Select_txt_file() const { return Get("Select .txt file"); }
-
-        // Current frame: %u
-        inline const char* Current_frame_u() const { return Get("Current frame: %u"); }
-
-        // Base frame: %s%u
-        inline const char* Base_frame_s_u() const { return Get("Base frame: %s%u"); }
-
-        // not saved / 
-        inline const char* not_saved() const { return Get("not saved / "); }
-
-        // Input progress: %u / %u
-        inline const char* Input_progress_u_u() const { return Get("Input progress: %u / %u"); }
-
-        // Rerecord count: %u
-        inline const char* Rerecord_count_u() const { return Get("Rerecord count: %u"); }
-
-        // Auto load base state and freeze after playback
-        inline const char* Auto_load_base_state_and_freeze_after_playback() const { return Get("Auto load base state and freeze after playback"); }
-
         // Save base state
         inline const char* Save_base_state() const { return Get("Save base state"); }
-
-        // Load base state
-        inline const char* Load_base_state() const { return Get("Load base state"); }
 
         // Resume game
         inline const char* Resume_game() const { return Get("Resume game"); }
@@ -2313,68 +2277,8 @@ struct LocalizationKeysAccessor
         // Stop playback
         inline const char* Stop_playback() const { return Get("Stop playback"); }
 
-        // Preview playback
-        inline const char* Preview_playback() const { return Get("Preview playback"); }
-
-        // Presentation playback
-        inline const char* Presentation_playback() const { return Get("Presentation playback"); }
-
         // Reset movie
         inline const char* Reset_movie() const { return Get("Reset movie"); }
-
-        // Movie frames: %u
-        inline const char* Movie_frames_u() const { return Get("Movie frames: %u"); }
-
-        // Movie edit frame: %u
-        inline const char* Movie_edit_frame_u() const { return Get("Movie edit frame: %u"); }
-
-        // Input commands
-        inline const char* Input_commands() const { return Get("Input commands"); }
-
-        // Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash.
-        inline const char* Examples_5C_4C_28D_623C_656_dash_Each_digit_uses_one_frame_66_means_two_frames_holding_6_while_656_performs_a_dash() const { return Get("Examples: 5C, 4C, 28D, 623C, 656 (dash). Each digit uses one frame; 66 means two frames holding 6, while 656 performs a dash."); }
-
-        // Parse input
-        inline const char* Parse_input() const { return Get("Parse input"); }
-
-        // Frame count
-        inline const char* Frame_count_2() const { return Get("Frame count"); }
-
-        // Advance N frames
-        inline const char* Advance_N_frames() const { return Get("Advance N frames"); }
-
-        // Rewind N frames
-        inline const char* Rewind_N_frames() const { return Get("Rewind N frames"); }
-
-        // Reset parsed input
-        inline const char* Reset_parsed_input() const { return Get("Reset parsed input"); }
-
-        // Current input: P1=%u P2=%u
-        inline const char* Current_input_P1_u_P2_u() const { return Get("Current input: P1=%u P2=%u"); }
-
-        // Instructions
-        inline const char* Instructions() const { return Get("Instructions"); }
-
-        // 1. Enter a training match and save a base state.
-        inline const char* _1_Enter_a_training_match_and_save_a_base_state() const { return Get("1. Enter a training match and save a base state."); }
-
-        // 2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C.
-        inline const char* _2_Use_numpad_directions_and_buttons_for_example_623C_means_6_2_then_3_C() const { return Get("2. Use numpad directions and buttons, for example 623C means 6, 2, then 3+C."); }
-
-        // 3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame.
-        inline const char* _3_Set_a_frame_count_and_use_Advance_N_Frames_Inputs_are_applied_frame_by_frame() const { return Get("3. Set a frame count and use Advance N Frames. Inputs are applied frame by frame."); }
-
-        // 4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames.
-        inline const char* _4_Preview_starts_immediately_and_freezes_at_the_movie_end_for_continued_frame_editing_Presentation_hides_TAS_UI_holds_neutral_for_60_game_frames_plays_the_movie_then_holds_neutral_for_240_frames() const { return Get("4. Preview starts immediately and freezes at the movie end for continued frame editing. Presentation hides TAS UI, holds neutral for 60 game frames, plays the movie, then holds neutral for 240 frames."); }
-
-        // 5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames.
-        inline const char* _5_Rewind_N_Frames_reloads_the_base_state_replays_to_the_target_and_deletes_all_later_movie_frames() const { return Get("5. Rewind N Frames reloads the base state, replays to the target, and deletes all later movie frames."); }
-
-        // 6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import.
-        inline const char* _6_Export_creates_a_numbered_txt_file_when_the_filename_is_empty_Import_selects_a_txt_file_from_the_current_game_directory_Save_the_matching_base_state_after_import() const { return Get("6. Export creates a numbered .txt file when the filename is empty. Import selects a .txt file from the current game directory. Save the matching base state after import."); }
-
-        // Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame.
-        inline const char* Directions_7_8_9_4_5_6_1_2_3_5_means_neutral_Parsed_commands_hold_neutral_after_their_final_frame() const { return Get("Directions: 7 8 9 / 4 5 6 / 1 2 3; 5 means neutral. Parsed commands hold neutral after their final frame."); }
 
         // TAS mode is available only during a training match.
         inline const char* TAS_mode_is_available_only_during_a_training_match() const { return Get("TAS mode is available only during a training match."); }
@@ -2477,6 +2381,369 @@ struct LocalizationKeysAccessor
 
         // Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.
         inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_or_656() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656."); }
+
+        // Frame %u
+        inline const char* Frame_u() const { return Get("Frame %u"); }
+
+        // %u frames
+        inline const char* u_frames() const { return Get("%u frames"); }
+
+        // 1 frame
+        inline const char* _1_frame() const { return Get("1 frame"); }
+
+        // Rerecords: %u
+        inline const char* Rerecords_u() const { return Get("Rerecords: %u"); }
+
+        // Saved at frame %u
+        inline const char* Saved_at_frame_u() const { return Get("Saved at frame %u"); }
+
+        // Commit %u frames
+        inline const char* Commit_u_frames() const { return Get("Commit %u frames"); }
+
+        // Commit 1 frame
+        inline const char* Commit_1_frame() const { return Get("Commit 1 frame"); }
+
+        // Typed but not committed yet: %u
+        inline const char* Typed_but_not_committed_yet_u() const { return Get("Typed but not committed yet: %u"); }
+
+        // Editing
+        inline const char* Editing() const { return Get("Editing"); }
+
+        // Preview
+        inline const char* Preview() const { return Get("Preview"); }
+
+        // Presentation
+        inline const char* Presentation() const { return Get("Presentation"); }
+
+        // Replaying
+        inline const char* Replaying() const { return Get("Replaying"); }
+
+        // No base state
+        inline const char* No_base_state() const { return Get("No base state"); }
+
+        // Base state
+        inline const char* Base_state() const { return Get("Base state"); }
+
+        // Set the match up the way you want the combo to start, then save a base state.
+        inline const char* Set_the_match_up_the_way_you_want_the_combo_to_start_then_save_a_base_state() const { return Get("Set the match up the way you want the combo to start, then save a base state."); }
+
+        // Captures positions, health, meter and everything else as the starting point of the combo. Every playback and every rewind returns here, so save it before you type any input.
+        inline const char* Captures_positions_health_meter_and_everything_else_as_the_starting_point_of_the_combo_Every_playback_and_every_rewind_returns_here_so_save_it_before_you_type_any_input() const { return Get("Captures positions, health, meter and everything else as the starting point of the combo. Every playback and every rewind returns here, so save it before you type any input."); }
+
+        // Every playback and every rewind restores this moment.
+        inline const char* Every_playback_and_every_rewind_restores_this_moment() const { return Get("Every playback and every rewind restores this moment."); }
+
+        // Re-save
+        inline const char* Re_save() const { return Get("Re-save"); }
+
+        // Replaces the base state with the current moment. The movie you have recorded is kept, but it will no longer line up with the new starting point.
+        inline const char* Replaces_the_base_state_with_the_current_moment_The_movie_you_have_recorded_is_kept_but_it_will_no_longer_line_up_with_the_new_starting_point() const { return Get("Replaces the base state with the current moment. The movie you have recorded is kept, but it will no longer line up with the new starting point."); }
+
+        // Jumps the match back to the base state without touching the movie.
+        inline const char* Jumps_the_match_back_to_the_base_state_without_touching_the_movie() const { return Get("Jumps the match back to the base state without touching the movie."); }
+
+        // Timeline
+        inline const char* Timeline() const { return Get("Timeline"); }
+
+        // No frames yet. Type a command below and commit it to start the combo.
+        inline const char* No_frames_yet_Type_a_command_below_and_commit_it_to_start_the_combo() const { return Get("No frames yet. Type a command below and commit it to start the combo."); }
+
+        // Click to rewind here. Every frame after it is deleted.
+        inline const char* Click_to_rewind_here_Every_frame_after_it_is_deleted() const { return Get("Click to rewind here. Every frame after it is deleted."); }
+
+        // Not played yet.
+        inline const char* Not_played_yet() const { return Get("Not played yet."); }
+
+        // Top row P1, bottom row P2. Highlighted column is the playhead; orange means a button is pressed.
+        inline const char* Top_row_P1_bottom_row_P2_Highlighted_column_is_the_playhead_orange_means_a_button_is_pressed() const { return Get("Top row P1, bottom row P2. Highlighted column is the playhead; orange means a button is pressed."); }
+
+        // Add input
+        inline const char* Add_input() const { return Get("Add input"); }
+
+        // invalid
+        inline const char* invalid() const { return Get("invalid"); }
+
+        // Numpad notation: 5 is neutral, 623C is three frames. One digit is one frame.
+        inline const char* Numpad_notation_5_is_neutral_623C_is_three_frames_One_digit_is_one_frame() const { return Get("Numpad notation: 5 is neutral, 623C is three frames. One digit is one frame."); }
+
+        // Directions use the numpad layout, 7 8 9 over 4 5 6 over 1 2 3, with 5 as neutral. Letters A B C D attach to the direction right before them, so 623C is 6, then 2, then 3 with C held. Press Help for the full reference.
+        inline const char* Directions_use_the_numpad_layout_7_8_9_over_4_5_6_over_1_2_3_with_5_as_neutral_Letters_A_B_C_D_attach_to_the_direction_right_before_them_so_623C_is_6_then_2_then_3_with_C_held_Press_Help_for_the_full_reference() const { return Get("Directions use the numpad layout, 7 8 9 over 4 5 6 over 1 2 3, with 5 as neutral. Letters A B C D attach to the direction right before them, so 623C is 6, then 2, then 3 with C held. Press Help for the full reference."); }
+
+        // Appends the typed input to the timeline and plays those frames. This is the main action: type, commit, repeat.
+        inline const char* Appends_the_typed_input_to_the_timeline_and_plays_those_frames_This_is_the_main_action_type_commit_repeat() const { return Get("Appends the typed input to the timeline and plays those frames. This is the main action: type, commit, repeat."); }
+
+        // Advance
+        inline const char* Advance() const { return Get("Advance"); }
+
+        // Plays this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves.
+        inline const char* Plays_this_many_frames_using_whatever_is_left_of_the_typed_input_then_neutral_Use_it_to_wait_between_moves() const { return Get("Plays this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves."); }
+
+        // Steps this many frames back to re-record. The frames after the new position are deleted, and the rerecord counter goes up.
+        inline const char* Steps_this_many_frames_back_to_re_record_The_frames_after_the_new_position_are_deleted_and_the_rerecord_counter_goes_up() const { return Get("Steps this many frames back to re-record. The frames after the new position are deleted, and the rerecord counter goes up."); }
+
+        // Playback
+        inline const char* Playback() const { return Get("Playback"); }
+
+        // Restores the base state, plays the whole combo, then freezes on the last frame so you can keep adding to it.
+        inline const char* Restores_the_base_state_plays_the_whole_combo_then_freezes_on_the_last_frame_so_you_can_keep_adding_to_it() const { return Get("Restores the base state, plays the whole combo, then freezes on the last frame so you can keep adding to it."); }
+
+        // For recording video: hides this window, holds neutral for 60 frames, plays the combo, then holds neutral for 240 frames. Press the TAS parse hotkey to stop it early.
+        inline const char* For_recording_video_hides_this_window_holds_neutral_for_60_frames_plays_the_combo_then_holds_neutral_for_240_frames_Press_the_TAS_parse_hotkey_to_stop_it_early() const { return Get("For recording video: hides this window, holds neutral for 60 frames, plays the combo, then holds neutral for 240 frames. Press the TAS parse hotkey to stop it early."); }
+
+        // Unfreezes the match so you can move around normally. The movie is kept.
+        inline const char* Unfreezes_the_match_so_you_can_move_around_normally_The_movie_is_kept() const { return Get("Unfreezes the match so you can move around normally. The movie is kept."); }
+
+        // Deletes every recorded frame and returns to the base state. The base state itself is kept.
+        inline const char* Deletes_every_recorded_frame_and_returns_to_the_base_state_The_base_state_itself_is_kept() const { return Get("Deletes every recorded frame and returns to the base state. The base state itself is kept."); }
+
+        // Return to base state when playback finishes
+        inline const char* Return_to_base_state_when_playback_finishes() const { return Get("Return to base state when playback finishes"); }
+
+        // After a preview ends, jump straight back to the start of the combo instead of staying on the final frame.
+        inline const char* After_a_preview_ends_jump_straight_back_to_the_start_of_the_combo_instead_of_staying_on_the_final_frame() const { return Get("After a preview ends, jump straight back to the start of the combo instead of staying on the final frame."); }
+
+        // Movie file
+        inline const char* Movie_file() const { return Get("Movie file"); }
+
+        // Save the combo to a .txt file in the game folder, or load one back.
+        inline const char* Save_the_combo_to_a_txt_file_in_the_game_folder_or_load_one_back() const { return Get("Save the combo to a .txt file in the game folder, or load one back."); }
+
+        // Help
+        inline const char* Help() const { return Get("Help"); }
+
+        // Files live in the game folder, next to BBCF.exe.
+        inline const char* Files_live_in_the_game_folder_next_to_BBCF_exe() const { return Get("Files live in the game folder, next to BBCF.exe."); }
+
+        // tas_movie_1.txt (auto)
+        inline const char* tas_movie_1_txt_auto() const { return Get("tas_movie_1.txt (auto)"); }
+
+        // Writes the characters and starting positions into the file as a comment, so you can tell later what the combo was built on.
+        inline const char* Writes_the_characters_and_starting_positions_into_the_file_as_a_comment_so_you_can_tell_later_what_the_combo_was_built_on() const { return Get("Writes the characters and starting positions into the file as a comment, so you can tell later what the combo was built on."); }
+
+        // Save to file
+        inline const char* Save_to_file_2() const { return Get("Save to file"); }
+
+        // Load
+        inline const char* Load() const { return Get("Load"); }
+
+        // Select a .txt file
+        inline const char* Select_a_txt_file() const { return Get("Select a .txt file"); }
+
+        // A movie file does not contain the base state. Save a matching one after loading.
+        inline const char* A_movie_file_does_not_contain_the_base_state_Save_a_matching_one_after_loading() const { return Get("A movie file does not contain the base state. Save a matching one after loading."); }
+
+        // Load from file
+        inline const char* Load_from_file() const { return Get("Load from file"); }
+
+        // How the TAS editor works
+        inline const char* How_the_TAS_editor_works() const { return Get("How the TAS editor works"); }
+
+        // Notation
+        inline const char* Notation() const { return Get("Notation"); }
+
+        // Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash.
+        inline const char* Directions_follow_the_numpad_7_8_9_on_the_top_row_4_5_6_in_the_middle_1_2_3_on_the_bottom_and_5_for_neutral_Each_digit_is_one_frame_so_66_holds_forward_for_two_frames_and_656_is_a_dash() const { return Get("Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash."); }
+
+        // A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.
+        inline const char* A_B_C_D_attach_to_the_direction_immediately_before_them_623C_is_three_frames_the_last_of_them_3_with_C_held_Spaces_commas_and_dashes_are_ignored_so_236_236C_reads_the_same_as_236236C() const { return Get("A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C."); }
+
+        // Building a combo
+        inline const char* Building_a_combo() const { return Get("Building a combo"); }
+
+        // 1. Set the match up the way the combo should start and save a base state.
+        inline const char* _1_Set_the_match_up_the_way_the_combo_should_start_and_save_a_base_state() const { return Get("1. Set the match up the way the combo should start and save a base state."); }
+
+        // 2. Type a command and press Commit. The frames are added to the timeline and played.
+        inline const char* _2_Type_a_command_and_press_Commit_The_frames_are_added_to_the_timeline_and_played() const { return Get("2. Type a command and press Commit. The frames are added to the timeline and played."); }
+
+        // 3. Repeat. Use Advance to wait a number of frames without pressing anything.
+        inline const char* _3_Repeat_Use_Advance_to_wait_a_number_of_frames_without_pressing_anything() const { return Get("3. Repeat. Use Advance to wait a number of frames without pressing anything."); }
+
+        // 4. If a frame was wrong, press Rewind or click that frame in the timeline, then commit the replacement.
+        inline const char* _4_If_a_frame_was_wrong_press_Rewind_or_click_that_frame_in_the_timeline_then_commit_the_replacement() const { return Get("4. If a frame was wrong, press Rewind or click that frame in the timeline, then commit the replacement."); }
+
+        // Rewinding deletes every frame after the point you go back to. That is what makes it a re-record rather than an undo.
+        inline const char* Rewinding_deletes_every_frame_after_the_point_you_go_back_to_That_is_what_makes_it_a_re_record_rather_than_an_undo() const { return Get("Rewinding deletes every frame after the point you go back to. That is what makes it a re-record rather than an undo."); }
+
+        // Hotkeys
+        inline const char* Hotkeys() const { return Get("Hotkeys"); }
+
+        // The three TAS hotkeys can be rebound in the Hotkeys section of the Settings.ini window. They do nothing while you are typing in a text field.
+        inline const char* The_three_TAS_hotkeys_can_be_rebound_in_the_Hotkeys_section_of_the_Settings_ini_window_They_do_nothing_while_you_are_typing_in_a_text_field() const { return Get("The three TAS hotkeys can be rebound in the Hotkeys section of the Settings.ini window. They do nothing while you are typing in a text field."); }
+
+        // Parse: reads the text fields into the queue.
+        inline const char* Parse_reads_the_text_fields_into_the_queue() const { return Get("Parse: reads the text fields into the queue."); }
+
+        // Step forward: same as Advance.
+        inline const char* Step_forward_same_as_Advance() const { return Get("Step forward: same as Advance."); }
+
+        // Step back: same as Rewind.
+        inline const char* Step_back_same_as_Rewind() const { return Get("Step back: same as Rewind."); }
+
+        // TAS combo editor
+        inline const char* TAS_combo_editor() const { return Get("TAS combo editor"); }
+
+        // numpad notation, e.g. 623C
+        inline const char* numpad_notation_e_g_623C() const { return Get("numpad notation, e.g. 623C"); }
+
+        // leave empty for neutral
+        inline const char* leave_empty_for_neutral() const { return Get("leave empty for neutral"); }
+
+        // Movies are plain text. They store the inputs only, not the base state.
+        inline const char* Movies_are_plain_text_They_store_the_inputs_only_not_the_base_state() const { return Get("Movies are plain text. They store the inputs only, not the base state."); }
+
+        // Save TAS movie
+        inline const char* Save_TAS_movie() const { return Get("Save TAS movie"); }
+
+        // Load TAS movie
+        inline const char* Load_TAS_movie() const { return Get("Load TAS movie"); }
+
+        // TAS Movie (*.txt)
+        inline const char* TAS_Movie_txt() const { return Get("TAS Movie (*.txt)"); }
+
+        // Waiting for the file picker...
+        inline const char* Waiting_for_the_file_picker() const { return Get("Waiting for the file picker..."); }
+
+        // TAS input list
+        inline const char* TAS_input_list() const { return Get("TAS input list"); }
+
+        // Follow playhead
+        inline const char* Follow_playhead() const { return Get("Follow playhead"); }
+
+        // Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays.
+        inline const char* Keeps_the_list_scrolled_to_the_current_frame_Turn_it_off_to_read_through_the_movie_while_it_plays() const { return Get("Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays."); }
+
+        // Click to watch from this frame. Nothing is deleted.
+        inline const char* Click_to_watch_from_this_frame_Nothing_is_deleted() const { return Get("Click to watch from this frame. Nothing is deleted."); }
+
+        // Seeking...
+        inline const char* Seeking() const { return Get("Seeking..."); }
+
+        // At the start of the movie.
+        inline const char* At_the_start_of_the_movie() const { return Get("At the start of the movie."); }
+
+        // Cannot seek during playback.
+        inline const char* Cannot_seek_during_playback() const { return Get("Cannot seek during playback."); }
+
+        // Save a base state before seeking.
+        inline const char* Save_a_base_state_before_seeking() const { return Get("Save a base state before seeking."); }
+
+        // Jump to the start
+        inline const char* Jump_to_the_start() const { return Get("Jump to the start"); }
+
+        // Jump to the end
+        inline const char* Jump_to_the_end() const { return Get("Jump to the end"); }
+
+        // Back 10 frames
+        inline const char* Back_10_frames() const { return Get("Back 10 frames"); }
+
+        // Back 1 frame
+        inline const char* Back_1_frame() const { return Get("Back 1 frame"); }
+
+        // Forward 1 frame
+        inline const char* Forward_1_frame() const { return Get("Forward 1 frame"); }
+
+        // Forward 10 frames
+        inline const char* Forward_10_frames() const { return Get("Forward 10 frames"); }
+
+        // Play the combo from the start, then freeze on the last frame
+        inline const char* Play_the_combo_from_the_start_then_freeze_on_the_last_frame() const { return Get("Play the combo from the start, then freeze on the last frame"); }
+
+        // Drag to move through the combo. Release to jump there.
+        inline const char* Drag_to_move_through_the_combo_Release_to_jump_there() const { return Get("Drag to move through the combo. Release to jump there."); }
+
+        // Seeking: %u / %u
+        inline const char* Seeking_u_u() const { return Get("Seeking: %u / %u"); }
+
+        // Frame %u of %u
+        inline const char* Frame_u_of_u() const { return Get("Frame %u of %u"); }
+
+        // Input list
+        inline const char* Input_list() const { return Get("Input list"); }
+
+        // Opens the whole movie as a vertical list, one row per frame. It is a separate window so you can make it tall and put it wherever you like.
+        inline const char* Opens_the_whole_movie_as_a_vertical_list_one_row_per_frame_It_is_a_separate_window_so_you_can_make_it_tall_and_put_it_wherever_you_like() const { return Get("Opens the whole movie as a vertical list, one row per frame. It is a separate window so you can make it tall and put it wherever you like."); }
+
+        // Moving around never deletes anything. Frames are only replaced when you commit new input.
+        inline const char* Moving_around_never_deletes_anything_Frames_are_only_replaced_when_you_commit_new_input() const { return Get("Moving around never deletes anything. Frames are only replaced when you commit new input."); }
+
+        // Adds this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves. To move around without changing anything, use the transport buttons above.
+        inline const char* Adds_this_many_frames_using_whatever_is_left_of_the_typed_input_then_neutral_Use_it_to_wait_between_moves_To_move_around_without_changing_anything_use_the_transport_buttons_above() const { return Get("Adds this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves. To move around without changing anything, use the transport buttons above."); }
+
+        // Overwrite the rest of the combo?
+        inline const char* Overwrite_the_rest_of_the_combo() const { return Get("Overwrite the rest of the combo?"); }
+
+        // You are at frame %u of %u. Committing here replaces the %u frames after it.
+        inline const char* You_are_at_frame_u_of_u_Committing_here_replaces_the_u_frames_after_it() const { return Get("You are at frame %u of %u. Committing here replaces the %u frames after it."); }
+
+        // This is how re-recording works: the new input becomes the end of the combo.
+        inline const char* This_is_how_re_recording_works_the_new_input_becomes_the_end_of_the_combo() const { return Get("This is how re-recording works: the new input becomes the end of the combo."); }
+
+        // Seek complete.
+        inline const char* Seek_complete() const { return Get("Seek complete."); }
+
+        // Seeking reloads a savestate and replays the stored input from there. Keyframes are taken every 60 frames so a nearby jump only replays a little; jumping far back replays from the start, which takes about a second per 60 frames.
+        inline const char* Seeking_reloads_a_savestate_and_replays_the_stored_input_from_there_Keyframes_are_taken_every_60_frames_so_a_nearby_jump_only_replays_a_little_jumping_far_back_replays_from_the_start_which_takes_about_a_second_per_60_frames() const { return Get("Seeking reloads a savestate and replays the stored input from there. Keyframes are taken every 60 frames so a nearby jump only replays a little; jumping far back replays from the start, which takes about a second per 60 frames."); }
+
+        // Forward 1 frame. Past the end of the combo this adds an idle frame.
+        inline const char* Forward_1_frame_Past_the_end_of_the_combo_this_adds_an_idle_frame() const { return Get("Forward 1 frame. Past the end of the combo this adds an idle frame."); }
+
+        // Forward 10 frames. Past the end of the combo this adds idle frames.
+        inline const char* Forward_10_frames_Past_the_end_of_the_combo_this_adds_idle_frames() const { return Get("Forward 10 frames. Past the end of the combo this adds idle frames."); }
+
+        // neutral
+        inline const char* neutral() const { return Get("neutral"); }
+
+        // move
+        inline const char* move_2() const { return Get("move"); }
+
+        // button
+        inline const char* button() const { return Get("button"); }
+
+        // Double-click to retype this frame.
+        inline const char* Double_click_to_retype_this_frame() const { return Get("Double-click to retype this frame."); }
+
+        // Click to watch from here. Drag to move. Right-click for more.
+        inline const char* Click_to_watch_from_here_Drag_to_move_Right_click_for_more() const { return Get("Click to watch from here. Drag to move. Right-click for more."); }
+
+        // %u frames selected
+        inline const char* u_frames_selected() const { return Get("%u frames selected"); }
+
+        // Move %u frames
+        inline const char* Move_u_frames() const { return Get("Move %u frames"); }
+
+        // Go to this frame
+        inline const char* Go_to_this_frame() const { return Get("Go to this frame"); }
+
+        // Frames
+        inline const char* Frames() const { return Get("Frames"); }
+
+        // Insert neutral above
+        inline const char* Insert_neutral_above() const { return Get("Insert neutral above"); }
+
+        // Insert neutral below
+        inline const char* Insert_neutral_below() const { return Get("Insert neutral below"); }
+
+        // Duplicate
+        inline const char* Duplicate() const { return Get("Duplicate"); }
+
+        // Undone.
+        inline const char* Undone() const { return Get("Undone."); }
+
+        // Redone.
+        inline const char* Redone() const { return Get("Redone."); }
+
+        // Play from the current frame to the end, then freeze there. At the end of the combo it plays from the start instead.
+        inline const char* Play_from_the_current_frame_to_the_end_then_freeze_there_At_the_end_of_the_combo_it_plays_from_the_start_instead() const { return Get("Play from the current frame to the end, then freeze there. At the end of the combo it plays from the start instead."); }
+
+        // TAS Combo tool
+        inline const char* TAS_Combo_tool() const { return Get("TAS Combo tool"); }
+
+        // Exit TAS Combo tool
+        inline const char* Exit_TAS_Combo_tool() const { return Get("Exit TAS Combo tool"); }
+
+        // Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.
+        inline const char* Frame_by_frame_combo_editor_build_a_combo_one_input_at_a_time_rewind_and_re_record_any_part_of_it_then_play_the_whole_thing_back_Training_mode_only() const { return Get("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only."); }
 };
 
 

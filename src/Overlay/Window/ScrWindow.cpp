@@ -12,6 +12,7 @@
 #include "Game/ReplayFiles/ReplayFileManager.h"
 #include "Game/Menus/TrainingSetupMenu.h"
 #include "Game/ScenesManager/ScenesManager.h"
+#include "Game/TasManager.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
 #include "Overlay/WindowManager.h"
 #include "Overlay/Window/HitboxOverlay.h"
@@ -60,6 +61,7 @@ void ScrWindow::Draw()
     DrawRoomSection();
     DrawInputBufferButton();
     DrawComboDataButton();
+    DrawTasComboToolButton();
 }
 void ScrWindow::DrawComboDataButton() {
     if (ImGui::Button("Combo Data"))
@@ -69,6 +71,38 @@ void ScrWindow::DrawComboDataButton() {
     ImGui::SameLine();
     ImGui::ShowHelpMarker(Messages.Combo_data_button_tooltip());
 }
+void ScrWindow::DrawTasComboToolButton() {
+    // Sits beside the other window toggles rather than inside the save-state section: it is
+    // a tool you open, and TasManager::Enter already explains itself when the match is not
+    // a training one.
+    ImGui::SameLine();
+    TasManager& tas = TasManager::Instance();
+    if (ImGui::Button(tas.IsActive() ? L("Exit TAS Combo tool").c_str()
+                                     : L("TAS Combo tool").c_str()))
+    {
+        if (tas.IsActive())
+        {
+            tas.Exit();
+            ScrWindow::m_pWindowContainer->GetWindow(WindowType_Tas)->Close();
+        }
+        else
+        {
+            tas.Enter();
+            if (tas.IsActive())
+            {
+                ScrWindow::m_pWindowContainer->GetWindow(WindowType_Tas)->Open();
+            }
+        }
+    }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(L("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.").c_str());
+
+    if (!tas.IsActive() && !tas.GetError().empty())
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", tas.GetError().c_str());
+    }
+}
+
 void ScrWindow::DrawInputBufferButton() {
     if (ImGui::Button("Input Buffer P1"))
     {
@@ -1551,11 +1585,13 @@ void ScrWindow::DrawSaveStates() {
             auto ensure_snapshot_apparatus = [&]() -> SnapshotApparatus* {
                 if (snap_apparatus == nullptr) {
                     snap_apparatus = new SnapshotApparatus();
+                    snap_apparatus->ReserveSlots("training_states", 1);
                 }
                 else if (!snap_apparatus->check_if_valid(g_interfaces.player1.GetData(),
                     g_interfaces.player2.GetData())) {
                     delete snap_apparatus;
                     snap_apparatus = new SnapshotApparatus();
+                    snap_apparatus->ReserveSlots("training_states", 1);
                 }
                 return snap_apparatus;
             };
@@ -1623,8 +1659,6 @@ void ScrWindow::DrawSaveStates() {
                     this->is_setup_time_running = false;
                 }
             }
-
-            ImGui::TextDisabled("%s", L("Open TAS mode from the F1 main window.").c_str());
         }
         else {
             ImGui::Text("You must be in a mode where state can be saved");
@@ -2071,11 +2105,13 @@ void ScrWindow::DrawReplayTakeover() {
     auto ensure_snapshot_apparatus_takeover = [&]() -> SnapshotApparatus* {
         if (snap_apparatus_takeover == nullptr) {
             snap_apparatus_takeover = new SnapshotApparatus();
+            snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
         }
         else if (!snap_apparatus_takeover->check_if_valid(g_interfaces.player1.GetData(),
             g_interfaces.player2.GetData())) {
             delete snap_apparatus_takeover;
             snap_apparatus_takeover = new SnapshotApparatus();
+            snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
         }
         return snap_apparatus_takeover;
     };

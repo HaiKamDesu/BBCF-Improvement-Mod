@@ -1,5 +1,7 @@
 #include "PalettesConfigWindow.h"
 
+#include "Core/NativeFileDialog.h"
+
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/Settings.h"
@@ -59,130 +61,15 @@ namespace
 		return _stricmp(fileName.c_str() + dot, extension) == 0;
 	}
 
-	// File dialogs follow the known-safe pattern from UnlimitedPlaybackWindow:
-	// the Win32 dialog runs on its own thread with OFN_NOCHANGEDIR and
-	// working-directory restore, and the render thread only consumes results.
-	enum class PaletteFileDialogAction
-	{
-		None,
-		ExportPalette,
-		ImportPalette,
-	};
+	constexpr const char* kFileDialogOwner = "palettes_window";
+	constexpr int kFileDialogExportPalette = 0;
+	constexpr int kFileDialogImportPalette = 1;
 
-	struct PaletteFileDialogState
-	{
-		std::mutex mutex;
-		bool active = false;
-		bool completed = false;
-		PaletteFileDialogAction action = PaletteFileDialogAction::None;
-		std::string path;
-		bool exportSucceeded = false;
-		std::string exportPalName;
-	};
-
-	PaletteFileDialogState g_paletteFileDialogState;
-
-	void StartExportPaletteDialogAsync(const IMPL_t& paletteFile, const std::string& palName)
-	{
-		{
-			std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-			if (g_paletteFileDialogState.active)
-				return;
-			g_paletteFileDialogState.active = true;
-			g_paletteFileDialogState.completed = false;
-			g_paletteFileDialogState.action = PaletteFileDialogAction::ExportPalette;
-			g_paletteFileDialogState.path.clear();
-			g_paletteFileDialogState.exportSucceeded = false;
-			g_paletteFileDialogState.exportPalName = palName;
-		}
-
-		std::thread([paletteFile, palName]() {
-			char selectedPath[MAX_PATH] = {};
-			char originalWorkingDirectory[MAX_PATH] = {};
-			OPENFILENAMEA ofn;
-			std::memset(&ofn, 0, sizeof(ofn));
-			GetCurrentDirectoryA(MAX_PATH, originalWorkingDirectory);
-
-			std::string defaultName = palName + IMPL_FILE_EXTENSION;
-			std::strncpy(selectedPath, defaultName.c_str(), MAX_PATH - 1);
-
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = nullptr;
-			ofn.lpstrFile = selectedPath;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.lpstrFilter = "BBCF Palette (*.cfpl)\0*.cfpl\0All Files\0*.*\0";
-			ofn.lpstrDefExt = "cfpl";
-			ofn.lpstrTitle = "Export palette";
-			ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-
-			const bool dialogConfirmed = GetSaveFileNameA(&ofn) == TRUE;
-
-			if (originalWorkingDirectory[0] != '\0')
-			{
-				SetCurrentDirectoryA(originalWorkingDirectory);
-			}
-
-			bool written = false;
-			if (dialogConfirmed)
-			{
-				IMPL_t fileToWrite = paletteFile;
-				written = utils_WriteFile(selectedPath, &fileToWrite, sizeof(IMPL_t), true);
-			}
-
-			std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-			g_paletteFileDialogState.path = dialogConfirmed ? selectedPath : "";
-			g_paletteFileDialogState.exportSucceeded = written;
-			g_paletteFileDialogState.completed = dialogConfirmed; // silent on cancel
-			g_paletteFileDialogState.active = false;
-		}).detach();
-	}
-
-	void StartImportPaletteDialogAsync()
-	{
-		{
-			std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-			if (g_paletteFileDialogState.active)
-				return;
-			g_paletteFileDialogState.active = true;
-			g_paletteFileDialogState.completed = false;
-			g_paletteFileDialogState.action = PaletteFileDialogAction::ImportPalette;
-			g_paletteFileDialogState.path.clear();
-		}
-
-		std::thread([]() {
-			char selectedPath[MAX_PATH] = {};
-			char originalWorkingDirectory[MAX_PATH] = {};
-			OPENFILENAMEA ofn;
-			std::memset(&ofn, 0, sizeof(ofn));
-			GetCurrentDirectoryA(MAX_PATH, originalWorkingDirectory);
-
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = nullptr;
-			ofn.lpstrFile = selectedPath;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.lpstrFilter = "BBCF Palettes (*.cfpl;*.hpl)\0*.cfpl;*.hpl\0All Files\0*.*\0";
-			ofn.lpstrTitle = "Import palette";
-			ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-
-			const bool dialogConfirmed = GetOpenFileNameA(&ofn) == TRUE;
-
-			if (originalWorkingDirectory[0] != '\0')
-			{
-				SetCurrentDirectoryA(originalWorkingDirectory);
-			}
-
-			std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-			g_paletteFileDialogState.path = dialogConfirmed ? selectedPath : "";
-			g_paletteFileDialogState.completed = dialogConfirmed; // silent on cancel
-			g_paletteFileDialogState.active = false;
-		}).detach();
-	}
-
-	bool IsFileDialogActive()
-	{
-		std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-		return g_paletteFileDialogState.active;
-	}
+	// The picker thread only asks for a path; the palette waits here and is written on the
+	// UI thread once the answer comes back. IMPL_t is not copy-assignable, so it is held as
+	// raw bytes rather than a value.
+	std::vector<unsigned char> g_pendingExportPaletteBytes;
+	std::string g_pendingExportPalName;
 
 	// Palettes can sit in subfolders and exist as .cfpl or legacy .hpl; legacy
 	// ones may also have companion "<name>_effect0X.hpl" / "<name>_effectbloom.hpl"
@@ -478,33 +365,24 @@ void PalettesConfigWindow::DrawDeleteConfirmModal()
 
 void PalettesConfigWindow::ConsumeFinishedFileDialog()
 {
-	PaletteFileDialogAction action;
-	std::string path;
-	bool exportSucceeded;
-	std::string exportPalName;
+	NativeFileDialog::Result result;
+	if (!NativeFileDialog::Consume(kFileDialogOwner, &result) || !result.accepted)
+		return;
 
+	const std::string path = result.path;
+
+	if (result.contextId == kFileDialogExportPalette)
 	{
-		std::lock_guard<std::mutex> lock(g_paletteFileDialogState.mutex);
-		if (!g_paletteFileDialogState.completed)
-			return;
-
-		action = g_paletteFileDialogState.action;
-		path = g_paletteFileDialogState.path;
-		exportSucceeded = g_paletteFileDialogState.exportSucceeded;
-		exportPalName = g_paletteFileDialogState.exportPalName;
-		g_paletteFileDialogState.completed = false;
-	}
-
-	if (action == PaletteFileDialogAction::ExportPalette)
-	{
-		if (exportSucceeded)
-			g_imGuiLogger->Log("[system] Exported palette '%s' to '%s'\n", exportPalName.c_str(), path.c_str());
+		const bool written = g_pendingExportPaletteBytes.size() == sizeof(IMPL_t) &&
+			utils_WriteFile(path.c_str(), g_pendingExportPaletteBytes.data(), sizeof(IMPL_t), true);
+		if (written)
+			g_imGuiLogger->Log("[system] Exported palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
 		else
-			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s'\n", exportPalName.c_str(), path.c_str());
+			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
 		return;
 	}
 
-	if (action != PaletteFileDialogAction::ImportPalette || path.empty())
+	if (result.contextId != kFileDialogImportPalette || path.empty())
 		return;
 
 	const std::string fileName = FileNameFromPath(path);
@@ -609,19 +487,19 @@ void PalettesConfigWindow::DrawImportButton()
 	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
 		(ImGui::GetWindowWidth() - buttonWidth) * 0.5f));
 
-	const bool dialogBusy = IsFileDialogActive();
-	if (dialogBusy)
+	const bool dialogBusy = NativeFileDialog::IsOpen();
+	ImGui::BeginDisabled(dialogBusy);
+
+	if (ImGui::Button(Messages.Import_palette_button(), ImVec2(buttonWidth, 0)))
 	{
-		ImGui::BeginDisabled();
+		NativeFileDialog::Request request;
+		request.title = "Import palette";
+		request.filters.push_back({ "BBCF Palettes (*.cfpl;*.hpl)", "*.cfpl;*.hpl" });
+		request.contextId = kFileDialogImportPalette;
+		NativeFileDialog::Open(kFileDialogOwner, request);
 	}
 
-	if (ImGui::Button(Messages.Import_palette_button(), ImVec2(buttonWidth, 0)) && !dialogBusy)
-		StartImportPaletteDialogAsync();
-
-	if (dialogBusy)
-	{
-		ImGui::EndDisabled();
-	}
+	ImGui::EndDisabled();
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(Messages.Palette_import_help());
 }
@@ -737,14 +615,26 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 		if (!row.isSpecial)
 		{
 			ImGui::SameLine();
-			if (ImGui::Button(Messages.Export()) && !IsFileDialogActive())
+			if (ImGui::Button(Messages.Export()) && !NativeFileDialog::IsOpen())
 			{
 				IMPL_t paletteFile{};
 				paletteFile.header.headerLen = sizeof(IMPL_header_t);
 				paletteFile.header.dataLen = sizeof(IMPL_data_t);
 				paletteFile.header.charIndex = (short)group.charIndex;
 				paletteFile.palData = customPalettes[group.charIndex][row.palIndex];
-				StartExportPaletteDialogAsync(paletteFile, row.name);
+
+				g_pendingExportPaletteBytes.resize(sizeof(IMPL_t));
+				std::memcpy(g_pendingExportPaletteBytes.data(), &paletteFile, sizeof(IMPL_t));
+				g_pendingExportPalName = row.name;
+
+				NativeFileDialog::Request request;
+				request.save = true;
+				request.title = "Export palette";
+				request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
+				request.defaultExtension = "cfpl";
+				request.initialPath = row.name + IMPL_FILE_EXTENSION;
+				request.contextId = kFileDialogExportPalette;
+				NativeFileDialog::Open(kFileDialogOwner, request);
 			}
 			ImGui::HoverTooltip(Messages.Palette_export_tooltip());
 

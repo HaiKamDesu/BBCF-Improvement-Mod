@@ -41,6 +41,7 @@ private:
 	void DrawInputBufferButton();
 	void DrawPlaybackEditor();
 	void DrawComboDataButton();
+	void DrawTasComboToolButton();
 	PlaybackManager playback_manager;
 	bool m_showDemoWindow = false;
 	void* p2_old_char_data = NULL;

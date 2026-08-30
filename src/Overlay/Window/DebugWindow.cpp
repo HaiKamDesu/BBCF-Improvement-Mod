@@ -222,6 +222,7 @@ void DebugWindow::DrawGameValuesSection()
 		static int snapshot_position_counter = 0;
 		if (snap_apparatus_debug == nullptr) {
 			snap_apparatus_debug = new SnapshotApparatus();
+			snap_apparatus_debug->ReserveSlots("debug_window", 1);
 		}
 		if (ImGui::Button("Save snapshot")) {
 			Snapshot* pbuf_mine = new Snapshot();

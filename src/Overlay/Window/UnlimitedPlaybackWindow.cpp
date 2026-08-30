@@ -1,5 +1,7 @@
 #include "UnlimitedPlaybackWindow.h"
 
+#include "Core/NativeFileDialog.h"
+
 #include "Core/Localization.h"
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
@@ -118,151 +120,46 @@ enum class NativeFileDialogAction {
     ExportEntryPlayback,
 };
 
-struct NativeFileDialogState {
-    std::mutex mutex;
-    bool active = false;
-    bool completed = false;
-    bool canceled = false;
-    NativeFileDialogAction action = NativeFileDialogAction::None;
-    int contextIndex = -1;
-    std::string path;
-};
-
-NativeFileDialogState g_nativeFileDialogState;
 const char* kNativeFileDialogToastKey = "up_native_file_dialog";
+constexpr const char* kFileDialogOwner = "unlimited_playback_window";
 
-void StartNativeFileDialogAsync(NativeFileDialogAction action, const std::string& initialPath, int contextIndex = -1) {
-    {
-        std::lock_guard<std::mutex> lock(g_nativeFileDialogState.mutex);
-        if (g_nativeFileDialogState.active) {
-            return;
-        }
-        g_nativeFileDialogState.active = true;
-        g_nativeFileDialogState.completed = false;
-        g_nativeFileDialogState.canceled = false;
-        g_nativeFileDialogState.action = action;
-        g_nativeFileDialogState.contextIndex = contextIndex;
-        g_nativeFileDialogState.path.clear();
+// The shared picker carries one opaque int, which the action claims, so the entry an
+// export belongs to is parked here alongside it.
+int g_pendingExportEntryIndex = -1;
+
+NativeFileDialog::Request BuildFileDialogRequest(NativeFileDialogAction action, const std::string& initialPath) {
+    NativeFileDialog::Request request;
+    request.contextId = static_cast<int>(action);
+
+    switch (action) {
+    case NativeFileDialogAction::LoadProfile:
+        request.title = L("Load unlimited playback profile");
+        request.filters.push_back({ "Unlimited Playback Profile (*.upl)", "*.upl" });
+        request.defaultExtension = "upl";
+        break;
+    case NativeFileDialogAction::SaveProfile:
+        request.save = true;
+        request.title = L("Save unlimited playback profile");
+        request.filters.push_back({ "Unlimited Playback Profile (*.upl)", "*.upl" });
+        request.defaultExtension = "upl";
+        break;
+    case NativeFileDialogAction::ImportPlayback:
+        request.title = L("Import unlimited playback entry");
+        request.filters.push_back({ "Unlimited Playback Entry (*.playback)", "*.playback" });
+        request.defaultExtension = "playback";
+        break;
+    case NativeFileDialogAction::ExportEntryPlayback:
+        request.save = true;
+        request.title = L("Export unlimited playback entry");
+        request.filters.push_back({ "Unlimited Playback Entry (*.playback)", "*.playback" });
+        request.defaultExtension = "playback";
+        break;
+    default:
+        break;
     }
 
-    std::thread([action, initialPath, contextIndex]() {
-        char selectedPath[MAX_PATH] = {};
-        char initialDir[MAX_PATH] = {};
-        char originalWorkingDirectory[MAX_PATH] = {};
-        OPENFILENAMEA ofn;
-        std::memset(&ofn, 0, sizeof(ofn));
-        GetCurrentDirectoryA(MAX_PATH, originalWorkingDirectory);
-
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = nullptr;
-        ofn.lpstrFile = selectedPath;
-        ofn.nMaxFile = MAX_PATH;
-
-        bool saveDialog = false;
-        switch (action) {
-        case NativeFileDialogAction::LoadProfile:
-            ofn.lpstrFilter = "Unlimited Playback Profile (*.upl)\0*.upl\0All Files\0*.*\0";
-            ofn.lpstrDefExt = "upl";
-            ofn.lpstrTitle = L("Load unlimited playback profile").c_str();
-            break;
-        case NativeFileDialogAction::SaveProfile:
-            ofn.lpstrFilter = "Unlimited Playback Profile (*.upl)\0*.upl\0All Files\0*.*\0";
-            ofn.lpstrDefExt = "upl";
-            ofn.lpstrTitle = L("Save unlimited playback profile").c_str();
-            saveDialog = true;
-            break;
-        case NativeFileDialogAction::ImportPlayback:
-            ofn.lpstrFilter = "Unlimited Playback Entry (*.playback)\0*.playback\0All Files\0*.*\0";
-            ofn.lpstrDefExt = "playback";
-            ofn.lpstrTitle = L("Import unlimited playback entry").c_str();
-            break;
-        case NativeFileDialogAction::ExportEntryPlayback:
-            ofn.lpstrFilter = "Unlimited Playback Entry (*.playback)\0*.playback\0All Files\0*.*\0";
-            ofn.lpstrDefExt = "playback";
-            ofn.lpstrTitle = L("Export unlimited playback entry").c_str();
-            saveDialog = true;
-            break;
-        default:
-            break;
-        }
-
-        const std::string pathSeed = initialPath.empty() ? kUnlimitedPlaybackProfileFolder : initialPath;
-        const DWORD pathAttributes = GetFileAttributesA(pathSeed.c_str());
-        if (pathAttributes != INVALID_FILE_ATTRIBUTES && (pathAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            std::strncpy(initialDir, pathSeed.c_str(), MAX_PATH - 1);
-            initialDir[MAX_PATH - 1] = '\0';
-            ofn.lpstrInitialDir = initialDir;
-        } else {
-            std::strncpy(selectedPath, pathSeed.c_str(), MAX_PATH - 1);
-            selectedPath[MAX_PATH - 1] = '\0';
-
-            const char* slash = (std::max)(std::strrchr(selectedPath, '\\'), std::strrchr(selectedPath, '/'));
-            if (slash != nullptr) {
-                const size_t dirLen = static_cast<size_t>(slash - selectedPath);
-                if (dirLen < MAX_PATH) {
-                    std::memcpy(initialDir, selectedPath, dirLen);
-                    initialDir[dirLen] = '\0';
-                    ofn.lpstrInitialDir = initialDir;
-                }
-
-                const char* fileName = slash + 1;
-                std::memmove(selectedPath, fileName, std::strlen(fileName) + 1);
-            }
-        }
-
-        bool success = false;
-        if (saveDialog) {
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-            success = GetSaveFileNameA(&ofn) == TRUE;
-        } else {
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-            success = GetOpenFileNameA(&ofn) == TRUE;
-        }
-
-        if (originalWorkingDirectory[0] != '\0') {
-            SetCurrentDirectoryA(originalWorkingDirectory);
-        }
-
-        std::lock_guard<std::mutex> lock(g_nativeFileDialogState.mutex);
-        g_nativeFileDialogState.path = success ? selectedPath : "";
-        g_nativeFileDialogState.canceled = !success;
-        g_nativeFileDialogState.completed = true;
-        g_nativeFileDialogState.active = false;
-        g_nativeFileDialogState.action = action;
-        g_nativeFileDialogState.contextIndex = contextIndex;
-    }).detach();
-}
-
-bool ConsumeCompletedNativeFileDialog(NativeFileDialogAction* outAction, std::string* outPath, bool* outCanceled, int* outContextIndex) {
-    std::lock_guard<std::mutex> lock(g_nativeFileDialogState.mutex);
-    if (!g_nativeFileDialogState.completed) {
-        return false;
-    }
-
-    if (outAction) {
-        *outAction = g_nativeFileDialogState.action;
-    }
-    if (outPath) {
-        *outPath = g_nativeFileDialogState.path;
-    }
-    if (outCanceled) {
-        *outCanceled = g_nativeFileDialogState.canceled;
-    }
-    if (outContextIndex) {
-        *outContextIndex = g_nativeFileDialogState.contextIndex;
-    }
-
-    g_nativeFileDialogState.completed = false;
-    g_nativeFileDialogState.canceled = false;
-    g_nativeFileDialogState.action = NativeFileDialogAction::None;
-    g_nativeFileDialogState.contextIndex = -1;
-    g_nativeFileDialogState.path.clear();
-    return true;
-}
-
-bool NativeFileDialogActive() {
-    std::lock_guard<std::mutex> lock(g_nativeFileDialogState.mutex);
-    return g_nativeFileDialogState.active;
+    request.initialPath = initialPath.empty() ? kUnlimitedPlaybackProfileFolder : initialPath;
+    return request;
 }
 
 bool DrawContextButton(const char* label, bool enabled) {
@@ -467,11 +364,14 @@ void UnlimitedPlaybackWindow::Draw() {
     mgr.PruneExpiredToasts();
 
     const auto beginNativeDialog = [&mgr](NativeFileDialogAction action, const std::string& initialPath, const char* activityText, int contextIndex = -1) {
-        if (NativeFileDialogActive()) {
+        if (NativeFileDialog::IsOpen()) {
             mgr.PushToast(L("A native file dialog is already open."));
             return false;
         }
-        StartNativeFileDialogAsync(action, initialPath, contextIndex);
+        g_pendingExportEntryIndex = contextIndex;
+        if (!NativeFileDialog::Open(kFileDialogOwner, BuildFileDialogRequest(action, initialPath))) {
+            return false;
+        }
         mgr.PushStickyToast(kNativeFileDialogToastKey, activityText);
         return true;
     };
@@ -516,9 +416,13 @@ void UnlimitedPlaybackWindow::Draw() {
 
     NativeFileDialogAction completedDialogAction = NativeFileDialogAction::None;
     std::string completedDialogPath;
-    bool completedDialogCanceled = false;
-    int completedDialogContextIndex = -1;
-    if (ConsumeCompletedNativeFileDialog(&completedDialogAction, &completedDialogPath, &completedDialogCanceled, &completedDialogContextIndex)) {
+    bool completedDialogCanceled = true;
+    const int completedDialogContextIndex = g_pendingExportEntryIndex;
+    NativeFileDialog::Result completedDialogResult;
+    if (NativeFileDialog::Consume(kFileDialogOwner, &completedDialogResult)) {
+        completedDialogAction = static_cast<NativeFileDialogAction>(completedDialogResult.contextId);
+        completedDialogPath = completedDialogResult.path;
+        completedDialogCanceled = !completedDialogResult.accepted;
         mgr.RemoveStickyToast(kNativeFileDialogToastKey);
     }
     if (!completedDialogCanceled && !completedDialogPath.empty()) {

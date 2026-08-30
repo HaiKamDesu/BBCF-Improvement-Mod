@@ -2449,12 +2449,14 @@ bool UnlimitedPlaybackManager::EnsureLoopSnapshotApparatus(bool preserveCustomSn
 
     if (!m_loopSnapshotApparatus) {
         m_loopSnapshotApparatus = new SnapshotApparatus();
+        m_loopSnapshotApparatus->ReserveSlots("playback_loop", 1);
         return m_loopSnapshotApparatus != nullptr;
     }
 
     if (!m_loopSnapshotApparatus->check_if_valid(g_interfaces.player1.GetData(), g_interfaces.player2.GetData())) {
         delete m_loopSnapshotApparatus;
         m_loopSnapshotApparatus = new SnapshotApparatus();
+        m_loopSnapshotApparatus->ReserveSlots("playback_loop", 1);
         if (!preserveCustomSnapshot) {
             ClearLoopCustomSnapshot();
         }
@@ -2467,13 +2469,12 @@ bool UnlimitedPlaybackManager::CaptureLoopSnapshotInternal() {
         return false;
     }
 
-    const int savedSlot = static_cast<int>(m_loopSnapshotApparatus->snapshot_count % 10);
     const bool nativeOk = m_loopSnapshotApparatus->save_snapshot(nullptr);
     if (!nativeOk) {
         ClearLoopCustomSnapshot();
         return false;
     }
-    m_loopCustomSnapshotSlotIndex = savedSlot;
+    m_loopCustomSnapshotSlotIndex = m_loopSnapshotApparatus->last_saved_slot();
     m_loopCustomSnapshotSize = m_loopSnapshotApparatus->get_last_saved_snapshot_size();
 
     m_loopCustomSnapshotBytes.clear();
@@ -2517,10 +2518,7 @@ bool UnlimitedPlaybackManager::RestoreLoopCustomSnapshot(bool showToast) {
     }
 
     if (m_loopCustomSnapshotSlotIndex >= 0) {
-        const unsigned int oldCount = m_loopSnapshotApparatus->snapshot_count;
-        m_loopSnapshotApparatus->snapshot_count = static_cast<unsigned int>(m_loopCustomSnapshotSlotIndex + 1);
-        const bool ok = m_loopSnapshotApparatus->load_snapshot(nullptr);
-        m_loopSnapshotApparatus->snapshot_count = oldCount;
+        const bool ok = m_loopSnapshotApparatus->load_snapshot_index(m_loopCustomSnapshotSlotIndex);
         if (showToast) {
             PushToast(ok ? L("Custom loop snapshot loaded.") : L("Custom loop snapshot load failed."));
         }

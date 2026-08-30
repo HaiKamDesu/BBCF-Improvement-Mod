@@ -1,6 +1,7 @@
 #include "UnlimitedReplayTakeoverWindow.h"
 
 #include "Game/ReplayTakeover/UnlimitedReplayTakeoverManager.h"
+#include "Core/NativeFileDialog.h"
 #include "Core/logger.h"
 #include "Core/interfaces.h"
 #include "Game/gamestates.h"
@@ -13,6 +14,11 @@
 #include <string>
 
 namespace {
+
+constexpr const char* kFileDialogOwner = "urt_window";
+constexpr int kFileDialogLoadProfile = 0;
+constexpr int kFileDialogSaveProfile = 1;
+
 void LogUrtWindowContext(const char* tag, int selectedEntry, size_t entryCount, bool inTrainingMatch, bool inReplayMatch) {
     const int gameMode = (g_gameVals.pGameMode != nullptr) ? *g_gameVals.pGameMode : -1;
     const int gameState = (g_gameVals.pGameState != nullptr) ? *g_gameVals.pGameState : -1;
@@ -40,39 +46,6 @@ void LogUrtWindowContext(const char* tag, int selectedEntry, size_t entryCount, 
         io.MousePos.x > -FLT_MAX ? 1 : 0,
         io.MousePos.x,
         io.MousePos.y);
-}
-
-bool OpenFileDialogForFilter(const char* title, const char* filter, char* outPath, int outPathSize) {
-    OPENFILENAMEA ofn;
-    std::memset(&ofn, 0, sizeof(ofn));
-    outPath[0] = '\0';
-
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFilter = filter;
-    ofn.lpstrFile = outPath;
-    ofn.nMaxFile = outPathSize;
-    ofn.lpstrTitle = title;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-
-    return GetOpenFileNameA(&ofn) == TRUE;
-}
-
-bool SaveFileDialogForFilter(const char* title, const char* filter, const char* defaultExt, char* outPath, int outPathSize) {
-    OPENFILENAMEA ofn;
-    std::memset(&ofn, 0, sizeof(ofn));
-    outPath[0] = '\0';
-
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFilter = filter;
-    ofn.lpstrDefExt = defaultExt;
-    ofn.lpstrFile = outPath;
-    ofn.nMaxFile = outPathSize;
-    ofn.lpstrTitle = title;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
-
-    return GetSaveFileNameA(&ofn) == TRUE;
 }
 
 int CaptureNextPressedVirtualKey() {
@@ -128,6 +101,23 @@ void UnlimitedReplayTakeoverWindow::BeforeDraw() {
 }
 
 void UnlimitedReplayTakeoverWindow::Draw() {
+    {
+        // Picked up here rather than at the button, because the dialog outlives the click.
+        NativeFileDialog::Result fileResult;
+        if (NativeFileDialog::Consume(kFileDialogOwner, &fileResult) && fileResult.accepted) {
+            UnlimitedReplayTakeoverManager& fileMgr = UnlimitedReplayTakeoverManager::Instance();
+            if (fileResult.contextId == kFileDialogLoadProfile) {
+                if (!fileMgr.LoadProfile(fileResult.path)) {
+                    fileMgr.PushToast("Failed to load replay takeover profile.");
+                }
+            } else if (fileResult.contextId == kFileDialogSaveProfile) {
+                if (!fileMgr.SaveProfile(fileResult.path)) {
+                    fileMgr.PushToast("Failed to save replay takeover profile.");
+                }
+            }
+        }
+    }
+
     auto& mgr = UnlimitedReplayTakeoverManager::Instance();
     mgr.InitializeIfNeeded();
     mgr.PruneExpiredToasts();
@@ -200,23 +190,27 @@ void UnlimitedReplayTakeoverWindow::Draw() {
 
     ImGui::Separator();
     ImGui::BeginChild("urt_top_controls", ImVec2(0, 84), true);
+    // Both pickers run off the render thread; the answer arrives via ConsumeFileDialog().
+    ImGui::BeginDisabled(NativeFileDialog::IsOpen());
     if (ImGui::Button("Load Profile")) {
-        char selectedPath[MAX_PATH] = {};
-        if (OpenFileDialogForFilter("Load replay takeover profile", "Replay Takeover Profile (*.urt)\0*.urt\0All Files\0*.*\0", selectedPath, MAX_PATH)) {
-            if (!mgr.LoadProfile(selectedPath)) {
-                mgr.PushToast("Failed to load replay takeover profile.");
-            }
-        }
+        NativeFileDialog::Request request;
+        request.title = "Load replay takeover profile";
+        request.filters.push_back({ "Replay Takeover Profile (*.urt)", "*.urt" });
+        request.defaultExtension = "urt";
+        request.contextId = kFileDialogLoadProfile;
+        NativeFileDialog::Open(kFileDialogOwner, request);
     }
     ImGui::SameLine();
     if (ImGui::Button("Save Profile")) {
-        char selectedPath[MAX_PATH] = {};
-        if (SaveFileDialogForFilter("Save replay takeover profile", "Replay Takeover Profile (*.urt)\0*.urt\0All Files\0*.*\0", "urt", selectedPath, MAX_PATH)) {
-            if (!mgr.SaveProfile(selectedPath)) {
-                mgr.PushToast("Failed to save replay takeover profile.");
-            }
-        }
+        NativeFileDialog::Request request;
+        request.save = true;
+        request.title = "Save replay takeover profile";
+        request.filters.push_back({ "Replay Takeover Profile (*.urt)", "*.urt" });
+        request.defaultExtension = "urt";
+        request.contextId = kFileDialogSaveProfile;
+        NativeFileDialog::Open(kFileDialogOwner, request);
     }
+    ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Clear All")) {
         mgr.ClearAll();
