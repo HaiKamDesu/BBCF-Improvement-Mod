@@ -31,6 +31,7 @@
 #include "Core/WineCheck.h"
 #include "Core/utils.h"
 #include "Web/update_check.h"
+#include "Audio/MusicManager.h"
 #include "Updater/UpdateCoordinator.h"
 
 #include "imgui_utils.h"
@@ -245,6 +246,8 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 
 	g_interfaces.pPaletteManager->LoadAllPalettes();
 
+	MusicManager::GetInstance().Initialize();
+
 	// Calling a frame to initialize beforehand to prevent a crash upon first call of Update() if the game window is not focused.
 	// Simply calling ImGui_ImplDX9_CreateDeviceObjects() might be enough too
 	ImGui_ImplWin32_NewFrame();
@@ -352,6 +355,10 @@ void WindowManager::Render()
 		return;
 	}
 
+	// The "return to Character Select?" confirm dialog's message id only exists in the
+	// render-phase UI buffer, so the Jukebox has to sample it from here.
+	GetMusicManager().PollDialogRenderPhase();
+
 	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
 	{
 		return;
@@ -449,6 +456,22 @@ void WindowManager::HandleButtons()
 	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleHud) && g_gameVals.pIsHUDHidden)
 	{
 		*g_gameVals.pIsHUDHidden ^= 1;
+	}
+
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleJukebox))
+	{
+		IWindow* jukebox = m_windowContainer->GetWindow(WindowType_Jukebox);
+		const bool opening = !jukebox->IsOpen();
+		jukebox->ToggleOpen();
+		if (opening)
+		{
+			GetMusicManager().StartCustomMusicDiscovery();
+		}
+	}
+
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_JukeboxNextTrack))
+	{
+		GetMusicManager().PlayNextTrack();
 	}
 
 	// Driven from the render loop rather than the GetFrameCounter hook: that hook only

@@ -66,6 +66,14 @@ HOTKEY(RankedAutomation, rankedAutomationHarnessHotkey, "RankedAutomationHarness
 	"Ranked automation harness",
 	"Starts or stops the ranked automation test tool. This is a development aid; leave it alone unless you were asked to use it.")
 
+HOTKEY(ToggleJukebox, toggleJukeboxButton, "ToggleJukeboxButton", "F10",
+	"Open/close the Jukebox",
+	"Shows or hides the Jukebox, where you pick which songs the game is allowed to play during a match and how it moves between them.")
+
+HOTKEY(JukeboxNextTrack, nextTrackButton, "NextTrackButton", "F11",
+	"Play the next song",
+	"Skips straight to the next song in your Jukebox playlist without waiting for the current one to finish.")
+
 HOTKEY(TasParse, tasParseKeybind, "TasParseKeybind", "I",
 	"TAS: apply typed inputs",
 	"In TAS mode, reads the numpad-notation inputs you typed into the TAS window and appends them to the movie.")

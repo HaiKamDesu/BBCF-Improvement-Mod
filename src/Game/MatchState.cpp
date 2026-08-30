@@ -1,5 +1,6 @@
 #include "MatchState.h"
 
+#include "Audio/MusicManager.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Game/gamestates.h"
@@ -24,6 +25,8 @@ void MatchState::OnMatchInit()
 	LOG(2, "MatchState::OnMatchInit\n");
 
 	RankedListConnectionFilter::GetInstance().OnMatchStarted();
+
+	GetMusicManager().OnMatchInit();
 
 	g_interfaces.pPaletteManager->LoadPaletteSettingsFile();
 	g_interfaces.pPaletteManager->OnMatchInit(g_interfaces.player1, g_interfaces.player2);
@@ -72,6 +75,13 @@ void MatchState::OnMatchRematch()
 {
 	LOG(2, "MatchState::OnMatchRematch\n");
 
+	// Backup BGM cleanup for flows that reach the rematch/summary screen without
+	// hitting the primary one (UpdateMusicState clears on MatchState -> VictoryScreen,
+	// while the audio engine is still alive). By here the engine is usually already
+	// tearing down, so the bank ops no-op and only the game-facing state restore
+	// applies. No-op unless the Jukebox took over BGM.
+	GetMusicManager().RestoreNativeBgmForMatchEnd();
+
 	g_interfaces.pPaletteManager->OnMatchRematch(
 		g_interfaces.player1,
 		g_interfaces.player2
@@ -83,6 +93,12 @@ void MatchState::OnMatchRematch()
 void MatchState::OnMatchEnd()
 {
 	LOG(2, "MatchState::OnMatchEnd\n");
+
+	// Clear the mod's custom BGM footprint at match end so the game's native
+	// post-match transition (summary / Character Select / Main Menu) doesn't stall
+	// on our direct-XACT state. Idempotent with the Character Select hook.
+	if (GetMusicManager().IsControllingBgm())
+		GetMusicManager().ClearBgmForSceneExit();
 
 	g_interfaces.pGameModeManager->EndGameMode();
 

@@ -22,6 +22,7 @@
 #include "Overlay/Widget/GameModeSelectWidget.h"
 #include "Overlay/Widget/StageSelectWidget.h"
 #include "Updater/UpdateCoordinator.h"
+#include "Audio/MusicManager.h"
 
 #include <Windows.h>
 
@@ -102,6 +103,7 @@ void MainWindow::Draw()
 	DrawFrameAdvantageSection();
 	DrawAvatarSection();
 	DrawControllerSettingSection();
+	DrawMusicSection();
 	m_settingsIniWindow.DrawModal();
 	m_palettesConfigWindow.DrawModal();
 	DrawUtilButtons();
@@ -582,6 +584,61 @@ void MainWindow::DrawControllerSettingSection() const {
 
 	ControllerSettings::DrawSection();
 } // DrawControllerSettingSection
+
+void MainWindow::DrawMusicSection() const
+{
+	if (!ImGui::CollapsingHeader(L("Music").c_str()))
+		return;
+
+	MusicManager& musicManager = GetMusicManager();
+
+	ImGui::HorizontalSpacing();
+	const MusicTrack* currentTrack = musicManager.GetCurrentTrack();
+	ImGui::Text("%s: %s", L("Current track").c_str(),
+		(currentTrack && musicManager.ShouldShowPlayback()) ? currentTrack->name.c_str() : L("None").c_str());
+
+	ImGui::HorizontalSpacing();
+	bool enabled = musicManager.IsEnabled();
+	if (ImGui::Checkbox(L("Enable music rotation").c_str(), &enabled)) {
+		musicManager.SetEnabled(enabled);
+		musicManager.SavePreferences();
+	}
+
+	ImGui::HorizontalSpacing();
+	bool repeatSingle = musicManager.IsRepeatSingle();
+	if (ImGui::Checkbox(L("Repeat Single").c_str(), &repeatSingle)) {
+		musicManager.SetRepeatSingle(repeatSingle);
+		musicManager.SavePreferences();
+	}
+
+	ImGui::HorizontalSpacing();
+	int rotationMode = static_cast<int>(musicManager.GetRotationMode());
+	ImGui::Text("%s", L("Rotation Mode:").c_str());
+	ImGui::SameLine();
+	if (ImGui::RadioButton(L("Sequential").c_str(), &rotationMode, 1)) {
+		musicManager.SetRotationMode(MusicRotationMode::Sequential);
+		musicManager.SavePreferences();
+	}
+	ImGui::SameLine();
+	if (ImGui::RadioButton(L("Shuffle").c_str(), &rotationMode, 2)) {
+		musicManager.SetRotationMode(MusicRotationMode::Shuffle);
+		musicManager.SavePreferences();
+	}
+
+	ImGui::HorizontalSpacing();
+	if (ImGui::Button(L("Play Next >|").c_str())) {
+		musicManager.PlayNextTrack();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("%s: %s", L("Shortcut").c_str(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_JukeboxNextTrack)).c_str());
+
+	ImGui::HorizontalSpacing();
+	if (ImGui::Button(L("Open Jukebox").c_str())) {
+		musicManager.StartCustomMusicDiscovery();
+		m_pWindowContainer->GetWindow(WindowType_Jukebox)->ToggleOpen();
+	}
+}
 
 void MainWindow::DrawLinkButtons() const
 {

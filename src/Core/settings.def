@@ -45,6 +45,8 @@ SETTING(bool, rankedProgressShowCharacterLeaderboardPlacement, "RankedProgressSh
 SETTING(bool, rankedProgressShowGlobalLeaderboardPlacement, "RankedProgressShowGlobalLeaderboardPlacement", "0");
 SETTING(bool, rankedAutomationHarnessEnabled, "RankedAutomationHarnessEnabled", "0");
 SETTING(std::string, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8");
+SETTING(std::string, toggleJukeboxButton, "ToggleJukeboxButton", "F10");
+SETTING(std::string, nextTrackButton, "NextTrackButton", "F11");
 SETTING(bool, rankedAutomationHarnessAutorun, "RankedAutomationHarnessAutorun", "0");
 SETTING(bool, rankedAutomationHarnessQuitOnFinish, "RankedAutomationHarnessQuitOnFinish", "0");
 // Watchdog for the "D-Code bug": when a per-room-member profile fetch wedges

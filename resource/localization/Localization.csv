@@ -1091,3 +1091,39 @@ Redone.,Redone.,Rehecho.
 TAS Combo tool,TAS Combo tool,Herramienta de combos TAS
 Exit TAS Combo tool,Exit TAS Combo tool,Salir de la herramienta de combos TAS
 "Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.","Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.","Editor de combos frame a frame: construye un combo entrada por entrada, retrocede y regraba cualquier parte y luego reprodúcelo entero. Solo en modo entrenamiento."
+Jukebox,Jukebox,Jukebox
+Music,Music,Música
+Loading custom music...,Loading custom music...,Cargando música personalizada...
+Enable Music Rotation,Enable Music Rotation,Activar rotación de música
+Enable music rotation,Enable music rotation,Activar rotación de música
+Enable/disable automatic music rotation in-game,Enable/disable automatic music rotation in-game,Activa o desactiva la rotación automática de música durante la partida
+Rotation Mode:,Rotation Mode:,Modo de rotación:
+Sequential: play tracks in order,Sequential: play tracks in order,Secuencial: reproduce las canciones en orden
+"Shuffle: play tracks in a shuffled order, no repeats until all have played","Shuffle: play tracks in a shuffled order, no repeats until all have played","Aleatorio: reproduce las canciones en orden aleatorio, sin repetir hasta que suenen todas"
+Shuffle,Shuffle,Aleatorio
+VS/Online Rematch:,VS/Online Rematch:,Revancha en VS/Online:
+Character Select Track,Character Select Track,Canción elegida en selección de personaje
+Resume Last Playlist Track,Resume Last Playlist Track,Retomar la última canción de la lista
+Play Next Playlist Track,Play Next Playlist Track,Reproducir la siguiente canción de la lista
+Character Select Track: use the song selected at Character Select,Character Select Track: use the song selected at Character Select,Canción elegida en selección de personaje: usa la canción elegida en la pantalla de selección
+Resume Last Playlist Track: restart the last song played by the Jukebox,Resume Last Playlist Track: restart the last song played by the Jukebox,Retomar la última canción de la lista: vuelve a poner la última canción que sonó en el Jukebox
+"Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song","Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song","Reproducir la siguiente canción de la lista: avanza desde la última canción del Jukebox según el modo de rotación elegido; si todavía no sonó ninguna, avanza desde la canción de selección de personaje"
+Only applies to local VS and Online rematches. The first match always uses the Character Select track.,Only applies to local VS and Online rematches. The first match always uses the Character Select track.,Solo se aplica a las revanchas en VS local y Online. La primera partida siempre usa la canción de selección de personaje.
+Repeat Single,Repeat Single,Repetir una sola
+Repeat the current track instead of playing a new one,Repeat the current track instead of playing a new one,Repite la canción actual en vez de pasar a otra
+Play Next >|,Play Next >|,Siguiente >|
+Play the next track (per the rotation mode),Play the next track (per the rotation mode),Reproduce la siguiente canción (según el modo de rotación)
+Shortcut,Shortcut,Atajo
+Search Tracks,Search Tracks,Buscar canciones
+Enable All,Enable All,Activar todas
+Disable All,Disable All,Desactivar todas
+Enable/Disable all tracks at once,Enable/Disable all tracks at once,Activa o desactiva todas las canciones a la vez
+Reset Preferences,Reset Preferences,Restablecer preferencias
+Reset all settings and re-enable all tracks,Reset all settings and re-enable all tracks,Restablece todos los ajustes y vuelve a activar todas las canciones
+Current Track:,Current Track:,Canción actual:
+Current track,Current track,Canción actual
+None (enter a match),None (enter a match),Ninguna (entra a una partida)
+None,None,Ninguna
+Time:,Time:,Tiempo:
+Enabled Tracks,Enabled Tracks,Canciones activadas
+Open Jukebox,Open Jukebox,Abrir Jukebox

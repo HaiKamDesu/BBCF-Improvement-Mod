@@ -2744,6 +2744,114 @@ struct LocalizationKeysAccessor
 
         // Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.
         inline const char* Frame_by_frame_combo_editor_build_a_combo_one_input_at_a_time_rewind_and_re_record_any_part_of_it_then_play_the_whole_thing_back_Training_mode_only() const { return Get("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only."); }
+
+        // Jukebox
+        inline const char* Jukebox() const { return Get("Jukebox"); }
+
+        // Music
+        inline const char* Music() const { return Get("Music"); }
+
+        // Loading custom music...
+        inline const char* Loading_custom_music() const { return Get("Loading custom music..."); }
+
+        // Enable Music Rotation
+        inline const char* Enable_Music_Rotation() const { return Get("Enable Music Rotation"); }
+
+        // Enable music rotation
+        inline const char* Enable_music_rotation_2() const { return Get("Enable music rotation"); }
+
+        // Enable/disable automatic music rotation in-game
+        inline const char* Enable_disable_automatic_music_rotation_in_game() const { return Get("Enable/disable automatic music rotation in-game"); }
+
+        // Rotation Mode:
+        inline const char* Rotation_Mode() const { return Get("Rotation Mode:"); }
+
+        // Sequential: play tracks in order
+        inline const char* Sequential_play_tracks_in_order() const { return Get("Sequential: play tracks in order"); }
+
+        // Shuffle: play tracks in a shuffled order, no repeats until all have played
+        inline const char* Shuffle_play_tracks_in_a_shuffled_order_no_repeats_until_all_have_played() const { return Get("Shuffle: play tracks in a shuffled order, no repeats until all have played"); }
+
+        // Shuffle
+        inline const char* Shuffle() const { return Get("Shuffle"); }
+
+        // VS/Online Rematch:
+        inline const char* VS_Online_Rematch() const { return Get("VS/Online Rematch:"); }
+
+        // Character Select Track
+        inline const char* Character_Select_Track() const { return Get("Character Select Track"); }
+
+        // Resume Last Playlist Track
+        inline const char* Resume_Last_Playlist_Track() const { return Get("Resume Last Playlist Track"); }
+
+        // Play Next Playlist Track
+        inline const char* Play_Next_Playlist_Track() const { return Get("Play Next Playlist Track"); }
+
+        // Character Select Track: use the song selected at Character Select
+        inline const char* Character_Select_Track_use_the_song_selected_at_Character_Select() const { return Get("Character Select Track: use the song selected at Character Select"); }
+
+        // Resume Last Playlist Track: restart the last song played by the Jukebox
+        inline const char* Resume_Last_Playlist_Track_restart_the_last_song_played_by_the_Jukebox() const { return Get("Resume Last Playlist Track: restart the last song played by the Jukebox"); }
+
+        // Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song
+        inline const char* Play_Next_Playlist_Track_advance_from_the_last_Jukebox_song_using_the_selected_rotation_mode_if_none_has_played_yet_advance_from_the_Character_Select_song() const { return Get("Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song"); }
+
+        // Only applies to local VS and Online rematches. The first match always uses the Character Select track.
+        inline const char* Only_applies_to_local_VS_and_Online_rematches_The_first_match_always_uses_the_Character_Select_track() const { return Get("Only applies to local VS and Online rematches. The first match always uses the Character Select track."); }
+
+        // Repeat Single
+        inline const char* Repeat_Single() const { return Get("Repeat Single"); }
+
+        // Repeat the current track instead of playing a new one
+        inline const char* Repeat_the_current_track_instead_of_playing_a_new_one() const { return Get("Repeat the current track instead of playing a new one"); }
+
+        // Play Next >|
+        inline const char* Play_Next() const { return Get("Play Next >|"); }
+
+        // Play the next track (per the rotation mode)
+        inline const char* Play_the_next_track_per_the_rotation_mode() const { return Get("Play the next track (per the rotation mode)"); }
+
+        // Shortcut
+        inline const char* Shortcut() const { return Get("Shortcut"); }
+
+        // Search Tracks
+        inline const char* Search_Tracks() const { return Get("Search Tracks"); }
+
+        // Enable All
+        inline const char* Enable_All() const { return Get("Enable All"); }
+
+        // Disable All
+        inline const char* Disable_All() const { return Get("Disable All"); }
+
+        // Enable/Disable all tracks at once
+        inline const char* Enable_Disable_all_tracks_at_once() const { return Get("Enable/Disable all tracks at once"); }
+
+        // Reset Preferences
+        inline const char* Reset_Preferences() const { return Get("Reset Preferences"); }
+
+        // Reset all settings and re-enable all tracks
+        inline const char* Reset_all_settings_and_re_enable_all_tracks() const { return Get("Reset all settings and re-enable all tracks"); }
+
+        // Current Track:
+        inline const char* Current_Track() const { return Get("Current Track:"); }
+
+        // Current track
+        inline const char* Current_track_2() const { return Get("Current track"); }
+
+        // None (enter a match)
+        inline const char* None_enter_a_match() const { return Get("None (enter a match)"); }
+
+        // None
+        inline const char* None_2() const { return Get("None"); }
+
+        // Time:
+        inline const char* Time() const { return Get("Time:"); }
+
+        // Enabled Tracks
+        inline const char* Enabled_Tracks() const { return Get("Enabled Tracks"); }
+
+        // Open Jukebox
+        inline const char* Open_Jukebox() const { return Get("Open Jukebox"); }
 };
 
 

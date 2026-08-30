@@ -16,6 +16,7 @@
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
 #include "Overlay/Window/ReplayRewindWindow.h"
+#include "Overlay/Window/JukeboxWindow.h"
 #include "Overlay/Window/WinePopupWindow.h"
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/Window/NetworkSquareColorWindow.h"
@@ -91,6 +92,10 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_PaletteSharePopup,
                 new PaletteSharePopupWindow("Palette Share Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
+
+        AddWindow(WindowType_Jukebox,
+        	new JukeboxWindow(L("Jukebox"), true,
+        		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_UnlimitedPlayback,
                 new UnlimitedPlaybackWindow(L("Unlimited Playback (BETA)").c_str(), true, *this));

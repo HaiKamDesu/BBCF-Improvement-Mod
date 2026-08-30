@@ -21,6 +21,7 @@
 #include <string>
 #include "Web/update_check.h"
 #include "Game/ReplayFiles/ReplayFileManager.h"
+#include "Audio/MusicManager.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/TasManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
@@ -9117,6 +9118,7 @@ void __declspec(naked)GetFrameCounter()
 	TasManager::Instance().Update();
 	RankedProbeTickFrameState();
 	RankedAutomationHarness::Tick();
+	GetMusicManager().Update();
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
 	{
 		UnlimitedReplayTakeoverManager::Instance().Tick();

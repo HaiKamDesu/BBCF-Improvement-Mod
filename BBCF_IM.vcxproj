@@ -26,6 +26,9 @@
     <ClCompile Include="depends\imgui\imgui_widgets.cpp" />
     <ClCompile Include="depends\imgui\imgui_impl_dx9.cpp" />
     <ClCompile Include="depends\imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="src\Audio\MusicManager.cpp" />
+    <ClCompile Include="src\Audio\CustomMusicConverter.cpp" />
+    <ClCompile Include="src\Overlay\Window\JukeboxWindow.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
     <ClCompile Include="src\Game\TasManager.cpp" />
@@ -320,6 +323,9 @@
     <ClInclude Include="src\SteamApiWrapper\SteamUserStatsWrapper.h" />
     <ClInclude Include="src\SteamApiWrapper\SteamUserWrapper.h" />
     <ClInclude Include="src\SteamApiWrapper\SteamUtilsWrapper.h" />
+    <ClInclude Include="src\Audio\MusicManager.h" />
+    <ClInclude Include="src\Audio\CustomMusicConverter.h" />
+    <ClInclude Include="src\Overlay\Window\JukeboxWindow.h" />
     <ClInclude Include="src\Web\update_check.h" />
     <ClInclude Include="src\Core\utils.h" />
     <ClInclude Include="src\Web\url_downloader.h" />
@@ -480,7 +486,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
     </Link>
@@ -508,7 +514,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
-      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
     </Link>
@@ -545,7 +551,7 @@
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
-      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
     <PreBuildEvent>
@@ -581,7 +587,7 @@
       <ModuleDefinitionFile>export/dinput8.def</ModuleDefinitionFile>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
-      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dinput8.lib;dxguid.lib;comsuppw.lib;winmm.lib;delayimp.lib;mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>hid.dll;setupapi.dll;cfgmgr32.dll;shlwapi.dll;winmm.dll;d3dx9_43.dll;steam_api.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
     <PreBuildEvent>

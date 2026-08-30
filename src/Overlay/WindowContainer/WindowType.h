@@ -28,4 +28,5 @@ enum WindowType_
         WindowType_RankedListFilter,
         WindowType_RankedLeaderboard,
         WindowType_PaletteSharePopup,
+        WindowType_Jukebox,
 };
