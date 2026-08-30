@@ -166,6 +166,10 @@ namespace
     }
 
     DWORD battleInputWrite_JmpBack = 0;
+
+    // Absolute target of the call instruction the hook replaces, resolved from its
+    // rel32 before the site is patched. The hook has to perform that call itself.
+    DWORD battleInputOriginalCall = 0;
 }
 
 uint16_t InputState::ToPackedValue() const
@@ -310,10 +314,15 @@ uint16_t GetLastAppliedBattleInputPacked(uint32_t playerIndex)
 void __declspec(naked) BattleInputWrite_Hook()
 {
     __asm {
-        // This hook runs at the common tail of both player iterations.
-        // EBX = player index (0 or 1), ESI = final packed-input word.
-        push ecx
-        push edx
+        // Site: 0x0055A338, the thiscall at the common tail of the two-player input
+        // loop. Both write paths have converged here, ESI points at the player's
+        // input object (stride 0x1C) with the finished packed word at offset 0, ECX
+        // has already been loaded with it and EBX is the player index.
+        //
+        // Do NOT move this back to 0x0055A333: eleven branches in the loop jump to
+        // 0x0055A336, which is three bytes inside a 5-byte JMP placed at 0x0055A333.
+        // Those paths land mid-instruction and the process dies on a CRT abort.
+        pushad
         movzx eax, word ptr[esi]
         push eax // previousValue
         push esi // targetAddress
@@ -322,12 +331,10 @@ void __declspec(naked) BattleInputWrite_Hook()
         call ProcessBattleInput
         add esp, 16
         mov word ptr[esi], ax
-        pop edx
-        pop ecx
+        popad
 
-        // ORIGINAL instructions:
-        mov edi, dword ptr[ebp-8]
-        mov ecx, esi
+        // ORIGINAL instruction: call <consume input object> (thiscall, ECX = ESI).
+        call dword ptr[battleInputOriginalCall]
 
         jmp battleInputWrite_JmpBack
     }
@@ -340,18 +347,36 @@ bool Hook_BattleInput()
         return false;
     }
 
-    // Common tail of the two-player loop at static 0x0055A333. The call
-    // displacement is wildcarded; the overwrite covers two whole instructions.
+    // The 5 bytes we take over are the call at the tail of the two-player input loop
+    // (static 0x0055A338). Resolve the site first without patching it, so the call's
+    // rel32 can be read while it is still the original instruction.
+    const DWORD siteAddress = HookManager::RegisterHook(
+        "BattleInputWriteSite",
+        "\xE8\x00\x00\x00\x00\x8B\x45\xF0\x81\x45\xF4\x78\x49\x02\x00\x83\xC0\x04\x43\x83\xC6\x1C",
+        "x????xxxxxxxxxxxxxxxxx",
+        5);
+
+    if (siteAddress == 0)
+    {
+        LOG(0, "FAILED TO LOCATE BattleInputWrite HOOK SITE\n");
+        return false;
+    }
+
+    const int32_t callDisplacement = *reinterpret_cast<const int32_t*>(siteAddress + 1);
+    battleInputOriginalCall = static_cast<DWORD>(siteAddress + 5 + callDisplacement);
+    LOG(1, "BattleInputWrite site 0x%08X, original call target 0x%08X\n",
+        siteAddress, battleInputOriginalCall);
+
     battleInputWrite_JmpBack = HookManager::SetHook(
         "BattleInputWrite",
-        "\x8B\x7D\xF8\x8B\xCE\xE8\x00\x00\x00\x00\x8B\x45\xF0\x81\x45\xF4\x78\x49\x02\x00\x83\xC0\x04\x43\x83\xC6\x1C",
-        "xxxxxx????xxxxxxxxxxxxxxxxx",
+        siteAddress,
         5,
         &BattleInputWrite_Hook
     );
 
     if (battleInputWrite_JmpBack == 0)
     {
+        battleInputOriginalCall = 0;
         LOG(0, "FAILED TO INSTALL BattleInputWrite HOOK\n");
         return false;
     }
