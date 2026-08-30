@@ -796,26 +796,44 @@ namespace
 		ImGui::Dummy(ImVec2(rowWidth, rowHeight));
 	}
 
-	// Fills the rounded bar rect with a horizontal two-stop gradient, restricted to [x0, x1].
+	// Fills [x0, x1] of the bar rect with a horizontal two-stop gradient.
 	//
 	// AddRectFilledMultiColor cannot do this: it always emits one sharp quad, ignoring rounding.
 	// That went unnoticed for years because the bar's border was sharp too - ImDrawFlags 0 meant
 	// "round no corners" before ImGui 1.82, and now means "round all corners", so the border
 	// became rounded and left the square gradient corners poking out from under it.
 	//
-	// Instead draw the full rounded rect and recolor its vertices, which keeps the rounded
-	// corners and the antialiased edges intact (KeepAlpha preserves the AA fringe alpha).
+	// The replacement drew the WHOLE rect and clipped it down to the span, which is what turned the
+	// bar into two flat halves. ShadeVerts colours by vertex position, and a rounded rect only has
+	// vertices at its corners, so the gradient stretched across the full bar instead of the span:
+	// the left half ran previous -> current over the whole width and showed only the first half of
+	// that ramp, the right half did the mirror image, and they met at the midpoint at two unrelated
+	// colours. The current colour - the one the middle of the scale is supposed to be - never
+	// appeared on the bar at all.
+	//
+	// So the geometry has to end where the span ends. It overshoots the inner edge by a pixel and a
+	// half and lets the clip rect cut that back, which keeps the antialiased edge outside the
+	// visible area: two abutting AA edges would blend into a seam straight down the middle of the
+	// bar. ShadeVerts clamps the overshot vertex to the end colour, so the span reaches ~98% of the
+	// way to it rather than exactly 100% - invisible on a colour ramp, and worth it for the seam.
 	void DrawShadedBarSpan(ImDrawList* drawList, const ImVec2& p0, const ImVec2& p1, float rounding,
-		float x0, float x1, ImU32 colLeft, ImU32 colRight)
+		float x0, float x1, ImU32 colLeft, ImU32 colRight, ImDrawFlags cornerFlags)
 	{
 		if (x1 <= x0)
 		{
 			return;
 		}
 
+		// Enough to put the AA fringe (half a pixel of inset plus half a pixel of feather) past the
+		// clip edge. Only the inner edge needs it; the bar's own ends are already the clip bounds.
+		constexpr float kSeamOvershoot = 1.5f;
+		const float geomX0 = (x0 <= p0.x) ? p0.x : (x0 - kSeamOvershoot);
+		const float geomX1 = (x1 >= p1.x) ? p1.x : (x1 + kSeamOvershoot);
+
 		drawList->PushClipRect(ImVec2(x0, p0.y), ImVec2(x1, p1.y), true);
 		const int vtxStart = drawList->VtxBuffer.Size;
-		drawList->AddRectFilled(p0, p1, ImGui::GetColorU32(IM_COL32_WHITE), rounding);
+		drawList->AddRectFilled(ImVec2(geomX0, p0.y), ImVec2(geomX1, p1.y),
+			ImGui::GetColorU32(IM_COL32_WHITE), rounding, cornerFlags);
 		ImGui::ShadeVertsLinearColorGradientKeepAlpha(drawList, vtxStart, drawList->VtxBuffer.Size,
 			ImVec2(x0, p0.y), ImVec2(x1, p0.y), colLeft, colRight);
 		drawList->PopClipRect();
@@ -839,8 +857,8 @@ namespace
 			const ImU32 colNext = ImGui::GetColorU32(GetNetColorVec4(nextColor));
 
 			drawList->PushClipRect(p0, ImVec2(p0.x + fillWidth, p1.y), true);
-			DrawShadedBarSpan(drawList, p0, p1, rounding, p0.x, midX, colPrevious, colCurrent);
-			DrawShadedBarSpan(drawList, p0, p1, rounding, midX, p1.x, colCurrent, colNext);
+			DrawShadedBarSpan(drawList, p0, p1, rounding, p0.x, midX, colPrevious, colCurrent, ImDrawFlags_RoundCornersLeft);
+			DrawShadedBarSpan(drawList, p0, p1, rounding, midX, p1.x, colCurrent, colNext, ImDrawFlags_RoundCornersRight);
 			drawList->PopClipRect();
 		}
 		drawList->AddRect(p0, p1, borderColor, rounding, ImDrawFlags_RoundCornersAll, 1.0f);
