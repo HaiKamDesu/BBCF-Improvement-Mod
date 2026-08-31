@@ -29,9 +29,20 @@
 #include <vector>
 
 namespace {
-const char* kUnlimitedPlaybackProfileFolder = "BBCF_IM/unlimited_playbacks/profiles";
-const char* kUnlimitedPlaybackImportFolder = "BBCF_IM/unlimited_playbacks/imports";
-const char* kUnlimitedPlaybackExportFolder = "BBCF_IM/unlimited_playbacks/exports";
+// Resolved on first use rather than at static-init time: they are anchored to the game
+// folder, and a function-local static keeps that out of static initialisation order.
+const std::string& UnlimitedPlaybackProfileFolder() {
+    static const std::string path = GamePath("BBCF_IM/unlimited_playbacks/profiles");
+    return path;
+}
+const std::string& UnlimitedPlaybackImportFolder() {
+    static const std::string path = GamePath("BBCF_IM/unlimited_playbacks/imports");
+    return path;
+}
+const std::string& UnlimitedPlaybackExportFolder() {
+    static const std::string path = GamePath("BBCF_IM/unlimited_playbacks/exports");
+    return path;
+}
 const char* kUnlimitedPlaybackDragDropPayload = "UP_SLOT";
 std::string NormalizePlaybackFileName(const char* input) {
     std::string out;
@@ -158,7 +169,7 @@ NativeFileDialog::Request BuildFileDialogRequest(NativeFileDialogAction action, 
         break;
     }
 
-    request.initialPath = initialPath.empty() ? kUnlimitedPlaybackProfileFolder : initialPath;
+    request.initialPath = initialPath.empty() ? UnlimitedPlaybackProfileFolder() : initialPath;
     return request;
 }
 
@@ -660,7 +671,7 @@ void UnlimitedPlaybackWindow::Draw() {
             }
             if (ImGui::MenuItem(L("Save to File").c_str())) {
                 const std::string initialExportPath =
-                    std::string(kUnlimitedPlaybackExportFolder) + "/" + NormalizePlaybackFileName(e.name.c_str());
+                    UnlimitedPlaybackExportFolder() + "/" + NormalizePlaybackFileName(e.name.c_str());
                 beginNativeDialog(
                     NativeFileDialogAction::ExportEntryPlayback,
                     initialExportPath,
@@ -752,12 +763,12 @@ void UnlimitedPlaybackWindow::Draw() {
     if (libraryPressed[0]) {
         beginNativeDialog(
             NativeFileDialogAction::LoadProfile,
-            kUnlimitedPlaybackProfileFolder,
+            UnlimitedPlaybackProfileFolder(),
             L("Load profile file dialog open...").c_str());
     }
     if (libraryPressed[1]) {
         const std::string initialSavePath = mgr.GetActiveProfilePath().empty()
-            ? std::string(kUnlimitedPlaybackProfileFolder) + "/profile.upl"
+            ? UnlimitedPlaybackProfileFolder() + "/profile.upl"
             : mgr.GetActiveProfilePath();
         beginNativeDialog(
             NativeFileDialogAction::SaveProfile,
@@ -798,7 +809,7 @@ void UnlimitedPlaybackWindow::Draw() {
     if (capturePressed[1]) {
         beginNativeDialog(
             NativeFileDialogAction::ImportPlayback,
-            kUnlimitedPlaybackImportFolder,
+            UnlimitedPlaybackImportFolder(),
             L("Import playback file dialog open...").c_str());
     }
     if (capturePressed[2]) {

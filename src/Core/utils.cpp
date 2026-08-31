@@ -61,6 +61,29 @@ std::string GamePath(const std::string& relativePath)
 	return GetGameDirectory() + "\\" + relativePath;
 }
 
+const std::wstring& GetGameDirectoryW()
+{
+	static std::wstring cached;
+	if (!cached.empty())
+		return cached;
+
+	const std::string& dir = GetGameDirectory();
+	const int needed = MultiByteToWideChar(CP_ACP, 0, dir.c_str(), (int)dir.size(), NULL, 0);
+	if (needed > 0)
+	{
+		cached.resize(needed);
+		MultiByteToWideChar(CP_ACP, 0, dir.c_str(), (int)dir.size(), &cached[0], needed);
+	}
+	if (cached.empty())
+		cached = L".";
+	return cached;
+}
+
+std::wstring GamePathW(const std::wstring& relativePath)
+{
+	return GetGameDirectoryW() + L"\\" + relativePath;
+}
+
 char* GetBbcfBaseAdress() {
 	static char* bbcf_base = NULL;
 

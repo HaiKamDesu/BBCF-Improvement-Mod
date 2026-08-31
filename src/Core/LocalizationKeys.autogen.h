@@ -2993,6 +2993,9 @@ struct LocalizationKeysAccessor
 
         // The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2.
         inline const char* The_game_never_loads_this_file_so_replacing_it_does_nothing_It_is_a_leftover_duplicate_of_set_2() const { return Get("The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2."); }
+
+        // Choose which songs play during a match and how it moves between them.
+        inline const char* Choose_which_songs_play_during_a_match_and_how_it_moves_between_them() const { return Get("Choose which songs play during a match and how it moves between them."); }
 };
 
 

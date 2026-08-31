@@ -1907,11 +1907,11 @@ void UnlimitedPlaybackManager::EnsureFolders() {
 }
 
 std::string UnlimitedPlaybackManager::GetLibraryFolder() const {
-    return "BBCF_IM/unlimited_playbacks/library";
+    return GamePath("BBCF_IM/unlimited_playbacks/library");
 }
 
 std::string UnlimitedPlaybackManager::GetProfileFolder() const {
-    return "BBCF_IM/unlimited_playbacks/profiles";
+    return GamePath("BBCF_IM/unlimited_playbacks/profiles");
 }
 
 std::string UnlimitedPlaybackManager::MakeEntryId() {

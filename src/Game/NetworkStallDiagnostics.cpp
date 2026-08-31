@@ -146,7 +146,7 @@ namespace
 
 	void AppendToIncidentFile(const char* message)
 	{
-		const HANDLE hFile = CreateFileW(L"BBCF_IM\\DCodeIncidents.log", FILE_APPEND_DATA,
+		const HANDLE hFile = CreateFileW(GamePathW(L"BBCF_IM\\DCodeIncidents.log").c_str(), FILE_APPEND_DATA,
 			FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (hFile == INVALID_HANDLE_VALUE)
 		{
@@ -199,9 +199,9 @@ namespace
 		SYSTEMTIME st;
 		GetLocalTime(&st);
 		wchar_t path[MAX_PATH];
-		swprintf_s(path, L"BBCF_IM\\DEBUG_DCodeIncident_%04u%02u%02u_%02u%02u%02u_slot%d.txt",
-			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, slot);
-		if (CopyFileW(L"BBCF_IM\\DEBUG.txt", path, FALSE))
+		swprintf_s(path, L"%s\\BBCF_IM\\DEBUG_DCodeIncident_%04u%02u%02u_%02u%02u%02u_slot%d.txt",
+			GetGameDirectoryW().c_str(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, slot);
+		if (CopyFileW(GamePathW(L"BBCF_IM\\DEBUG.txt").c_str(), path, FALSE))
 		{
 			++g_debugSnapshotsThisSession;
 			IncidentPrintf("[DCodeTick] DEBUG.txt snapshotted to BBCF_IM\\DEBUG_DCodeIncident_%04u%02u%02u_%02u%02u%02u_slot%d.txt\n",
@@ -263,7 +263,8 @@ namespace
 	{
 		const ULONGLONG tick = GetTickCount64();
 		wchar_t path[MAX_PATH];
-		swprintf_s(path, L"BBCF_IM\\DCodeBlobFail_slot%d_tick%llu.bin", slot, tick);
+		swprintf_s(path, L"%s\\BBCF_IM\\DCodeBlobFail_slot%d_tick%llu.bin",
+			GetGameDirectoryW().c_str(), slot, tick);
 		const HANDLE hFile = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
 			FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (hFile == INVALID_HANDLE_VALUE)

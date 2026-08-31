@@ -24,6 +24,10 @@ const std::string& GetGameDirectory();
 
 /* Anchors a mod-relative path (e.g. "BBCF_IM/foo.ini") to the game folder. */
 std::string GamePath(const std::string& relativePath);
+
+/* Wide variants, for the Win32 calls that take wchar_t paths. */
+const std::wstring& GetGameDirectoryW();
+std::wstring GamePathW(const std::wstring& relativePath);
 void WriteToProtectedMemory(uintptr_t addressToWrite, char* valueToWrite, int byteNum);
 char* RawMemoryArrayToString(unsigned char* srcBuf, int length);
 DWORD FindPattern(LPCWSTR module, char *pattern, char *mask);

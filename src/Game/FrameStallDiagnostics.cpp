@@ -1,4 +1,5 @@
 #include "FrameStallDiagnostics.h"
+#include "Core/utils.h"
 
 #include "Core/interfaces.h"
 #include "Core/logger.h"
@@ -73,7 +74,7 @@ namespace
 
 	void AppendToIncidentFile(const char* message)
 	{
-		const HANDLE hFile = CreateFileW(L"BBCF_IM\\FrameStallIncidents.log", FILE_APPEND_DATA,
+		const HANDLE hFile = CreateFileW(GamePathW(L"BBCF_IM\\FrameStallIncidents.log").c_str(), FILE_APPEND_DATA,
 			FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (hFile == INVALID_HANDLE_VALUE)
 		{

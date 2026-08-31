@@ -71,7 +71,7 @@ void BgmReplacementWindow::Draw()
 
 	if (!mgr.IsInitialized())
 	{
-		ImGui::TextColored(ImVec4(1, 0.45f, 0.45f, 1), "%s",
+		ImGui::TextColoredWrapped(ImVec4(1, 0.45f, 0.45f, 1), "%s",
 			L("Music replacement is unavailable - the game's audio table could not be read.").c_str());
 		return;
 	}
@@ -111,7 +111,7 @@ void BgmReplacementWindow::DrawSummary()
 			m_lastMessage = L("Every song is back to normal.");
 		}
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", L("Puts every song back to the original and deletes the "
+			ImGui::SetTooltipWrapped(L("Puts every song back to the original and deletes the "
 				"converted files.").c_str());
 	}
 
@@ -133,7 +133,7 @@ void BgmReplacementWindow::DrawSummary()
 	if (!m_lastMessage.empty())
 	{
 		ImGui::Spacing();
-		ImGui::TextDisabled("%s", m_lastMessage.c_str());
+		ImGui::TextDisabledWrapped("%s", m_lastMessage.c_str());
 	}
 
 	// The game reads a song's filename only when it loads it, and it loads a match's music
@@ -141,9 +141,9 @@ void BgmReplacementWindow::DrawSummary()
 	// nothing until the next one. This is the single most confusing thing about the
 	// feature, so it gets a coloured line rather than grey small print.
 	ImGui::Spacing();
-	ImGui::TextColored(StateColor(BgmReplacementState::Converting), "%s",
+	ImGui::TextColoredWrapped(StateColor(BgmReplacementState::Converting), "%s",
 		L("Swaps take effect when a match STARTS.").c_str());
-	ImGui::TextDisabled("%s", L("If you are in a match right now, leave and start a new one. "
+	ImGui::TextDisabledWrapped("%s", L("If you are in a match right now, leave and start a new one. "
 		"This includes Astral Finish music, which is loaded up front with the rest of the "
 		"match, not when the Astral happens.").c_str());
 }
@@ -256,15 +256,15 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		ImGui::TextColored(color, "%s", L("Converting your song...").c_str());
 		break;
 	case BgmReplacementState::Active:
-		ImGui::TextColored(color, "%s: %s", L("Now playing your song").c_str(),
+		ImGui::TextColoredWrapped(color, "%s: %s", L("Now playing your song").c_str(),
 			mgr.GetSourceName(tableIndex).c_str());
 		break;
 	case BgmReplacementState::Missing:
 	case BgmReplacementState::Failed:
-		ImGui::TextColored(color, "%s", mgr.GetError(tableIndex).c_str());
+		ImGui::TextColoredWrapped(color, "%s", mgr.GetError(tableIndex).c_str());
 		break;
 	case BgmReplacementState::Unavailable:
-		ImGui::TextDisabled("%s", track->everUsed
+		ImGui::TextDisabledWrapped("%s", track->everUsed
 			? L("This track isn't installed on your copy of the game.").c_str()
 			: L("The game never plays this file, so it can't be replaced.").c_str());
 		break;
@@ -273,7 +273,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 	// Where a track is heard is not always obvious - Astral Heat music in particular only
 	// uses one of three sets, chosen by a sound option - so say it right on the row.
 	if (!track->usageNote.empty())
-		ImGui::TextDisabled("%s", L(track->usageNote).c_str());
+		ImGui::TextDisabledWrapped("%s", L(track->usageNote).c_str());
 
 	// Buttons. Preview only works inside a match, where the audio engine is live, so it is
 	// disabled rather than silently doing nothing.
@@ -288,7 +288,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		if (!can) ImGui::PopStyleVar();
 		if (ImGui::IsItemHovered())
 		{
-			ImGui::SetTooltip("%s", !inMatch
+			ImGui::SetTooltipWrapped(!inMatch
 				? L("Start a match to hear previews.").c_str()
 				: (relPath.empty() ? L("Nothing to preview for this track.").c_str() : tip));
 		}
@@ -317,7 +317,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		if (ImGui::Button(L("Replace...").c_str()))
 			OpenPickerFor(tableIndex);
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", L("Pick an MP3 to play instead of this track.").c_str());
+			ImGui::SetTooltipWrapped(L("Pick an MP3 to play instead of this track.").c_str());
 	}
 	else if (state == BgmReplacementState::Converting)
 	{
@@ -337,7 +337,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 				m_lastMessage = L("Rebuilding") + " " + track->displayName + "...";
 			}
 			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("%s", L("Convert the same MP3 again.").c_str());
+				ImGui::SetTooltipWrapped(L("Convert the same MP3 again.").c_str());
 		}
 
 		ImGui::SameLine();
@@ -347,7 +347,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 			m_lastMessage = track->displayName + " " + L("is back to normal.");
 		}
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", L("Put the original back and delete the converted file.").c_str());
+			ImGui::SetTooltipWrapped(L("Put the original back and delete the converted file.").c_str());
 	}
 
 	ImGui::Unindent(22.0f);

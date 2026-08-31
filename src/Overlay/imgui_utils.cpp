@@ -1,4 +1,5 @@
 #include "imgui_utils.h"
+#include <cstdarg>
 
 #include "imgui_internal.h"
 
@@ -349,6 +350,35 @@ bool ImGui::ColorPicker4On32Bit(const char* label, unsigned char val[4], ImGuiCo
 	return changed;
 }
 
+
+void ImGui::TextDisabledWrapped(const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+	ImGui::TextWrappedV(fmt, args);
+	ImGui::PopStyleColor();
+	va_end(args);
+}
+
+void ImGui::TextColoredWrapped(const ImVec4& color, const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	ImGui::PushStyleColor(ImGuiCol_Text, color);
+	ImGui::TextWrappedV(fmt, args);
+	ImGui::PopStyleColor();
+	va_end(args);
+}
+
+void ImGui::SetTooltipWrapped(const char* text)
+{
+	ImGui::BeginTooltip();
+	ImGui::PushTextWrapPos(450.0f);
+	ImGui::TextUnformatted(text ? text : "");
+	ImGui::PopTextWrapPos();
+	ImGui::EndTooltip();
+}
 
 void ImGui::ShowHelpMarker(const char* desc)
 {

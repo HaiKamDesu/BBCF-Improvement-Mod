@@ -45,11 +45,11 @@ void JukeboxWindow::DrawControls() {
 		std::string status = musicManager.GetCustomMusicStatus();
 		ImGui::Text("%s", L("Loading custom music...").c_str());
 		ImGui::ProgressBar(musicManager.GetCustomMusicProgress(), ImVec2(-1, 0), "");
-		ImGui::TextDisabled("%s", status.c_str());
+		ImGui::TextDisabledWrapped("%s", status.c_str());
 		ImGui::Spacing();
 	} else if (musicManager.HasStartedCustomMusicDiscovery()) {
 		std::string status = musicManager.GetCustomMusicStatus();
-		ImGui::TextDisabled("%s", status.c_str());
+		ImGui::TextDisabledWrapped("%s", status.c_str());
 		ImGui::Spacing();
 	}
 
@@ -112,7 +112,7 @@ void JukeboxWindow::DrawControls() {
 	if (ImGui::Button(L("Play Next >|").c_str())) {
 		musicManager.PlayNextTrack();
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", L("Play the next track (per the rotation mode)").c_str());
+	if (ImGui::IsItemHovered()) ImGui::SetTooltipWrapped(L("Play the next track (per the rotation mode)").c_str());
 	ImGui::SameLine();
 	ImGui::TextDisabled("%s: %s", L("Shortcut").c_str(),
 		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_JukeboxNextTrack)).c_str());
@@ -277,7 +277,7 @@ void JukeboxWindow::DrawTrackList() {
 				musicManager.SetCategoryEnabled(lastCategory, catAllOn);
 			}
 			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltip(catState == -1
+				ImGui::SetTooltipWrapped(catState == -1
 					? "Mixed: click to enable ALL tracks in this category"
 					: "Enable/disable ALL tracks in this category");
 			}

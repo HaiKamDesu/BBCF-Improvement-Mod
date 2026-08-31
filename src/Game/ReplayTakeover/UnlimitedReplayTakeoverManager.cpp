@@ -596,7 +596,7 @@ void DumpMismatchSnapshotsForRe(const unsigned char* seededBuf, size_t seededSiz
     if (!seededBuf || !entryBuf || seededSize == 0 || entrySize == 0) {
         return;
     }
-    const std::string outDir = "BBCF_IM/URT_RE_BLOBS";
+    const std::string outDir = GamePath("BBCF_IM/URT_RE_BLOBS");
     EnsureDirectoryRecursive(outDir);
     const unsigned long long stamp = GetTickCount64();
     const std::string base = JoinPath(outDir, "mismatch_" + std::to_string(stamp));
@@ -1717,11 +1717,11 @@ void UnlimitedReplayTakeoverManager::EnsureFolders() {
 }
 
 std::string UnlimitedReplayTakeoverManager::GetLibraryFolder() const {
-    return "BBCF_IM/unlimited_replay_takeover/library";
+    return GamePath("BBCF_IM/unlimited_replay_takeover/library");
 }
 
 std::string UnlimitedReplayTakeoverManager::GetProfileFolder() const {
-    return "BBCF_IM/unlimited_replay_takeover/profiles";
+    return GamePath("BBCF_IM/unlimited_replay_takeover/profiles");
 }
 
 std::string UnlimitedReplayTakeoverManager::MakeEntryId() {

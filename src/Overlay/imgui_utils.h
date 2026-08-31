@@ -37,4 +37,14 @@ namespace ImGui
 	IMGUI_API bool ColorButtonOn32Bit(const char* desc_id, int idx, unsigned char val[4], ImGuiColorEditFlags flags = 0, ImVec2 size = ImVec2(0, 0));
 	IMGUI_API bool ColorPicker4On32Bit(const char* label, unsigned char col[4], ImGuiColorEditFlags flags = 0, const float* ref_col = NULL);
 	IMGUI_API void ShowHelpMarker(const char* desc);
+
+	/* Wrapping variants of the coloured/disabled text calls. Plain TextDisabled and
+	   TextColored do NOT wrap, so a long sentence runs off the side of the window and
+	   forces a horizontal scrollbar (or is simply lost, in a NoScrollbar window). Use
+	   these for anything longer than a label. */
+	IMGUI_API void TextDisabledWrapped(const char* fmt, ...);
+	IMGUI_API void TextColoredWrapped(const ImVec4& color, const char* fmt, ...);
+
+	/* SetTooltip does not wrap either; this matches ShowHelpMarker's wrap width. */
+	IMGUI_API void SetTooltipWrapped(const char* text);
 }
