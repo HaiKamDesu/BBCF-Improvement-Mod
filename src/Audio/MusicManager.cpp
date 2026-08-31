@@ -1445,7 +1445,10 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// Build the path strings
 	char physicalPath[260];
 	char logicalPath[260];
-	sprintf_s(physicalPath, "data/Sound/BGM/%s.pac", bgmName);
+	// Anchored to the game folder: this one is opened with CreateFileA, so a moved working
+	// directory would make it miss. The logical path below stays relative - that one is
+	// handed to the game, which resolves it its own way.
+	sprintf_s(physicalPath, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), bgmName);
 	sprintf_s(logicalPath, "data/sound/BGM/%s.pac", bgmName);
 	LogMusic("MusicManager: Loading BGM file: %s (logical: %s)\n", physicalPath, logicalPath);
 
@@ -2164,9 +2167,9 @@ void MusicManager::SavePreferences() {
     // BBCF_IM/ only exists once some other feature has written into it, and on a
     // fresh install nothing has yet - without this the ofstream below silently
     // fails and every Jukebox setting is lost on restart.
-    CreateDirectoryA("BBCF_IM", NULL); // no-op if it already exists
+    CreateDirectoryA(GamePath("BBCF_IM").c_str(), NULL); // no-op if it already exists
 
-    std::ofstream file("BBCF_IM/music_preferences.ini");
+    std::ofstream file(GamePath("BBCF_IM/music_preferences.ini"));
     if (!file.is_open()) {
         LOG(2, "MusicManager: Could not open music_preferences.ini for writing\n");
         return;
@@ -2194,7 +2197,7 @@ void MusicManager::SavePreferences() {
 }
 
 void MusicManager::LoadPreferences() {
-    std::ifstream file("BBCF_IM/music_preferences.ini");
+    std::ifstream file(GamePath("BBCF_IM/music_preferences.ini"));
     if (!file.is_open()) {
         LOG(2, "MusicManager: No preferences file found, using defaults\n");
         return;

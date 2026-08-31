@@ -2972,6 +2972,27 @@ struct LocalizationKeysAccessor
 
         // A swap is heard the next time that song loads - leave and re-enter the match to hear it.
         inline const char* A_swap_is_heard_the_next_time_that_song_loads_leave_and_re_enter_the_match_to_hear_it() const { return Get("A swap is heard the next time that song loads - leave and re-enter the match to hear it."); }
+
+        // Swaps take effect when a match STARTS.
+        inline const char* Swaps_take_effect_when_a_match_STARTS() const { return Get("Swaps take effect when a match STARTS."); }
+
+        // If you are in a match right now, leave and start a new one. This includes Astral Finish music, which is loaded up front with the rest of the match, not when the Astral happens.
+        inline const char* If_you_are_in_a_match_right_now_leave_and_start_a_new_one_This_includes_Astral_Finish_music_which_is_loaded_up_front_with_the_rest_of_the_match_not_when_the_Astral_happens() const { return Get("If you are in a match right now, leave and start a new one. This includes Astral Finish music, which is loaded up front with the rest of the match, not when the Astral happens."); }
+
+        // The game never plays this file, so it can't be replaced.
+        inline const char* The_game_never_plays_this_file_so_it_can_t_be_replaced() const { return Get("The game never plays this file, so it can't be replaced."); }
+
+        // Plays on an Astral Finish. Used only when your Astral Heat BGM: 1st option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure.
+        inline const char* Plays_on_an_Astral_Finish_Used_only_when_your_Astral_Heat_BGM_1st_option_is_selected_in_the_game_s_Sound_settings_and_only_one_of_the_three_variants_plays_replace_all_three_of_a_set_to_be_sure() const { return Get("Plays on an Astral Finish. Used only when your Astral Heat BGM: 1st option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure."); }
+
+        // Plays on an Astral Finish. Used only when your Astral Heat BGM: 2nd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure.
+        inline const char* Plays_on_an_Astral_Finish_Used_only_when_your_Astral_Heat_BGM_2nd_option_is_selected_in_the_game_s_Sound_settings_and_only_one_of_the_three_variants_plays_replace_all_three_of_a_set_to_be_sure() const { return Get("Plays on an Astral Finish. Used only when your Astral Heat BGM: 2nd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure."); }
+
+        // Plays on an Astral Finish. Used only when your Astral Heat BGM: 3rd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure.
+        inline const char* Plays_on_an_Astral_Finish_Used_only_when_your_Astral_Heat_BGM_3rd_option_is_selected_in_the_game_s_Sound_settings_and_only_one_of_the_three_variants_plays_replace_all_three_of_a_set_to_be_sure() const { return Get("Plays on an Astral Finish. Used only when your Astral Heat BGM: 3rd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure."); }
+
+        // The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2.
+        inline const char* The_game_never_loads_this_file_so_replacing_it_does_nothing_It_is_a_leftover_duplicate_of_set_2() const { return Get("The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2."); }
 };
 
 

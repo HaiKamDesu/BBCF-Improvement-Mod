@@ -136,11 +136,16 @@ void BgmReplacementWindow::DrawSummary()
 		ImGui::TextDisabled("%s", m_lastMessage.c_str());
 	}
 
-	// The game only reads a song's filename when it loads it, so a swap made mid-match
-	// is not heard until the next load. Say so rather than let it look broken.
+	// The game reads a song's filename only when it loads it, and it loads a match's music
+	// - Astral Heat included - when the match starts. A swap made mid-match therefore does
+	// nothing until the next one. This is the single most confusing thing about the
+	// feature, so it gets a coloured line rather than grey small print.
 	ImGui::Spacing();
-	ImGui::TextDisabled("%s", L("A swap is heard the next time that song loads - leave and "
-		"re-enter the match to hear it.").c_str());
+	ImGui::TextColored(StateColor(BgmReplacementState::Converting), "%s",
+		L("Swaps take effect when a match STARTS.").c_str());
+	ImGui::TextDisabled("%s", L("If you are in a match right now, leave and start a new one. "
+		"This includes Astral Finish music, which is loaded up front with the rest of the "
+		"match, not when the Astral happens.").c_str());
 }
 
 void BgmReplacementWindow::DrawFilters()
@@ -259,9 +264,16 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		ImGui::TextColored(color, "%s", mgr.GetError(tableIndex).c_str());
 		break;
 	case BgmReplacementState::Unavailable:
-		ImGui::TextDisabled("%s", L("This track isn't installed on your copy of the game.").c_str());
+		ImGui::TextDisabled("%s", track->everUsed
+			? L("This track isn't installed on your copy of the game.").c_str()
+			: L("The game never plays this file, so it can't be replaced.").c_str());
 		break;
 	}
+
+	// Where a track is heard is not always obvious - Astral Heat music in particular only
+	// uses one of three sets, chosen by a sound option - so say it right on the row.
+	if (!track->usageNote.empty())
+		ImGui::TextDisabled("%s", L(track->usageNote).c_str());
 
 	// Buttons. Preview only works inside a match, where the audio engine is live, so it is
 	// disabled rather than silently doing nothing.

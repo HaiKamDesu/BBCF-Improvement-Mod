@@ -11,6 +11,19 @@
 #define nameof(symbol) #symbol
 
 char* GetBbcfBaseAdress();
+
+/* The folder BBCF.exe lives in, with no trailing separator.
+
+   Every file the mod touches must be addressed through this, never through a relative
+   path. The process working directory is NOT stable: while a common file dialog is on
+   screen the shell can move it, and anything that writes a relative path in that window
+   lands in whatever folder the user was browsing. That is not hypothetical - it put a
+   BBCF_IM folder inside a user's Downloads because a background conversion finished
+   while the file picker was open. */
+const std::string& GetGameDirectory();
+
+/* Anchors a mod-relative path (e.g. "BBCF_IM/foo.ini") to the game folder. */
+std::string GamePath(const std::string& relativePath);
 void WriteToProtectedMemory(uintptr_t addressToWrite, char* valueToWrite, int byteNum);
 char* RawMemoryArrayToString(unsigned char* srcBuf, int length);
 DWORD FindPattern(LPCWSTR module, char *pattern, char *mask);

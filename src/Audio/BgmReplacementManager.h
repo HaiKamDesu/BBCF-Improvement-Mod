@@ -36,6 +36,8 @@ struct BgmReplaceableTrack
 	std::string displayName;       // "REPPUU II (Bang)", else the base name
 	std::string category;          // "btl", "astral", ...
 	std::string originalDir;       // folder holding the shipped file; empty if not installed
+	std::string usageNote;         // where this track is actually heard; empty if obvious
+	bool        everUsed = true;   // false for entries the game never reads at all
 };
 
 class BgmReplacementManager

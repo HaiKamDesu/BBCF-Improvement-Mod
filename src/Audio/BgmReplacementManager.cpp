@@ -3,6 +3,7 @@
 #include "MusicManager.h"
 
 #include "Core/logger.h"
+#include "Core/utils.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 
 #include <windows.h>
@@ -25,10 +26,41 @@ namespace
 	const char* kReplacementDir = "BBCFIM_Music";
 
 	// Only two prefixes are used for BGM; a track's original tells us which one applies.
+	// These are relative to the GAME FOLDER, never to the working directory - see
+	// GetGameDirectory() for why that distinction matters.
 	const char* kBgmDir = "data/Sound/BGM";
 	const char* kBgmEndDir = "data/sound/bgm_End";
 
-	const char* kSettingsPath = "BBCF_IM/bgm_replacements.ini";
+	const char* kSettingsRelPath = "BBCF_IM/bgm_replacements.ini";
+
+
+	// Astral Heat music is the one place where "replace the file" is not the whole story,
+	// so the browser spells out where each of these is actually heard.
+	//
+	// Established from the disassembly (docs/Research/BgmReplacementFeasibility.md):
+	// the per-match audio loader FUN_00555A20 reads a saved option (global 0x16BB0B0,
+	// the Astral Heat BGM setting, menu id MOGO_AstralHeatBGM) and loads ONE set of three
+	// according to its value - 0 -> the 603/604/605 set, 1 -> 600/601/602, 2 -> 606/607/608.
+	// All three of the chosen set are loaded together and one is picked when the Astral
+	// actually fires, so replacing all three of a set is the only way to be certain.
+	//
+	// 609/610/611 are referenced NOWHERE in the executable and are byte-identical copies
+	// of 600/601/602 - dead weight, replacing them can never do anything.
+	struct AstralInfo { const char* base; const char* name; const char* note; bool used; };
+	const AstralInfo kAstralInfo[] = {
+		{ "603_cs_astral_a", "Astral Finish - set 1, variant A", "Astral Heat BGM: 1st option", true },
+		{ "604_cs_astral_b", "Astral Finish - set 1, variant B", "Astral Heat BGM: 1st option", true },
+		{ "605_cs_astral_c", "Astral Finish - set 1, variant C", "Astral Heat BGM: 1st option", true },
+		{ "600_astral_a",    "Astral Finish - set 2, variant A", "Astral Heat BGM: 2nd option", true },
+		{ "601_astral_b",    "Astral Finish - set 2, variant B", "Astral Heat BGM: 2nd option", true },
+		{ "602_astral_c",    "Astral Finish - set 2, variant C", "Astral Heat BGM: 2nd option", true },
+		{ "606_v2_astral_a", "Astral Finish - set 3, variant A", "Astral Heat BGM: 3rd option", true },
+		{ "607_v2_astral_b", "Astral Finish - set 3, variant B", "Astral Heat BGM: 3rd option", true },
+		{ "608_v2_astral_c", "Astral Finish - set 3, variant C", "Astral Heat BGM: 3rd option", true },
+		{ "609_cs_astral_a", "Astral Finish - unused copy A",    "", false },
+		{ "610_cs_astral_b", "Astral Finish - unused copy B",    "", false },
+		{ "611_cs_astral_c", "Astral Finish - unused copy C",    "", false },
+	};
 
 	void LogRepl(const char* fmt, ...)
 	{
@@ -207,6 +239,21 @@ void BgmReplacementManager::BuildCatalogue()
 				break;
 			}
 		}
+		for (const auto& info : kAstralInfo)
+		{
+			if (_stricmp(info.base, track.baseName.c_str()) != 0)
+				continue;
+			track.displayName = info.name;
+			track.everUsed = info.used;
+			track.usageNote = info.used
+				? std::string("Plays on an Astral Finish. Used only when your ") + info.note +
+				  " is selected in the game's Sound settings, and only one of the three "
+				  "variants plays - replace all three of a set to be sure."
+				: "The game never loads this file, so replacing it does nothing. It is a "
+				  "leftover duplicate of set 2.";
+			break;
+		}
+
 		if (track.displayName.empty())
 			track.displayName = track.baseName;
 		if (track.category.empty())
@@ -214,9 +261,9 @@ void BgmReplacementManager::BuildCatalogue()
 
 		// Which folder ships this track decides where its replacement has to live, since
 		// the game prefixes the table string differently for the two BGM directories.
-		if (FileExists(std::string(kBgmDir) + "/" + fileName))
+		if (FileExists(GamePath(std::string(kBgmDir) + "/" + fileName)))
 			track.originalDir = kBgmDir;
-		else if (FileExists(std::string(kBgmEndDir) + "/" + fileName))
+		else if (FileExists(GamePath(std::string(kBgmEndDir) + "/" + fileName)))
 			track.originalDir = kBgmEndDir;
 
 		m_tracks.push_back(track);
@@ -334,7 +381,7 @@ void BgmReplacementManager::Update()
 			if (result.ok && track && !track->originalDir.empty())
 			{
 				const std::string stray =
-					track->originalDir + "/" + kReplacementDir + "/" + track->fileName;
+					GamePath(track->originalDir + "/" + kReplacementDir + "/" + track->fileName);
 				DeleteFileA(stray.c_str());
 				LogRepl("Entry %d was undone mid-conversion; removed \"%s\"\n",
 					result.tableIndex, stray.c_str());
@@ -393,6 +440,16 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	if (!track)
 		return;
 
+	if (!track->everUsed)
+	{
+		Assignment bad;
+		bad.sourcePath = mp3Path;
+		bad.state = BgmReplacementState::Unavailable;
+		bad.error = "The game never loads this track, so replacing it would do nothing";
+		m_assignments[tableIndex] = bad;
+		return;
+	}
+
 	if (track->originalDir.empty())
 	{
 		Assignment bad;
@@ -413,7 +470,7 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 		return;
 	}
 
-	const std::string outDir = track->originalDir + "/" + kReplacementDir;
+	const std::string outDir = GamePath(track->originalDir + "/" + kReplacementDir);
 	CreateDirectoryA(outDir.c_str(), NULL);
 
 	Assignment assignment;
@@ -430,7 +487,7 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	Job job;
 	job.tableIndex = tableIndex;
 	job.mp3Path = mp3Path;
-	job.originalPac = track->originalDir + "/" + track->fileName;
+	job.originalPac = GamePath(track->originalDir + "/" + track->fileName);
 	job.outPac = assignment.pacPath;
 	m_pending.push_back(job);
 
@@ -497,7 +554,7 @@ BgmReplacementState BgmReplacementManager::GetState(int tableIndex) const
 	auto it = m_assignments.find(tableIndex);
 	if (it == m_assignments.end())
 	{
-		if (track && track->originalDir.empty())
+		if (track && (track->originalDir.empty() || !track->everUsed))
 			return BgmReplacementState::Unavailable;
 		return BgmReplacementState::Original;
 	}
@@ -564,12 +621,12 @@ std::string BgmReplacementManager::GetReplacementPreviewPath(int tableIndex) con
 
 void BgmReplacementManager::Save()
 {
-	CreateDirectoryA("BBCF_IM", NULL); // absent on a fresh install
+	CreateDirectoryA(GamePath("BBCF_IM").c_str(), NULL); // absent on a fresh install
 
-	std::ofstream file(kSettingsPath);
+	std::ofstream file(GamePath(kSettingsRelPath));
 	if (!file.is_open())
 	{
-		LogRepl("Could not write %s\n", kSettingsPath);
+		LogRepl("Could not write %s\n", GamePath(kSettingsRelPath).c_str());
 		return;
 	}
 
@@ -587,7 +644,7 @@ void BgmReplacementManager::Save()
 
 void BgmReplacementManager::Load()
 {
-	std::ifstream file(kSettingsPath);
+	std::ifstream file(GamePath(kSettingsRelPath));
 	if (!file.is_open())
 		return;
 
@@ -626,7 +683,7 @@ void BgmReplacementManager::Load()
 
 		Assignment assignment;
 		assignment.sourcePath = source;
-		assignment.pacPath = track->originalDir + "/" + kReplacementDir + "/" + track->fileName;
+		assignment.pacPath = GamePath(track->originalDir + "/" + kReplacementDir + "/" + track->fileName);
 		assignment.relPath = std::string(kReplacementDir) + "/" + track->fileName;
 		assignment.state = BgmReplacementState::Missing;
 		m_assignments[track->tableIndex] = assignment;

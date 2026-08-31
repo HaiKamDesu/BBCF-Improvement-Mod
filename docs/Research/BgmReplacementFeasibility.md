@@ -287,3 +287,64 @@ Jukebox's own display, which has its own working detection path.
 # table VA 0x9DC650; walk 4-byte pointers, resolve each through the PE section map
 # entries 0..159 are BGM .pac names, 160..174 are voice format strings
 ```
+
+---
+
+## 11. Astral Heat music — where each of the twelve is actually used (2026-08-31)
+
+Prompted by a report that replacing all twelve Astral tracks changed nothing in game.
+
+**It was not a bug.** The log showed the last match loaded at 23:35:04 and the Astral
+pointers were patched between 23:37:23 and 23:38:16 — all *after* that match had started.
+Astral music is loaded up front by `FUN_00555A20` along with the rest of the match's audio,
+so a swap made mid-match cannot be heard until the next match starts. The UI now says this
+in colour rather than grey small print.
+
+**Only 9 of the 12 entries are ever read.** Each of indices 97–105 is referenced exactly
+once, all inside `FUN_00555A20`. Indices 106–108 (`609/610/611_cs_astral_*`) are referenced
+**nowhere in the executable**, and are byte-identical duplicates of `600/601/602`
+(537696 / 295808 / 205600 bytes). They are dead weight; the browser now refuses to replace
+them and says so.
+
+**Which set loads is a user setting.** The loader reads a saved option — global
+`0x16BB0B0`, written by an options-apply routine at `0x6B4701`, menu id `MOGO_AstralHeatBGM`
+with items labelled `MOGO_AstralHeatBGMV%d` — into `[+0xBBB0]`, and switches on it three
+times, once per variant slot:
+
+| option value | set loaded | durations |
+|---|---|---|
+| 0 | `603/604/605_cs_astral_*` | 26.4 / 20.2 / 20.2 s |
+| 1 | `600/601/602_astral_*` | 47.8 / 25.9 / 17.7 s |
+| 2 | `606/607/608_v2_astral_*` | 33.2 / 24.0 / 24.0 s |
+
+Only the selected set is loaded, so replacing the other two sets has no effect until the
+player changes that option.
+
+**All three variants of the chosen set are resident at once.** They are loaded into tags
+`0x41`/`0x42`/`0x43` and registered together into sound-registry slot 5 at `0x56BACB`,
+alongside `088_btl_bangthem2_short` (tag `0x40`) — Bang's theme, the other in-match special
+cue. Playback picks one of them by index at Astral time.
+
+**Not determined:** which of A/B/C plays in which situation. The play path does not read the
+filename table (each Astral entry has exactly one xref, in the loader), so the choice is an
+index into registry slot 5 made by game logic that was not traced. Practically this does not
+matter — replacing all three variants of a set covers every case, which is what the browser
+now tells the user to do.
+
+## 12. Working-directory hazard (2026-08-31)
+
+A user reported the mod creating a `BBCF_IM` folder inside the folder they had picked an MP3
+from. Reproduced: `Downloads/Kam te juego/BBCF_IM/` contained both `bgm_replacements.ini`
+**and** `FrameStallIncidents.log`, so this is not specific to one feature.
+
+`NativeFileDialog` is not at fault — it passes `OFN_NOCHANGEDIR` and restores the working
+directory before publishing its result. The gap is that the shell moves the working
+directory *while the dialog is on screen*, and anything that writes a relative path during
+that window lands in the browsed folder. Queueing several conversions while opening more
+pickers is exactly that situation.
+
+Fix: `GetGameDirectory()` / `GamePath()` in `Core/utils`, resolved once from the executable's
+own module path. The music code now anchors every filesystem path through it.
+`UnlimitedPlaybackManager`, `UnlimitedReplayTakeoverManager` and the frame-stall logger still
+use relative paths and have the same latent bug.
+

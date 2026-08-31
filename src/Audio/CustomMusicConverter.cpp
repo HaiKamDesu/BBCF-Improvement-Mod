@@ -1,5 +1,6 @@
 #include "CustomMusicConverter.h"
 #include "Core/logger.h"
+#include "Core/utils.h"
 
 #include <windows.h>
 #include <mfapi.h>
@@ -37,9 +38,9 @@ static void LogCustom(const char* fmt, ...) {
 // ============================================================================
 
 // Custom directory relative to the game's working directory
-static const char* CUSTOM_DIR = "data/Sound/BGM/custom";
+static const char* CUSTOM_DIR_REL = "data/Sound/BGM/custom";
 // Output directory for converted .pac files
-static const char* BGM_DIR = "data/Sound/BGM";
+static const char* BGM_DIR_REL = "data/Sound/BGM";
 
 // All custom tracks are transcoded to 44100 Hz stereo WMA Standard. This is the
 // geometry used by 135 of the game's 186 native BGM tracks: WMA mini-format tag
@@ -946,14 +947,14 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
     }
 
     // Ensure the custom directory exists
-    CreateDirectoryA(CUSTOM_DIR, NULL);
+    CreateDirectoryA(GamePath(CUSTOM_DIR_REL).c_str(), NULL);
 
     // Scan for .mp3 files (case-insensitive on Windows)
-    std::string searchPattern = std::string(CUSTOM_DIR) + "\\*.mp3";
+    std::string searchPattern = GamePath(std::string(CUSTOM_DIR_REL) + "\\*.mp3");
     WIN32_FIND_DATAA findData;
     HANDLE hFind = FindFirstFileA(searchPattern.c_str(), &findData);
     if (hFind == INVALID_HANDLE_VALUE) {
-        LogCustom("No custom MP3 files found in %s\n", CUSTOM_DIR);
+        LogCustom("No custom MP3 files found in %s\n", GamePath(CUSTOM_DIR_REL).c_str());
         MFShutdown();
         if (coInitialized) CoUninitialize();
         return result;
@@ -969,7 +970,7 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
 
     // A cached .pac from an older converter carries a stale cue name, which the play
     // path would then fail to resolve. Rebuild everything when the stamp doesn't match.
-    const std::string stampPath = std::string(CUSTOM_DIR) + "\\.converter_version";
+    const std::string stampPath = GamePath(std::string(CUSTOM_DIR_REL) + "\\.converter_version");
     bool forceRebuild = true;
     {
         HANDLE hStamp = CreateFileA(stampPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -987,7 +988,7 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
 
     // Sort for deterministic ID/cue-name assignment across runs
     std::sort(mp3Files.begin(), mp3Files.end());
-    LogCustom("Found %d custom MP3 file(s) in %s\n", (int)mp3Files.size(), CUSTOM_DIR);
+    LogCustom("Found %d custom MP3 file(s) in %s\n", (int)mp3Files.size(), GamePath(CUSTOM_DIR_REL).c_str());
     if (progress) progress(0, (int)mp3Files.size(), "Scanning custom music");
 
     std::vector<int> assignedIds;
@@ -1011,8 +1012,8 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         if (cueName.size() > MAX_CUE_NAME_LEN) cueName.resize(MAX_CUE_NAME_LEN);
 
         std::string pacFilename = cueName; // without .pac extension
-        std::string pacPath = std::string(BGM_DIR) + "/" + cueName + ".pac";
-        std::string mp3Path = std::string(CUSTOM_DIR) + "/" + mp3Filename;
+        std::string pacPath = GamePath(std::string(BGM_DIR_REL) + "/" + cueName + ".pac");
+        std::string mp3Path = GamePath(std::string(CUSTOM_DIR_REL) + "/" + mp3Filename);
 
         // --- Cache check: reuse an up-to-date .pac ---
         WIN32_FILE_ATTRIBUTE_DATA pacInfo = {}, mp3Info = {};

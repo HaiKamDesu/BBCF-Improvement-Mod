@@ -33,6 +33,34 @@ std::string FormatWindowsError(const char* prefix, DWORD errorCode)
 	return result;
 }
 
+const std::string& GetGameDirectory()
+{
+	// Resolved once from the executable's own path, so it cannot drift with the working
+	// directory. Falls back to "." only if the module path is unreadable, which would
+	// mean something far more broken than a music file in the wrong place.
+	static std::string cached;
+	if (!cached.empty())
+		return cached;
+
+	char path[MAX_PATH + 1] = {};
+	const DWORD length = GetModuleFileNameA(NULL, path, MAX_PATH);
+	if (length == 0 || length > MAX_PATH)
+	{
+		cached = ".";
+		return cached;
+	}
+
+	std::string full(path, length);
+	const size_t slash = full.find_last_of("\\/");
+	cached = (slash == std::string::npos) ? std::string(".") : full.substr(0, slash);
+	return cached;
+}
+
+std::string GamePath(const std::string& relativePath)
+{
+	return GetGameDirectory() + "\\" + relativePath;
+}
+
 char* GetBbcfBaseAdress() {
 	static char* bbcf_base = NULL;
 
