@@ -17,6 +17,7 @@
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
 #include "Overlay/Window/ReplayRewindWindow.h"
 #include "Overlay/Window/JukeboxWindow.h"
+#include "Overlay/Window/BgmReplacementWindow.h"
 #include "Overlay/Window/WinePopupWindow.h"
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/Window/NetworkSquareColorWindow.h"
@@ -95,6 +96,10 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_Jukebox,
         	new JukeboxWindow(L("Jukebox"), true,
+        		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse));
+
+        AddWindow(WindowType_BgmReplacement,
+        	new BgmReplacementWindow(L("Music Replacement"), true,
         		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_UnlimitedPlayback,

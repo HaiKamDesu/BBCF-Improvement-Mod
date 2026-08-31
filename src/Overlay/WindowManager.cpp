@@ -32,7 +32,7 @@
 #include "Core/utils.h"
 #include "Web/update_check.h"
 #include "Audio/MusicManager.h"
-#include "Audio/BgmTableProbe.h"
+#include "Audio/BgmReplacementManager.h"
 #include "Updater/UpdateCoordinator.h"
 
 #include "imgui_utils.h"
@@ -248,7 +248,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	g_interfaces.pPaletteManager->LoadAllPalettes();
 
 	MusicManager::GetInstance().Initialize();
-	BgmTableProbe::Initialize();
+	BgmReplacementManager::GetInstance().Initialize();
 
 	// Calling a frame to initialize beforehand to prevent a crash upon first call of Update() if the game window is not focused.
 	// Simply calling ImGui_ImplDX9_CreateDeviceObjects() might be enough too
@@ -360,6 +360,7 @@ void WindowManager::Render()
 	// The "return to Character Select?" confirm dialog's message id only exists in the
 	// render-phase UI buffer, so the Jukebox has to sample it from here.
 	GetMusicManager().PollDialogRenderPhase();
+	GetBgmReplacements().Update();
 
 	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
 	{

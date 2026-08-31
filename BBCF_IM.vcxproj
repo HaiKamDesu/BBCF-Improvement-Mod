@@ -27,7 +27,8 @@
     <ClCompile Include="depends\imgui\imgui_impl_dx9.cpp" />
     <ClCompile Include="depends\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="src\Audio\MusicManager.cpp" />
-    <ClCompile Include="src\Audio\BgmTableProbe.cpp" />
+    <ClCompile Include="src\Audio\BgmReplacementManager.cpp" />
+    <ClCompile Include="src\Overlay\Window\BgmReplacementWindow.cpp" />
     <ClCompile Include="src\Audio\CustomMusicConverter.cpp" />
     <ClCompile Include="src\Overlay\Window\JukeboxWindow.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
@@ -325,7 +326,8 @@
     <ClInclude Include="src\SteamApiWrapper\SteamUserWrapper.h" />
     <ClInclude Include="src\SteamApiWrapper\SteamUtilsWrapper.h" />
     <ClInclude Include="src\Audio\MusicManager.h" />
-    <ClInclude Include="src\Audio\BgmTableProbe.h" />
+    <ClInclude Include="src\Audio\BgmReplacementManager.h" />
+    <ClInclude Include="src\Overlay\Window\BgmReplacementWindow.h" />
     <ClInclude Include="src\Audio\CustomMusicConverter.h" />
     <ClInclude Include="src\Overlay\Window\JukeboxWindow.h" />
     <ClInclude Include="src\Web\update_check.h" />

@@ -23,6 +23,7 @@
 #include "Overlay/Widget/StageSelectWidget.h"
 #include "Updater/UpdateCoordinator.h"
 #include "Audio/MusicManager.h"
+#include "Audio/BgmReplacementManager.h"
 
 #include <Windows.h>
 
@@ -637,6 +638,18 @@ void MainWindow::DrawMusicSection() const
 	if (ImGui::Button(L("Open Jukebox").c_str())) {
 		musicManager.StartCustomMusicDiscovery();
 		m_pWindowContainer->GetWindow(WindowType_Jukebox)->ToggleOpen();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button(L("Replace songs...").c_str())) {
+		m_pWindowContainer->GetWindow(WindowType_BgmReplacement)->ToggleOpen();
+	}
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(L("Swap any song in the game for one of your own.").c_str());
+
+	const int replaced = GetBgmReplacements().GetActiveCount();
+	if (replaced > 0) {
+		ImGui::HorizontalSpacing();
+		ImGui::TextDisabled("%s: %d", L("Songs replaced").c_str(), replaced);
 	}
 }
 

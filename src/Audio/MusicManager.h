@@ -54,6 +54,12 @@ public:
     int GetCategoryEnabledState(const std::string& category) const;
 
     void PlayTrack(int trackId);
+
+    // Play an arbitrary .pac for auditioning, given a path relative to data/Sound/BGM/
+    // (without the .pac extension) and the cue name inside it. Used by the replacement
+    // browser to let you hear a track before and after swapping it. Only works inside a
+    // match, where the audio engine is live; returns false otherwise.
+    bool PreviewPac(const std::string& relPathNoExt, const std::string& cueName);
     void PlayNextTrack();
     void StartCustomMusicDiscovery();
     bool IsCustomMusicLoading() const { return m_customMusicLoading.load(); }
@@ -163,7 +169,7 @@ private:
     void ApplyPendingRematchTrack();
     bool IsVersusMode() const;
     void DetectSceneExitAndUnload();
-    bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId);
+    bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
 
     std::vector<MusicTrack> m_tracks;
     std::map<int, bool> m_trackEnabled;

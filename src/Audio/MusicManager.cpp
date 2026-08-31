@@ -1428,7 +1428,7 @@ static int GetTrackDurationFramesFromPac(int trackId) {
 // array allocation; Clear releases all SBs (vtable[0x18]) and WB handles
 // (engine refcount table) and zeroes the counts. So after InitCues the bank
 // is empty and ready for exactly one custom SB/WB pair (registered below).
-bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId) {
+bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride) {
 	if (outDurationFrames) *outDurationFrames = 0;
 	uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
 	uintptr_t playControllerAddr = modBase + PLAY_CONTROLLER_RVA;
@@ -1696,7 +1696,9 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 				// names, custom ones too. So the cue to request is always just the
 				// bgm name. (Custom banks used to inherit the template's literal
 				// "000_btl_rg" cue and needed a special case here.)
-				const char* playCueName = bgmName;
+				// A preview loads a .pac from a subfolder, so its path and its cue name
+				// are not the same string; everything else plays by its own base name.
+				const char* playCueName = cueOverride ? cueOverride : bgmName;
 				playCue(bank13, &playResult, playCueName, dummyParams);
 				LogMusic("MusicManager: Direct CSoundBank_XACT::Play(\"%s\") returned %d\n", playCueName, playResult);
 			}
@@ -1808,6 +1810,50 @@ void MusicManager::PlayTrack(int trackId) {
 	if (m_currentTrack) {
 		LogMusic("MusicManager: Track = \"%s\"\n", m_currentTrack->name.c_str());
 	}
+}
+
+bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string& cueName) {
+	if (!IsInMatch()) {
+		LogMusic("MusicManager: PreviewPac(%s) ignored - only works inside a match\n",
+			relPathNoExt.c_str());
+		return false;
+	}
+
+	HMODULE hMod = GetModuleHandleA("BBCF.exe");
+	if (!hMod) return false;
+	const uintptr_t modBase = (uintptr_t)hMod;
+
+	if (!m_audioSlot0Captured) {
+		__try {
+			const uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
+			m_origSlot0Active = *(int*)(audioMgrAddr + 0x118 + 0x00);
+			m_origSlot0State  = *(int*)(audioMgrAddr + 0x118 + 0x04);
+			m_audioSlot0Captured = true;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER) {}
+	}
+
+	LogMusic("MusicManager: PreviewPac path=\"%s\" cue=\"%s\"\n",
+		relPathNoExt.c_str(), cueName.c_str());
+
+	int durationFrames = 0;
+	if (!PlayTrackPhysically(modBase, -1, relPathNoExt.c_str(), &durationFrames,
+			m_anchorTrackId, cueName.c_str())) {
+		LogMusic("MusicManager: PreviewPac FAILED for \"%s\"\n", relPathNoExt.c_str());
+		return false;
+	}
+
+	// The mod is now driving BGM, so the scene-exit cleanup has to know - otherwise
+	// leaving the match with a preview loaded errors Character Select.
+	m_currentTrackDurationFrames = durationFrames;
+	m_currentTrackId = -1;
+	m_currentTrack = nullptr;
+	m_modControllingBgm = true;
+	m_customBgmLoaded = true;
+	m_framesSinceLastChange = 0;
+	m_songPlaybackFrames = 0;
+	m_songStartTime = std::chrono::steady_clock::now();
+	return true;
 }
 
 void MusicManager::PlayNextTrack() {

@@ -2852,6 +2852,126 @@ struct LocalizationKeysAccessor
 
         // Open Jukebox
         inline const char* Open_Jukebox() const { return Get("Open Jukebox"); }
+
+        // Music Replacement
+        inline const char* Music_Replacement() const { return Get("Music Replacement"); }
+
+        // Music replacement is unavailable - the game's audio table could not be read.
+        inline const char* Music_replacement_is_unavailable_the_game_s_audio_table_could_not_be_read() const { return Get("Music replacement is unavailable - the game's audio table could not be read."); }
+
+        // Swap any song in the game for one of your own. Nothing in your game folder is overwritten, and every swap can be undone.
+        inline const char* Swap_any_song_in_the_game_for_one_of_your_own_Nothing_in_your_game_folder_is_overwritten_and_every_swap_can_be_undone() const { return Get("Swap any song in the game for one of your own. Nothing in your game folder is overwritten, and every swap can be undone."); }
+
+        // Songs replaced
+        inline const char* Songs_replaced() const { return Get("Songs replaced"); }
+
+        // No songs replaced yet.
+        inline const char* No_songs_replaced_yet() const { return Get("No songs replaced yet."); }
+
+        // Nothing to undo
+        inline const char* Nothing_to_undo() const { return Get("Nothing to undo"); }
+
+        // Undo everything
+        inline const char* Undo_everything() const { return Get("Undo everything"); }
+
+        // Every song is back to normal.
+        inline const char* Every_song_is_back_to_normal() const { return Get("Every song is back to normal."); }
+
+        // Puts every song back to the original and deletes the converted files.
+        inline const char* Puts_every_song_back_to_the_original_and_deletes_the_converted_files() const { return Get("Puts every song back to the original and deletes the converted files."); }
+
+        // Converting for
+        inline const char* Converting_for() const { return Get("Converting for"); }
+
+        // Converting...
+        inline const char* Converting() const { return Get("Converting..."); }
+
+        // Still to do
+        inline const char* Still_to_do() const { return Get("Still to do"); }
+
+        // Only replaced
+        inline const char* Only_replaced() const { return Get("Only replaced"); }
+
+        // All groups
+        inline const char* All_groups() const { return Get("All groups"); }
+
+        // Nothing matches that search.
+        inline const char* Nothing_matches_that_search() const { return Get("Nothing matches that search."); }
+
+        // Original game music
+        inline const char* Original_game_music() const { return Get("Original game music"); }
+
+        // Converting your song...
+        inline const char* Converting_your_song() const { return Get("Converting your song..."); }
+
+        // Now playing your song
+        inline const char* Now_playing_your_song() const { return Get("Now playing your song"); }
+
+        // This track isn't installed on your copy of the game.
+        inline const char* This_track_isn_t_installed_on_your_copy_of_the_game() const { return Get("This track isn't installed on your copy of the game."); }
+
+        // Start a match to hear previews.
+        inline const char* Start_a_match_to_hear_previews() const { return Get("Start a match to hear previews."); }
+
+        // Nothing to preview for this track.
+        inline const char* Nothing_to_preview_for_this_track() const { return Get("Nothing to preview for this track."); }
+
+        // Play original
+        inline const char* Play_original() const { return Get("Play original"); }
+
+        // Hear the game's own version of this track.
+        inline const char* Hear_the_game_s_own_version_of_this_track() const { return Get("Hear the game's own version of this track."); }
+
+        // Play yours
+        inline const char* Play_yours() const { return Get("Play yours"); }
+
+        // Hear the song you put in its place.
+        inline const char* Hear_the_song_you_put_in_its_place() const { return Get("Hear the song you put in its place."); }
+
+        // Replace...
+        inline const char* Replace() const { return Get("Replace..."); }
+
+        // Pick an MP3 to play instead of this track.
+        inline const char* Pick_an_MP3_to_play_instead_of_this_track() const { return Get("Pick an MP3 to play instead of this track."); }
+
+        // please wait
+        inline const char* please_wait() const { return Get("please wait"); }
+
+        // Change...
+        inline const char* Change() const { return Get("Change..."); }
+
+        // Rebuild
+        inline const char* Rebuild() const { return Get("Rebuild"); }
+
+        // Rebuilding
+        inline const char* Rebuilding() const { return Get("Rebuilding"); }
+
+        // Convert the same MP3 again.
+        inline const char* Convert_the_same_MP3_again() const { return Get("Convert the same MP3 again."); }
+
+        // is back to normal.
+        inline const char* is_back_to_normal() const { return Get("is back to normal."); }
+
+        // Put the original back and delete the converted file.
+        inline const char* Put_the_original_back_and_delete_the_converted_file() const { return Get("Put the original back and delete the converted file."); }
+
+        // Choose a song to play instead of
+        inline const char* Choose_a_song_to_play_instead_of() const { return Get("Choose a song to play instead of"); }
+
+        // Converting your song for
+        inline const char* Converting_your_song_for() const { return Get("Converting your song for"); }
+
+        // Replace songs...
+        inline const char* Replace_songs() const { return Get("Replace songs..."); }
+
+        // Swap any song in the game for one of your own.
+        inline const char* Swap_any_song_in_the_game_for_one_of_your_own() const { return Get("Swap any song in the game for one of your own."); }
+
+        // Choosing a file...
+        inline const char* Choosing_a_file() const { return Get("Choosing a file..."); }
+
+        // A swap is heard the next time that song loads - leave and re-enter the match to hear it.
+        inline const char* A_swap_is_heard_the_next_time_that_song_loads_leave_and_re_enter_the_match_to_hear_it() const { return Get("A swap is heard the next time that song loads - leave and re-enter the match to hear it."); }
 };
 
 

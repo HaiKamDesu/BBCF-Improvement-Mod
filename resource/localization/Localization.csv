@@ -1127,3 +1127,43 @@ None,None,Ninguna
 Time:,Time:,Tiempo:
 Enabled Tracks,Enabled Tracks,Canciones activadas
 Open Jukebox,Open Jukebox,Abrir Jukebox
+Music Replacement,Music Replacement,Reemplazo de música
+Music replacement is unavailable - the game's audio table could not be read.,Music replacement is unavailable - the game's audio table could not be read.,El reemplazo de música no está disponible: no se pudo leer la tabla de audio del juego.
+"Swap any song in the game for one of your own. Nothing in your game folder is overwritten, and every swap can be undone.","Swap any song in the game for one of your own. Nothing in your game folder is overwritten, and every swap can be undone.",Cambia cualquier canción del juego por una tuya. No se sobrescribe nada en la carpeta del juego y todo cambio se puede deshacer.
+Songs replaced,Songs replaced,Canciones reemplazadas
+No songs replaced yet.,No songs replaced yet.,Todavía no reemplazaste ninguna canción.
+Nothing to undo,Nothing to undo,Nada que deshacer
+Undo everything,Undo everything,Deshacer todo
+Every song is back to normal.,Every song is back to normal.,Todas las canciones volvieron a la normalidad.
+Puts every song back to the original and deletes the converted files.,Puts every song back to the original and deletes the converted files.,Restaura todas las canciones originales y borra los archivos convertidos.
+Converting for,Converting for,Convirtiendo para
+Converting...,Converting...,Convirtiendo...
+Still to do,Still to do,Faltan
+Only replaced,Only replaced,Solo reemplazadas
+All groups,All groups,Todos los grupos
+Nothing matches that search.,Nothing matches that search.,No hay resultados para esa búsqueda.
+Original game music,Original game music,Música original del juego
+Converting your song...,Converting your song...,Convirtiendo tu canción...
+Now playing your song,Now playing your song,Ahora suena tu canción
+This track isn't installed on your copy of the game.,This track isn't installed on your copy of the game.,Esta pista no está instalada en tu copia del juego.
+Start a match to hear previews.,Start a match to hear previews.,Entra a una partida para escuchar las vistas previas.
+Nothing to preview for this track.,Nothing to preview for this track.,No hay nada para escuchar en esta pista.
+Play original,Play original,Escuchar original
+Hear the game's own version of this track.,Hear the game's own version of this track.,Escucha la versión original del juego.
+Play yours,Play yours,Escuchar la tuya
+Hear the song you put in its place.,Hear the song you put in its place.,Escucha la canción que pusiste en su lugar.
+Replace...,Replace...,Reemplazar...
+Pick an MP3 to play instead of this track.,Pick an MP3 to play instead of this track.,Elige un MP3 para que suene en lugar de esta pista.
+please wait,please wait,espera un momento
+Change...,Change...,Cambiar...
+Rebuild,Rebuild,Reconstruir
+Rebuilding,Rebuilding,Reconstruyendo
+Convert the same MP3 again.,Convert the same MP3 again.,Vuelve a convertir el mismo MP3.
+is back to normal.,is back to normal.,volvió a la normalidad.
+Put the original back and delete the converted file.,Put the original back and delete the converted file.,Restaura la original y borra el archivo convertido.
+Choose a song to play instead of,Choose a song to play instead of,Elige una canción para reemplazar a
+Converting your song for,Converting your song for,Convirtiendo tu canción para
+Replace songs...,Replace songs...,Reemplazar canciones...
+Swap any song in the game for one of your own.,Swap any song in the game for one of your own.,Cambia cualquier canción del juego por una tuya.
+Choosing a file...,Choosing a file...,Eligiendo un archivo...
+A swap is heard the next time that song loads - leave and re-enter the match to hear it.,A swap is heard the next time that song loads - leave and re-enter the match to hear it.,El cambio se escucha la próxima vez que suene esa canción: sal y vuelve a entrar a la partida para oírlo.

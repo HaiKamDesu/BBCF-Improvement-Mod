@@ -17,7 +17,6 @@
 #include "Overlay/imgui_utils.h"
 
 #include <algorithm>
-#include "Audio/BgmTableProbe.h"
 #include "Audio/MusicManager.h"
 #define STB_IMAGE_IMPLEMENTATION
 //#include "stb_image.h"
@@ -100,141 +99,8 @@ void DebugWindow::Draw()
 
 	DrawNotificationSection();
 
-	DrawBgmTableProbeSection();
 }
 
-
-// TEMPORARY research UI for docs/Research/BgmReplacementFeasibility.md. Remove with the
-// probe once the two open questions are answered.
-void DebugWindow::DrawBgmTableProbeSection()
-{
-	if (!ImGui::CollapsingHeader("BGM table probe (research)"))
-		return;
-
-	if (!BgmTableProbe::IsInitialized())
-	{
-		ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "Probe not initialized.");
-		if (ImGui::Button("Initialize"))
-			BgmTableProbe::Initialize();
-		return;
-	}
-
-	ImGui::Text("Table: 0x%p", (void*)BgmTableProbe::GetTableAddress());
-
-	// All three "what is playing" sources, purely diagnostic. audioMgr+0x1690 is known
-	// to hold unrelated values during matches, which is why the checks below target an
-	// index the user picks rather than whatever these report.
-	ImGui::Text("audioMgr+0x1690: %d   musicSelect_X: %d   MusicManager: %d",
-		BgmTableProbe::GetLiveBgmId(),
-		BgmTableProbe::GetMusicSelectId(),
-		BgmTableProbe::GetManagerTrackId());
-
-	ImGui::Separator();
-
-	const auto& names = BgmTableProbe::GetBgmEntryNames();
-	ImGui::InputText("Filter", m_bgmProbeFilter, sizeof(m_bgmProbeFilter));
-
-	std::string needle(m_bgmProbeFilter);
-	std::transform(needle.begin(), needle.end(), needle.begin(), ::tolower);
-
-	ImGui::BeginChild("##BgmProbeList", ImVec2(0, 160), true);
-	for (int i = 0; i < (int)names.size(); ++i)
-	{
-		if (!needle.empty())
-		{
-			std::string hay = names[i];
-			std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-			if (hay.find(needle) == std::string::npos)
-				continue;
-		}
-
-		char label[128];
-		sprintf_s(label, "[%3d] %s", i, names[i].c_str());
-		if (ImGui::Selectable(label, m_bgmProbeIndex == i))
-			m_bgmProbeIndex = i;
-	}
-	ImGui::EndChild();
-
-	if (m_bgmProbeIndex >= 0 && m_bgmProbeIndex < (int)names.size())
-	{
-		ImGui::Text("Selected: [%d] %s", m_bgmProbeIndex, names[m_bgmProbeIndex].c_str());
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), "  currently points at: %s",
-			BgmTableProbe::GetEntry(m_bgmProbeIndex));
-	}
-
-	ImGui::Separator();
-	if (ImGui::Button("Check 1: redirect selected into imtest/"))
-		BgmTableProbe::RedirectIndexToSubdir(m_bgmProbeIndex, &m_bgmProbeStatus);
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Copies the selected track's .pac into data/Sound/BGM/imtest/ and\n"
-		"points its table entry there. Play that song: music = subdirectories work.");
-
-	if (ImGui::Button("Check 2: redirect selected to a missing file"))
-		BgmTableProbe::RedirectIndexToMissing(m_bgmProbeIndex, &m_bgmProbeStatus);
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker("Points the entry at a file that does not exist. Music must keep playing\n"
-		"now; after a reload, silence = the table is re-read, music = the bank is cached.");
-
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(0.4f, 0.9f, 1, 1), "Check 3: convert an MP3 as a stand-in");
-
-	const auto& mp3s = BgmTableProbe::GetCustomMp3s();
-	if (ImGui::Button("Rescan data/Sound/BGM/custom/"))
-		BgmTableProbe::RefreshCustomMp3List();
-
-	if (mp3s.empty())
-	{
-		ImGui::TextDisabled("No .mp3 files found. Drop some in data/Sound/BGM/custom/ and rescan.");
-	}
-	else
-	{
-		if (m_bgmProbeMp3Index >= (int)mp3s.size())
-			m_bgmProbeMp3Index = 0;
-
-		if (ImGui::BeginCombo("MP3", mp3s[m_bgmProbeMp3Index].c_str()))
-		{
-			for (int i = 0; i < (int)mp3s.size(); ++i)
-			{
-				if (ImGui::Selectable(mp3s[i].c_str(), m_bgmProbeMp3Index == i))
-					m_bgmProbeMp3Index = i;
-			}
-			ImGui::EndCombo();
-		}
-
-		if (ImGui::Button("Convert + redirect selected track"))
-		{
-			m_bgmProbeStatus = "Converting, please wait...";
-			BgmTableProbe::ConvertAndRedirect(m_bgmProbeIndex, mp3s[m_bgmProbeMp3Index],
-				&m_bgmProbeStatus);
-		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker("Converts the chosen MP3 into a stand-in for the selected track and\n"
-			"redirects the table entry at it. The game will stall for a few seconds\n"
-			"while it converts - that is the transcode, not a hang.");
-	}
-
-	ImGui::Separator();
-	if (ImGui::Button("Restore all entries"))
-	{
-		BgmTableProbe::RestoreAll();
-		m_bgmProbeStatus = "All entries restored.";
-	}
-
-	const int touched = BgmTableProbe::GetLastTouchedIndex();
-	if (touched >= 0)
-	{
-		ImGui::Separator();
-		ImGui::Text("Patched [%d] %s", touched, BgmTableProbe::GetLastTouchedBaseName());
-		ImGui::Text("  original: %s", BgmTableProbe::GetOriginalEntry(touched));
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), "  now:      %s", BgmTableProbe::GetEntry(touched));
-	}
-
-	if (!m_bgmProbeStatus.empty())
-	{
-		ImGui::Separator();
-		ImGui::TextWrapped("%s", m_bgmProbeStatus.c_str());
-	}
-}
 
 void DebugWindow::DrawImGuiSection()
 {
