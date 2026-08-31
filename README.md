@@ -17,6 +17,8 @@ Join the [BB Improvement Mod Discord Server](https://discord.gg/j2mCX9s) to disc
 - Adds wakeup action thru training dummy slots
 - Adds gap action thru training dummy slots
 - Adds local replay file loading
+- Adds an in-game Jukebox with music rotation, search, and manual track selection
+- Supports custom `.mp3` music through the Jukebox's `[ custom ]` category
 - more experimental features
 - Switchable overlay language (English/Spanish) with extendable dictionaries (see `docs/localization.md` to add more)
 
@@ -29,6 +31,16 @@ Join the [BB Improvement Mod Discord Server](https://discord.gg/j2mCX9s) to disc
 
 ## Installing
 Download dinput8.dll, settings.ini and optionally palettes.ini from the latest release and put it in your BlazBlue Centralfiction folder. All localization data is bundled inside dinput8.dll, so no extra language files are required. There is no need to compile it yourself for regular usage.
+
+
+## Custom music (Jukebox)
+1. Open the game's `data/Sound/BGM/` directory and create a folder named `custom` if it does not already exist.
+2. Place your `.mp3` files in `data/Sound/BGM/custom/`. Keep the original MP3 files there so the mod can discover the tracks on future launches.
+3. Launch the game and open the Jukebox (default hotkey: `F6`). New or changed MP3 files are converted asynchronously; conversion status and progress appear in the Jukebox.
+4. When conversion finishes, the songs appear immediately under the cyan **`[ custom ]`** category. Enter a match before selecting a song for playback.
+5. Converted `.pac` files are cached in `data/Sound/BGM/`. They are rebuilt when the source MP3 changes or the converter format is updated.
+
+For example, `C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\custom\3.02 You Will Recall Our Names.mp3` remains in place and produces the cache file `C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\c58370_3_02_yo.pac`. The Jukebox still displays the full title **3.02 You Will Recall Our Names** under **`[ custom ]`**.
 
 
 ## Compiling and usage

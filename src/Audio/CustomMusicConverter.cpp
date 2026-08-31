@@ -53,13 +53,16 @@ static const unsigned int WMA_PACKET_SIZE = 4459;      // native blkIdx=6 packet
 static const unsigned int WMA_BLOCK_ALIGN_INDEX = 6;   // WAVEBANKMINIWAVEFORMAT wBlockAlign
 static const unsigned int WMA_AVG_BYTES_PER_SEC = 12003; // ~96 kbps CBR, per the encoder's own type list
 static const unsigned int MAX_CUE_NAME_LEN = 14;       // cap for GENERATED custom-track names
+// Jukebox custom tracks keep the complete, known-working native sound-bank identity.
+// The generated c##### filename is only the outer .pac filename used for lookup.
+static const char* CUSTOM_JUKEBOX_BANK_NAME = "000_btl_rg";
 // The sound bank's two name fields are a fixed 64 bytes each, so a bank/cue name can be
 // up to 63 chars + NUL. Native names go up to 23 ("088_btl_bangthem2_short"), which is
 // what a replacement bank has to be able to carry.
 static const unsigned int MAX_BANK_NAME_LEN = 63;
 // Bumped whenever the generated .pac layout changes, so cached files from an older
 // converter are rebuilt instead of being reused with a stale cue name.
-static const unsigned int CONVERTER_VERSION = 2;
+static const unsigned int CONVERTER_VERSION = 3;
 
 // Sanitize an MP3 basename to lowercase [a-z0-9_] for use inside a cue name.
 static std::string SanitizeCueName(const std::string& base) {
@@ -1035,9 +1038,13 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         }
 
         // --- Convert: MP3 -> PCM -> WMA -> XACT banks -> FPAC .pac ---
+        // Keep Jukebox custom tracks on the byte-proven native 000_btl_rg bank/cue
+        // identity. Rewriting the template bank to the generated c##### name makes
+        // XACT reject it in AA_CSoundBank_XACT::AddSoundBank. The outer .pac keeps
+        // its unique generated filename, while the internal XSB/XWB stays native.
         unsigned long long durationSamples = 0;
         std::string convertError;
-        if (!ConvertOneMp3(mp3Path, pacPath, cueName, &durationSamples, &convertError)) {
+        if (!ConvertOneMp3(mp3Path, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
             LogCustom("SKIPPING '%s': %s\n", mp3Filename.c_str(), convertError.c_str());
             continue;
         }

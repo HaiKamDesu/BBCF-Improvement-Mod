@@ -7,6 +7,8 @@ What this mod provides
 - Adds extra game modes
 - Adds hitbox overlay
 - Adds framedata advantage info
+- Adds an in-game Jukebox with music rotation, search, and manual track selection
+- Supports custom .mp3 music through the Jukebox's [ custom ] category
 - Create and load custom palettes and effects without file modifications
 - See each other's custom palettes in online matches
 - Options to improve the performance of the game even further
@@ -37,6 +39,16 @@ How to use the mod's overlay
 - Click and drag on lower right corner to resize the palette editor window (double-click to auto fit window to its contents).
 - CTRL + Click on a slider or drag box to input value as text.
 - Mouse wheel to scroll.
+
+How to add custom songs to the Jukebox
+==========================
+1. Open the game's "data\Sound\BGM\" directory and create a folder named "custom" if it does not already exist.
+2. Place your .mp3 files in "data\Sound\BGM\custom\". Keep the original MP3 files there so the mod can discover the tracks on future launches.
+3. Launch the game and open the Jukebox (default hotkey: F6). New or changed MP3 files are converted asynchronously; conversion status and progress appear in the Jukebox.
+4. When conversion finishes, the songs appear immediately under the cyan [ custom ] category. Enter a match before selecting a song for playback.
+5. Converted .pac files are cached in "data\Sound\BGM\". They are rebuilt when the source MP3 changes or the converter format is updated.
+
+For example, "C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\custom\3.02 You Will Recall Our Names.mp3" remains in place and produces the cache file "C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\c58370_3_02_yo.pac". The Jukebox still displays the full title "3.02 You Will Recall Our Names" under [ custom ].
 
 How to start a custom game mode
 ==========================

@@ -62,6 +62,10 @@ public:
     bool PreviewPac(const std::string& relPathNoExt, const std::string& cueName);
     void PlayNextTrack();
     void StartCustomMusicDiscovery();
+    // Publish completed async conversions to the live track list. Called from
+    // both the game tick and Jukebox draw path so the custom category appears
+    // immediately even when game logic is not advancing.
+    void PollCustomMusicDiscovery();
     bool IsCustomMusicLoading() const { return m_customMusicLoading.load(); }
     bool HasStartedCustomMusicDiscovery() const { return m_customMusicStarted.load(); }
     float GetCustomMusicProgress() const;
@@ -160,7 +164,6 @@ private:
     void BuildTrackList();
     void DiscoverCustomTracks();
     void RegisterCustomTracks(const std::vector<CustomTrackInfo>& customTracks);
-    void PollCustomMusicDiscovery();
     void ChangeMusicIfNeeded();
     void UpdateMusicState();
     void ShufflePlaylist();
@@ -188,6 +191,7 @@ private:
     std::atomic<int> m_customMusicCurrent{ 0 };
     std::atomic<int> m_customMusicTotal{ 0 };
     std::atomic<int> m_customTrackCount{ 0 };
+    std::mutex m_customMusicPollMutex;
     mutable std::mutex m_customMusicStatusMutex;
     std::string m_customMusicStatus = "Custom music loads when the Jukebox is opened";
     std::future<std::vector<CustomTrackInfo>> m_customMusicFuture;
