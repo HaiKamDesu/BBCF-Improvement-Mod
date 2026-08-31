@@ -32,6 +32,7 @@
 #include "Core/utils.h"
 #include "Web/update_check.h"
 #include "Audio/MusicManager.h"
+#include "Audio/BgmTableProbe.h"
 #include "Updater/UpdateCoordinator.h"
 
 #include "imgui_utils.h"
@@ -247,6 +248,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	g_interfaces.pPaletteManager->LoadAllPalettes();
 
 	MusicManager::GetInstance().Initialize();
+	BgmTableProbe::Initialize();
 
 	// Calling a frame to initialize beforehand to prevent a crash upon first call of Update() if the game window is not focused.
 	// Simply calling ImGui_ImplDX9_CreateDeviceObjects() might be enough too

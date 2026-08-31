@@ -1,6 +1,8 @@
 #pragma once
 #include "IWindow.h"
 
+#include <string>
+
 class DebugWindow : public IWindow
 {
 public:
@@ -19,6 +21,10 @@ private:
 	void DrawSpectatorSyncSection();
 	void DrawSettingsSection();
 	void DrawNotificationSection();
+	void DrawBgmTableProbeSection();
 
 	bool m_showDemoWindow = false;
+	std::string m_bgmProbeStatus;
+	int m_bgmProbeIndex = 0;
+	char m_bgmProbeFilter[64] = {};
 };

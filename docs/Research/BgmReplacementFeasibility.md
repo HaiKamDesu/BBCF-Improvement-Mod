@@ -5,7 +5,8 @@
 without modifying any shipped file (so Steam file verification has nothing to restore),
 covering Astral Heat music, and without desyncing online?
 
-**Verdict: yes.** The mechanism is a single data write — no code hooks required. Details below.
+**Verdict: yes — confirmed in-game 2026-08-31 (see §9).** The mechanism is a single data
+write; no code hooks required. Details below.
 
 ---
 
@@ -179,12 +180,50 @@ strictly safer than anything the mod already does to the game.
 Preview in the overlay is nearly free: `PlayTrackPhysically` already loads an arbitrary
 `.pac` by path and plays a named cue, which is exactly what previewing a replacement needs.
 
-## 9. Open items to confirm in-game
+## 9. In-game verification — both questions answered (2026-08-31)
 
-- A subdirectory in the table string is accepted by the BGM reader. Strong static evidence
-  (native voice entries use one), not yet empirically confirmed on the BGM path.
-- Whether a loaded bank is cached across matches, i.e. whether changing a replacement takes
-  effect immediately or only on the next load of that track.
+Tested with `BgmTableProbe` (`src/Audio/BgmTableProbe.*`, temporary instrumentation exposed
+in the Debug window). Log evidence in `BBCF_IM/DEBUG.txt`; table resolved to `0x00A4C650`,
+i.e. an ASLR base of `0x470000` — the RVA-relative approach handles relocation correctly.
+
+**Subdirectories work — CONFIRMED.** Entry [0] was pointed at `imtest/000_btl_rg.pac` (a
+copy of the original placed in a new subfolder). Ragna's theme played normally in Training.
+So the reader resolves `data/sound/BGM/<subdir>/<file>.pac`, and replacements can live in a
+mod-owned subfolder without touching a single shipped file.
+
+**The table is re-read on every load — CONFIRMED.** Entry [0] was then pointed at a
+non-existent file. Music kept playing for the rest of that match (nothing reloads mid-match),
+and on re-entering Training the game reached `OnMatchInit` and then died. It could only have
+died there by acting on the newly-written pointer, so the entry is re-read per load and is
+not cached across matches. A replacement therefore takes effect on the next load of that
+track, with no restart needed.
+
+**NEW — a missing target file wedges the game.** This was not a graceful fallback to silence:
+the game froze and had to be killed, producing no crash report, with `DEBUG.txt` ending
+mid-match-init. That signature matches the hang aikuxa documented for the match-summary black
+screen — the main thread waiting forever on an audio clock that never starts because the bank
+never loaded.
+
+**This is a hard requirement on the feature:** never write a pointer without first confirming
+the target file exists, and re-validate every assignment at startup (the user can delete or
+move a converted file between sessions). Treat a missing target as "assignment disabled,
+restore the original pointer, tell the user" — never as something to pass to the game.
+
+On the upside, the crash confirmed reversibility for free: the patch is process memory only,
+so the relaunched game came up with a pristine table and all 186 shipped files untouched.
+
+## 9a. Remaining minor unknown: which track is playing
+
+None of the three "what is playing" sources agreed during the test (`audioMgr+0x1690` = 0,
+`musicSelect_X` = 2, `MusicManager` = 0). `audioMgr+0x1690` is already documented as
+unreliable during matches (`MusicManager.cpp:971`), and `musicSelect_X` is paired with a
+`musicSelect_Y`, so it is likely a 2D menu-cursor coordinate rather than a track id —
+which would make `MusicManager::Initialize`'s use of it as a startup track id a latent bug
+worth a second look.
+
+This does **not** block the replacement feature, which is driven by an explicitly chosen
+table index and never needs to know what is currently playing. It only matters for the
+Jukebox's own display, which has its own working detection path.
 
 ## 10. Reproducing the table dump
 
