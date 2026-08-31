@@ -1691,12 +1691,12 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 				int playResult = -1;
 				typedef void (__thiscall *BankPlayFuncType)(void* bank, int* resultOut, const char* cueName, void* param3);
 				BankPlayFuncType playCue = (BankPlayFuncType)(modBase + 0x0515B0);
-				// Custom tracks (id >= 10000) are built from the native 000_btl_rg
-				// sound-bank template, whose single cue is literally named
-				// "000_btl_rg" (see CustomMusicConverter::BuildSoundBank). The wave
-				// data is the custom song, but the cue we must request is the
-				// template's. Native tracks play by their own filename as before.
-				const char* playCueName = (trackId >= 10000) ? "000_btl_rg" : bgmName;
+				// Every .pac's cue is named after its own base filename - native
+				// tracks and, since the converter learned to write arbitrary cue
+				// names, custom ones too. So the cue to request is always just the
+				// bgm name. (Custom banks used to inherit the template's literal
+				// "000_btl_rg" cue and needed a special case here.)
+				const char* playCueName = bgmName;
 				playCue(bank13, &playResult, playCueName, dummyParams);
 				LogMusic("MusicManager: Direct CSoundBank_XACT::Play(\"%s\") returned %d\n", playCueName, playResult);
 			}

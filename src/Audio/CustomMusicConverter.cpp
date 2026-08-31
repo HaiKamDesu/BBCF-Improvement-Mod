@@ -51,7 +51,14 @@ static const unsigned int TARGET_CHANNELS = 2;
 static const unsigned int WMA_PACKET_SIZE = 4459;      // native blkIdx=6 packet size
 static const unsigned int WMA_BLOCK_ALIGN_INDEX = 6;   // WAVEBANKMINIWAVEFORMAT wBlockAlign
 static const unsigned int WMA_AVG_BYTES_PER_SEC = 12003; // ~96 kbps CBR, per the encoder's own type list
-static const unsigned int MAX_CUE_NAME_LEN = 14;       // native cues are <= 14 chars
+static const unsigned int MAX_CUE_NAME_LEN = 14;       // cap for GENERATED custom-track names
+// The sound bank's two name fields are a fixed 64 bytes each, so a bank/cue name can be
+// up to 63 chars + NUL. Native names go up to 23 ("088_btl_bangthem2_short"), which is
+// what a replacement bank has to be able to carry.
+static const unsigned int MAX_BANK_NAME_LEN = 63;
+// Bumped whenever the generated .pac layout changes, so cached files from an older
+// converter are rebuilt instead of being reused with a stale cue name.
+static const unsigned int CONVERTER_VERSION = 2;
 
 // Sanitize an MP3 basename to lowercase [a-z0-9_] for use inside a cue name.
 static std::string SanitizeCueName(const std::string& base) {
@@ -544,11 +551,21 @@ static std::vector<unsigned char> BuildWaveBank(const std::string& bankName,
 // xactengine2_10.dll's sound bank validation checks ONLY: size >= 0x8A, magic
 // "SDBK", and the format version u16 at +6 == 0x2B (disassembled from the
 // DLL). The CRC/timestamp fields are build-time metadata, not verified at
-// runtime. Native BGM .xsb files are a fixed 0x120-byte structure followed by
-// the cue name + NUL terminator (total = 0x120 + len + 1 bytes), with the cue
-// name also appearing in two 64-byte zero-padded fields at +0x4A and +0x8A,
-// and a u16 at +0x1E holding len+1. We patch a byte-exact copy of a native
-// bank (050_btl_rgvsjn.xsb) accordingly. Cue names are capped at 14 chars.
+// runtime.
+//
+// Native BGM .xsb files are a fixed 0x120-byte structure followed by the cue
+// name + NUL (total = 0x120 + len + 1), with the name ALSO in two 64-byte
+// zero-padded fields at +0x4A and +0x8A, and a u16 at +0x1E holding len+1.
+//
+// Confirmed against four native banks of differing name length, which are
+// byte-identical apart from those fields and a build GUID at +0x08:
+//     000_btl_rg (10) = 299    050_btl_rgvsjn (14) = 303
+//     950_btl_rgvsjn_old (18) = 307    084_btl_bangthem_short (22) = 311
+// i.e. size = 0x120 + len + 1 exactly, and [0x1E] = len + 1 in every one.
+//
+// The name matters: the game asks its sound bank for a cue BY NAME, and a
+// .pac's cue name is always its own base filename. So a bank generated to
+// stand in for `008_btl_bn.pac` must carry the cue name `008_btl_bn`.
 static std::vector<unsigned char> BuildSoundBank(const std::string& cueName) {
     // Exact 299-byte native XSB extracted directly from working track 000_btl_rg.pac
     static const unsigned char NATIVE_000_XSB[299] = {
@@ -573,7 +590,31 @@ static std::vector<unsigned char> BuildSoundBank(const std::string& cueName) {
         0x30, 0x30, 0x30, 0x5f, 0x62, 0x74, 0x6c, 0x5f, 0x72, 0x67, 0x00,
     };
 
-    return std::vector<unsigned char>(NATIVE_000_XSB, NATIVE_000_XSB + sizeof(NATIVE_000_XSB));
+    // Offsets of the three name slots and the size-driving length field.
+    const size_t kFixedPrefix = 0x120;  // everything before the trailing name string
+    const size_t kNameFieldA  = 0x4A;
+    const size_t kNameFieldB  = 0x8A;
+    const size_t kNameFieldSz = 64;
+    const size_t kLenField    = 0x1E;   // u16 = name length + 1
+
+    std::string name = cueName;
+    if (name.size() > MAX_BANK_NAME_LEN)
+        name.resize(MAX_BANK_NAME_LEN);
+
+    // Take the native bank's fixed prefix and regrow the trailing name string.
+    std::vector<unsigned char> xsb(NATIVE_000_XSB, NATIVE_000_XSB + kFixedPrefix);
+
+    memset(&xsb[kNameFieldA], 0, kNameFieldSz);
+    memcpy(&xsb[kNameFieldA], name.data(), name.size());
+    memset(&xsb[kNameFieldB], 0, kNameFieldSz);
+    memcpy(&xsb[kNameFieldB], name.data(), name.size());
+
+    *(unsigned short*)&xsb[kLenField] = (unsigned short)(name.size() + 1);
+
+    xsb.insert(xsb.end(), name.begin(), name.end());
+    xsb.push_back(0);
+
+    return xsb;
 }
 
 // ============================================================================
@@ -586,9 +627,9 @@ static std::vector<unsigned char> BuildSoundBank(const std::string& cueName) {
 //     entry[i]: name[nameField], index u32, offset u32 (rel. dataStart),
 //               size u32, 16 bytes padding
 //   Sub-file data: .xsb first at dataStart, .xwb at dataStart + align16(xsbSize)
-// For our <=14-char cue names the sub-file names are <=18 chars, so
-// nameField = 0x14 (20), stride = 0x30 and dataStart = 0x80 — identical to the
-// native long-name files (e.g. 050_btl_rgvsjn.pac).
+// Geometry is derived from the name length so it matches the native files for any
+// name: nameField = align4(len + 2), stride = align16(nameField + 16). Verified to
+// reproduce all 186 shipped .pac files byte-for-byte in the header and file table.
 static std::vector<unsigned char> BuildFpacContainer(const std::string& cueName,
                                                      const std::vector<unsigned char>& xsb,
                                                      const std::vector<unsigned char>& xwb) {
@@ -596,11 +637,19 @@ static std::vector<unsigned char> BuildFpacContainer(const std::string& cueName,
     std::string xwbName = cueName + ".xwb";
 
     size_t maxNameLen = (xsbName.size() > xwbName.size()) ? xsbName.size() : xwbName.size();
-    unsigned int nameField = (unsigned int)((maxNameLen + 1 + 3) & ~3u); // name + NUL, 4-aligned
+    // name + NUL + at least one pad byte, 4-aligned. The extra byte matters: with plain
+    // align4(len + 1) the 21 shipped files whose name length is already 4-aligned come
+    // out 4 bytes short. This formula reproduces the file-table geometry of all 186
+    // shipped .pac files exactly.
+    unsigned int nameField = (unsigned int)((maxNameLen + 2 + 3) & ~3u);
     if (nameField < 0x10) nameField = 0x10;
-    unsigned int stride = nameField + 16;
+    // Native stride is align16(nameField + 16), not nameField + 16 - verified against
+    // five shipped .pac files (nameField 16 -> 32; 20/24/28 -> 48). Getting this wrong
+    // produced a 4/8-byte-misaligned file table that no native file has, which matters
+    // more now that replacement names push nameField past 16.
+    unsigned int stride = ((nameField + 16) + 15) & ~15u;
     unsigned int fileCount = 2;
-    unsigned int dataStart = 0x20 + stride * fileCount; // 0x80 for nameField 0x14
+    unsigned int dataStart = 0x20 + stride * fileCount; // 0x60 or 0x80, as in native files
 
     // Sub-file offsets (relative to dataStart); .xwb starts 16-byte aligned
     unsigned int xsbOffset = 0;
@@ -652,6 +701,231 @@ static unsigned int StableTrackHash(const std::string& filename) {
     return hash;
 }
 
+// Transcode one MP3 and write it out as a game-native .pac whose wave bank, sound bank,
+// cue and FPAC sub-files all carry `cueName`. Assumes Media Foundation is already
+// started (see ConvertMp3ToPac for the standalone entry point). Writes via a temp file
+// so an interrupted run never leaves a torn .pac behind.
+static bool ConvertOneMp3(const std::string& mp3Path,
+                          const std::string& outPacPath,
+                          const std::string& cueName,
+                          unsigned long long* durationSamplesOut,
+                          std::string* errorOut) {
+    auto fail = [&](const std::string& msg) {
+        if (errorOut) *errorOut = msg;
+        LogCustom("%s\n", msg.c_str());
+        return false;
+    };
+
+    std::vector<unsigned char> wmaData;
+    std::vector<unsigned int> pktSamples;
+    unsigned long long durationSamples = 0;
+    if (!TranscodeMp3ToWma(mp3Path, wmaData, pktSamples, &durationSamples))
+        return fail("Could not decode '" + mp3Path + "' - is it a valid MP3?");
+    if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)
+        return fail("Implausible duration for '" + mp3Path + "'");
+
+    std::vector<unsigned char> xwb = BuildWaveBank(cueName, wmaData, pktSamples, durationSamples);
+    std::vector<unsigned char> xsb = BuildSoundBank(cueName);
+    std::vector<unsigned char> pac = BuildFpacContainer(cueName, xsb, xwb);
+
+    const std::string tmpPath = outPacPath + ".tmp";
+    HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hOut == INVALID_HANDLE_VALUE) {
+        char buf[320];
+        sprintf_s(buf, "Could not create '%s' (error %lu)", tmpPath.c_str(), GetLastError());
+        return fail(buf);
+    }
+    DWORD written = 0;
+    BOOL ok = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
+    CloseHandle(hOut);
+    if (!ok || written != (DWORD)pac.size()) {
+        DeleteFileA(tmpPath.c_str());
+        char buf[192];
+        sprintf_s(buf, "Short write (%lu of %zu bytes)", written, pac.size());
+        return fail(buf);
+    }
+    if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+        DeleteFileA(tmpPath.c_str());
+        char buf[320];
+        sprintf_s(buf, "Could not move '%s' into place (error %lu)", tmpPath.c_str(), GetLastError());
+        return fail(buf);
+    }
+
+    if (durationSamplesOut) *durationSamplesOut = durationSamples;
+    return true;
+}
+
+// Pull one sub-file out of an FPAC container by extension, returning its bytes and its
+// base name (the sub-file name minus the extension). Mirrors MusicManager's parser: the
+// table stride comes from dataStart, never from nameField.
+static bool ExtractPacSubFile(const std::vector<unsigned char>& pac,
+                              const char* wantExt,
+                              std::vector<unsigned char>* dataOut,
+                              std::string* baseNameOut) {
+    const size_t size = pac.size();
+    if (size < 0x20 || memcmp(pac.data(), "FPAC", 4) != 0) return false;
+
+    auto rd = [&](size_t off) -> unsigned int {
+        if (off + 4 > size) return 0;
+        return *(const unsigned int*)(pac.data() + off);
+    };
+
+    const unsigned int dataStart = rd(0x04);
+    const unsigned int fileCount = rd(0x0C);
+    const unsigned int nameField = rd(0x14);
+    if (dataStart < 0x20 || dataStart > size) return false;
+    if (fileCount < 1 || fileCount > 8) return false;
+    if (nameField < 4 || nameField > 256) return false;
+    const unsigned int stride = (dataStart - 0x20) / fileCount;
+    if (stride < nameField + 12) return false;
+
+    const size_t extLen = strlen(wantExt);
+    for (unsigned int i = 0; i < fileCount; ++i) {
+        const size_t e = 0x20 + (size_t)i * stride;
+        if (e + nameField + 12 > size) return false;
+
+        const char* nm = (const char*)pac.data() + e;
+        size_t nl = 0;
+        while (nl < nameField && nm[nl] != '\0') ++nl;
+        if (nl < extLen || _strnicmp(nm + nl - extLen, wantExt, extLen) != 0) continue;
+
+        const unsigned int off = rd(e + nameField + 4);
+        const unsigned int sz = rd(e + nameField + 8);
+        if (sz == 0 || (size_t)dataStart + off + sz > size) return false;
+
+        dataOut->assign(pac.begin() + dataStart + off, pac.begin() + dataStart + off + sz);
+        baseNameOut->assign(nm, nl - extLen);
+        return true;
+    }
+    return false;
+}
+
+bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
+                                const std::string& originalPacPath,
+                                const std::string& outPacPath,
+                                std::string* errorOut) {
+    auto fail = [&](const std::string& msg) {
+        if (errorOut) *errorOut = msg;
+        LogCustom("%s\n", msg.c_str());
+        return false;
+    };
+
+    // Read the shipped track we are standing in for. Its sound bank is reused BYTE FOR
+    // BYTE rather than generated: besides the cue name it carries per-track authoring
+    // values (a pair of 0/0xFFFF reference fields at +0xFA and near the tail differ
+    // between shipped tracks), and copying them is the only way to be sure a replacement
+    // behaves exactly like the track it replaces.
+    HANDLE hIn = CreateFileA(originalPacPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hIn == INVALID_HANDLE_VALUE) {
+        char buf[320];
+        sprintf_s(buf, "Could not open original track '%s' (error %lu)",
+            originalPacPath.c_str(), GetLastError());
+        return fail(buf);
+    }
+    const DWORD inSize = GetFileSize(hIn, NULL);
+    if (inSize == INVALID_FILE_SIZE || inSize == 0) {
+        CloseHandle(hIn);
+        return fail("Original track '" + originalPacPath + "' is empty or unreadable");
+    }
+    std::vector<unsigned char> originalPac(inSize);
+    DWORD got = 0;
+    const BOOL readOk = ReadFile(hIn, originalPac.data(), inSize, &got, NULL);
+    CloseHandle(hIn);
+    if (!readOk || got != inSize)
+        return fail("Short read on original track '" + originalPacPath + "'");
+
+    std::vector<unsigned char> originalXsb;
+    std::string baseName;
+    if (!ExtractPacSubFile(originalPac, ".xsb", &originalXsb, &baseName))
+        return fail("No sound bank inside '" + originalPacPath + "' - not a BGM .pac?");
+
+    LogCustom("Replacement for \"%s\": reusing its %zu-byte sound bank verbatim\n",
+        baseName.c_str(), originalXsb.size());
+
+    HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    bool coInitialized = SUCCEEDED(hrCo);
+    if (FAILED(MFStartup(MF_VERSION))) {
+        if (coInitialized) CoUninitialize();
+        return fail("Media Foundation is unavailable on this system");
+    }
+
+    std::vector<unsigned char> wmaData;
+    std::vector<unsigned int> pktSamples;
+    unsigned long long durationSamples = 0;
+    bool ok = TranscodeMp3ToWma(mp3Path, wmaData, pktSamples, &durationSamples);
+    if (ok && (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)) ok = false;
+
+    if (ok) {
+        // The wave bank must carry the SAME name, because the reused sound bank refers
+        // to it by that name.
+        std::vector<unsigned char> xwb = BuildWaveBank(baseName, wmaData, pktSamples, durationSamples);
+        std::vector<unsigned char> pac = BuildFpacContainer(baseName, originalXsb, xwb);
+
+        const std::string tmpPath = outPacPath + ".tmp";
+        HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
+            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hOut == INVALID_HANDLE_VALUE) {
+            ok = false;
+            if (errorOut) *errorOut = "Could not create the output file";
+        } else {
+            DWORD written = 0;
+            const BOOL wrote = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
+            CloseHandle(hOut);
+            if (!wrote || written != (DWORD)pac.size()) {
+                DeleteFileA(tmpPath.c_str());
+                ok = false;
+                if (errorOut) *errorOut = "Short write on the output file";
+            } else if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
+                                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+                DeleteFileA(tmpPath.c_str());
+                ok = false;
+                if (errorOut) *errorOut = "Could not move the converted file into place";
+            } else {
+                const int durSec = (int)(durationSamples / TARGET_RATE);
+                LogCustom("SUCCESS: '%s' replaces \"%s\" -> '%s' (~%02d:%02d)\n",
+                    mp3Path.c_str(), baseName.c_str(), outPacPath.c_str(),
+                    durSec / 60, durSec % 60);
+            }
+        }
+    } else if (errorOut && errorOut->empty()) {
+        *errorOut = "Could not decode '" + mp3Path + "' - is it a valid MP3?";
+    }
+
+    MFShutdown();
+    if (coInitialized) CoUninitialize();
+    return ok;
+}
+
+bool ConvertMp3ToPac(const std::string& mp3Path,
+                     const std::string& outPacPath,
+                     const std::string& cueName,
+                     std::string* errorOut) {
+    if (cueName.empty()) {
+        if (errorOut) *errorOut = "Empty cue name";
+        return false;
+    }
+
+    HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    bool coInitialized = SUCCEEDED(hrCo);
+    HRESULT hr = MFStartup(MF_VERSION);
+    if (FAILED(hr)) {
+        if (coInitialized) CoUninitialize();
+        if (errorOut) *errorOut = "Media Foundation is unavailable on this system";
+        return false;
+    }
+
+    LogCustom("Converting '%s' -> '%s' (cue \"%s\")\n",
+        mp3Path.c_str(), outPacPath.c_str(), cueName.c_str());
+    const bool ok = ConvertOneMp3(mp3Path, outPacPath, cueName, NULL, errorOut);
+
+    MFShutdown();
+    if (coInitialized) CoUninitialize();
+    return ok;
+}
+
 std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgressCallback& progress) {
     std::vector<CustomTrackInfo> result;
 
@@ -693,6 +967,24 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
     } while (FindNextFileA(hFind, &findData));
     FindClose(hFind);
 
+    // A cached .pac from an older converter carries a stale cue name, which the play
+    // path would then fail to resolve. Rebuild everything when the stamp doesn't match.
+    const std::string stampPath = std::string(CUSTOM_DIR) + "\\.converter_version";
+    bool forceRebuild = true;
+    {
+        HANDLE hStamp = CreateFileA(stampPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hStamp != INVALID_HANDLE_VALUE) {
+            char stampBuf[32] = {};
+            DWORD got = 0;
+            if (ReadFile(hStamp, stampBuf, sizeof(stampBuf) - 1, &got, NULL))
+                forceRebuild = ((unsigned int)atoi(stampBuf) != CONVERTER_VERSION);
+            CloseHandle(hStamp);
+        }
+    }
+    if (forceRebuild)
+        LogCustom("Converter version %u - rebuilding every cached .pac\n", CONVERTER_VERSION);
+
     // Sort for deterministic ID/cue-name assignment across runs
     std::sort(mp3Files.begin(), mp3Files.end());
     LogCustom("Found %d custom MP3 file(s) in %s\n", (int)mp3Files.size(), CUSTOM_DIR);
@@ -726,7 +1018,7 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         WIN32_FILE_ATTRIBUTE_DATA pacInfo = {}, mp3Info = {};
         bool pacExists = GetFileAttributesExA(pacPath.c_str(), GetFileExInfoStandard, &pacInfo) != 0;
         bool mp3Stat = GetFileAttributesExA(mp3Path.c_str(), GetFileExInfoStandard, &mp3Info) != 0;
-        if (pacExists && mp3Stat &&
+        if (!forceRebuild && pacExists && mp3Stat &&
             CompareFileTime(&mp3Info.ftLastWriteTime, &pacInfo.ftLastWriteTime) <= 0) {
             LogCustom("Using cached PAC for '%s' -> %s.pac\n", mp3Filename.c_str(), cueName.c_str());
             CustomTrackInfo info;
@@ -742,51 +1034,16 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         }
 
         // --- Convert: MP3 -> PCM -> WMA -> XACT banks -> FPAC .pac ---
-        LogCustom("Converting '%s' -> '%s.pac'...\n", mp3Filename.c_str(), cueName.c_str());
-
-        std::vector<unsigned char> wmaData;
-        std::vector<unsigned int> pktSamples;
         unsigned long long durationSamples = 0;
-        if (!TranscodeMp3ToWma(mp3Path, wmaData, pktSamples, &durationSamples)) {
-            LogCustom("FAILED to transcode '%s' — skipping\n", mp3Filename.c_str());
-            continue;
-        }
-        if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull) {
-            LogCustom("FAILED: implausible duration for '%s' — skipping\n", mp3Filename.c_str());
-            continue;
-        }
-
-        std::vector<unsigned char> xwb = BuildWaveBank("000_btl_rg", wmaData, pktSamples, durationSamples);
-        std::vector<unsigned char> xsb = BuildSoundBank("000_btl_rg");
-        std::vector<unsigned char> pac = BuildFpacContainer("000_btl_rg", xsb, xwb);
-
-        // Write atomically: temp file, then replace (never leaves a torn .pac
-        // behind if the conversion is interrupted).
-        std::string tmpPath = pacPath + ".tmp";
-        HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
-            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hOut == INVALID_HANDLE_VALUE) {
-            LogCustom("FAILED to create output file '%s' (error %lu)\n", tmpPath.c_str(), GetLastError());
-            continue;
-        }
-        DWORD written = 0;
-        BOOL ok = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
-        CloseHandle(hOut);
-        if (!ok || written != (DWORD)pac.size()) {
-            LogCustom("FAILED to write full PAC file (wrote %lu of %zu bytes)\n", written, pac.size());
-            DeleteFileA(tmpPath.c_str());
-            continue;
-        }
-        if (!MoveFileExA(tmpPath.c_str(), pacPath.c_str(),
-                         MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
-            LogCustom("FAILED to move '%s' into place (error %lu)\n", tmpPath.c_str(), GetLastError());
-            DeleteFileA(tmpPath.c_str());
+        std::string convertError;
+        if (!ConvertOneMp3(mp3Path, pacPath, cueName, &durationSamples, &convertError)) {
+            LogCustom("SKIPPING '%s': %s\n", mp3Filename.c_str(), convertError.c_str());
             continue;
         }
 
         int durSec = (int)(durationSamples / TARGET_RATE);
-        LogCustom("SUCCESS: '%s' -> '%s.pac' (%zu bytes, ~%02d:%02d)\n",
-            mp3Filename.c_str(), cueName.c_str(), pac.size(), durSec / 60, durSec % 60);
+        LogCustom("SUCCESS: '%s' -> '%s.pac' (~%02d:%02d)\n",
+            mp3Filename.c_str(), cueName.c_str(), durSec / 60, durSec % 60);
 
         CustomTrackInfo info;
         info.id = trackId;
@@ -794,6 +1051,18 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         info.pacFilename = pacFilename;
         info.pacPath = pacPath;
         result.push_back(info);
+    }
+
+    {
+        HANDLE hStamp = CreateFileA(stampPath.c_str(), GENERIC_WRITE, 0, NULL,
+            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hStamp != INVALID_HANDLE_VALUE) {
+            char stampBuf[32];
+            int n = sprintf_s(stampBuf, "%u", CONVERTER_VERSION);
+            DWORD written = 0;
+            WriteFile(hStamp, stampBuf, (DWORD)n, &written, NULL);
+            CloseHandle(hStamp);
+        }
     }
 
     MFShutdown();

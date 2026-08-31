@@ -32,6 +32,37 @@ struct CustomTrackInfo {
 // Returns the list of custom tracks (both freshly converted and cached). On any
 // failure the affected track is skipped (logged) and the rest still convert, so
 // a bad MP3 can never block the mod from loading.
+// Convert a single MP3 into a game-native .pac whose wave bank, sound bank, cue name and
+// FPAC sub-file names all carry `cueName`.
+//
+// The cue name is what makes a .pac usable as a REPLACEMENT for a shipped track: the game
+// asks its sound bank for a cue by name, and a native .pac's cue is always its own base
+// filename. So standing in for `008_btl_bn.pac` means passing cueName "008_btl_bn".
+// Names up to 63 chars are supported (the bank's name fields are 64 bytes); the longest
+// native name is 23.
+//
+// Returns false and fills `errorOut` (if given) on failure, leaving any existing file at
+// `outPacPath` untouched.
+bool ConvertMp3ToPac(const std::string& mp3Path,
+                     const std::string& outPacPath,
+                     const std::string& cueName,
+                     std::string* errorOut = nullptr);
+
+// Convert an MP3 into a drop-in replacement for a shipped track.
+//
+// Unlike ConvertMp3ToPac this does not generate a sound bank - it reuses the original
+// track's own, byte for byte, and swaps only the wave data. That preserves the cue name
+// AND the per-track authoring values baked into it, so the replacement behaves exactly
+// like the track it stands in for. Prefer this whenever an original exists.
+//
+// `originalPacPath` is the shipped .pac (e.g. "data/Sound/BGM/008_btl_bn.pac");
+// `outPacPath` should keep that same base filename in a mod-owned folder, since the
+// game resolves a cue by the file's base name.
+bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
+                                const std::string& originalPacPath,
+                                const std::string& outPacPath,
+                                std::string* errorOut = nullptr);
+
 using CustomMusicProgressCallback = std::function<void(int, int, const std::string&)>;
 std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(
     const CustomMusicProgressCallback& progress = CustomMusicProgressCallback());

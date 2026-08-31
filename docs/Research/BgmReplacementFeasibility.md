@@ -100,24 +100,59 @@ native tracks by requesting cue name = lowercase base filename, and that works i
 Replace `008_btl_bn.pac` by pointing table[8] at `custom/008_btl_bn.pac`. The base name is
 unchanged, so whatever the game derives the cue request from, it matches.
 
-## 5. Converter work required
+## 5. Converter work — DONE (2026-08-31)
 
-`BuildSoundBank(cueName)` currently **ignores its parameter** and returns a fixed 299-byte
-blob with `000_btl_rg` baked in (which is why the play path hardcodes that cue for custom
-tracks). To emit a replacement for an arbitrary track it must write the target's name.
+`BuildSoundBank(cueName)` used to ignore its parameter and return a fixed blob with
+`000_btl_rg` baked in. It now honours the name, and the surrounding container geometry was
+corrected to match the shipped files exactly.
 
-The name appears at three offsets in the template:
+**Sound bank layout** (confirmed against four shipped banks of differing name length, which
+are byte-identical apart from these fields and a build GUID at `+0x08`):
 
-| offset | following zero bytes | room |
+- fixed 0x120-byte prefix, then the name + NUL as a variable-length tail
+- the name also sits in two 64-byte zero-padded fields at `+0x4A` and `+0x8A`
+- u16 at `+0x1E` = name length + 1
+- total size = `0x120 + len + 1`
+
+Generating a bank for a shipped track's own name reproduces that track's real `.xsb`
+byte-for-byte (bar the build GUID) for every battle-family track tested, including the
+longest native name, `088_btl_bangthem2_short` at 23 chars.
+
+**Two container bugs found and fixed** while verifying against all 186 shipped `.pac` files:
+
+| field | was | correct |
 |---|---|---|
-| `0x04A` | 54 | 64-byte fixed field |
-| `0x08A` | 54 | 64-byte fixed field |
-| `0x120` | 1 (end of file) | variable-length tail |
+| FPAC `stride` | `nameField + 16` | `align16(nameField + 16)` |
+| FPAC `nameField` | `align4(len + 1)` | `align4(len + 2)` |
 
-The two 64-byte fields take any name up to 63 chars in place. The tail string at `0x120`
-changes the file length, so the SDBK header size fields need fixing up — real native banks
-vary in size with name length (299 / 307 / 311 bytes for 10 / 18 / 22-char names), which
-confirms the tail is the variable part. Bounded work, not research.
+The stride error produced a 4/8-byte-misaligned file table no shipped file has. The
+`nameField` error was subtler — it only shows on the 21 files whose name length is already
+4-aligned, which is exactly why an exhaustive check was worth running. With both fixed,
+the generated header and file table match **all 186 shipped files with zero mismatches.**
+
+**Replacements do not generate a sound bank at all.** Shipped banks carry per-track
+authoring values beyond the name — a pair of `0`/`0xFFFF` reference fields at `+0xFA` and
+near the tail differ between tracks — so `ConvertMp3ToReplacementPac` reads the original
+`.pac`, reuses its `.xsb` **byte for byte**, and swaps only the wave bank (named to match,
+since the reused bank refers to it by name). The replacement then behaves exactly like the
+track it stands in for, with no guesswork. `BuildSoundBank` is still needed for the
+Jukebox's own custom tracks, which have no original to borrow from.
+
+Cached `.pac` files from an older converter carry a stale cue name, so a `CONVERTER_VERSION`
+stamp in the custom folder forces a rebuild when the layout changes.
+
+New API in `CustomMusicConverter.h`:
+
+```cpp
+bool ConvertMp3ToPac(mp3Path, outPacPath, cueName, errorOut);              // new custom track
+bool ConvertMp3ToReplacementPac(mp3Path, originalPacPath, outPacPath, errorOut); // stand-in
+```
+
+`MusicManager`'s play path no longer special-cases custom tracks: every `.pac`'s cue is
+named after its own base filename, so the requested cue is always just the bgm name.
+
+**Still untested in-game** — the verification above is byte-level static comparison against
+shipped files, which is strong for layout but says nothing about playback.
 
 ## 6. Desync analysis
 
