@@ -2996,6 +2996,342 @@ struct LocalizationKeysAccessor
 
         // Choose which songs play during a match and how it moves between them.
         inline const char* Choose_which_songs_play_during_a_match_and_how_it_moves_between_them() const { return Get("Choose which songs play during a match and how it moves between them."); }
+
+        // %s closes this menu
+        inline const char* s_closes_this_menu() const { return Get("%s closes this menu"); }
+
+        // A small movable window listing who is in the room with you, who is playing, and who is spectating.
+        inline const char* A_small_movable_window_listing_who_is_in_the_room_with_you_who_is_playing_and_who_is_spectating() const { return Get("A small movable window listing who is in the room with you, who is playing, and who is spectating."); }
+
+        // All settings
+        inline const char* All_settings() const { return Get("All settings"); }
+
+        // Available from character select onwards.
+        inline const char* Available_from_character_select_onwards() const { return Get("Available from character select onwards."); }
+
+        // Character positions
+        inline const char* Character_positions() const { return Get("Character positions"); }
+
+        // Choose whether your finished matches are uploaded to the community replay database.
+        inline const char* Choose_whether_your_finished_matches_are_uploaded_to_the_community_replay_database() const { return Get("Choose whether your finished matches are uploaded to the community replay database."); }
+
+        // Combo data
+        inline const char* Combo_data() const { return Get("Combo data"); }
+
+        // Comes alive from character select onwards.
+        inline const char* Comes_alive_from_character_select_onwards() const { return Get("Comes alive from character select onwards."); }
+
+        // Connection & crashes
+        inline const char* Connection_crashes() const { return Get("Connection & crashes"); }
+
+        // Controllers
+        inline const char* Controllers() const { return Get("Controllers"); }
+
+        // Diagnostics
+        inline const char* Diagnostics() const { return Get("Diagnostics"); }
+
+        // Dummy actions
+        inline const char* Dummy_actions() const { return Get("Dummy actions"); }
+
+        // Every hotkey, including the ones not listed here, can be rebound under All settings > Hotkeys.
+        inline const char* Every_hotkey_including_the_ones_not_listed_here_can_be_rebound_under_All_settings_Hotkeys() const { return Get("Every hotkey, including the ones not listed here, can be rebound under All settings > Hotkeys."); }
+
+        // Everything on this page needs training mode. It is all listed anyway so you know what is waiting for you there.
+        inline const char* Everything_on_this_page_needs_training_mode_It_is_all_listed_anyway_so_you_know_what_is_waiting_for_you_there() const { return Get("Everything on this page needs training mode. It is all listed anyway so you know what is waiting for you there."); }
+
+        // Extra information drawn on top of the game while you play.
+        inline const char* Extra_information_drawn_on_top_of_the_game_while_you_play() const { return Get("Extra information drawn on top of the game while you play."); }
+
+        // Frame advantage
+        inline const char* Frame_advantage() const { return Get("Frame advantage"); }
+
+        // Frame history
+        inline const char* Frame_history() const { return Get("Frame history"); }
+
+        // Freeze & frame step
+        inline const char* Freeze_frame_step() const { return Get("Freeze & frame step"); }
+
+        // Game HUD
+        inline const char* Game_HUD() const { return Get("Game HUD"); }
+
+        // Game mode
+        inline const char* Game_mode_2() const { return Get("Game mode"); }
+
+        // Hitboxes
+        inline const char* Hitboxes() const { return Get("Hitboxes"); }
+
+        // Hotkeys: %s pauses, %s steps forward.
+        inline const char* Hotkeys_s_pauses_s_steps_forward() const { return Get("Hotkeys: %s pauses, %s steps forward."); }
+
+        // Input display
+        inline const char* Input_display() const { return Get("Input display"); }
+
+        // Join or host a room to change these.
+        inline const char* Join_or_host_a_room_to_change_these() const { return Get("Join or host a room to change these."); }
+
+        // Jump into a replay and play it out yourself from a moment you saved. Hotkey: %s loads that moment.
+        inline const char* Jump_into_a_replay_and_play_it_out_yourself_from_a_moment_you_saved_Hotkey_s_loads_that_moment() const { return Get("Jump into a replay and play it out yourself from a moment you saved. Hotkey: %s loads that moment."); }
+
+        // Lab tools: what the dummy does, recordings, and save states.
+        inline const char* Lab_tools_what_the_dummy_does_recordings_and_save_states() const { return Get("Lab tools: what the dummy does, recordings, and save states."); }
+
+        // Links & community
+        inline const char* Links_community() const { return Get("Links & community"); }
+
+        // Load a replay file the game's own theater cannot see, browse the archive, or pull one down from the replay database.
+        inline const char* Load_a_replay_file_the_game_s_own_theater_cannot_see_browse_the_archive_or_pull_one_down_from_the_replay_database() const { return Get("Load a replay file the game's own theater cannot see, browse the archive, or pull one down from the replay database."); }
+
+        // Load into training mode to use this.
+        inline const char* Load_into_training_mode_to_use_this() const { return Get("Load into training mode to use this."); }
+
+        // Load other players' custom palettes
+        inline const char* Load_other_players_custom_palettes() const { return Get("Load other players' custom palettes"); }
+
+        // Lobby avatar
+        inline const char* Lobby_avatar() const { return Get("Lobby avatar"); }
+
+        // Look & Sound
+        inline const char* Look_Sound() const { return Get("Look & Sound"); }
+
+        // Manage the palette files on disk: which ones are loaded, importing, and sharing.
+        inline const char* Manage_the_palette_files_on_disk_which_ones_are_loaded_importing_and_sharing() const { return Get("Manage the palette files on disk: which ones are loaded, importing, and sharing."); }
+
+        // Match
+        inline const char* Match() const { return Get("Match"); }
+
+        // Mod
+        inline const char* Mod() const { return Get("Mod"); }
+
+        // Needs a match in training, versus or the replay theater.
+        inline const char* Needs_a_match_in_training_versus_or_the_replay_theater() const { return Get("Needs a match in training, versus or the replay theater."); }
+
+        // Needs a room or an online match.
+        inline const char* Needs_a_room_or_an_online_match() const { return Get("Needs a room or an online match."); }
+
+        // Needs training mode.
+        inline const char* Needs_training_mode() const { return Get("Needs training mode."); }
+
+        // Nothing matched. Try a shorter word, or browse the list on the left.
+        inline const char* Nothing_matched_Try_a_shorter_word_or_browse_the_list_on_the_left() const { return Get("Nothing matched. Try a shorter word, or browse the list on the left."); }
+
+        // One searchable list of everything the mod can be configured to do, with a description for each option.
+        inline const char* One_searchable_list_of_everything_the_mod_can_be_configured_to_do_with_a_description_for_each_option() const { return Get("One searchable list of everything the mod can be configured to do, with a description for each option."); }
+
+        // Open the online window
+        inline const char* Open_the_online_window() const { return Get("Open the online window"); }
+
+        // Opens a window per player showing the inputs they are actually sending, one line per frame.
+        inline const char* Opens_a_window_per_player_showing_the_inputs_they_are_actually_sending_one_line_per_frame() const { return Get("Opens a window per player showing the inputs they are actually sending, one line per frame."); }
+
+        // Opens the rewind bar, so you can step a replay backwards instead of restarting it.
+        inline const char* Opens_the_rewind_bar_so_you_can_step_a_replay_backwards_instead_of_restarting_it() const { return Get("Opens the rewind bar, so you can step a replay backwards instead of restarting it."); }
+
+        // Overlays
+        inline const char* Overlays() const { return Get("Overlays"); }
+
+        // Override the dummy's wake-up timing
+        inline const char* Override_the_dummy_s_wake_up_timing() const { return Get("Override the dummy's wake-up timing"); }
+
+        // Palettes and music - how the game looks and what it plays.
+        inline const char* Palettes_and_music_how_the_game_looks_and_what_it_plays() const { return Get("Palettes and music - how the game looks and what it plays."); }
+
+        // Pick a stage from character select, the versus screen, or the replay menu.
+        inline const char* Pick_a_stage_from_character_select_the_versus_screen_or_the_replay_menu() const { return Get("Pick a stage from character select, the versus screen, or the replay menu."); }
+
+        // Pick one of the dummy's own moves and tell it when to use that move: after waking up, in a gap in your pressure, when it gets hit, or when it techs a throw.
+        inline const char* Pick_one_of_the_dummy_s_own_moves_and_tell_it_when_to_use_that_move_after_waking_up_in_a_gap_in_your_pressure_when_it_gets_hit_or_when_it_techs_a_throw() const { return Get("Pick one of the dummy's own moves and tell it when to use that move: after waking up, in a gap in your pressure, when it gets hit, or when it techs a throw."); }
+
+        // Pick one to jump straight to it.
+        inline const char* Pick_one_to_jump_straight_to_it() const { return Get("Pick one to jump straight to it."); }
+
+        // Player money (P$)
+        inline const char* Player_money_P() const { return Get("Player money (P$)"); }
+
+        // Players online
+        inline const char* Players_online() const { return Get("Players online"); }
+
+        // Ranked
+        inline const char* Ranked() const { return Get("Ranked"); }
+
+        // Reach the main menu for this to become editable.
+        inline const char* Reach_the_main_menu_for_this_to_become_editable() const { return Get("Reach the main menu for this to become editable."); }
+
+        // Record what you do into a slot, then have the dummy replay it. Four classic slots, plus the longer Unlimited Playback recorder.
+        inline const char* Record_what_you_do_into_a_slot_then_have_the_dummy_replay_it_Four_classic_slots_plus_the_longer_Unlimited_Playback_recorder() const { return Get("Record what you do into a slot, then have the dummy replay it. Four classic slots, plus the longer Unlimited Playback recorder."); }
+
+        // Recording slots
+        inline const char* Recording_slots() const { return Get("Recording slots"); }
+
+        // Replay database
+        inline const char* Replay_database_2() const { return Get("Replay database"); }
+
+        // Replay files
+        inline const char* Replay_files() const { return Get("Replay files"); }
+
+        // Replay files can be managed here at any time; the rest needs the replay theater.
+        inline const char* Replay_files_can_be_managed_here_at_any_time_the_rest_needs_the_replay_theater() const { return Get("Replay files can be managed here at any time; the rest needs the replay theater."); }
+
+        // Replay takeover
+        inline const char* Replay_takeover() const { return Get("Replay takeover"); }
+
+        // Replays
+        inline const char* Replays() const { return Get("Replays"); }
+
+        // Room
+        inline const char* Room() const { return Get("Room"); }
+
+        // Rooms, ranked, and everything that only matters with other people.
+        inline const char* Rooms_ranked_and_everything_that_only_matters_with_other_people() const { return Get("Rooms, ranked, and everything that only matters with other people."); }
+
+        // Save states
+        inline const char* Save_states() const { return Get("Save states"); }
+
+        // Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load.
+        inline const char* Save_the_exact_moment_you_are_in_and_jump_back_to_it_later_Hotkeys_s_to_save_s_to_load() const { return Get("Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load."); }
+
+        // Search every feature in the mod...
+        inline const char* Search_every_feature_in_the_mod() const { return Get("Search every feature in the mod..."); }
+
+        // Search results
+        inline const char* Search_results() const { return Get("Search results"); }
+
+        // Shortcut: %s opens the same window.
+        inline const char* Shortcut_s_opens_the_same_window() const { return Get("Shortcut: %s opens the same window."); }
+
+        // Shortcut: %s toggles the HUD from anywhere.
+        inline const char* Shortcut_s_toggles_the_HUD_from_anywhere() const { return Get("Shortcut: %s toggles the HUD from anywhere."); }
+
+        // Shortcuts: %s opens the Jukebox, %s skips to the next song.
+        inline const char* Shortcuts_s_opens_the_Jukebox_s_skips_to_the_next_song() const { return Get("Shortcuts: %s opens the Jukebox, %s skips to the next song."); }
+
+        // Size and spacing
+        inline const char* Size_and_spacing() const { return Get("Size and spacing"); }
+
+        // Slot 1
+        inline const char* Slot_1() const { return Get("Slot 1"); }
+
+        // Slot 2
+        inline const char* Slot_2() const { return Get("Slot 2"); }
+
+        // Slot 3
+        inline const char* Slot_3() const { return Get("Slot 3"); }
+
+        // Slot 4
+        inline const char* Slot_4() const { return Get("Slot 4"); }
+
+        // Spectators cannot change the game mode.
+        inline const char* Spectators_cannot_change_the_game_mode() const { return Get("Spectators cannot change the game mode."); }
+
+        // Start a match to use this.
+        inline const char* Start_a_match_to_use_this() const { return Get("Start a match to use this."); }
+
+        // Start watching a replay to use this.
+        inline const char* Start_watching_a_replay_to_use_this() const { return Get("Start watching a replay to use this."); }
+
+        // Swap sides now
+        inline const char* Swap_sides_now() const { return Get("Swap sides now"); }
+
+        // Swap sides on every reset
+        inline const char* Swap_sides_on_every_reset() const { return Get("Swap sides on every reset"); }
+
+        // The Discord is the fastest place to ask a question or report something broken.
+        inline const char* The_Discord_is_the_fastest_place_to_ask_a_question_or_report_something_broken() const { return Get("The Discord is the fastest place to ask a question or report something broken."); }
+
+        // The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.
+        inline const char* The_dummy_s_move_list_could_not_be_read_This_happens_on_the_training_character_select_screen_and_in_mirror_matches() const { return Get("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches."); }
+
+        // The mod itself: settings, controllers, language, updates and help.
+        inline const char* The_mod_itself_settings_controllers_language_updates_and_help() const { return Get("The mod itself: settings, controllers, language, updates and help."); }
+
+        // The palette editor itself opens once you are in a match.
+        inline const char* The_palette_editor_itself_opens_once_you_are_in_a_match() const { return Get("The palette editor itself opens once you are in a match."); }
+
+        // These tools moved into the mod menu.
+        inline const char* These_tools_moved_into_the_mod_menu() const { return Get("These tools moved into the mod menu."); }
+
+        // This will continuously loop the current recording slot, subject to absolute positioning.
+        inline const char* This_will_continuously_loop_the_current_recording_slot_subject_to_absolute_positioning() const { return Get("This will continuously loop the current recording slot, subject to absolute positioning."); }
+
+        // Training
+        inline const char* Training() const { return Get("Training"); }
+
+        // Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix.
+        inline const char* Turn_this_off_if_your_game_crashes_when_you_search_for_a_ranked_match_from_training_mode_It_only_stops_other_players_custom_colours_from_loading_yours_are_unaffected_This_is_a_stopgap_not_the_real_fix() const { return Get("Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix."); }
+
+        // Updates
+        inline const char* Updates() const { return Get("Updates"); }
+
+        // Wake-up timing
+        inline const char* Wake_up_timing() const { return Get("Wake-up timing"); }
+
+        // Watching, rewinding, taking over and sharing replays.
+        inline const char* Watching_rewinding_taking_over_and_sharing_replays() const { return Get("Watching, rewinding, taking over and sharing replays."); }
+
+        // What is happening in the current match: mode, stage and HUD.
+        inline const char* What_is_happening_in_the_current_match_mode_stage_and_HUD() const { return Get("What is happening in the current match: mode, stage and HUD."); }
+
+        // (in a match)
+        inline const char* in_a_match() const { return Get("(in a match)"); }
+
+        // (while watching a replay)
+        inline const char* while_watching_a_replay() const { return Get("(while watching a replay)"); }
+
+        // Choosing a palette per character needs a match in progress.
+        inline const char* Choosing_a_palette_per_character_needs_a_match_in_progress() const { return Get("Choosing a palette per character needs a match in progress."); }
+
+        // Controller setup
+        inline const char* Controller_setup() const { return Get("Controller setup"); }
+
+        // Current match
+        inline const char* Current_match() const { return Get("Current match"); }
+
+        // Game
+        inline const char* Game() const { return Get("Game"); }
+
+        // Game mode: available from character select onwards.
+        inline const char* Game_mode_available_from_character_select_onwards() const { return Get("Game mode: available from character select onwards."); }
+
+        // Hide the game HUD
+        inline const char* Hide_the_game_HUD() const { return Get("Hide the game HUD"); }
+
+        // Keys
+        inline const char* Keys() const { return Get("Keys"); }
+
+        // One searchable list of everything the mod can be configured to do, hotkeys included, with a description for each option.
+        inline const char* One_searchable_list_of_everything_the_mod_can_be_configured_to_do_hotkeys_included_with_a_description_for_each_option() const { return Get("One searchable list of everything the mod can be configured to do, hotkeys included, with a description for each option."); }
+
+        // Pages
+        inline const char* Pages() const { return Get("Pages"); }
+
+        // Reachable once the game has loaded its save data.
+        inline const char* Reachable_once_the_game_has_loaded_its_save_data() const { return Get("Reachable once the game has loaded its save data."); }
+
+        // Room settings
+        inline const char* Room_settings() const { return Get("Room settings"); }
+
+        // Rooms, ranked, and everything that only matters with people.
+        inline const char* Rooms_ranked_and_everything_that_only_matters_with_people() const { return Get("Rooms, ranked, and everything that only matters with people."); }
+
+        // Stage: pick one from character select, the versus screen, or the replay menu.
+        inline const char* Stage_pick_one_from_character_select_the_versus_screen_or_the_replay_menu() const { return Get("Stage: pick one from character select, the versus screen, or the replay menu."); }
+
+        // The match you are in, and the game's own values.
+        inline const char* The_match_you_are_in_and_the_game_s_own_values() const { return Get("The match you are in, and the game's own values."); }
+
+        // The mod itself: settings, language, updates and diagnostics.
+        inline const char* The_mod_itself_settings_language_updates_and_diagnostics() const { return Get("The mod itself: settings, language, updates and diagnostics."); }
+
+        // Which device each side plays on, and how the mod reads them.
+        inline const char* Which_device_each_side_plays_on_and_how_the_mod_reads_them() const { return Get("Which device each side plays on, and how the mod reads them."); }
+
+        // hide the HUD
+        inline const char* hide_the_HUD() const { return Get("hide the HUD"); }
+
+        // online info
+        inline const char* online_info() const { return Get("online info"); }
+
+        // this menu
+        inline const char* this_menu() const { return Get("this menu"); }
 };
 
 

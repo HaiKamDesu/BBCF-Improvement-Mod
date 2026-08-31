@@ -363,6 +363,10 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		// Runs on every real rendered frame, unlike the battle-frame-counter hook (which
 		// goes idle during the reset fadeout's limbo - see TickTrainingResetSwap's comment).
 		ScrWindow::TickTrainingResetSwap();
+		// Wake-up override and the replay-file redirect used to be applied as a side effect
+		// of drawing the old States window. Their controls now live on mod-menu pages, so
+		// they are pumped here instead of dying whenever the menu is closed.
+		ScrWindow::Tick();
 	}
 	if (s_endSceneProbeBudget > 0)
 	{

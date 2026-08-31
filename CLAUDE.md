@@ -37,6 +37,7 @@ The mod is a Win32 DLL (`dinput8.dll`) placed next to `BBCF.exe`. It forwards `D
 | Hook a game function (JMP patch) | `src/Hooks/hooks_bbcf.cpp` + addresses from `notes.h` |
 | Hook a system/API call (Detours) | `src/Hooks/hooks_detours.cpp` |
 | Add an overlay window or UI panel | `src/Overlay/Window/` + register in `WindowManager` |
+| Add a control to the F1 menu | `src/Overlay/Window/MainMenu/Page*.cpp` + declare the section in `MainMenuNav.cpp` |
 | Add a UI string (all languages) | `resource/localization/Localization.csv`, then re-run localization script |
 | Add a network packet | `src/Network/Packet.h`, then send/receive in the relevant manager |
 | Reverse-engineered game offsets | `src/Game/GhidraDefs.h`, `notes.h` |

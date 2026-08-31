@@ -40,28 +40,14 @@
 
 void ScrWindow::Draw()
 {
-    
-    static bool random_seeded = false;
-    if (!random_seeded){
-        std::srand(static_cast<unsigned int>(std::time(nullptr)));
-        random_seeded = true;
-    }
     if (m_showDemoWindow)
     {
         ImGui::ShowDemoWindow(&m_showDemoWindow);
     }
-    DrawGenericOptionsSection();
-    DrawStatesSection();
-    DrawPlaybackSection();
-    DrawSaveStates();
-    DrawReplayTheaterSection();
-    
-    
-    DrawReplayTakeover();
-    DrawRoomSection();
-    DrawInputBufferButton();
-    DrawComboDataButton();
-    DrawTasComboToolButton();
+    // Everything this window used to host now lives in the mod menu's Training, Replays and
+    // Online pages, which call the section bodies below directly. The window itself is kept
+    // only as the owner of that state; nothing opens it any more.
+    ImGui::TextWrapped("%s", L("These tools moved into the mod menu.").c_str());
 }
 void ScrWindow::DrawComboDataButton() {
     if (ImGui::Button("Combo Data"))
@@ -72,10 +58,8 @@ void ScrWindow::DrawComboDataButton() {
     ImGui::ShowHelpMarker(Messages.Combo_data_button_tooltip());
 }
 void ScrWindow::DrawTasComboToolButton() {
-    // Sits beside the other window toggles rather than inside the save-state section: it is
-    // a tool you open, and TasManager::Enter already explains itself when the match is not
-    // a training one.
-    ImGui::SameLine();
+    // TasManager::Enter already explains itself when the match is not a training one, so
+    // this stays a plain button rather than growing its own availability check.
     TasManager& tas = TasManager::Instance();
     if (ImGui::Button(tas.IsActive() ? L("Exit TAS Combo tool").c_str()
                                      : L("TAS Combo tool").c_str()))
@@ -228,25 +212,57 @@ void ScrWindow::check_wakeup_delay() {
     }
 
 }
-void ScrWindow::DrawGenericOptionsSection() {
-    static bool check_dummy = g_modVals.enableForeignPalettes;
-    if (ImGui::Checkbox("Load foreign palettes", &check_dummy)) {
-        g_modVals.enableForeignPalettes = !g_modVals.enableForeignPalettes;
+// Body of "Training > Wake-up". The enable flag is a class member rather than a local
+// static so Tick() can keep enforcing the override every frame: the section used to be
+// permanently on screen inside the old States window, so nobody noticed that it only
+// applied while it was being drawn. Now that it lives behind a menu page, it has to work
+// with the menu closed.
+bool ScrWindow::s_wakeupOverrideEnabled = false;
 
+void ScrWindow::DrawWakeupBody() {
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training
+        || g_interfaces.player2.IsCharDataNullPtr()) {
+        ImGui::TextDisabled("%s", L("Load into training mode to use this.").c_str());
+        return;
     }
+
+    ImGui::Checkbox(L("Override the dummy's wake-up timing").c_str(), &s_wakeupOverrideEnabled);
     ImGui::SameLine();
-    ImGui::ShowHelpMarker("If you're having crash issues when joining ranked from training mode, disable this when searching in training mode, can be reenabled for any other situation. It stops your game from loading foreign palettes. This is just a stopgap, grim will come with the real fix.");
-    if (*g_gameVals.pGameMode == GameMode_Training && !g_interfaces.player2.IsCharDataNullPtr()) {
-        static bool check_enable_wakeup_delay = false;
-        ImGui::Checkbox("Enable wakeup delay override", &check_enable_wakeup_delay);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Enable_wakeup_delay_override_tooltip());
-        if (check_enable_wakeup_delay) {
-            DrawWakeupDelayControl();
-            check_wakeup_delay();
-        } 
+    ImGui::ShowHelpMarker(Messages.Enable_wakeup_delay_override_tooltip());
+    if (s_wakeupOverrideEnabled) {
+        DrawWakeupDelayControl();
     }
 }
+
+// Per-frame work that used to happen as a side effect of drawing the States window, and so
+// must not depend on any menu page being visible.
+void ScrWindow::Tick() {
+    // The dummy's random wake-up/gap picks use std::rand; this used to be seeded the first
+    // time the States window drew itself, which no longer happens.
+    static bool random_seeded = false;
+    if (!random_seeded) {
+        std::srand(static_cast<unsigned int>(std::time(nullptr)));
+        random_seeded = true;
+    }
+
+    WindowContainer* container = WindowManager::GetInstance().GetWindowContainer();
+    if (!container)
+        return;
+
+    ScrWindow* self = container->GetWindow<ScrWindow>(WindowType_Scr);
+    if (!self)
+        return;
+
+    if (self->s_wakeupOverrideEnabled
+        && g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_Training
+        && !g_interfaces.player1.IsCharDataNullPtr()
+        && !g_interfaces.player2.IsCharDataNullPtr()) {
+        self->check_wakeup_delay();
+    }
+
+    TickLocalReplayRedirect();
+}
+
 bool ScrWindow::s_swapCoordsToggle = false;
 
 void ScrWindow::TickTrainingResetSwap() {
@@ -365,29 +381,32 @@ bool find_substring_in_vector(std::vector<std::string> string_vector, std::strin
     };
     return false;
 }
-void ScrWindow::DrawStatesSection()
+void ScrWindow::DrawPositionsBody()
 {
-    if (*g_gameVals.pGameMode == GameMode_Training) {
-		if (ImGui::Button("Swap character coordinates")) {
-            ScrWindow::swap_character_coordinates();
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Swap_coordinates_tooltip());
-        ImGui::SameLine();
-        ImGui::Checkbox("Always swap coordinates", &s_swapCoordsToggle);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(L("Always swap coordinates help").c_str());
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        ImGui::TextDisabled("%s", L("Load into training mode to use this.").c_str());
+        return;
     }
 
+    if (ImGui::Button(L("Swap sides now").c_str())) {
+        ScrWindow::swap_character_coordinates();
+    }
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(Messages.Swap_coordinates_tooltip());
+    ImGui::SameLine();
+    ImGui::Checkbox(L("Swap sides on every reset").c_str(), &s_swapCoordsToggle);
+    ImGui::SameLine();
+    ImGui::ShowHelpMarker(L("Always swap coordinates help").c_str());
+}
 
-    if (!ImGui::CollapsingHeader("States"))
-        return;
-    if (*g_gameVals.pGameMode != GameMode_Training) {
-        ImGui::Text("Only works in training mode");
+void ScrWindow::DrawDummyActionsBody()
+{
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        ImGui::TextDisabled("%s", L("Load into training mode to use this.").c_str());
         return;
     }
     if (g_interfaces.player2.IsCharDataNullPtr()  || g_interfaces.player2.GetData()->charIndex == g_interfaces.player1.GetData()->charIndex) {
-        ImGui::TextWrapped("Something invalid, you are in training mode char select, have 2 of the same characters or some other shit i haven't figured out yet that you should tell me so i can fix");
+        ImGui::TextWrapped("%s", L("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.").c_str());
         return;
     }
     static int selected = 0;
@@ -1236,14 +1255,14 @@ void ScrWindow::DrawPlaybackEditor() {
     ImGui::SameLine();
     ImGui::ShowHelpMarker(Messages.Open_playback_editor_tooltip());
 }
-void ScrWindow::DrawPlaybackSection() {
+void ScrWindow::DrawRecordingSlotsBody() {
     char* bbcf_base_adress = GetBbcfBaseAdress();
     char* active_slot = bbcf_base_adress + 0x902C3C;
     static bool loop_playback = false;
     auto& unlimitedPlayback = UnlimitedPlaybackManager::Instance();
     unlimitedPlayback.InitializeIfNeeded();
     //ScrWindow::DrawPlaybackEditor();
-    if (ImGui::CollapsingHeader("Playback")) {
+    {
         if (ImGui::Button(L("Unlimited Playback (BETA)").c_str())) {
             ScrWindow::m_pWindowContainer->GetWindow(WindowType_UnlimitedPlayback)->ToggleOpen();
         }
@@ -1255,19 +1274,19 @@ void ScrWindow::DrawPlaybackSection() {
         ImGui::SameLine();
         ImGui::ShowHelpMarker(L("This will continuously loop the current recording slot, subject to absolute positioning.").c_str());
         ScrWindow::DrawPlaybackEditor();
-        if (ImGui::CollapsingHeader("SLOT_1")) {
+        if (ImGui::CollapsingHeader(L("Slot 1").c_str())) {
             draw_playback_slot_section(1);
 
         }
-        if (ImGui::CollapsingHeader("SLOT_2")) {
+        if (ImGui::CollapsingHeader(L("Slot 2").c_str())) {
             draw_playback_slot_section(2);
         }
         
-        if (ImGui::CollapsingHeader("SLOT_3")) {
+        if (ImGui::CollapsingHeader(L("Slot 3").c_str())) {
             draw_playback_slot_section(3);
         }
 
-        if (ImGui::CollapsingHeader("SLOT_4")) {
+        if (ImGui::CollapsingHeader(L("Slot 4").c_str())) {
             draw_playback_slot_section(4);
         }
         
@@ -1575,11 +1594,9 @@ void ScrWindow::DrawPlaybackSection() {
 //    }
 //}
 
-void ScrWindow::DrawSaveStates() {
+void ScrWindow::DrawSaveStatesBody() {
     static SnapshotApparatus* snap_apparatus = nullptr;
-    
-    if (!ImGui::CollapsingHeader("Save states"))
-        return;
+
     if (*(bbcf_base_adress + 0x8F7758) == 0) {
         if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
             auto ensure_snapshot_apparatus = [&]() -> SnapshotApparatus* {
@@ -1708,23 +1725,34 @@ void restore_replays(int fname_size_max) {
 #include <wininet.h> // only for InternetCanonicalizeUrlA
 
 
-void ScrWindow::DrawReplayTheaterSection() {
+// The replay-file redirect is a patch on the game's replay filename template, so it has to
+// be re-applied (and undone on the way out of the theater) every frame, not only while the
+// Replays page happens to be open.
+bool ScrWindow::s_localReplayLoaded = false;
+std::string ScrWindow::s_localReplayLoadedName = "";
+
+void ScrWindow::TickLocalReplayRedirect() {
+    const int FNAME_SIZE_MAX = 31;
+    if (!g_gameVals.pGameMode || !s_localReplayLoaded)
+        return;
+
+    if (*g_gameVals.pGameMode != GameMode_ReplayTheater) {
+        restore_replays(FNAME_SIZE_MAX);
+    }
+    else {
+        set_local_replay(&s_localReplayLoadedName[0], FNAME_SIZE_MAX);
+    }
+}
+
+void ScrWindow::DrawLocalReplaysBody() {
     /*std::filesystem::path targetParent = "./Save/Replay/locals";
     std::filesystem::create_directories(targetParent);*/
     
 
 
     const int FNAME_SIZE_MAX = 31;
-    static bool local_replay_loaded = false;
-    static std::string local_replay_loaded_name = "";
     ReplayFileManager& rep_manager = g_rep_manager;
-    if (*g_gameVals.pGameMode != GameMode_ReplayTheater && local_replay_loaded) {
-        restore_replays(FNAME_SIZE_MAX);
-    }
-    if (*g_gameVals.pGameMode == GameMode_ReplayTheater && local_replay_loaded) {
-        set_local_replay(&local_replay_loaded_name[0], FNAME_SIZE_MAX);
-    }
-    if (ImGui::CollapsingHeader("Local Replays")) {
+    {
         
         static int view_type = 0; // 0 for default, 1 for archive, 2 for db
         static int page = 0;
@@ -1743,8 +1771,8 @@ void ScrWindow::DrawReplayTheaterSection() {
  
         if (ImGui::Button("Load##replay_theater")) {
             set_local_replay(local_replay_name, FNAME_SIZE_MAX);
-            local_replay_loaded = true;
-            local_replay_loaded_name = local_replay_name;
+            s_localReplayLoaded = true;
+            s_localReplayLoadedName = local_replay_name;
         }
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Loads the specified File Name. Once done you can select any replay from the list and it will play the loaded replay file.");
@@ -1752,7 +1780,7 @@ void ScrWindow::DrawReplayTheaterSection() {
 
         if (ImGui::Button("Restore original replays##replay_theater")) {
             restore_replays(FNAME_SIZE_MAX);
-            local_replay_loaded = false;
+            s_localReplayLoaded = false;
         }
         ImGui::SameLine();
         ImGui::ShowHelpMarker("Restores your replays to their original files, reverting the effect of \"Load\".");
@@ -2094,7 +2122,7 @@ unsigned int count_entities(bool unk_status2) {
 
   
 
-void ScrWindow::DrawReplayTakeover() {
+void ScrWindow::DrawReplayTakeoverBody() {
   
     
 
@@ -2124,9 +2152,6 @@ void ScrWindow::DrawReplayTakeover() {
     char* r3p1_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
     char* r3p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
     static float wait_before_exec_s2 = 0; //for the little load delay bar
-
-    if (!ImGui::CollapsingHeader("Replay Takeover"))
-        return;
 
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
     {
@@ -2289,17 +2314,14 @@ void ScrWindow::DrawReplayTakeover() {
 
 
 
-void ScrWindow::DrawRoomSection() {
+void ScrWindow::DrawRoomSettingsBody() {
     const char* items[] = { "No Rematch", "No limit", "FT2", "FT3", "FT5", "FT10"};
     static int currentItem = 0;
-
-    if (!ImGui::CollapsingHeader("Room Settings"))
-        return;
 
     if (!g_gameVals.pRoom || g_gameVals.pRoom->roomStatus == RoomStatus_Unavailable 
         || !(RoomManager::GetRoomSettingsStaticBaseAdress()))
     {
-        ImGui::TextUnformatted("Room is not available!");
+        ImGui::TextDisabled("%s", L("Join or host a room to change these.").c_str());
         return;
     }
     //sets the selected value in the dropdown the actual value

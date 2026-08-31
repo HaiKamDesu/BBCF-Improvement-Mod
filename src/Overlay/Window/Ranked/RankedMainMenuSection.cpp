@@ -8,13 +8,10 @@
 
 namespace RankedUi
 {
+	// Body only - the mod menu's Online page owns the "Ranked" header this used to draw
+	// for itself, and the room/online-window door now lives next to the room settings.
 	uint32_t DrawMainMenuSection()
 	{
-		if (!ImGui::CollapsingHeader(L("Network Matches").c_str()))
-		{
-			return RankedMainMenuAction_None;
-		}
-
 		uint32_t actions = RankedMainMenuAction_None;
 
 		ImGui::HorizontalSpacing();
@@ -81,12 +78,6 @@ namespace RankedUi
 		}
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Choose any rank and open an explanation of its LP, promotion, and demotion rules.").c_str());
-
-		ImGui::HorizontalSpacing();
-		if (ImGui::Button(L("Online").c_str()))
-		{
-			actions |= RankedMainMenuAction_OpenOnline;
-		}
 
 		return actions;
 	}

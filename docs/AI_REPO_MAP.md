@@ -25,6 +25,9 @@ No unit test suite is present; normal validation is build plus operator in-game 
 - Game memory structs/state: `src/Game`, `notes.h`, `src/Game/GhidraDefs.h`.
 - Hooks: `src/Hooks/HookManager.*` for JMP patches; `src/Hooks/hooks_detours.*` for API detours; `hooks_bbcf.*` for game behavior.
 - Overlay/UI: `src/Overlay/Window*`, `Widget*`, `WindowManager.*`, `imgui_utils.*`.
+- Mod menu (F1): `src/Overlay/Window/MainWindow.*` is only the shell (page list + feature search).
+  Pages and their sections live in `src/Overlay/Window/MainMenu/`; every section is declared once
+  in `MainMenuNav.cpp`'s table, which is also what the search indexes.
 - Localization: `resource/localization/Localization.csv`; generated accessor is `src/Core/LocalizationKeys.autogen.h`.
 - Replay/URT: `src/Game/ReplayTakeover`, `ReplayRewind`, `ReplayStates`, `SnapshotApparatus`; docs in `docs/replay_takeover`.
 - Networking/Steam: `src/Network`, `src/SteamApiWrapper`, packet structs in `src/Network/Packet.h`.

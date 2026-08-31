@@ -113,6 +113,15 @@
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\MainMenuNav.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageGame.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageControllers.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageTraining.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageOverlays.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageOnline.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageReplays.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageLookAndSound.cpp" />
+    <ClCompile Include="src\Overlay\Window\MainMenu\PageMod.cpp" />
     <ClCompile Include="src\Overlay\Window\PalettesConfigWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\SettingsIniWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.cpp" />
@@ -275,6 +284,8 @@
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Overlay\Window\LogWindow.h" />
     <ClInclude Include="src\Overlay\Window\MainWindow.h" />
+    <ClInclude Include="src\Overlay\Window\MainMenu\MainMenuNav.h" />
+    <ClInclude Include="src\Overlay\Window\MainMenu\MainMenuPages.h" />
     <ClInclude Include="src\Overlay\Window\PalettesConfigWindow.h" />
     <ClInclude Include="src\Overlay\Window\SettingsIniWindow.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />

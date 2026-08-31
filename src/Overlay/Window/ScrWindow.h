@@ -2,6 +2,7 @@
 #include "IWindow.h"
 #include <vector>
 #include <chrono>
+#include <string>
 #include "Game/Scr/ScrStateReader.h"
 #include "Game/Playbacks/PlaybackManager.h"
 #include "Core/utils.h"
@@ -19,6 +20,25 @@ public:
 	// hold-Up-while-resetting-the-lab shortcut works with the mod menu closed.
 	static void TickTrainingResetSwap();
 
+	// Per-frame side effects that used to ride along with drawing this window. Now that the
+	// controls live on mod-menu pages that are only drawn when selected, these have to be
+	// pumped independently or the features would stop the moment you looked elsewhere.
+	static void Tick();
+
+	// Section bodies drawn by the mod menu's Training, Replays and Online pages. Each of
+	// these renders the CONTENT only - the page owns the header and the layout around it.
+	void DrawPositionsBody();
+	void DrawDummyActionsBody();
+	void DrawWakeupBody();
+	void DrawRecordingSlotsBody();
+	void DrawSaveStatesBody();
+	void DrawLocalReplaysBody();
+	void DrawReplayTakeoverBody();
+	void DrawRoomSettingsBody();
+	void DrawInputBufferButton();
+	void DrawComboDataButton();
+	void DrawTasComboToolButton();
+
 protected:
 	void Draw() override;
 
@@ -26,22 +46,17 @@ protected:
 	void check_wakeup_delay();
 
 private:
+	static void TickLocalReplayRedirect();
+
 	static bool s_swapCoordsToggle;
-	void DrawGenericOptionsSection();
-	void DrawStatesSection();
+	static bool s_wakeupOverrideEnabled;
+	static bool s_localReplayLoaded;
+	static std::string s_localReplayLoadedName;
 	void draw_playback_slot_section(int slot);
-	void DrawPlaybackSection();
-	void DrawReplayTheaterSection();
 	void DrawReplayRewind();
 	void DrawReplayRewind_old();
-	void DrawSaveStates();
-	void DrawReplayTakeover();
-	void DrawRoomSection();
 	void DrawWakeupDelayControl();
-	void DrawInputBufferButton();
 	void DrawPlaybackEditor();
-	void DrawComboDataButton();
-	void DrawTasComboToolButton();
 	PlaybackManager playback_manager;
 	bool m_showDemoWindow = false;
 	void* p2_old_char_data = NULL;

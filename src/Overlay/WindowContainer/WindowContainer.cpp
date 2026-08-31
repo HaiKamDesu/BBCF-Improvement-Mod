@@ -38,8 +38,10 @@
 
 WindowContainer::WindowContainer()
 {
+	// No AlwaysAutoResize: the menu is a fixed two-pane layout that scrolls, not a stack of
+	// headers whose height depends on which ones happen to be open.
 	AddWindow(WindowType_Main,
-		new MainWindow(MOD_WINDOW_TITLE, false, *this, ImGuiWindowFlags_AlwaysAutoResize));
+		new MainWindow(MOD_WINDOW_TITLE, false, *this));
 
 	AddWindow(WindowType_Log,
 		new LogWindow("Log", true, *(ImGuiLogger*)g_imGuiLogger,

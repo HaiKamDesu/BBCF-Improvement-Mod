@@ -1175,3 +1175,115 @@ Swaps take effect when a match STARTS.,Swaps take effect when a match STARTS.,Lo
 "Plays on an Astral Finish. Used only when your Astral Heat BGM: 3rd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure.","Plays on an Astral Finish. Used only when your Astral Heat BGM: 3rd option is selected in the game's Sound settings, and only one of the three variants plays - replace all three of a set to be sure.","Suena en un Astral Finish. Solo se usa cuando tienes seleccionada la 3ra opción de Astral Heat BGM en las opciones de sonido del juego, y solo suena una de las tres variantes: reemplaza las tres de un conjunto para asegurarte."
 "The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2.","The game never loads this file, so replacing it does nothing. It is a leftover duplicate of set 2.","El juego nunca carga este archivo, así que reemplazarlo no hace nada. Es un duplicado sobrante del conjunto 2."
 Choose which songs play during a match and how it moves between them.,Choose which songs play during a match and how it moves between them.,Elige qué canciones suenan durante una partida y cómo pasa de una a otra.
+%s closes this menu,%s closes this menu,%s cierra este menú
+"A small movable window listing who is in the room with you, who is playing, and who is spectating.","A small movable window listing who is in the room with you, who is playing, and who is spectating.","Una ventanita movible que lista quién está en la sala contigo, quién está jugando y quién está mirando."
+All settings,All settings,Todos los ajustes
+Available from character select onwards.,Available from character select onwards.,Disponible desde la selección de personaje en adelante.
+Character positions,Character positions,Posiciones de los personajes
+Choose whether your finished matches are uploaded to the community replay database.,Choose whether your finished matches are uploaded to the community replay database.,Elige si tus partidas terminadas se suben a la base de datos de repeticiones de la comunidad.
+Combo data,Combo data,Datos de combo
+Comes alive from character select onwards.,Comes alive from character select onwards.,Se activa desde la selección de personaje en adelante.
+Connection & crashes,Connection & crashes,Conexión y cierres inesperados
+Controllers,Controllers,Mandos
+Diagnostics,Diagnostics,Diagnóstico
+Dummy actions,Dummy actions,Acciones del muñeco
+"Every hotkey, including the ones not listed here, can be rebound under All settings > Hotkeys.","Every hotkey, including the ones not listed here, can be rebound under All settings > Hotkeys.","Todos los atajos, incluidos los que no aparecen aquí, se pueden reasignar en Todos los ajustes > Atajos."
+Everything on this page needs training mode. It is all listed anyway so you know what is waiting for you there.,Everything on this page needs training mode. It is all listed anyway so you know what is waiting for you there.,Todo lo de esta página necesita el modo entrenamiento. Aun así se lista todo para que sepas lo que te espera ahí.
+Extra information drawn on top of the game while you play.,Extra information drawn on top of the game while you play.,Información extra dibujada sobre el juego mientras juegas.
+Frame advantage,Frame advantage,Ventaja de frames
+Frame history,Frame history,Historial de frames
+Freeze & frame step,Freeze & frame step,Congelar y avanzar frame a frame
+Game HUD,Game HUD,HUD del juego
+Game mode,Game mode,Modo de juego
+Hitboxes,Hitboxes,Hitboxes
+"Hotkeys: %s pauses, %s steps forward.","Hotkeys: %s pauses, %s steps forward.","Atajos: %s pausa, %s avanza un frame."
+Input display,Input display,Visor de inputs
+Join or host a room to change these.,Join or host a room to change these.,Entra o crea una sala para cambiar esto.
+Jump into a replay and play it out yourself from a moment you saved. Hotkey: %s loads that moment.,Jump into a replay and play it out yourself from a moment you saved. Hotkey: %s loads that moment.,Métete en una repetición y juégala tú mismo desde un momento que hayas guardado. Atajo: %s carga ese momento.
+"Lab tools: what the dummy does, recordings, and save states.","Lab tools: what the dummy does, recordings, and save states.","Herramientas de laboratorio: qué hace el muñeco, grabaciones y estados guardados."
+Links & community,Links & community,Enlaces y comunidad
+"Load a replay file the game's own theater cannot see, browse the archive, or pull one down from the replay database.","Load a replay file the game's own theater cannot see, browse the archive, or pull one down from the replay database.","Carga un archivo de repetición que el teatro del juego no ve, explora el archivo o baja una de la base de datos de repeticiones."
+Load into training mode to use this.,Load into training mode to use this.,Entra al modo entrenamiento para usar esto.
+Load other players' custom palettes,Load other players' custom palettes,Cargar las paletas personalizadas de otros jugadores
+Lobby avatar,Lobby avatar,Avatar del lobby
+Look & Sound,Look & Sound,Aspecto y sonido
+"Manage the palette files on disk: which ones are loaded, importing, and sharing.","Manage the palette files on disk: which ones are loaded, importing, and sharing.","Gestiona los archivos de paleta en el disco: cuáles se cargan, importar y compartir."
+Match,Match,Partida
+Mod,Mod,Mod
+"Needs a match in training, versus or the replay theater.","Needs a match in training, versus or the replay theater.","Necesita una partida en entrenamiento, versus o el teatro de repeticiones."
+Needs a room or an online match.,Needs a room or an online match.,Necesita una sala o una partida en línea.
+Needs training mode.,Needs training mode.,Necesita el modo entrenamiento.
+"Nothing matched. Try a shorter word, or browse the list on the left.","Nothing matched. Try a shorter word, or browse the list on the left.",Sin resultados. Prueba con una palabra más corta o mira la lista de la izquierda.
+"One searchable list of everything the mod can be configured to do, with a description for each option.","One searchable list of everything the mod can be configured to do, with a description for each option.","Una sola lista buscable con todo lo que se puede configurar en el mod, con una descripción para cada opción."
+Open the online window,Open the online window,Abrir la ventana de en línea
+"Opens a window per player showing the inputs they are actually sending, one line per frame.","Opens a window per player showing the inputs they are actually sending, one line per frame.","Abre una ventana por jugador que muestra los inputs que está enviando de verdad, una línea por frame."
+"Opens the rewind bar, so you can step a replay backwards instead of restarting it.","Opens the rewind bar, so you can step a replay backwards instead of restarting it.","Abre la barra de rebobinado, para retroceder una repetición en vez de reiniciarla."
+Overlays,Overlays,Superposiciones
+Override the dummy's wake-up timing,Override the dummy's wake-up timing,Forzar el timing de levantada del muñeco
+Palettes and music - how the game looks and what it plays.,Palettes and music - how the game looks and what it plays.,Paletas y música: cómo se ve el juego y qué suena.
+"Pick a stage from character select, the versus screen, or the replay menu.","Pick a stage from character select, the versus screen, or the replay menu.","Elige escenario desde la selección de personaje, la pantalla de versus o el menú de repeticiones."
+"Pick one of the dummy's own moves and tell it when to use that move: after waking up, in a gap in your pressure, when it gets hit, or when it techs a throw.","Pick one of the dummy's own moves and tell it when to use that move: after waking up, in a gap in your pressure, when it gets hit, or when it techs a throw.","Elige uno de los movimientos del propio muñeco y dile cuándo usarlo: al levantarse, en un hueco de tu presión, cuando lo golpean o cuando escapa de un agarre."
+Pick one to jump straight to it.,Pick one to jump straight to it.,Elige uno para ir directo ahí.
+Player money (P$),Player money (P$),Dinero del jugador (P$)
+Players online,Players online,Jugadores en línea
+Ranked,Ranked,Clasificatoria
+Reach the main menu for this to become editable.,Reach the main menu for this to become editable.,Llega al menú principal para poder editar esto.
+"Record what you do into a slot, then have the dummy replay it. Four classic slots, plus the longer Unlimited Playback recorder.","Record what you do into a slot, then have the dummy replay it. Four classic slots, plus the longer Unlimited Playback recorder.","Graba lo que haces en una ranura y haz que el muñeco lo repita. Cuatro ranuras clásicas, más el grabador largo de Reproducción Ilimitada."
+Recording slots,Recording slots,Ranuras de grabación
+Replay database,Replay database,Base de datos de repeticiones
+Replay files,Replay files,Archivos de repetición
+Replay files can be managed here at any time; the rest needs the replay theater.,Replay files can be managed here at any time; the rest needs the replay theater.,Los archivos de repetición se pueden gestionar aquí en cualquier momento; lo demás necesita el teatro de repeticiones.
+Replay takeover,Replay takeover,Tomar el control de la repetición
+Replays,Replays,Repeticiones
+Room,Room,Sala
+"Rooms, ranked, and everything that only matters with other people.","Rooms, ranked, and everything that only matters with other people.","Salas, clasificatoria y todo lo que solo importa con otra gente."
+Save states,Save states,Estados guardados
+"Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load.","Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load.","Guarda el momento exacto en el que estás y vuelve a él más tarde. Atajos: %s para guardar, %s para cargar."
+Search every feature in the mod...,Search every feature in the mod...,Busca cualquier función del mod...
+Search results,Search results,Resultados de la búsqueda
+Shortcut: %s opens the same window.,Shortcut: %s opens the same window.,Atajo: %s abre la misma ventana.
+Shortcut: %s toggles the HUD from anywhere.,Shortcut: %s toggles the HUD from anywhere.,Atajo: %s muestra u oculta el HUD desde cualquier sitio.
+"Shortcuts: %s opens the Jukebox, %s skips to the next song.","Shortcuts: %s opens the Jukebox, %s skips to the next song.","Atajos: %s abre la Rocola, %s salta a la siguiente canción."
+Size and spacing,Size and spacing,Tamaño y separación
+Slot 1,Slot 1,Ranura 1
+Slot 2,Slot 2,Ranura 2
+Slot 3,Slot 3,Ranura 3
+Slot 4,Slot 4,Ranura 4
+Spectators cannot change the game mode.,Spectators cannot change the game mode.,Los espectadores no pueden cambiar el modo de juego.
+Start a match to use this.,Start a match to use this.,Empieza una partida para usar esto.
+Start watching a replay to use this.,Start watching a replay to use this.,Ponte a ver una repetición para usar esto.
+Swap sides now,Swap sides now,Intercambiar lados ahora
+Swap sides on every reset,Swap sides on every reset,Intercambiar lados en cada reinicio
+The Discord is the fastest place to ask a question or report something broken.,The Discord is the fastest place to ask a question or report something broken.,El Discord es el sitio más rápido para preguntar algo o avisar de que algo está roto.
+"The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.","The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.",No se pudo leer la lista de movimientos del muñeco. Esto pasa en la pantalla de selección de personaje del entrenamiento y en los espejos.
+"The mod itself: settings, controllers, language, updates and help.","The mod itself: settings, controllers, language, updates and help.","El mod en sí: ajustes, mandos, idioma, actualizaciones y ayuda."
+The palette editor itself opens once you are in a match.,The palette editor itself opens once you are in a match.,El editor de paletas se abre cuando estés en una partida.
+These tools moved into the mod menu.,These tools moved into the mod menu.,Estas herramientas se movieron al menú del mod.
+"This will continuously loop the current recording slot, subject to absolute positioning.","This will continuously loop the current recording slot, subject to absolute positioning.","Repite en bucle la ranura de grabación actual, sujeto al posicionamiento absoluto."
+Training,Training,Entrenamiento
+"Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix.","Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix.","Desactiva esto si tu juego se cierra al buscar partida clasificatoria desde el modo entrenamiento. Solo evita que se carguen los colores personalizados de otros jugadores; los tuyos no se ven afectados. Es un parche temporal, no el arreglo de verdad."
+Updates,Updates,Actualizaciones
+Wake-up timing,Wake-up timing,Timing de levantada
+"Watching, rewinding, taking over and sharing replays.","Watching, rewinding, taking over and sharing replays.","Ver, rebobinar, tomar el control y compartir repeticiones."
+"What is happening in the current match: mode, stage and HUD.","What is happening in the current match: mode, stage and HUD.","Lo que está pasando en la partida actual: modo, escenario y HUD."
+(in a match),(in a match),(en una partida)
+(while watching a replay),(while watching a replay),(mientras ves una repetición)
+Choosing a palette per character needs a match in progress.,Choosing a palette per character needs a match in progress.,Elegir una paleta por personaje necesita una partida en curso.
+Controller setup,Controller setup,Configuración de mandos
+Current match,Current match,Partida actual
+Game,Game,Juego
+Game mode: available from character select onwards.,Game mode: available from character select onwards.,Modo de juego: disponible desde la selección de personaje en adelante.
+Hide the game HUD,Hide the game HUD,Ocultar el HUD del juego
+Keys,Keys,Teclas
+"One searchable list of everything the mod can be configured to do, hotkeys included, with a description for each option.","One searchable list of everything the mod can be configured to do, hotkeys included, with a description for each option.","Una sola lista buscable con todo lo que se puede configurar en el mod, atajos incluidos, con una descripción para cada opción."
+Pages,Pages,Páginas
+Reachable once the game has loaded its save data.,Reachable once the game has loaded its save data.,Disponible cuando el juego haya cargado sus datos de guardado.
+Room settings,Room settings,Ajustes de la sala
+"Rooms, ranked, and everything that only matters with people.","Rooms, ranked, and everything that only matters with people.","Salas, clasificatoria y todo lo que solo importa con más gente."
+"Stage: pick one from character select, the versus screen, or the replay menu.","Stage: pick one from character select, the versus screen, or the replay menu.","Escenario: elige uno desde la selección de personaje, la pantalla de versus o el menú de repeticiones."
+"The match you are in, and the game's own values.","The match you are in, and the game's own values.",La partida en la que estás y los valores propios del juego.
+"The mod itself: settings, language, updates and diagnostics.","The mod itself: settings, language, updates and diagnostics.","El mod en sí: ajustes, idioma, actualizaciones y diagnóstico."
+"Which device each side plays on, and how the mod reads them.","Which device each side plays on, and how the mod reads them.",Con qué dispositivo juega cada lado y cómo los lee el mod.
+hide the HUD,hide the HUD,ocultar el HUD
+online info,online info,info de en línea
+this menu,this menu,este menú
