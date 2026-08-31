@@ -175,6 +175,45 @@ void DebugWindow::DrawBgmTableProbeSection()
 	ImGui::ShowHelpMarker("Points the entry at a file that does not exist. Music must keep playing\n"
 		"now; after a reload, silence = the table is re-read, music = the bank is cached.");
 
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(0.4f, 0.9f, 1, 1), "Check 3: convert an MP3 as a stand-in");
+
+	const auto& mp3s = BgmTableProbe::GetCustomMp3s();
+	if (ImGui::Button("Rescan data/Sound/BGM/custom/"))
+		BgmTableProbe::RefreshCustomMp3List();
+
+	if (mp3s.empty())
+	{
+		ImGui::TextDisabled("No .mp3 files found. Drop some in data/Sound/BGM/custom/ and rescan.");
+	}
+	else
+	{
+		if (m_bgmProbeMp3Index >= (int)mp3s.size())
+			m_bgmProbeMp3Index = 0;
+
+		if (ImGui::BeginCombo("MP3", mp3s[m_bgmProbeMp3Index].c_str()))
+		{
+			for (int i = 0; i < (int)mp3s.size(); ++i)
+			{
+				if (ImGui::Selectable(mp3s[i].c_str(), m_bgmProbeMp3Index == i))
+					m_bgmProbeMp3Index = i;
+			}
+			ImGui::EndCombo();
+		}
+
+		if (ImGui::Button("Convert + redirect selected track"))
+		{
+			m_bgmProbeStatus = "Converting, please wait...";
+			BgmTableProbe::ConvertAndRedirect(m_bgmProbeIndex, mp3s[m_bgmProbeMp3Index],
+				&m_bgmProbeStatus);
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker("Converts the chosen MP3 into a stand-in for the selected track and\n"
+			"redirects the table entry at it. The game will stall for a few seconds\n"
+			"while it converts - that is the transcode, not a hang.");
+	}
+
+	ImGui::Separator();
 	if (ImGui::Button("Restore all entries"))
 	{
 		BgmTableProbe::RestoreAll();

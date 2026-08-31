@@ -1,5 +1,6 @@
 #include "BgmTableProbe.h"
 #include "MusicManager.h"
+#include "CustomMusicConverter.h"
 
 #include "Core/interfaces.h"
 #include "Core/logger.h"
@@ -29,6 +30,7 @@ namespace
 	int                       g_lastIndex = -1;
 	std::string               g_lastBaseName;
 	std::vector<std::string>  g_bgmNames;
+	std::vector<std::string>  g_customMp3s;
 
 	void LogProbe(const char* fmt, ...)
 	{
@@ -99,6 +101,7 @@ namespace BgmTableProbe
 			g_bgmNames.push_back(g_original[i] ? g_original[i] : "(null)");
 
 		g_initialized = true;
+		RefreshCustomMp3List();
 		LogProbe("Initialized. table=0x%p  [0]=\"%s\"  [8]=\"%s\"  [97]=\"%s\"\n",
 			(void*)g_tableAddr,
 			g_original[0] ? g_original[0] : "(null)",
@@ -210,6 +213,89 @@ namespace BgmTableProbe
 		g_lastIndex = -1;
 		g_lastBaseName.clear();
 		LogProbe("RESTORE ALL - every entry back to its original pointer\n");
+	}
+
+	void RefreshCustomMp3List()
+	{
+		g_customMp3s.clear();
+		WIN32_FIND_DATAA fd;
+		HANDLE h = FindFirstFileA("data/Sound/BGM/custom/*.mp3", &fd);
+		if (h == INVALID_HANDLE_VALUE)
+			return;
+		do {
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+				g_customMp3s.push_back(fd.cFileName);
+		} while (FindNextFileA(h, &fd));
+		FindClose(h);
+		LogProbe("Found %d custom .mp3 file(s)\n", (int)g_customMp3s.size());
+	}
+
+	const std::vector<std::string>& GetCustomMp3s() { return g_customMp3s; }
+
+	bool ConvertAndRedirect(int index, const std::string& mp3File, std::string* statusOut)
+	{
+		if (!g_initialized || index < 0 || index >= kBgmEntryCount)
+		{
+			if (statusOut) *statusOut = "Pick a track first";
+			return false;
+		}
+		if (mp3File.empty())
+		{
+			if (statusOut) *statusOut = "Pick an .mp3 first";
+			return false;
+		}
+
+		const std::string file = g_original[index] ? g_original[index] : "";
+		if (file.size() < 5)
+		{
+			if (statusOut) *statusOut = "That entry has no usable filename";
+			return false;
+		}
+
+		const std::string mp3Path = "data/Sound/BGM/custom/" + mp3File;
+		const std::string origPath = "data/Sound/BGM/" + file;
+		const std::string dstDir = std::string("data/Sound/BGM/") + kSubdir;
+		const std::string dstPath = dstDir + "/" + file;
+		CreateDirectoryA(dstDir.c_str(), NULL);
+
+		LogProbe("Converting '%s' as a stand-in for \"%s\"...\n", mp3File.c_str(), file.c_str());
+
+		std::string err;
+		if (!ConvertMp3ToReplacementPac(mp3Path, origPath, dstPath, &err))
+		{
+			if (statusOut) *statusOut = "Conversion failed: " + err;
+			LogProbe("Conversion FAILED: %s\n", err.c_str());
+			return false;
+		}
+
+		// Never point an entry at something that isn't really there.
+		WIN32_FILE_ATTRIBUTE_DATA info = {};
+		if (!GetFileAttributesExA(dstPath.c_str(), GetFileExInfoStandard, &info) ||
+			(info.nFileSizeHigh == 0 && info.nFileSizeLow < 1024))
+		{
+			if (statusOut) *statusOut = "Converted file is missing or implausibly small - not redirecting";
+			LogProbe("Post-conversion check FAILED for %s\n", dstPath.c_str());
+			return false;
+		}
+		LogProbe("Converted OK: %s (%lu bytes)\n", dstPath.c_str(), info.nFileSizeLow);
+
+		const std::string relPath = std::string(kSubdir) + "/" + file;
+		if (!PatchEntry(index, relPath))
+		{
+			if (statusOut) *statusOut = "Pointer write or read-back failed";
+			return false;
+		}
+
+		g_lastIndex = index;
+		g_lastBaseName = file.substr(0, file.size() - 4);
+
+		char buf[400];
+		sprintf_s(buf, "CHECK 3 armed: '%s' converted (%lu bytes) as a stand-in for %s. "
+			"Play that song - you should hear the MP3 instead of the original.",
+			mp3File.c_str(), info.nFileSizeLow, file.c_str());
+		if (statusOut) *statusOut = buf;
+		LogProbe("%s\n", buf);
+		return true;
 	}
 
 	bool RedirectIndexToSubdir(int index, std::string* statusOut)

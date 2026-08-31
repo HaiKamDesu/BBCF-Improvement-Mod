@@ -27,4 +27,5 @@ private:
 	std::string m_bgmProbeStatus;
 	int m_bgmProbeIndex = 0;
 	char m_bgmProbeFilter[64] = {};
+	int m_bgmProbeMp3Index = 0;
 };

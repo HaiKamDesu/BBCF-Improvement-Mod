@@ -56,6 +56,17 @@ namespace BgmTableProbe
 	// Original filenames of the BGM entries, for the picker.
 	const std::vector<std::string>& GetBgmEntryNames();
 
+	// .mp3 files sitting in data/Sound/BGM/custom/, for the conversion check.
+	const std::vector<std::string>& GetCustomMp3s();
+	void RefreshCustomMp3List();
+
+	// Converts `mp3File` into a stand-in for the selected track, writing it to
+	// data/Sound/BGM/imtest/<original name>.pac, then redirects the entry there.
+	// The pointer is only written once the converted file is confirmed on disk -
+	// pointing an entry at a missing file wedges the game (see the report, §9).
+	// Runs synchronously and will stall the game for a few seconds.
+	bool ConvertAndRedirect(int index, const std::string& mp3File, std::string* statusOut);
+
 	// What the last check touched, for the UI to display.
 	int GetLastTouchedIndex();
 	const char* GetLastTouchedBaseName();

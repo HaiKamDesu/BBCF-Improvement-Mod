@@ -151,8 +151,27 @@ bool ConvertMp3ToReplacementPac(mp3Path, originalPacPath, outPacPath, errorOut);
 `MusicManager`'s play path no longer special-cases custom tracks: every `.pac`'s cue is
 named after its own base filename, so the requested cue is always just the bgm name.
 
-**Still untested in-game** — the verification above is byte-level static comparison against
-shipped files, which is strong for layout but says nothing about playback.
+### Playback confirmed end-to-end (2026-08-31)
+
+`01 Centralfiction.mp3` from the game's own Digital Extras was converted as a stand-in for
+`000_btl_rg` and the table entry redirected at it. In Training with that song selected, the
+MP3 played instead of Ragna's theme, and looped cleanly.
+
+The heard track was not immediately recognisable, so it was verified offline rather than by
+ear. Extracting the generated wave bank, wrapping it as xWMA and decoding with ffmpeg:
+
+| | generated | source MP3 |
+|---|---|---|
+| decoded duration | 104.2576 s | 104.2548 s |
+| mean level | 8340.8 | 8274.3 |
+
+Loudness-envelope correlation over 1042 100 ms frames: **0.994**. Same audio. (The track is
+an instrumental by 石渡太輔 / Daisuke Ishiwatari, which is why it sounded like an Astral
+theme rather than anything obviously "custom".)
+
+This exercises the whole chain: MP3 → WMA transcode, wave bank build, byte-for-byte reuse
+of the original sound bank, FPAC assembly with the corrected geometry, subdirectory
+redirect via the table pointer, cue resolution by name, and clean looping.
 
 ## 6. Desync analysis
 
