@@ -32,8 +32,7 @@ namespace MainMenu
 
 			ImGui::HorizontalSpacing();
 			const bool toggled = ImGui::Checkbox(Messages.Enable_hitbox_overlay_section(), &isOpen);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Enable_hitbox_overlay_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Enable_hitbox_overlay_tooltip());
 			if (toggled)
 			{
 				if (isOpen)
@@ -76,23 +75,19 @@ namespace MainMenu
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Draw_hitbox_hurtbox(), &overlay->drawHitboxHurtbox);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Draw_hitbox_hurtbox_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Draw_hitbox_hurtbox_tooltip());
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Draw_origin(), &overlay->drawOriginLine);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Origin_point_note());
+			ImGui::ShowHelpMarkerSameLine(Messages.Origin_point_note());
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Draw_collision(), &overlay->drawCollisionBoxes);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Collision_box_note());
+			ImGui::ShowHelpMarkerSameLine(Messages.Collision_box_note());
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Draw_throw_range_boxes(), &overlay->drawRangeCheckBoxes);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Throw_range_help());
+			ImGui::ShowHelpMarkerSameLine(Messages.Throw_range_help());
 		}
 
 		// Freezing and stepping used to be buried at the bottom of the hitbox section, which
@@ -108,8 +103,7 @@ namespace MainMenu
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Freeze_frame_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Freeze_frame_tooltip());
 
 			// No Ctrl check needed any more: HotkeyManager matches modifiers exactly, so a
 			// plain "C" freeze binding no longer also fires on the Ctrl+C room-link shortcut.
@@ -118,16 +112,15 @@ namespace MainMenu
 
 			if (g_gameVals.pFrameCount)
 			{
-				ImGui::SameLine();
+				ImGui::SameLineOrWrap(ImGui::CalcTextSize("000000").x);
 				ImGui::Text("%d", *g_gameVals.pFrameCount);
-				ImGui::SameLine();
+				ImGui::SameLineOrWrap(ImGui::ButtonWidth(Messages.Reset()));
 				if (ImGui::Button(Messages.Reset()))
 				{
 					*g_gameVals.pFrameCount = 0;
 					g_gameVals.framesToReach = 0;
 				}
-				ImGui::SameLine();
-				ImGui::ShowHelpMarker(Messages.Reset_frame_counter_tooltip());
+				ImGui::ShowHelpMarkerSameLine(Messages.Reset_frame_counter_tooltip());
 			}
 
 			if (g_gameVals.isFrameFrozen)
@@ -139,14 +132,12 @@ namespace MainMenu
 				{
 					g_gameVals.framesToReach = *g_gameVals.pFrameCount + framesToStep;
 				}
-				ImGui::SameLine();
-				ImGui::ShowHelpMarker(Messages.Step_frames_tooltip());
+				ImGui::ShowHelpMarkerSameLine(Messages.Step_frames_tooltip());
 
-				ImGui::SameLine();
+				ImGui::SameLineOrWrap(160.0f);
 				ImGui::SetNextItemWidth(160.0f);
 				ImGui::SliderInt("##framestostep", &framesToStep, 1, 60);
-				ImGui::SameLine();
-				ImGui::ShowHelpMarker(Messages.Step_frames_count_tooltip());
+				ImGui::ShowHelpMarkerSameLine(Messages.Step_frames_count_tooltip());
 			}
 
 			Hint(FormatText(L("Hotkeys: %s pauses, %s steps forward.").c_str(),
@@ -172,13 +163,11 @@ namespace MainMenu
 			static bool isFrameAdvantageOpen = false;
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Enable_framedata_section(), &isFrameAdvantageOpen);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Enable_framedata_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Enable_framedata_tooltip());
 
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Advantage_on_stagger_hit(), &idleActionToggles.ukemiStaggerHit);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Advantage_stagger_hit_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Advantage_stagger_hit_tooltip());
 
 			if (isFrameAdvantageOpen)
 				ctx.container->GetWindow(WindowType_FrameAdvantage)->Open();
@@ -208,8 +197,7 @@ namespace MainMenu
 				Settings::settingsIni.frameHistoryEnabled = isOpen;
 				Settings::changeSetting("FrameHistoryEnabled", isOpen ? "1" : "0");
 			}
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.FrameHistory_help());
+			ImGui::ShowHelpMarkerSameLine(Messages.FrameHistory_help());
 			if (isOpen)
 				frameHistWin->Open();
 			else
@@ -221,8 +209,7 @@ namespace MainMenu
 				Settings::settingsIni.frameHistoryAutoReset = frameHistWin->resetting;
 				Settings::changeSetting("FrameHistoryAutoReset", frameHistWin->resetting ? "1" : "0");
 			}
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.FrameHistory_auto_reset_help());
+			ImGui::ShowHelpMarkerSameLine(Messages.FrameHistory_auto_reset_help());
 
 			ImGui::HorizontalSpacing();
 			if (ImGui::Checkbox(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
@@ -230,8 +217,7 @@ namespace MainMenu
 				Settings::settingsIni.frameHistoryCountEmptyFrames = frameHistWin->countEmptyFrames;
 				Settings::changeSetting("FrameHistoryCountEmptyFrames", frameHistWin->countEmptyFrames ? "1" : "0");
 			}
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.FrameHistory_count_empty_frames_help());
+			ImGui::ShowHelpMarkerSameLine(Messages.FrameHistory_count_empty_frames_help());
 
 			ImGui::VerticalSpacing(6);
 			ImGui::HorizontalSpacing();
@@ -279,7 +265,7 @@ namespace MainMenu
 		{
 			Anchor(Overlays_InputDisplay);
 			scr->DrawInputBufferButton();
-			ImGui::SameLine();
+			ImGui::SameLineOrWrap(ImGui::ButtonWidth("Combo Data"));
 			Anchor(Overlays_ComboData);
 			scr->DrawComboDataButton();
 		}

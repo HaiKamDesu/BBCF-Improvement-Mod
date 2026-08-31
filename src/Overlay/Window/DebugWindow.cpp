@@ -14,6 +14,7 @@
 #include "Game/SnapshotApparatus/SnapshotApparatus.h"
 #include "Game/SpectatorSyncDiagnostics.h"
 #include "Game/ReplayFiles/ReplayFileManager.h"
+#include "Overlay/BrandingLayout.h"
 #include "Overlay/imgui_utils.h"
 
 #include <algorithm>
@@ -88,6 +89,9 @@ void DebugWindow::Draw()
 	}
 
 	DrawImGuiSection();
+
+	// Live knobs for the mod menu's title bar and background watermark. See BrandingLayout.h.
+	Branding::DrawLayoutTuner();
 
 	DrawGameValuesSection();
 

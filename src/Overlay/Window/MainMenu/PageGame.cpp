@@ -25,8 +25,7 @@ namespace MainMenu
 		{
 			ImGui::SetNextItemWidth(160.0f);
 			ImGui::InputInt("P$##money", *&g_gameVals.pGameMoney);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Player_money_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Player_money_tooltip());
 		}
 		else
 		{
@@ -35,8 +34,9 @@ namespace MainMenu
 			ImGui::SetNextItemWidth(160.0f);
 			ImGui::InputInt("P$##money", &placeholder);
 			ImGui::EndDisabled();
-			ImGui::SameLine();
-			ImGui::TextDisabled("%s", L("Reachable once the game has loaded its save data.").c_str());
+			const std::string note = L("Reachable once the game has loaded its save data.");
+			ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
+			ImGui::TextDisabled("%s", note.c_str());
 		}
 
 		ImGui::VerticalSpacing(6);
@@ -91,15 +91,15 @@ namespace MainMenu
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Hide_HUD_checkbox(), &placeholder);
 			ImGui::EndDisabled();
-			ImGui::SameLine();
-			ImGui::TextDisabled("%s", L("(in a match)").c_str());
+			const std::string note = L("(in a match)");
+			ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
+			ImGui::TextDisabled("%s", note.c_str());
 		}
 		else
 		{
 			ImGui::HorizontalSpacing();
 			ImGui::Checkbox(Messages.Hide_HUD_checkbox(), (bool*)g_gameVals.pIsHUDHidden);
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Hide_HUD_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Hide_HUD_tooltip());
 		}
 	}
 }

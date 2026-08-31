@@ -2,3 +2,9 @@
 #include <windows.h>
 
 "Localization.csv" RCDATA "localization\\Localization.csv"
+
+// Branding artwork drawn by the mod menu (title bar wordmarks, background watermark).
+// Embedded rather than shipped as loose files so the DLL stays self-contained.
+"Logo_Oceanya.png" RCDATA "branding\\Logo_Oceanya.png"
+"Logo_Laboratories.png" RCDATA "branding\\Logo_Laboratories.png"
+"Logo_O_Centered.png" RCDATA "branding\\Logo_O_Centered.png"

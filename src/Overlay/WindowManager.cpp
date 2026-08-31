@@ -1,5 +1,6 @@
 #include "WindowManager.h"
 
+#include "Branding.h"
 #include "fonts.h"
 #include "NotificationBar/NotificationBar.h"
 #include "WindowContainer/WindowContainer.h"
@@ -153,6 +154,9 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	// cursor untouched; the overlay's own software cursor (io.MouseDrawCursor, set in Render())
 	// stays the only cursor logic, exactly as before.
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+	// After the ImGui DX9 backend, which is what proves the device is usable.
+	Branding::Initialize(device);
 
 	m_pLogger = g_imGuiLogger;
 
@@ -332,6 +336,7 @@ void WindowManager::InvalidateDeviceObjects()
 
 	LOG(2, "WindowManager::InvalidateDeviceObjects\n");
 	ImGui_ImplDX9_InvalidateDeviceObjects();
+	Branding::InvalidateDeviceObjects();
 }
 
 void WindowManager::CreateDeviceObjects()
@@ -343,6 +348,7 @@ void WindowManager::CreateDeviceObjects()
 
 	LOG(2, "WindowManager::CreateDeviceObjects\n");
 	ImGui_ImplDX9_CreateDeviceObjects();
+	Branding::CreateDeviceObjects();
 }
 
 void WindowManager::Render()

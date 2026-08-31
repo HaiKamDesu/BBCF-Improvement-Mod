@@ -380,6 +380,39 @@ void ImGui::SetTooltipWrapped(const char* text)
 	ImGui::EndTooltip();
 }
 
+void ImGui::SameLineOrWrap(float nextItemWidth)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	const float lastItemRight = ImGui::GetItemRectMax().x;
+	const float contentRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+
+	if (lastItemRight + style.ItemSpacing.x + nextItemWidth <= contentRight)
+		ImGui::SameLine();
+}
+
+float ImGui::ButtonWidth(const char* label)
+{
+	return ImGui::CalcTextSize(label, NULL, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+float ImGui::CheckboxWidth(const char* label)
+{
+	const ImGuiStyle& style = ImGui::GetStyle();
+	return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x
+		+ ImGui::CalcTextSize(label, NULL, true).x;
+}
+
+float ImGui::HelpMarkerWidth()
+{
+	return ImGui::CalcTextSize("(?)").x;
+}
+
+void ImGui::ShowHelpMarkerSameLine(const char* desc)
+{
+	ImGui::SameLineOrWrap(ImGui::HelpMarkerWidth());
+	ImGui::ShowHelpMarker(desc);
+}
+
 void ImGui::ShowHelpMarker(const char* desc)
 {
 	ImGui::TextDisabled("(?)");

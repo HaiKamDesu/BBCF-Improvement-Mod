@@ -38,6 +38,15 @@ namespace ImGui
 	IMGUI_API bool ColorPicker4On32Bit(const char* label, unsigned char col[4], ImGuiColorEditFlags flags = 0, const float* ref_col = NULL);
 	IMGUI_API void ShowHelpMarker(const char* desc);
 
+	// SameLine(), but only when the next item actually fits. The mod menu is resizable, and a
+	// plain SameLine() chain simply runs off the right edge and clips whatever came last -
+	// help markers, the second button of a pair, a checkbox. These start a new line instead.
+	IMGUI_API void SameLineOrWrap(float nextItemWidth);
+	IMGUI_API float ButtonWidth(const char* label);
+	IMGUI_API float CheckboxWidth(const char* label);
+	IMGUI_API float HelpMarkerWidth();
+	IMGUI_API void ShowHelpMarkerSameLine(const char* desc);
+
 	/* Wrapping variants of the coloured/disabled text calls. Plain TextDisabled and
 	   TextColored do NOT wrap, so a long sentence runs off the side of the window and
 	   forces a horizontal scrollbar (or is simply lost, in a NoScrollbar window). Use

@@ -11,7 +11,6 @@ namespace MainMenu
 	void DrawReplaysPage(const PageContext& ctx);
 	void DrawLookAndSoundPage(const PageContext& ctx);
 	void DrawControllersPage(const PageContext& ctx);
-	void DrawModPage(const PageContext& ctx);
 
 	void DrawPage(PageId page, const PageContext& ctx);
 }

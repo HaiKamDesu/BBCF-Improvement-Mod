@@ -3332,6 +3332,18 @@ struct LocalizationKeysAccessor
 
         // this menu
         inline const char* this_menu() const { return Get("this menu"); }
+
+        // Everything the mod can be configured to do, hotkeys and language included, in one searchable list.
+        inline const char* Everything_the_mod_can_be_configured_to_do_hotkeys_and_language_included_in_one_searchable_list() const { return Get("Everything the mod can be configured to do, hotkeys and language included, in one searchable list."); }
+
+        // Releases
+        inline const char* Releases() const { return Get("Releases"); }
+
+        // You must be in a mode where state can be saved.
+        inline const char* You_must_be_in_a_mode_where_state_can_be_saved() const { return Get("You must be in a mode where state can be saved."); }
+
+        // You cannot use this feature while searching for a ranked match.
+        inline const char* You_cannot_use_this_feature_while_searching_for_a_ranked_match() const { return Get("You cannot use this feature while searching for a ranked match."); }
 };
 
 

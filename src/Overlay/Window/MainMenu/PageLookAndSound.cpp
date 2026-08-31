@@ -40,15 +40,13 @@ namespace MainMenu
 		if (ImGui::Button(Messages.Palette_editor()))
 			ctx.container->GetWindow(WindowType_PaletteEditor)->ToggleOpen();
 		ImGui::EndDisabled();
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(Messages.Palette_editor_tooltip());
+		ImGui::ShowHelpMarkerSameLine(Messages.Palette_editor_tooltip());
 
 		if (ctx.palettesConfigWindow)
 		{
-			ImGui::SameLine();
+			ImGui::SameLineOrWrap(ImGui::ButtonWidth("Palettes"));
 			ctx.palettesConfigWindow->DrawOpenButton();
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(L("Manage the palette files on disk: which ones are loaded, importing, and sharing.").c_str());
+			ImGui::ShowHelpMarkerSameLine(L("Manage the palette files on disk: which ones are loaded, importing, and sharing.").c_str());
 			ctx.palettesConfigWindow->DrawModal();
 		}
 
@@ -63,16 +61,14 @@ namespace MainMenu
 			GetMusicManager().StartCustomMusicDiscovery();
 			ctx.container->GetWindow(WindowType_Jukebox)->ToggleOpen();
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Choose which songs play during a match and how it moves between them.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Choose which songs play during a match and how it moves between them.").c_str());
 
-		ImGui::SameLine();
+		ImGui::SameLineOrWrap(ImGui::ButtonWidth(L("Replace songs...").c_str()));
 		if (ImGui::Button(L("Replace songs...").c_str()))
 		{
 			ctx.container->GetWindow(WindowType_BgmReplacement)->ToggleOpen();
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Swap any song in the game for one of your own.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Swap any song in the game for one of your own.").c_str());
 
 		Hint(FormatText(L("Shortcuts: %s opens the Jukebox, %s skips to the next song.").c_str(),
 			HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_ToggleJukebox)).c_str(),

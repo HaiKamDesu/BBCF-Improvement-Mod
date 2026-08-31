@@ -26,13 +26,13 @@ namespace MainMenu
 			}
 
 			ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Avatar(), g_gameVals.playerAvatarAddr, 0, 0x2F);
-			ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_icon_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_icon_tooltip());
 			ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Color(), g_gameVals.playerAvatarColAddr, 0, 0x3);
-			ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_color_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_color_tooltip());
 			ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_1(), g_gameVals.playerAvatarAcc1, 0, 0xCF);
-			ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_accessory1_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_accessory1_tooltip());
 			ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_2(), g_gameVals.playerAvatarAcc2, 0, 0xCF);
-			ImGui::SameLine(); ImGui::ShowHelpMarker(Messages.Avatar_accessory2_tooltip());
+			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_accessory2_tooltip());
 		}
 	}
 
@@ -46,8 +46,7 @@ namespace MainMenu
 		{
 			ctx.container->GetWindow(WindowType_Room)->ToggleOpen();
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("A small movable window listing who is in the room with you, who is playing, and who is spectating.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("A small movable window listing who is in the room with you, who is playing, and who is spectating.").c_str());
 
 		ImGui::VerticalSpacing(8);
 
@@ -84,7 +83,6 @@ namespace MainMenu
 		{
 			g_modVals.enableForeignPalettes = loadForeignPalettes;
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Turn this off if your game crashes when you search for a ranked match from training mode. It only stops other players' custom colours from loading; yours are unaffected. This is a stopgap, not the real fix.").c_str());
 	}
 }

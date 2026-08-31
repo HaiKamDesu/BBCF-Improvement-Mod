@@ -19,12 +19,13 @@ namespace ControllerSettings
                         LOG(1, "MainWindow::DrawControllers - Refresh controllers clicked\n");
                         controllerManager.RefreshDevicesAndReinitializeGame();
                 }
-                ImGui::SameLine();
-ImGui::ShowHelpMarker(Messages.Controller_refresh_help());
+                ImGui::ShowHelpMarkerSameLine(Messages.Controller_refresh_help());
 
+                // Every step wraps: this row can hold three controls, and "Auto-refresh" is the
+                // last of them, so on a narrow menu it was simply pushed off the right edge.
                 if (inDevelopmentFeaturesEnabled)
                 {
-                        ImGui::SameLine();
+                        ImGui::SameLineOrWrap(ImGui::ButtonWidth(Messages.Open_Joy_cpl()));
                         if (steamInputLikely)
                         {
                                 ImGui::BeginDisabled();
@@ -42,7 +43,7 @@ ImGui::ShowHelpMarker(Messages.Controller_refresh_help());
                         }
                 }
 
-                ImGui::SameLine();
+                ImGui::SameLineOrWrap(ImGui::CheckboxWidth(Messages.Auto_refresh()));
                 bool autoRefreshEnabled = controllerManager.IsAutoRefreshEnabled();
                 if (ImGui::Checkbox(Messages.Auto_refresh(), &autoRefreshEnabled))
                 {
@@ -50,8 +51,7 @@ ImGui::ShowHelpMarker(Messages.Controller_refresh_help());
                         Settings::settingsIni.autoUpdateControllers = autoRefreshEnabled;
                         Settings::changeSetting("AutomaticallyUpdateControllers", autoRefreshEnabled ? "1" : "0");
                 }
-                ImGui::SameLine();
-ImGui::ShowHelpMarker(Messages.Auto_refresh_warning());
+                ImGui::ShowHelpMarkerSameLine(Messages.Auto_refresh_warning());
 
                 if (inDevelopmentFeaturesEnabled)
                 {

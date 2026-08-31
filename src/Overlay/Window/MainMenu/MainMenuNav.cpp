@@ -17,7 +17,6 @@ namespace MainMenu
 			{ "Replays",      "Watching, rewinding, taking over and sharing replays.",         "replay theater rewind takeover" },
 			{ "Look & Sound", "Palettes and music - how the game looks and what it plays.",    "palette colour color music bgm" },
 			{ "Controllers",  "Which device each side plays on, and how the mod reads them.",  "controller gamepad pad keyboard input device" },
-			{ "Mod",          "The mod itself: settings, language, updates and diagnostics.",  "mod settings config language update log debug" },
 		};
 
 		const EntryInfo kEntries[Entry_Count] = {
@@ -56,11 +55,6 @@ namespace MainMenu
 			{ Page_LookAndSound, Item_Group, "Music",    "music bgm jukebox song track replace playlist astral" },
 
 			{ Page_Controllers, Item_Loose, "Controller setup", "controller gamepad pad keyboard steam input separation override refresh" },
-
-			{ Page_Mod, Item_Loose, "All settings", "settings ini config options preferences hotkey keybind bind shortcut" },
-			{ Page_Mod, Item_Loose, "Language",     "language english spanish translate idioma" },
-			{ Page_Mod, Item_Loose, "Updates",      "update release version changelog new" },
-			{ Page_Mod, Item_Loose, "Diagnostics",  "log debug window troubleshoot crash report" },
 		};
 
 		PageId g_currentPage = Page_Game;

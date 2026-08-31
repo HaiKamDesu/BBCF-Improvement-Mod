@@ -54,8 +54,7 @@ void ScrWindow::DrawComboDataButton() {
     {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_ComboData)->ToggleOpen();
     }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Combo_data_button_tooltip());
+    ImGui::ShowHelpMarkerSameLine(Messages.Combo_data_button_tooltip());
 }
 void ScrWindow::DrawTasComboToolButton() {
     // TasManager::Enter already explains itself when the match is not a training one, so
@@ -78,8 +77,7 @@ void ScrWindow::DrawTasComboToolButton() {
             }
         }
     }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(L("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.").c_str());
+    ImGui::ShowHelpMarkerSameLine(L("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.").c_str());
 
     if (!tas.IsActive() && !tas.GetError().empty())
     {
@@ -92,15 +90,13 @@ void ScrWindow::DrawInputBufferButton() {
     {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_InputBufferP1)->ToggleOpen();
     }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Input_buffer_button_tooltip());
-    ImGui::SameLine();
+    ImGui::ShowHelpMarkerSameLine(Messages.Input_buffer_button_tooltip());
+    ImGui::SameLineOrWrap(ImGui::ButtonWidth("Input Buffer P2"));
     if (ImGui::Button("Input Buffer P2"))
     {
         ScrWindow::m_pWindowContainer->GetWindow(WindowType_InputBufferP2)->ToggleOpen();
     }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Input_buffer_button_tooltip());
+    ImGui::ShowHelpMarkerSameLine(Messages.Input_buffer_button_tooltip());
 }
 void ScrWindow::DrawWakeupDelayControl() {
     //ImGui::BeginChild("zbmjxc");
@@ -227,8 +223,7 @@ void ScrWindow::DrawWakeupBody() {
     }
 
     ImGui::Checkbox(L("Override the dummy's wake-up timing").c_str(), &s_wakeupOverrideEnabled);
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Enable_wakeup_delay_override_tooltip());
+    ImGui::ShowHelpMarkerSameLine(Messages.Enable_wakeup_delay_override_tooltip());
     if (s_wakeupOverrideEnabled) {
         DrawWakeupDelayControl();
     }
@@ -391,12 +386,11 @@ void ScrWindow::DrawPositionsBody()
     if (ImGui::Button(L("Swap sides now").c_str())) {
         ScrWindow::swap_character_coordinates();
     }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Swap_coordinates_tooltip());
-    ImGui::SameLine();
-    ImGui::Checkbox(L("Swap sides on every reset").c_str(), &s_swapCoordsToggle);
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(L("Always swap coordinates help").c_str());
+    ImGui::ShowHelpMarkerSameLine(Messages.Swap_coordinates_tooltip());
+    const std::string alwaysSwapLabel = L("Swap sides on every reset");
+    ImGui::SameLineOrWrap(ImGui::CheckboxWidth(alwaysSwapLabel.c_str()));
+    ImGui::Checkbox(alwaysSwapLabel.c_str(), &s_swapCoordsToggle);
+    ImGui::ShowHelpMarkerSameLine(L("Always swap coordinates help").c_str());
 }
 
 void ScrWindow::DrawDummyActionsBody()
@@ -1678,12 +1672,12 @@ void ScrWindow::DrawSaveStatesBody() {
             }
         }
         else {
-            ImGui::Text("You must be in a mode where state can be saved");
+            ImGui::TextWrapped("%s", L("You must be in a mode where state can be saved.").c_str());
         }
 
     }
     else {
-        ImGui::Text("You cannot use this feature while searching for a ranked match");
+        ImGui::TextWrapped("%s", L("You cannot use this feature while searching for a ranked match.").c_str());
     }
 }
 bool compareFiles(const std::string& p1, const std::string& p2) {
@@ -2308,7 +2302,7 @@ void ScrWindow::DrawReplayTakeoverBody() {
         }
     }
     else {
-        ImGui::Text("You cannot use this feature while searching for a ranked match.");
+        ImGui::TextWrapped("%s", L("You cannot use this feature while searching for a ranked match.").c_str());
     }
 }
 
@@ -2349,8 +2343,7 @@ void ScrWindow::DrawRoomSettingsBody() {
     }
 
     bool rematchSettingsChanged = ImGui::Combo("Rematch Settings##dropdown", &currentItem, items, IM_ARRAYSIZE(items));
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Rematch_settings_tooltip());
+    ImGui::ShowHelpMarkerSameLine(Messages.Rematch_settings_tooltip());
     if (rematchSettingsChanged)
     {
         switch (currentItem) {

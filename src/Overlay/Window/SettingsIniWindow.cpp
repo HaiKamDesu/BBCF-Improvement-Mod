@@ -1,6 +1,7 @@
 #include "SettingsIniWindow.h"
 
 #include "Core/HotkeyManager.h"
+#include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Widget/HotkeyBindWidget.h"
@@ -282,11 +283,56 @@ namespace {
 	// Defined below with the other value widgets; needed here for the non-hotkey fallback.
 	static bool DrawValueWidget(const char* id, std::string& val);
 
+	// The language used to be a combo box of its own in the mod menu. It is a setting like any
+	// other, so it lives here now - but stored as a language code, which is not something to
+	// type into a text box, hence its own widget.
+	static bool DrawLanguageValueWidget(const char* id, std::string& val)
+	{
+		const auto& options = Localization::GetAvailableLanguages();
+
+		std::string preview = val;
+		for (const auto& option : options)
+			if (option.code == val)
+				preview = option.displayName;
+
+		bool changed = false;
+		ImGui::PushItemWidth(-1);
+		if (ImGui::BeginCombo(id, preview.c_str()))
+		{
+			for (const auto& option : options)
+			{
+				std::string label = option.displayName;
+				if (!option.complete)
+					label += Messages.Language_incomplete_label();
+
+				if (!option.complete)
+					ImGui::BeginDisabled();
+
+				const bool selected = option.code == val;
+				if (ImGui::Selectable(label.c_str(), selected))
+				{
+					val = option.code;
+					changed = true;
+				}
+				if (selected)
+					ImGui::SetItemDefaultFocus();
+
+				if (!option.complete)
+					ImGui::EndDisabled();
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::PopItemWidth();
+		return changed;
+	}
+
 	static bool DrawValueWidgetForSetting(const char* iniKey, const char* id, std::string& val)
 	{
 		const HotkeyManager::Action action = HotkeyManager::ActionFromIniKey(iniKey);
 		if (action != HotkeyManager::Hotkey_Count)
 			return DrawHotkeyValueWidget(action, val);
+		if (_stricmp(iniKey, "Language") == 0)
+			return DrawLanguageValueWidget(id, val);
 		return DrawValueWidget(id, val);
 	}
 
@@ -361,7 +407,20 @@ void SettingsIniWindow::DrawOpenButton()
 	if (!ImGui::Button("Settings"))
 		return;
 
+	Open();
+}
+
+void SettingsIniWindow::Open(const char* initialFilter)
+{
 	BuildRows();
+
+	if (initialFilter && *initialFilter)
+	{
+		// After BuildRows, which clears the filter.
+		strncpy_s(m_settingsFilter.InputBuf, sizeof(m_settingsFilter.InputBuf), initialFilter, _TRUNCATE);
+		m_settingsFilter.Build();
+	}
+
 	ImGui::OpenPopup("Settings##modal");
 }
 
@@ -393,7 +452,8 @@ void SettingsIniWindow::BuildRows()
 		}, \
 		[this]() -> bool { return m_settingsDraft._var != Settings::settingsIni._var; }, \
 		[this]() { SettingAssignFromString(m_settingsDraft._var, _defaultval); }, \
-		IsRestartRequired(_inistring) \
+		IsRestartRequired(_inistring), \
+		_stricmp(_inistring, "Language") == 0 \
 	});
 #include "Core/settings.def"
 #undef SETTING
@@ -479,8 +539,14 @@ void SettingsIniWindow::DrawModal()
 		ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableHeadersRow();
 
+		// Two passes so pinned rows lead their category regardless of settings.def order,
+		// which exists to keep settings.ini stable and is nobody's idea of a reading order.
+		for (int pass = 0; pass < 2; ++pass)
 		for (SettingRow& row : m_settingRows)
 		{
+			if (row.pinnedFirst != (pass == 0))
+				continue;
+
 			const bool filterMatch =
 				m_settingsFilter.PassFilter(row.name.c_str()) ||
 				m_settingsFilter.PassFilter(row.displayName.c_str()) ||
@@ -566,6 +632,7 @@ void SettingsIniWindow::DrawModal()
 	if (ImGui::Button(saveLabel, ImVec2(saveButtonWidth, 0)))
 	{
 		const bool debugLogsWereEnabled = Settings::settingsIni.generateDebugLogs;
+		const std::string languageBeforeSave = Settings::settingsIni.language;
 
 #define SETTING(_type, _var, _inistring, _defaultval) \
 		if (m_settingsDraft._var != Settings::settingsIni._var) { \
@@ -577,6 +644,15 @@ void SettingsIniWindow::DrawModal()
 
 		if (Settings::settingsIni.generateDebugLogs != debugLogsWereEnabled)
 			SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);
+
+		// Every string the menus draw is looked up per frame, so reloading here is enough to
+		// change the whole UI language without a restart.
+		if (Settings::settingsIni.language != languageBeforeSave)
+		{
+			Localization::Reload(Settings::settingsIni.language);
+			Settings::settingsIni.language = Localization::GetCurrentLanguage();
+			Settings::changeSetting("Language", Settings::settingsIni.language);
+		}
 
 		// Push the settings that subsystems read through g_modVals (keybinds, frame history
 		// sizing, palette/upload toggles). Without this they'd only take effect on the next

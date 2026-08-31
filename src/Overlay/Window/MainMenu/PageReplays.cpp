@@ -24,12 +24,12 @@ namespace MainMenu
 		if (ImGui::Button(Messages.Toggle_Rewind()))
 			ctx.container->GetWindow(WindowType_ReplayRewind)->ToggleOpen();
 		ImGui::EndDisabled();
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Opens the rewind bar, so you can step a replay backwards instead of restarting it.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Opens the rewind bar, so you can step a replay backwards instead of restarting it.").c_str());
 		if (!inTheater)
 		{
-			ImGui::SameLine();
-			ImGui::TextDisabled("%s", L("(while watching a replay)").c_str());
+			const std::string note = L("(while watching a replay)");
+			ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
+			ImGui::TextDisabled("%s", note.c_str());
 		}
 
 		ImGui::VerticalSpacing(8);
@@ -56,12 +56,11 @@ namespace MainMenu
 
 		Anchor(Replays_Database);
 		ImGui::ButtonUrl(Messages.Replay_Database(), REPLAY_DB_FRONTEND);
-		ImGui::SameLine();
+		ImGui::SameLineOrWrap(ImGui::ButtonWidth(Messages.Enable_Disable_Upload()));
 		if (ImGui::Button(Messages.Enable_Disable_Upload()))
 		{
 			ctx.container->GetWindow(WindowType_ReplayDBPopup)->ToggleOpen();
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Choose whether your finished matches are uploaded to the community replay database.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Choose whether your finished matches are uploaded to the community replay database.").c_str());
 	}
 }

@@ -22,7 +22,6 @@
 #include <string>
 
 class WindowContainer;
-class SettingsIniWindow;
 class PalettesConfigWindow;
 
 namespace MainMenu
@@ -36,7 +35,6 @@ namespace MainMenu
 		Page_Replays,
 		Page_LookAndSound,
 		Page_Controllers,
-		Page_Mod,
 		Page_Count
 	};
 
@@ -78,11 +76,6 @@ namespace MainMenu
 
 		Controllers_Setup,
 
-		Mod_Settings,
-		Mod_Language,
-		Mod_Updates,
-		Mod_Diagnostics,
-
 		Entry_Count
 	};
 
@@ -116,7 +109,6 @@ namespace MainMenu
 	struct PageContext
 	{
 		WindowContainer* container = nullptr;
-		SettingsIniWindow* settingsIniWindow = nullptr;
 		PalettesConfigWindow* palettesConfigWindow = nullptr;
 	};
 
