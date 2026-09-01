@@ -11,6 +11,9 @@ struct CustomTrackInfo {
     std::string pacFilename;  // e.g. "c10000_my_song" (no .pac extension). NOT the cue
                               // name: custom banks keep the native 000_btl_rg cue.
     std::string pacPath;      // Full relative path e.g. "data/Sound/BGM/c10000_my_song.pac"
+    std::string sourceName;   // the file it came from, which is how its volume is keyed
+    float tagGainDb = 0.0f;   // the file's own ReplayGain, already applied
+    bool  hasTagGain = false; // whether it had one at all
 };
 
 // Scan data/Sound/BGM/custom/ for audio files in any supported format (see
@@ -47,7 +50,7 @@ struct CustomTrackInfo {
 // Returns false and fills `errorOut` (if given) on failure, leaving any existing file at
 // `outPacPath` untouched.
 bool ConvertAudioToPac(const std::string& srcPath,
-                       const AudioDecode::GainSpec& gain,
+                       float gainDb,
                        const std::string& outPacPath,
                        const std::string& cueName,
                        std::string* errorOut = nullptr);
@@ -62,12 +65,23 @@ bool ConvertAudioToPac(const std::string& srcPath,
 // `originalPacPath` is the shipped .pac (e.g. "data/Sound/BGM/008_btl_bn.pac");
 // `outPacPath` should keep that same base filename in a mod-owned folder, since the
 // game resolves a cue by the file's base name.
+// `gainDb` is the user's OFFSET, not the final volume: if the file carries a ReplayGain
+// tag, that is applied first and this is added on top. `headroomOut`, when given,
+// receives the source's peak level in dBFS - how much gain it can take before the limiter
+// has to do anything - and `tagGainOut` the tag's own value, or 0 when there is none.
 bool ConvertAudioToReplacementPac(const std::string& srcPath,
-                                  const AudioDecode::GainSpec& gain,
+                                  float gainDb,
                                   const std::string& originalPacPath,
                                   const std::string& outPacPath,
-                                  std::string* errorOut = nullptr);
+                                  std::string* errorOut = nullptr,
+                                  float* headroomOut = nullptr,
+                                  float* tagGainOut = nullptr);
 
 using CustomMusicProgressCallback = std::function<void(int, int, const std::string&)>;
+// The user's volume OFFSET for one custom track, in dB, by file name. Any ReplayGain tag
+// in the file is applied first and this is added to it. Returns 0 for an untouched track.
+using CustomMusicGainLookup = std::function<float(const std::string&)>;
+
 std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(
-    const CustomMusicProgressCallback& progress = CustomMusicProgressCallback());
+    const CustomMusicProgressCallback& progress = CustomMusicProgressCallback(),
+    const CustomMusicGainLookup& gainLookup = CustomMusicGainLookup());

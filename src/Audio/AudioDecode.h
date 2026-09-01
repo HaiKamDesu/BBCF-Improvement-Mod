@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -37,23 +38,6 @@ namespace AudioDecode
     // it has to survive being written to and read back from an ini.
     extern const float kSilenceDb;
 
-    // The RMS level custom tracks are normalized to by default. Provisional -
-    // it has not been measured against the game's own BGM yet. See the comment
-    // on the definition in AudioDecode.cpp before relying on it.
-    extern const float kDefaultTargetRmsDb;
-
-    // How loud a track should end up. `automatic` measures the decoded audio and
-    // normalizes it toward kDefaultTargetRmsDb, which is what stops one custom
-    // track being twice the volume of the next; `manualDb` is the user's own
-    // offset when they have overridden it.
-    struct GainSpec
-    {
-        bool automatic = true;
-        float manualDb = 0.0f;
-    };
-
-    // The gain `spec` actually resolves to for a decoded buffer, in dB.
-    float ResolveGainDb(const GainSpec& spec, const std::vector<unsigned char>& pcm);
 
     // Decodes `path` to interleaved s16 PCM. Returns false and fills `err` with
     // a user-presentable sentence on failure.
@@ -63,15 +47,27 @@ namespace AudioDecode
                     std::vector<unsigned char>& outPcm,
                     std::string* err);
 
-    // Scales `pcm` in place by `gainDb`, saturating rather than wrapping. A
-    // gain of 0 dB returns immediately without touching the buffer.
-    void ApplyGainDb(std::vector<unsigned char>& pcm, float gainDb);
+    // Scales `pcm` in place by `gainDb`, holding peaks under full scale with a
+    // look-ahead limiter.
+    //
+    // The limiter matters more than it sounds like it should. Clamping each sample on its
+    // own - which is all you can do without looking ahead - reshapes the waveform and is
+    // heard as harsh distortion across the whole track. This instead works out how much
+    // gain reduction each short block needs, ramps into it BEFORE the loud part arrives
+    // and eases back out afterwards, so what changes is the volume envelope rather than
+    // the shape of the wave. That is the difference between a track that is louder and a
+    // track that is louder and crunchy.
+    //
+    // `channels` and `rate` describe the buffer, since the ramp times are in milliseconds.
+    void ApplyGainDb(std::vector<unsigned char>& pcm, float gainDb,
+                     unsigned int channels, unsigned int rate);
+
+    // Peak level of `pcm` in dBFS, i.e. how much gain it can take before anything has to
+    // be limited at all. Below this the limiter never engages and the track is untouched.
+    float HeadroomDb(const std::vector<unsigned char>& pcm);
 
     Loudness Analyze(const std::vector<unsigned char>& pcm);
 
-    // Gain that would bring `loudness` to `targetRmsDb`, clamped so that a very
-    // quiet track cannot be pushed into clipping. Returns 0 for silence.
-    float SuggestGainDb(const Loudness& loudness, float targetRmsDb);
 
     // Lowercase, no leading dot, e.g. "mp3". Used by the file picker and the
     // Jukebox folder scan so both agree on what is importable.

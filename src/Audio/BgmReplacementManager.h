@@ -70,10 +70,14 @@ public:
 
 	// Gain is baked into the converted .pac, because the game plays it through its own
 	// XACT engine where the mod has no volume control. Changing it therefore re-runs the
-	// conversion; the UI auditions a gain with AudioPreviewPlayer first so that only
-	// happens once the user has settled on a value.
-	AudioDecode::GainSpec GetGain(int tableIndex) const;
-	void SetGain(int tableIndex, const AudioDecode::GainSpec& gain);
+	// conversion, so the UI only applies a change when the user asks for it.
+	float GetGainDb(int tableIndex) const;
+	void SetGainDb(int tableIndex, float gainDb);
+	// How much gain this song can take before anything has to be limited, in dB.
+	// -1000 when it has not been measured yet.
+	float GetHeadroomDb(int tableIndex) const;
+	// The song's own ReplayGain if it had one; false when it did not.
+	bool GetTagGainDb(int tableIndex, float& outGainDb) const;
 	// Restores the pointer, forgets the assignment and deletes the converted file.
 	void Unassign(int tableIndex);
 	// Drops every assignment.
@@ -106,7 +110,13 @@ private:
 		std::string          relPath;      // what goes in the table, e.g. "BBCFIM_Music/x.pac"
 		BgmReplacementState  state = BgmReplacementState::Original;
 		std::string          error;
-		AudioDecode::GainSpec gain;    // baked into pacPath; changing it forces a rebuild
+		float gainDb = 0.0f;           // baked into pacPath; changing it forces a rebuild
+		// Peak level of the source in dBFS, measured when it was decoded. Gain up to
+		// -headroom is completely transparent; past that the limiter has to work.
+		float headroomDb = -1000.0f;
+		// The song's own ReplayGain, already applied. gainDb is the user's offset on top.
+		float tagGainDb = 0.0f;
+		bool  hasTagGain = false;
 	};
 
 	struct Job
@@ -115,7 +125,7 @@ private:
 		std::string mp3Path;
 		std::string originalPac;
 		std::string outPac;
-		AudioDecode::GainSpec gain;
+		float gainDb = 0.0f;
 	};
 
 	struct JobResult
@@ -123,6 +133,9 @@ private:
 		int         tableIndex = -1;
 		bool        ok = false;
 		std::string error;
+		float       headroomDb = -1000.0f;
+		float       tagGainDb = 0.0f;
+		bool        hasTagGain = false;
 	};
 
 	void BuildCatalogue();

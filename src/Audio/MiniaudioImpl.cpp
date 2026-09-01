@@ -29,10 +29,11 @@
 #undef C
 #undef R
 
-// We use miniaudio for exactly two things: decoding user files to PCM, and
-// playing a preview out of the default output device. Everything else it can do
-// is switched off — this header is 4 MB and the unused subsystems are pure
-// compile time.
+// miniaudio is used for exactly one thing here: decoding user audio files to PCM. The
+// mod does not play audio itself - the game does - so the device backends are switched
+// off too, which drops all of the WASAPI/DirectSound/WinMM machinery and removes any
+// chance of the mod opening an output device behind the game's back.
+#define MA_NO_DEVICE_IO         // decoding only; the mod never opens an audio device
 #define MA_NO_ENCODING          // we never write audio files; the XACT converter does that
 #define MA_NO_GENERATION        // no waveform/noise generators
 #define MA_NO_ENGINE            // no high-level engine

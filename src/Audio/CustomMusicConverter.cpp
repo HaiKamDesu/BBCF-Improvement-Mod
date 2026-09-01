@@ -1,5 +1,6 @@
 #include "CustomMusicConverter.h"
 #include "AudioDecode.h"
+#include "ReplayGain.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
 
@@ -115,7 +116,9 @@ static std::string GetDisplayName(const std::string& filename) {
 // native BBCF tracks. Per-packet decoded-sample counts (from the encoder's
 // sample durations) are recorded for the wave bank's seek table.
 static bool TranscodeToWma(const std::string& srcPath,
-                           const AudioDecode::GainSpec& gain,
+                           float gainDb,
+                           float* headroomOut,
+                           float* tagGainOut,
                            std::vector<unsigned char>& wmaData,
                            std::vector<unsigned int>& pktSamples,
                            unsigned long long* outTotalSamples) {
@@ -129,20 +132,30 @@ static bool TranscodeToWma(const std::string& srcPath,
     // nor cares whether the source was an mp3, a flac or an ogg by the time it
     // gets here. Gain is baked into the PCM because the game plays the finished
     // .pac through its own XACT engine, where the mod has no volume control at
-    // all - see AudioPreviewPlayer for how the user auditions a gain before it
-    // is committed.
+    // all, so it has to be part of the audio itself.
     std::vector<unsigned char> pcmData;
     std::string decodeError;
     if (!AudioDecode::DecodeFile(srcPath, TARGET_RATE, TARGET_CHANNELS, pcmData, &decodeError)) {
         LogCustom("Decode failed for '%s': %s\n", srcPath.c_str(), decodeError.c_str());
         return false;
     }
-    const float gainDb = AudioDecode::ResolveGainDb(gain, pcmData);
-    AudioDecode::ApplyGainDb(pcmData, gainDb);
+    if (headroomOut)
+        *headroomOut = -AudioDecode::HeadroomDb(pcmData); // peak -6 dBFS -> +6 dB to spare
+
+    // A file that has been through MP3Gain, foobar2000, loudgain or anything else that
+    // writes ReplayGain already knows how far off a sensible level it is, and that number
+    // comes from a real loudness measurement. Start from it and let the user's setting be
+    // an adjustment on top, rather than ignoring work that has already been done.
+    const ReplayGain::Tag tag = ReplayGain::Read(srcPath);
+    if (tagGainOut)
+        *tagGainOut = tag.found ? tag.trackGainDb : 0.0f;
+
+    const float effectiveGain = (tag.found ? tag.trackGainDb : 0.0f) + gainDb;
+    AudioDecode::ApplyGainDb(pcmData, effectiveGain, TARGET_CHANNELS, TARGET_RATE);
 
     double pcmSeconds = (double)pcmData.size() / (TARGET_RATE * TARGET_CHANNELS * 2);
-    LogCustom("Transcode: %.1f s of PCM from '%s' at %+.1f dB (%s)\n", pcmSeconds, srcPath.c_str(),
-        gainDb, gain.automatic ? "auto" : "manual");
+    LogCustom("Transcode: %.1f s of PCM from '%s' at %+.1f dB (tag %+.1f, offset %+.1f)\n",
+        pcmSeconds, srcPath.c_str(), effectiveGain, tag.found ? tag.trackGainDb : 0.0f, gainDb);
 
     // --- Locate the WMA Standard encoder MFT ---
     IMFTransform* pEncoder = NULL;
@@ -621,7 +634,9 @@ static unsigned int StableTrackHash(const std::string& filename) {
 // started (see ConvertMp3ToPac for the standalone entry point). Writes via a temp file
 // so an interrupted run never leaves a torn .pac behind.
 static bool ConvertOneTrack(const std::string& srcPath,
-                            const AudioDecode::GainSpec& gain,
+                            float gainDb,
+                            float* headroomOut,
+                            float* tagGainOut,
                             const std::string& outPacPath,
                             const std::string& cueName,
                             unsigned long long* durationSamplesOut,
@@ -635,7 +650,7 @@ static bool ConvertOneTrack(const std::string& srcPath,
     std::vector<unsigned char> wmaData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    if (!TranscodeToWma(srcPath, gain, wmaData, pktSamples, &durationSamples))
+    if (!TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, wmaData, pktSamples, &durationSamples))
         return fail("Could not decode '" + srcPath + "'");
     if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)
         return fail("Implausible duration for '" + srcPath + "'");
@@ -719,10 +734,12 @@ static bool ExtractPacSubFile(const std::vector<unsigned char>& pac,
 }
 
 bool ConvertAudioToReplacementPac(const std::string& srcPath,
-                                  const AudioDecode::GainSpec& gain,
+                                  float gainDb,
                                   const std::string& originalPacPath,
-                                const std::string& outPacPath,
-                                std::string* errorOut) {
+                                  const std::string& outPacPath,
+                                  std::string* errorOut,
+                                  float* headroomOut,
+                                  float* tagGainOut) {
     auto fail = [&](const std::string& msg) {
         if (errorOut) *errorOut = msg;
         LogCustom("%s\n", msg.c_str());
@@ -772,7 +789,7 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
     std::vector<unsigned char> wmaData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    bool ok = TranscodeToWma(srcPath, gain, wmaData, pktSamples, &durationSamples);
+    bool ok = TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, wmaData, pktSamples, &durationSamples);
     if (ok && (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)) ok = false;
 
     if (ok) {
@@ -817,7 +834,7 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
 }
 
 bool ConvertAudioToPac(const std::string& srcPath,
-                       const AudioDecode::GainSpec& gain,
+                       float gainDb,
                        const std::string& outPacPath,
                      const std::string& cueName,
                      std::string* errorOut) {
@@ -837,14 +854,15 @@ bool ConvertAudioToPac(const std::string& srcPath,
 
     LogCustom("Converting '%s' -> '%s' (cue \"%s\")\n",
         srcPath.c_str(), outPacPath.c_str(), cueName.c_str());
-    const bool ok = ConvertOneTrack(srcPath, gain, outPacPath, cueName, NULL, errorOut);
+    const bool ok = ConvertOneTrack(srcPath, gainDb, nullptr, nullptr, outPacPath, cueName, NULL, errorOut);
 
     MFShutdown();
     if (coInitialized) CoUninitialize();
     return ok;
 }
 
-std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgressCallback& progress) {
+std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgressCallback& progress,
+                                                         const CustomMusicGainLookup& gainLookup) {
     std::vector<CustomTrackInfo> result;
 
     // Media Foundation's MFT activation needs COM on this thread. The game's
@@ -871,16 +889,20 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
     // one place (AudioDecode) so the Jukebox and the file picker cannot drift.
     std::vector<std::string> mp3Files;
     {
-        std::string searchPattern = GamePath(std::string(CUSTOM_DIR_REL) + "\\*.*");
-        WIN32_FIND_DATAA findData;
-        HANDLE hFind = FindFirstFileA(searchPattern.c_str(), &findData);
+        // Wide enumeration, names kept as UTF-8. The ANSI walk turned any filename outside
+        // the system codepage into question marks - a song named in Japanese on an English
+        // install then looked like a file that did not exist.
+        std::wstring searchPattern = GamePathW(utf8_to_utf16(std::string(CUSTOM_DIR_REL) + "\\*.*"));
+        WIN32_FIND_DATAW findData;
+        HANDLE hFind = FindFirstFileW(searchPattern.c_str(), &findData);
         if (hFind != INVALID_HANDLE_VALUE) {
             do {
                 if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     continue;
-                if (AudioDecode::IsSupportedExtension(GetExtensionLower(findData.cFileName)))
-                    mp3Files.push_back(findData.cFileName);
-            } while (FindNextFileA(hFind, &findData));
+                const std::string name = utf16_to_utf8(findData.cFileName);
+                if (AudioDecode::IsSupportedExtension(GetExtensionLower(name)))
+                    mp3Files.push_back(name);
+            } while (FindNextFileW(hFind, &findData));
             FindClose(hFind);
         }
     }
@@ -938,11 +960,34 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         std::string pacPath = GamePath(std::string(BGM_DIR_REL) + "/" + cueName + ".pac");
         std::string mp3Path = GamePath(std::string(CUSTOM_DIR_REL) + "/" + mp3Filename);
 
+        const float gainDb = gainLookup ? gainLookup(mp3Filename) : 0.0f;
+
         // --- Cache check: reuse an up-to-date .pac ---
+        // The volume is baked into the .pac, so a cached one is only good if it was built
+        // at the volume the user is asking for now. The gain is recorded beside it; a
+        // mismatch reconverts exactly like a newer source file does.
+        // The stamp records the EFFECTIVE gain - the file's own ReplayGain plus the
+        // user's offset - so retagging a song reconverts it just as changing the offset
+        // does, even though neither the timestamp nor the offset moved.
+        const ReplayGain::Tag sourceTag = ReplayGain::Read(mp3Path);
+        const float effectiveGain = (sourceTag.found ? sourceTag.trackGainDb : 0.0f) + gainDb;
+
+        const std::string gainStampPath = pacPath + ".gain";
+        bool gainMatches = true;
+        {
+            float cachedGain = 0.0f;
+            std::ifstream stamp(utf8_to_utf16(gainStampPath));
+            if (stamp.is_open())
+                stamp >> cachedGain;
+            else
+                cachedGain = 0.0f; // no stamp means it was built before volumes existed
+            gainMatches = (cachedGain == effectiveGain);
+        }
         WIN32_FILE_ATTRIBUTE_DATA pacInfo = {}, mp3Info = {};
         bool pacExists = GetFileAttributesExA(pacPath.c_str(), GetFileExInfoStandard, &pacInfo) != 0;
-        bool mp3Stat = GetFileAttributesExA(mp3Path.c_str(), GetFileExInfoStandard, &mp3Info) != 0;
-        if (!forceRebuild && pacExists && mp3Stat &&
+        bool mp3Stat = GetFileAttributesExW(utf8_to_utf16(mp3Path).c_str(),
+            GetFileExInfoStandard, &mp3Info) != 0;
+        if (!forceRebuild && pacExists && mp3Stat && gainMatches &&
             CompareFileTime(&mp3Info.ftLastWriteTime, &pacInfo.ftLastWriteTime) <= 0) {
             LogCustom("Using cached PAC for '%s' -> %s.pac\n", mp3Filename.c_str(), cueName.c_str());
             CustomTrackInfo info;
@@ -950,6 +995,9 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
             info.displayName = displayName;
             info.pacFilename = pacFilename;
             info.pacPath = pacPath;
+            info.sourceName = mp3Filename;
+            info.tagGainDb = sourceTag.found ? sourceTag.trackGainDb : 0.0f;
+            info.hasTagGain = sourceTag.found;
             result.push_back(info);
             continue;
         }
@@ -964,12 +1012,16 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         // its unique generated filename, while the internal XSB/XWB stays native.
         unsigned long long durationSamples = 0;
         std::string convertError;
-                // Jukebox custom tracks always auto-normalize: they are discovered by a
-        // folder scan, so there is no per-track UI on which to offer a manual gain.
-        AudioDecode::GainSpec jukeboxGain;
-        if (!ConvertOneTrack(mp3Path, jukeboxGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
+        float tagGain = 0.0f;
+        if (!ConvertOneTrack(mp3Path, gainDb, nullptr, &tagGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
             LogCustom("SKIPPING '%s': %s\n", mp3Filename.c_str(), convertError.c_str());
             continue;
+        }
+
+        {
+            std::ofstream stamp(utf8_to_utf16(gainStampPath));
+            if (stamp.is_open())
+                stamp << effectiveGain;
         }
 
         int durSec = (int)(durationSamples / TARGET_RATE);
@@ -981,6 +1033,9 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         info.displayName = displayName;
         info.pacFilename = pacFilename;
         info.pacPath = pacPath;
+        info.sourceName = mp3Filename;
+        info.tagGainDb = tagGain;
+        info.hasTagGain = sourceTag.found;
         result.push_back(info);
     }
 

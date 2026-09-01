@@ -53,7 +53,10 @@ public:
     // 1 = all enabled, 0 = all disabled, -1 = mixed (or empty category).
     int GetCategoryEnabledState(const std::string& category) const;
 
-    void PlayTrack(int trackId);
+    // `force` reloads a track that is already playing. Normally that is skipped, but
+    // after the file has been rewritten - a volume change reconverts it - the game is
+    // still holding the old one and has to be made to read it again.
+    void PlayTrack(int trackId, bool force = false);
 
     // Play an arbitrary .pac for auditioning, given a path relative to data/Sound/BGM/
     // (without the .pac extension) and the cue name inside it. Used by the replacement
@@ -62,6 +65,23 @@ public:
     bool PreviewPac(const std::string& relPathNoExt, const std::string& cueName);
     void PlayNextTrack();
     void StartCustomMusicDiscovery();
+    // Runs discovery again after a file has been added to the custom folder. Discovery is
+    // otherwise once per session, so without this an imported track only appears after a
+    // restart. Ignored while a scan is already running.
+    void RescanCustomMusic();
+
+    // Per-song volume for custom Jukebox tracks, in dB. Keyed by the source file name
+    // rather than the track id, because ids are derived from a hash and would move if the
+    // naming ever changed, while the file name is what the user actually recognises.
+    //
+    // The volume is baked into the converted .pac, so setting it queues a reconversion.
+    float GetCustomTrackVolumeDb(int trackId) const;
+    void SetCustomTrackVolumeDb(int trackId, float volumeDb);
+    // Source file for a custom track id, or empty for a native one.
+    std::string GetCustomTrackSourceName(int trackId) const;
+    // The song's own ReplayGain, already applied on top of the user's offset. `found`
+    // is false when the file carried no tag.
+    bool GetCustomTrackTagGainDb(int trackId, float& outGainDb) const;
     // Publish completed async conversions to the live track list. Called from
     // both the game tick and Jukebox draw path so the custom category appears
     // immediately even when game logic is not advancing.
@@ -191,6 +211,9 @@ private:
     std::atomic<int> m_customMusicCurrent{ 0 };
     std::atomic<int> m_customMusicTotal{ 0 };
     std::atomic<int> m_customTrackCount{ 0 };
+    std::map<std::string, float> m_customTrackVolume;   // source file name -> dB
+    std::map<int, std::string> m_customTrackSource;     // track id -> source file name
+    std::map<int, float> m_customTrackTagGain;          // track id -> its own ReplayGain
     std::mutex m_customMusicPollMutex;
     mutable std::mutex m_customMusicStatusMutex;
     std::string m_customMusicStatus = "Custom music loads when the Jukebox is opened";

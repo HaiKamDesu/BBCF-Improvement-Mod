@@ -78,7 +78,9 @@ namespace
 	bool FileExists(const std::string& path)
 	{
 		WIN32_FILE_ATTRIBUTE_DATA info = {};
-		return GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &info) != 0 &&
+		// Wide: a source path can be any filename the user picked, including one outside
+		// the system codepage.
+		return GetFileAttributesExW(utf8_to_utf16(path).c_str(), GetFileExInfoStandard, &info) != 0 &&
 			!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 	}
 
@@ -325,7 +327,7 @@ void BgmReplacementManager::Initialize()
 bool BgmReplacementManager::LooksLikeUsablePac(const std::string& path)
 {
 	WIN32_FILE_ATTRIBUTE_DATA info = {};
-	if (!GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &info))
+	if (!GetFileAttributesExW(utf8_to_utf16(path).c_str(), GetFileExInfoStandard, &info))
 		return false;
 	if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		return false;
@@ -355,7 +357,11 @@ void BgmReplacementManager::StartNextJob()
 		JobResult result;
 		result.tableIndex = job.tableIndex;
 		std::string error;
-		result.ok = ConvertAudioToReplacementPac(job.mp3Path, job.gain, job.originalPac, job.outPac, &error);
+		float tagGain = 0.0f;
+		result.ok = ConvertAudioToReplacementPac(job.mp3Path, job.gainDb, job.originalPac, job.outPac,
+			&error, &result.headroomDb, &tagGain);
+		result.tagGainDb = tagGain;
+		result.hasTagGain = (tagGain != 0.0f);
 		result.error = error;
 		return result;
 	});
@@ -374,6 +380,13 @@ void BgmReplacementManager::Update()
 		++m_batchDone;
 
 		auto it = m_assignments.find(result.tableIndex);
+		if (it != m_assignments.end() && result.headroomDb > -1000.0f)
+		{
+			it->second.headroomDb = result.headroomDb;
+			it->second.tagGainDb = result.tagGainDb;
+			it->second.hasTagGain = result.hasTagGain;
+		}
+
 		if (it == m_assignments.end())
 		{
 			// Unassigned while it was converting - clean up what the worker wrote.
@@ -475,16 +488,16 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 
 	// Carry the gain over when this is a re-conversion of the same file - that is what
 	// SetGain and Retry both go through. A genuinely new song starts on auto again.
-	AudioDecode::GainSpec carriedGain;
+	float carriedGain = 0.0f;
 	{
 		auto prior = m_assignments.find(tableIndex);
 		if (prior != m_assignments.end() && prior->second.sourcePath == mp3Path)
-			carriedGain = prior->second.gain;
+			carriedGain = prior->second.gainDb;
 	}
 
 	Assignment assignment;
 	assignment.sourcePath = mp3Path;
-	assignment.gain = carriedGain;
+	assignment.gainDb = carriedGain;
 	assignment.pacPath = outDir + "/" + track->fileName;
 	assignment.relPath = std::string(kReplacementDir) + "/" + track->fileName;
 	assignment.state = BgmReplacementState::Converting;
@@ -499,7 +512,7 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	job.mp3Path = mp3Path;
 	job.originalPac = GamePath(track->originalDir + "/" + track->fileName);
 	job.outPac = assignment.pacPath;
-	job.gain = assignment.gain;
+	job.gainDb = assignment.gainDb;
 	m_pending.push_back(job);
 
 	if (m_batchTotal == 0)
@@ -510,22 +523,36 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	StartNextJob();
 }
 
-AudioDecode::GainSpec BgmReplacementManager::GetGain(int tableIndex) const
+float BgmReplacementManager::GetHeadroomDb(int tableIndex) const
 {
 	auto it = m_assignments.find(tableIndex);
-	return it == m_assignments.end() ? AudioDecode::GainSpec() : it->second.gain;
+	return it == m_assignments.end() ? -1000.0f : it->second.headroomDb;
 }
 
-void BgmReplacementManager::SetGain(int tableIndex, const AudioDecode::GainSpec& gain)
+bool BgmReplacementManager::GetTagGainDb(int tableIndex, float& outGainDb) const
+{
+	auto it = m_assignments.find(tableIndex);
+	if (it == m_assignments.end() || !it->second.hasTagGain)
+		return false;
+	outGainDb = it->second.tagGainDb;
+	return true;
+}
+
+float BgmReplacementManager::GetGainDb(int tableIndex) const
+{
+	auto it = m_assignments.find(tableIndex);
+	return it == m_assignments.end() ? 0.0f : it->second.gainDb;
+}
+
+void BgmReplacementManager::SetGainDb(int tableIndex, float gainDb)
 {
 	auto it = m_assignments.find(tableIndex);
 	if (it == m_assignments.end())
 		return;
-	if (it->second.gain.automatic == gain.automatic &&
-		it->second.gain.manualDb == gain.manualDb)
+	if (it->second.gainDb == gainDb)
 		return; // nothing to re-encode for
 
-	it->second.gain = gain;
+	it->second.gainDb = gainDb;
 	const std::string source = it->second.sourcePath;
 	if (source.empty())
 	{
@@ -690,11 +717,7 @@ void BgmReplacementManager::Save()
 		const BgmReplaceableTrack* track = FindTrack(entry.first);
 		if (!track || entry.second.sourcePath.empty())
 			continue;
-		file << track->baseName << "=";
-		if (entry.second.gain.automatic)
-			file << "auto\n";
-		else
-			file << entry.second.gain.manualDb << "\n";
+		file << track->baseName << "=" << entry.second.gainDb << "\n";
 	}
 }
 
@@ -743,15 +766,10 @@ void BgmReplacementManager::Load()
 			auto existing = m_assignments.find(track->tableIndex);
 			if (existing == m_assignments.end())
 				continue;
-			if (_stricmp(source.c_str(), "auto") == 0)
-			{
-				existing->second.gain.automatic = true;
-			}
-			else
-			{
-				existing->second.gain.automatic = false;
-				existing->second.gain.manualDb = (float)atof(source.c_str());
-			}
+			// "auto" is what an older build wrote for the automatic levelling that no
+			// longer exists; treat it as no adjustment rather than failing to load.
+			existing->second.gainDb = (_stricmp(source.c_str(), "auto") == 0)
+				? 0.0f : (float)atof(source.c_str());
 			continue;
 		}
 

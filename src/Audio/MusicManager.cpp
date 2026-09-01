@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <algorithm>
 #include <random>
+#include <map>
 #include <fstream>
 #include <cstdio>
 #include <psapi.h>
@@ -38,6 +39,10 @@ static void LogMusic(const char* fmt, ...) {
 int* MusicManager::s_musicSelectX = nullptr;
 int* MusicManager::s_musicSelectY = nullptr;
 std::vector<std::pair<int, std::string>> MusicManager::s_customTrackFiles;
+
+// Custom tracks are numbered from here up, so they can never collide with a native id -
+// and so they can be told apart from native ones when a rescan replaces them.
+static const int kCustomTrackIdBase = 10000;
 
 // Audio engine constants (from reverse engineering BBCF.exe)
 static constexpr uintptr_t AUDIO_MGR_RVA = 0x008903B0;
@@ -448,6 +453,17 @@ void MusicManager::DiscoverCustomTracks() {
 }
 
 void MusicManager::RegisterCustomTracks(const std::vector<CustomTrackInfo>& customTracks) {
+    // Discovery can run more than once now (importing a file rescans), and it returns
+    // every custom track each time - not just the new one. Drop what a previous run
+    // registered first, or the same track is added twice, which shows up as duplicate
+    // ids and an ImGui "conflicting ID" complaint over the track list.
+    m_tracks.erase(std::remove_if(m_tracks.begin(), m_tracks.end(),
+        [](const MusicTrack& track) { return track.id >= kCustomTrackIdBase; }), m_tracks.end());
+    s_customTrackFiles.erase(std::remove_if(s_customTrackFiles.begin(), s_customTrackFiles.end(),
+        [](const std::pair<int, std::string>& entry) { return entry.first >= kCustomTrackIdBase; }),
+        s_customTrackFiles.end());
+    m_currentTrack = nullptr;
+
     if (customTracks.empty()) {
         LogMusic("MusicManager: No custom tracks found\n");
         m_customTrackCount = 0;
@@ -456,9 +472,15 @@ void MusicManager::RegisterCustomTracks(const std::vector<CustomTrackInfo>& cust
 
     LogMusic("MusicManager: Registering %d custom track(s)\n", (int)customTracks.size());
 
+    m_customTrackSource.clear();
+    m_customTrackTagGain.clear();
+
     for (const auto& ct : customTracks) {
         // Add to the track list with "custom" category (appears below "astral")
         m_tracks.push_back({ ct.id, ct.displayName, "custom" });
+        m_customTrackSource[ct.id] = ct.sourceName;
+        if (ct.hasTagGain)
+            m_customTrackTagGain[ct.id] = ct.tagGainDb;
 
         // Register in the custom filename lookup table
         s_customTrackFiles.push_back({ ct.id, ct.pacFilename });
@@ -504,8 +526,51 @@ void MusicManager::StartCustomMusicDiscovery() {
             m_customMusicTotal = total;
             std::lock_guard<std::mutex> lock(m_customMusicStatusMutex);
             m_customMusicStatus = status;
+        },
+        [this](const std::string& sourceName) {
+            auto it = m_customTrackVolume.find(sourceName);
+            return it == m_customTrackVolume.end() ? 0.0f : it->second;
         });
     });
+}
+
+std::string MusicManager::GetCustomTrackSourceName(int trackId) const {
+    auto it = m_customTrackSource.find(trackId);
+    return it == m_customTrackSource.end() ? std::string() : it->second;
+}
+
+bool MusicManager::GetCustomTrackTagGainDb(int trackId, float& outGainDb) const {
+    auto it = m_customTrackTagGain.find(trackId);
+    if (it == m_customTrackTagGain.end())
+        return false;
+    outGainDb = it->second;
+    return true;
+}
+
+float MusicManager::GetCustomTrackVolumeDb(int trackId) const {
+    const std::string source = GetCustomTrackSourceName(trackId);
+    if (source.empty()) return 0.0f;
+    auto it = m_customTrackVolume.find(source);
+    return it == m_customTrackVolume.end() ? 0.0f : it->second;
+}
+
+void MusicManager::SetCustomTrackVolumeDb(int trackId, float volumeDb) {
+    const std::string source = GetCustomTrackSourceName(trackId);
+    if (source.empty()) return;
+    if (GetCustomTrackVolumeDb(trackId) == volumeDb) return;
+
+    m_customTrackVolume[source] = volumeDb;
+    SavePreferences();
+
+    // The volume lives inside the converted .pac, so the file has to be rebuilt. The
+    // scan notices the recorded gain no longer matches and reconverts just this one.
+    RescanCustomMusic();
+}
+
+void MusicManager::RescanCustomMusic() {
+    if (m_customMusicLoading) return;
+    m_customMusicStarted = false;
+    StartCustomMusicDiscovery();
 }
 
 void MusicManager::PollCustomMusicDiscovery() {
@@ -1751,7 +1816,7 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	return true;
 }
 
-void MusicManager::PlayTrack(int trackId) {
+void MusicManager::PlayTrack(int trackId, bool force) {
 	LogMusic("MusicManager: PlayTrack(%d)\n", trackId);
 
 	HMODULE hMod = GetModuleHandleA("BBCF.exe");
@@ -1763,8 +1828,9 @@ void MusicManager::PlayTrack(int trackId) {
 	uintptr_t modBase = (uintptr_t)hMod;
 
 	// Skip if this is already the current track (compare against our tracked
-	// track, not audioMgr+0x1690 which holds the selectable "anchor" id).
-	if (m_currentTrackId == trackId) {
+	// track, not audioMgr+0x1690 which holds the selectable "anchor" id) - unless the
+	// caller needs it reloaded because the file behind it has been rewritten.
+	if (m_currentTrackId == trackId && !force) {
 		LogMusic("MusicManager: Track %d already playing, skipping\n", trackId);
 		return;
 	}
@@ -2186,6 +2252,13 @@ void MusicManager::SavePreferences() {
         file << track.id << "=" << (enabled ? "1" : "0") << "\n";
     }
 
+    file << "\n[CustomTrackVolume]\n";
+    file << "; Per-song volume for custom Jukebox tracks, in decibels, by file name.\n";
+    for (const auto& entry : m_customTrackVolume) {
+        if (entry.second != 0.0f)
+            file << entry.first << "=" << entry.second << "\n";
+    }
+
     file << "\n[Settings]\n";
     file << "Enabled=" << (m_enabled ? "1" : "0") << "\n";
 
@@ -2223,7 +2296,10 @@ void MusicManager::LoadPreferences() {
         std::string key = line.substr(0, eqPos);
         std::string value = line.substr(eqPos + 1);
 
-        if (section == "MusicTracks") {
+        if (section == "CustomTrackVolume") {
+            if (!key.empty() && key[0] != ';')
+                m_customTrackVolume[key] = (float)atof(value.c_str());
+        } else if (section == "MusicTracks") {
             int trackId = std::stoi(key);
             bool enabled = (value == "1");
             m_trackEnabled[trackId] = enabled;

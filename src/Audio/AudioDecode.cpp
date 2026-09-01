@@ -24,14 +24,6 @@ namespace AudioDecode
 
 const float kSilenceDb = -120.0f;
 
-// PROVISIONAL. This has NOT been measured against the game's own BGM — doing so
-// means pulling WMA payloads back out of the shipped XACT wave banks, which
-// nothing here does yet. -18 dBFS RMS is the usual resting level for mastered
-// game music and is a sane starting point, but if custom tracks come out
-// consistently louder or quieter than the native ones, this constant is the
-// thing to correct. It is deliberately a single named value so that is a
-// one-line change.
-const float kDefaultTargetRmsDb = -18.0f;
 
 static void LogAudio(const char* fmt, ...)
 {
@@ -43,6 +35,8 @@ static void LogAudio(const char* fmt, ...)
     LOG(1, "%s", buf);
 }
 
+// Paths reaching this file are UTF-8 - that is what the file dialog and the folder scan
+// both produce - so widening is a UTF-8 conversion, not an ANSI one.
 static std::wstring Widen(const std::string& utf8)
 {
     int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, NULL, 0);
@@ -825,48 +819,118 @@ Loudness Analyze(const std::vector<unsigned char>& pcm)
     return out;
 }
 
-void ApplyGainDb(std::vector<unsigned char>& pcm, float gainDb)
+// Limiter shape. These follow the usual look-ahead limiter design: analyse ahead of the
+// signal, fade the gain reduction IN before the peak arrives rather than dropping onto it,
+// and let it back out slowly enough not to pump. Dropping gain instantly - which is all a
+// per-sample clamp can do - is what turns a loud track into a distorted one.
+static const double kCeiling = 0.977;         // -0.2 dBFS, a little room for the encoder
+static const size_t kBlockFrames = 16;        // envelope resolution, ~0.36 ms at 44.1 kHz
+static const double kLookaheadMs = 5.0;       // how far ahead peaks are seen
+static const double kReleaseMs = 200.0;       // slow enough not to pump on sustained loud parts
+
+float HeadroomDb(const std::vector<unsigned char>& pcm)
 {
-    if (gainDb == 0.0f || pcm.empty())
+    return Analyze(pcm).peakDb;
+}
+
+void ApplyGainDb(std::vector<unsigned char>& pcm, float gainDb,
+                 unsigned int channels, unsigned int rate)
+{
+    if (gainDb == 0.0f || pcm.empty() || channels == 0 || rate == 0)
         return;
 
     const double scale = pow(10.0, gainDb / 20.0);
     short* samples = reinterpret_cast<short*>(pcm.data());
-    const size_t count = pcm.size() / sizeof(short);
-    for (size_t i = 0; i < count; ++i)
+    const size_t frameCount = (pcm.size() / sizeof(short)) / channels;
+    if (frameCount == 0)
+        return;
+
+    // The envelope is per block, not per sample: a four minute track is over ten million
+    // frames and a float each would be tens of megabytes in a 32-bit process. At 0.36 ms a
+    // block the ramps below still span dozens of blocks, so the curve is smooth.
+    const size_t blockCount = (frameCount + kBlockFrames - 1) / kBlockFrames;
+    std::vector<float> gain;
+    try
     {
-        // Saturate. Wrapping here is the difference between a loud track and a
-        // track full of clicks.
-        double scaled = (double)samples[i] * scale;
-        if (scaled > 32767.0) scaled = 32767.0;
-        else if (scaled < -32768.0) scaled = -32768.0;
-        samples[i] = (short)scaled;
+        gain.resize(blockCount);
     }
-}
+    catch (const std::bad_alloc&)
+    {
+        return; // leave the track alone rather than half-processing it
+    }
 
-float ResolveGainDb(const GainSpec& spec, const std::vector<unsigned char>& pcm)
-{
-    if (!spec.automatic)
-        return spec.manualDb;
-    return SuggestGainDb(Analyze(pcm), kDefaultTargetRmsDb);
-}
+    // What each block needs on its own, before any shaping.
+    for (size_t b = 0; b < blockCount; b++)
+    {
+        const size_t first = b * kBlockFrames;
+        const size_t last = (std::min)(first + kBlockFrames, frameCount);
 
-float SuggestGainDb(const Loudness& loudness, float targetRmsDb)
-{
-    if (loudness.rmsDb <= kSilenceDb)
-        return 0.0f;
+        int peak = 0;
+        for (size_t f = first; f < last; f++)
+        {
+            for (unsigned int c = 0; c < channels; c++)
+            {
+                const int value = samples[f * channels + c];
+                const int magnitude = value < 0 ? -value : value;
+                if (magnitude > peak)
+                    peak = magnitude;
+            }
+        }
 
-    float gain = targetRmsDb - loudness.rmsDb;
+        const double scaled = ((double)peak / 32768.0) * scale;
+        gain[b] = (scaled > kCeiling) ? (float)(kCeiling / scaled) : 1.0f;
+    }
 
-    // Never normalize a track into clipping. Leave a small amount of headroom
-    // so that the WMA encode, which is lossy and can overshoot slightly, has
-    // somewhere to go.
-    const float kHeadroomDb = 1.0f;
-    const float maxGain = -kHeadroomDb - loudness.peakDb;
-    if (gain > maxGain)
-        gain = maxGain;
+    // Fade in, backwards. Each block may be no louder than the one after it plus one step,
+    // so the gain slides down over the whole look-ahead window and is already where it
+    // needs to be when the peak lands. This is the part that keeps transients clean: the
+    // reduction is a ramp, not a step.
+    size_t lookaheadBlocks = (size_t)((kLookaheadMs * 0.001 * rate) / kBlockFrames);
+    if (lookaheadBlocks < 1) lookaheadBlocks = 1;
+    const float attackStep = 1.0f / (float)lookaheadBlocks;
+    for (size_t b = blockCount - 1; b > 0; b--)
+    {
+        const float ceiling = gain[b] + attackStep;
+        if (gain[b - 1] > ceiling)
+            gain[b - 1] = ceiling;
+    }
 
-    return gain;
+    // Release, forwards, and exponential rather than linear - a straight line back up is
+    // audible as the level climbing, where an exponential curve moves quickly at first and
+    // then settles, which is what the ear expects a room to do.
+    size_t releaseBlocks = (size_t)((kReleaseMs * 0.001 * rate) / kBlockFrames);
+    if (releaseBlocks < 1) releaseBlocks = 1;
+    const float releaseCoef = (float)exp(-1.0 / (double)releaseBlocks);
+    float running = gain[0];
+    for (size_t b = 0; b < blockCount; b++)
+    {
+        if (gain[b] < running)
+            running = gain[b];                                   // follow it down at once
+        else
+            running = gain[b] + (running - gain[b]) * releaseCoef; // ease back up
+        gain[b] = running;
+    }
+
+    // Apply, interpolating across each block so the gain never steps.
+    for (size_t f = 0; f < frameCount; f++)
+    {
+        const size_t b = f / kBlockFrames;
+        const size_t next = (b + 1 < blockCount) ? b + 1 : b;
+        const float mix = (float)(f % kBlockFrames) / (float)kBlockFrames;
+        const double envelope = gain[b] + (gain[next] - gain[b]) * mix;
+        const double total = scale * envelope;
+
+        for (unsigned int c = 0; c < channels; c++)
+        {
+            // Round rather than truncate; truncation on every sample is a DC-ish bias and
+            // its own small distortion.
+            double value = (double)samples[f * channels + c] * total;
+            value = value < 0.0 ? value - 0.5 : value + 0.5;
+            if (value > 32767.0) value = 32767.0;
+            else if (value < -32768.0) value = -32768.0;
+            samples[f * channels + c] = (short)value;
+        }
+    }
 }
 
 } // namespace AudioDecode
