@@ -378,11 +378,14 @@ void BgmReplacementWindow::DrawGainRow(int tableIndex)
 	BgmReplacementManager& mgr = GetBgmReplacements();
 	const float saved = mgr.GetGainDb(tableIndex);
 
-	// The draft is per-row and only exists while the user is editing this track.
-	if (m_gainEditIndex != tableIndex)
+	// The draft is per-row. It is seeded from the saved value and left alone after that,
+	// so dragging is not fought by the other rows; it re-seeds only when the saved value
+	// itself moves underneath it, which is what an Apply or a new file does.
+	GainDraft& draft = m_gainDrafts[tableIndex];
+	if (draft.savedSeen != saved)
 	{
-		m_gainDraft = saved;
-		m_gainEditIndex = tableIndex;
+		draft.value = saved;
+		draft.savedSeen = saved;
 	}
 
 	ImGui::Spacing();
@@ -400,7 +403,7 @@ void BgmReplacementWindow::DrawGainRow(int tableIndex)
 
 	// Ctrl+click to type an exact value.
 	ImGui::SetNextItemWidth(180.0f);
-	ImGui::SliderFloat(L("Adjust").c_str(), &m_gainDraft, -40.0f, 40.0f, "%+.1f dB");
+	ImGui::SliderFloat(L("Adjust").c_str(), &draft.value, -40.0f, 40.0f, "%+.1f dB");
 
 	// How much of that is free. Up to the song's own headroom nothing is altered at all;
 	// past it the loud parts have to be held down to fit, and the song is being squashed
@@ -409,7 +412,7 @@ void BgmReplacementWindow::DrawGainRow(int tableIndex)
 	const float headroom = mgr.GetHeadroomDb(tableIndex);
 	if (headroom > -200.0f)
 	{
-		if (m_gainDraft > headroom)
+		if (draft.value > headroom)
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s",
 				(L("Above") + " " + FormatDb(headroom) + " " + L("this song gets squashed to fit.")).c_str());
@@ -421,12 +424,12 @@ void BgmReplacementWindow::DrawGainRow(int tableIndex)
 		}
 	}
 
-	const bool dirty = (m_gainDraft != saved);
+	const bool dirty = (draft.value != saved);
 	if (dirty)
 	{
 		if (ImGui::Button(L("Apply volume").c_str()))
 		{
-			mgr.SetGainDb(tableIndex, m_gainDraft);
+			mgr.SetGainDb(tableIndex, draft.value);
 			m_lastMessage = L("Reconverting at the new volume") + "...";
 
 			// The game is holding the old .pac. If this track is being previewed, play it
