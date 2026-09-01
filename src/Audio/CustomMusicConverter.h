@@ -1,4 +1,5 @@
 #pragma once
+#include "AudioDecode.h"
 #include <string>
 #include <vector>
 #include <functional>
@@ -6,12 +7,14 @@
 // Information about a discovered custom track (after conversion).
 struct CustomTrackInfo {
     int id;                   // Assigned track ID (10000+)
-    std::string displayName;  // Human-readable name (from MP3 filename)
-    std::string pacFilename;  // e.g. "c10000_my_song" (no .pac extension); also the XACT cue name
+    std::string displayName;  // Human-readable name (from the source filename)
+    std::string pacFilename;  // e.g. "c10000_my_song" (no .pac extension). NOT the cue
+                              // name: custom banks keep the native 000_btl_rg cue.
     std::string pacPath;      // Full relative path e.g. "data/Sound/BGM/c10000_my_song.pac"
 };
 
-// Scan data/Sound/BGM/custom/ for .mp3 files, convert any new ones to
+// Scan data/Sound/BGM/custom/ for audio files in any supported format (see
+// AudioDecode::SupportedExtensions), convert any new ones to
 // XACT 2.x-compatible .pac files, and return metadata for all discovered
 // custom tracks. Safe to call multiple times (idempotent): an up-to-date
 // cached .pac is reused; only new/modified MP3s are transcoded.
@@ -43,14 +46,15 @@ struct CustomTrackInfo {
 //
 // Returns false and fills `errorOut` (if given) on failure, leaving any existing file at
 // `outPacPath` untouched.
-bool ConvertMp3ToPac(const std::string& mp3Path,
-                     const std::string& outPacPath,
-                     const std::string& cueName,
-                     std::string* errorOut = nullptr);
+bool ConvertAudioToPac(const std::string& srcPath,
+                       const AudioDecode::GainSpec& gain,
+                       const std::string& outPacPath,
+                       const std::string& cueName,
+                       std::string* errorOut = nullptr);
 
-// Convert an MP3 into a drop-in replacement for a shipped track.
+// Convert a user audio file into a drop-in replacement for a shipped track.
 //
-// Unlike ConvertMp3ToPac this does not generate a sound bank - it reuses the original
+// Unlike ConvertAudioToPac this does not generate a sound bank - it reuses the original
 // track's own, byte for byte, and swaps only the wave data. That preserves the cue name
 // AND the per-track authoring values baked into it, so the replacement behaves exactly
 // like the track it stands in for. Prefer this whenever an original exists.
@@ -58,10 +62,11 @@ bool ConvertMp3ToPac(const std::string& mp3Path,
 // `originalPacPath` is the shipped .pac (e.g. "data/Sound/BGM/008_btl_bn.pac");
 // `outPacPath` should keep that same base filename in a mod-owned folder, since the
 // game resolves a cue by the file's base name.
-bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
-                                const std::string& originalPacPath,
-                                const std::string& outPacPath,
-                                std::string* errorOut = nullptr);
+bool ConvertAudioToReplacementPac(const std::string& srcPath,
+                                  const AudioDecode::GainSpec& gain,
+                                  const std::string& originalPacPath,
+                                  const std::string& outPacPath,
+                                  std::string* errorOut = nullptr);
 
 using CustomMusicProgressCallback = std::function<void(int, int, const std::string&)>;
 std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(

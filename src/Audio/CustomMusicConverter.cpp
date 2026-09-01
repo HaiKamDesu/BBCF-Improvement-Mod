@@ -1,4 +1,5 @@
 #include "CustomMusicConverter.h"
+#include "AudioDecode.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
 
@@ -60,9 +61,10 @@ static const char* CUSTOM_JUKEBOX_BANK_NAME = "000_btl_rg";
 // up to 63 chars + NUL. Native names go up to 23 ("088_btl_bangthem2_short"), which is
 // what a replacement bank has to be able to carry.
 static const unsigned int MAX_BANK_NAME_LEN = 63;
-// Bumped whenever the generated .pac layout changes, so cached files from an older
-// converter are rebuilt instead of being reused with a stale cue name.
-static const unsigned int CONVERTER_VERSION = 3;
+// Bumped whenever the generated .pac layout OR the audio written into it changes, so
+// cached files from an older converter are rebuilt rather than reused. v4 added
+// auto-normalized gain, so every v3 cache holds un-normalized audio.
+static const unsigned int CONVERTER_VERSION = 4;
 
 // Sanitize an MP3 basename to lowercase [a-z0-9_] for use inside a cue name.
 static std::string SanitizeCueName(const std::string& base) {
@@ -84,17 +86,23 @@ static std::string SanitizeCueName(const std::string& base) {
     return result;
 }
 
-// Display name = MP3 filename without its extension.
-static std::string GetDisplayName(const std::string& mp3Filename) {
-    std::string name = mp3Filename;
-    size_t dot = name.find_last_of('.');
-    if (dot != std::string::npos && dot > 0) {
-        std::string ext = name.substr(dot + 1);
-        std::string extLower;
-        for (char c : ext) extLower += (char)tolower((unsigned char)c);
-        if (extLower == "mp3") name = name.substr(0, dot);
-    }
-    return name;
+// Lowercased extension without the dot, or "" if the name has none.
+static std::string GetExtensionLower(const std::string& filename) {
+    const size_t dot = filename.find_last_of('.');
+    if (dot == std::string::npos || dot == 0)
+        return std::string();
+    std::string extLower;
+    for (size_t i = dot + 1; i < filename.size(); ++i)
+        extLower += (char)tolower((unsigned char)filename[i]);
+    return extLower;
+}
+
+// Display name = filename without its extension, for any format we support.
+static std::string GetDisplayName(const std::string& filename) {
+    const std::string ext = GetExtensionLower(filename);
+    if (!ext.empty() && AudioDecode::IsSupportedExtension(ext))
+        return filename.substr(0, filename.size() - ext.size() - 1);
+    return filename;
 }
 
 // ============================================================================
@@ -106,132 +114,35 @@ static std::string GetDisplayName(const std::string& mp3Filename) {
 // packet is exactly WMA_PACKET_SIZE (4459) bytes — the same geometry as the
 // native BBCF tracks. Per-packet decoded-sample counts (from the encoder's
 // sample durations) are recorded for the wave bank's seek table.
-static bool TranscodeMp3ToWma(const std::string& mp3Path,
-                              std::vector<unsigned char>& wmaData,
-                              std::vector<unsigned int>& pktSamples,
-                              unsigned long long* outTotalSamples) {
+static bool TranscodeToWma(const std::string& srcPath,
+                           const AudioDecode::GainSpec& gain,
+                           std::vector<unsigned char>& wmaData,
+                           std::vector<unsigned int>& pktSamples,
+                           unsigned long long* outTotalSamples) {
     HRESULT hr;
     wmaData.clear();
     pktSamples.clear();
     *outTotalSamples = 0;
 
-    // --- Path to wide string ---
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, mp3Path.c_str(), -1, NULL, 0);
-    if (wlen <= 0) {
-        LogCustom("MF: Bad path for '%s'\n", mp3Path.c_str());
-        return false;
-    }
-    std::vector<wchar_t> wpath(wlen);
-    MultiByteToWideChar(CP_UTF8, 0, mp3Path.c_str(), -1, wpath.data(), wlen);
-
-    // --- Decode MP3 -> PCM via source reader ---
-    IMFSourceReader* pReader = NULL;
-    hr = MFCreateSourceReaderFromURL(wpath.data(), NULL, &pReader);
-    if (FAILED(hr)) {
-        LogCustom("MF: Failed to create source reader for '%s' (0x%08X) — not a decodable MP3?\n",
-            mp3Path.c_str(), hr);
-        return false;
-    }
-
-    IMFMediaType* pNativeType = NULL;
-    hr = pReader->GetNativeMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &pNativeType);
-    if (FAILED(hr)) {
-        LogCustom("MF: No audio stream in '%s' (0x%08X)\n", mp3Path.c_str(), hr);
-        pReader->Release();
-        return false;
-    }
-    UINT32 nativeRate = 0, nativeChannels = 0;
-    pNativeType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &nativeRate);
-    pNativeType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &nativeChannels);
-    pNativeType->Release();
-    LogCustom("MF: '%s' native format: %u Hz, %u ch\n", mp3Path.c_str(), nativeRate, nativeChannels);
-
-    // Request 44100 Hz stereo PCM. The source reader inserts the resampler /
-    // channel converter automatically when the source differs.
-    IMFMediaType* pPcmType = NULL;
-    hr = MFCreateMediaType(&pPcmType);
-    if (FAILED(hr)) { pReader->Release(); return false; }
-    pPcmType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-    pPcmType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-    pPcmType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, TARGET_RATE);
-    pPcmType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, TARGET_CHANNELS);
-    pPcmType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-    pPcmType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, TARGET_CHANNELS * 2);
-    pPcmType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, TARGET_RATE * TARGET_CHANNELS * 2);
-    hr = pReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pPcmType);
-    pPcmType->Release();
-    if (FAILED(hr)) {
-        LogCustom("MF: Failed to set PCM output type (0x%08X)\n", hr);
-        pReader->Release();
-        return false;
-    }
-
-    // Read all PCM samples. If the reader still delivers mono (some sources
-    // refuse the channel conversion), upmix manually afterwards.
+    // --- Decode the source file to PCM, then apply the user's gain ---
+    // Format support lives entirely in AudioDecode: this function neither knows
+    // nor cares whether the source was an mp3, a flac or an ogg by the time it
+    // gets here. Gain is baked into the PCM because the game plays the finished
+    // .pac through its own XACT engine, where the mod has no volume control at
+    // all - see AudioPreviewPlayer for how the user auditions a gain before it
+    // is committed.
     std::vector<unsigned char> pcmData;
-    UINT32 pcmChannels = TARGET_CHANNELS;
-    {
-        IMFMediaType* pCur = NULL;
-        if (SUCCEEDED(pReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pCur))) {
-            UINT32 ch = 0;
-            pCur->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &ch);
-            if (ch == 1 || ch == 2) pcmChannels = ch;
-            pCur->Release();
-        }
-    }
-    for (;;) {
-        DWORD flags = 0;
-        IMFSample* pSample = NULL;
-        hr = pReader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, NULL, &pSample);
-        if (FAILED(hr)) break;
-        if (flags & MF_SOURCE_READERF_ENDOFSTREAM) {
-            if (pSample) pSample->Release();
-            break;
-        }
-        if (flags & 0x00000008) { // MF_SOURCE_READERF_CURRENTMEDIACHANGED
-            IMFMediaType* pCur = NULL;
-            if (SUCCEEDED(pReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pCur))) {
-                UINT32 ch = 0;
-                pCur->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &ch);
-                if (ch == 1 || ch == 2) pcmChannels = ch;
-                pCur->Release();
-            }
-        }
-        if (pSample) {
-            IMFMediaBuffer* pBuffer = NULL;
-            if (SUCCEEDED(pSample->ConvertToContiguousBuffer(&pBuffer))) {
-                BYTE* pData = NULL;
-                DWORD cbData = 0;
-                if (SUCCEEDED(pBuffer->Lock(&pData, NULL, &cbData))) {
-                    pcmData.insert(pcmData.end(), pData, pData + cbData);
-                    pBuffer->Unlock();
-                }
-                pBuffer->Release();
-            }
-            pSample->Release();
-        }
-    }
-    pReader->Release();
-
-    // Upmix mono -> stereo (duplicate each sample)
-    if (pcmChannels == 1) {
-        std::vector<unsigned char> stereo;
-        stereo.reserve(pcmData.size() * 2);
-        for (size_t i = 0; i + 1 < pcmData.size(); i += 2) {
-            stereo.push_back(pcmData[i]);
-            stereo.push_back(pcmData[i + 1]);
-            stereo.push_back(pcmData[i]);
-            stereo.push_back(pcmData[i + 1]);
-        }
-        pcmData.swap(stereo);
-    }
-
-    if (pcmData.empty()) {
-        LogCustom("MF: No PCM data decoded from '%s'\n", mp3Path.c_str());
+    std::string decodeError;
+    if (!AudioDecode::DecodeFile(srcPath, TARGET_RATE, TARGET_CHANNELS, pcmData, &decodeError)) {
+        LogCustom("Decode failed for '%s': %s\n", srcPath.c_str(), decodeError.c_str());
         return false;
     }
+    const float gainDb = AudioDecode::ResolveGainDb(gain, pcmData);
+    AudioDecode::ApplyGainDb(pcmData, gainDb);
+
     double pcmSeconds = (double)pcmData.size() / (TARGET_RATE * TARGET_CHANNELS * 2);
-    LogCustom("MF: Decoded %.1f s of PCM from '%s'\n", pcmSeconds, mp3Path.c_str());
+    LogCustom("Transcode: %.1f s of PCM from '%s' at %+.1f dB (%s)\n", pcmSeconds, srcPath.c_str(),
+        gainDb, gain.automatic ? "auto" : "manual");
 
     // --- Locate the WMA Standard encoder MFT ---
     IMFTransform* pEncoder = NULL;
@@ -420,7 +331,7 @@ static bool TranscodeMp3ToWma(const std::string& mp3Path,
     pEncoder->Release();
 
     if (wmaData.empty()) {
-        LogCustom("MF: No WMA data produced for '%s'\n", mp3Path.c_str());
+        LogCustom("Transcode: no WMA data produced for '%s'\n", srcPath.c_str());
         return false;
     }
     unsigned long long totalSamples = 0;
@@ -432,7 +343,7 @@ static bool TranscodeMp3ToWma(const std::string& mp3Path,
             nonUniformPackets, WMA_PACKET_SIZE);
     }
     LogCustom("MF: Encoded %zu WMA bytes (%zu packets, %.1f s) from '%s'\n",
-        wmaData.size(), pktSamples.size(), (double)totalSamples / TARGET_RATE, mp3Path.c_str());
+        wmaData.size(), pktSamples.size(), (double)totalSamples / TARGET_RATE, srcPath.c_str());
     return true;
 }
 
@@ -709,11 +620,12 @@ static unsigned int StableTrackHash(const std::string& filename) {
 // cue and FPAC sub-files all carry `cueName`. Assumes Media Foundation is already
 // started (see ConvertMp3ToPac for the standalone entry point). Writes via a temp file
 // so an interrupted run never leaves a torn .pac behind.
-static bool ConvertOneMp3(const std::string& mp3Path,
-                          const std::string& outPacPath,
-                          const std::string& cueName,
-                          unsigned long long* durationSamplesOut,
-                          std::string* errorOut) {
+static bool ConvertOneTrack(const std::string& srcPath,
+                            const AudioDecode::GainSpec& gain,
+                            const std::string& outPacPath,
+                            const std::string& cueName,
+                            unsigned long long* durationSamplesOut,
+                            std::string* errorOut) {
     auto fail = [&](const std::string& msg) {
         if (errorOut) *errorOut = msg;
         LogCustom("%s\n", msg.c_str());
@@ -723,10 +635,10 @@ static bool ConvertOneMp3(const std::string& mp3Path,
     std::vector<unsigned char> wmaData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    if (!TranscodeMp3ToWma(mp3Path, wmaData, pktSamples, &durationSamples))
-        return fail("Could not decode '" + mp3Path + "' - is it a valid MP3?");
+    if (!TranscodeToWma(srcPath, gain, wmaData, pktSamples, &durationSamples))
+        return fail("Could not decode '" + srcPath + "'");
     if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)
-        return fail("Implausible duration for '" + mp3Path + "'");
+        return fail("Implausible duration for '" + srcPath + "'");
 
     std::vector<unsigned char> xwb = BuildWaveBank(cueName, wmaData, pktSamples, durationSamples);
     std::vector<unsigned char> xsb = BuildSoundBank(cueName);
@@ -806,8 +718,9 @@ static bool ExtractPacSubFile(const std::vector<unsigned char>& pac,
     return false;
 }
 
-bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
-                                const std::string& originalPacPath,
+bool ConvertAudioToReplacementPac(const std::string& srcPath,
+                                  const AudioDecode::GainSpec& gain,
+                                  const std::string& originalPacPath,
                                 const std::string& outPacPath,
                                 std::string* errorOut) {
     auto fail = [&](const std::string& msg) {
@@ -859,7 +772,7 @@ bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
     std::vector<unsigned char> wmaData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    bool ok = TranscodeMp3ToWma(mp3Path, wmaData, pktSamples, &durationSamples);
+    bool ok = TranscodeToWma(srcPath, gain, wmaData, pktSamples, &durationSamples);
     if (ok && (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)) ok = false;
 
     if (ok) {
@@ -890,12 +803,12 @@ bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
             } else {
                 const int durSec = (int)(durationSamples / TARGET_RATE);
                 LogCustom("SUCCESS: '%s' replaces \"%s\" -> '%s' (~%02d:%02d)\n",
-                    mp3Path.c_str(), baseName.c_str(), outPacPath.c_str(),
+                    srcPath.c_str(), baseName.c_str(), outPacPath.c_str(),
                     durSec / 60, durSec % 60);
             }
         }
     } else if (errorOut && errorOut->empty()) {
-        *errorOut = "Could not decode '" + mp3Path + "' - is it a valid MP3?";
+        *errorOut = "Could not decode '" + srcPath + "'";
     }
 
     MFShutdown();
@@ -903,8 +816,9 @@ bool ConvertMp3ToReplacementPac(const std::string& mp3Path,
     return ok;
 }
 
-bool ConvertMp3ToPac(const std::string& mp3Path,
-                     const std::string& outPacPath,
+bool ConvertAudioToPac(const std::string& srcPath,
+                       const AudioDecode::GainSpec& gain,
+                       const std::string& outPacPath,
                      const std::string& cueName,
                      std::string* errorOut) {
     if (cueName.empty()) {
@@ -922,8 +836,8 @@ bool ConvertMp3ToPac(const std::string& mp3Path,
     }
 
     LogCustom("Converting '%s' -> '%s' (cue \"%s\")\n",
-        mp3Path.c_str(), outPacPath.c_str(), cueName.c_str());
-    const bool ok = ConvertOneMp3(mp3Path, outPacPath, cueName, NULL, errorOut);
+        srcPath.c_str(), outPacPath.c_str(), cueName.c_str());
+    const bool ok = ConvertOneTrack(srcPath, gain, outPacPath, cueName, NULL, errorOut);
 
     MFShutdown();
     if (coInitialized) CoUninitialize();
@@ -952,24 +866,30 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
     // Ensure the custom directory exists
     CreateDirectoryA(GamePath(CUSTOM_DIR_REL).c_str(), NULL);
 
-    // Scan for .mp3 files (case-insensitive on Windows)
-    std::string searchPattern = GamePath(std::string(CUSTOM_DIR_REL) + "\\*.mp3");
-    WIN32_FIND_DATAA findData;
-    HANDLE hFind = FindFirstFileA(searchPattern.c_str(), &findData);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        LogCustom("No custom MP3 files found in %s\n", GamePath(CUSTOM_DIR_REL).c_str());
+    // Enumerate the folder once and keep whatever we can decode, rather than
+    // globbing per extension - one pass, and the supported list lives in exactly
+    // one place (AudioDecode) so the Jukebox and the file picker cannot drift.
+    std::vector<std::string> mp3Files;
+    {
+        std::string searchPattern = GamePath(std::string(CUSTOM_DIR_REL) + "\\*.*");
+        WIN32_FIND_DATAA findData;
+        HANDLE hFind = FindFirstFileA(searchPattern.c_str(), &findData);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                    continue;
+                if (AudioDecode::IsSupportedExtension(GetExtensionLower(findData.cFileName)))
+                    mp3Files.push_back(findData.cFileName);
+            } while (FindNextFileA(hFind, &findData));
+            FindClose(hFind);
+        }
+    }
+    if (mp3Files.empty()) {
+        LogCustom("No supported audio files found in %s\n", GamePath(CUSTOM_DIR_REL).c_str());
         MFShutdown();
         if (coInitialized) CoUninitialize();
         return result;
     }
-
-    std::vector<std::string> mp3Files;
-    do {
-        if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-            mp3Files.push_back(findData.cFileName);
-        }
-    } while (FindNextFileA(hFind, &findData));
-    FindClose(hFind);
 
     // A cached .pac from an older converter carries a stale cue name, which the play
     // path would then fail to resolve. Rebuild everything when the stamp doesn't match.
@@ -991,7 +911,7 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
 
     // Sort for deterministic ID/cue-name assignment across runs
     std::sort(mp3Files.begin(), mp3Files.end());
-    LogCustom("Found %d custom MP3 file(s) in %s\n", (int)mp3Files.size(), GamePath(CUSTOM_DIR_REL).c_str());
+    LogCustom("Found %d custom audio file(s) in %s\n", (int)mp3Files.size(), GamePath(CUSTOM_DIR_REL).c_str());
     if (progress) progress(0, (int)mp3Files.size(), "Scanning custom music");
 
     std::vector<int> assignedIds;
@@ -1044,7 +964,10 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         // its unique generated filename, while the internal XSB/XWB stays native.
         unsigned long long durationSamples = 0;
         std::string convertError;
-        if (!ConvertOneMp3(mp3Path, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
+                // Jukebox custom tracks always auto-normalize: they are discovered by a
+        // folder scan, so there is no per-track UI on which to offer a manual gain.
+        AudioDecode::GainSpec jukeboxGain;
+        if (!ConvertOneTrack(mp3Path, jukeboxGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
             LogCustom("SKIPPING '%s': %s\n", mp3Filename.c_str(), convertError.c_str());
             continue;
         }

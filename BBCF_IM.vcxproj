@@ -30,6 +30,9 @@
     <ClCompile Include="src\Audio\BgmReplacementManager.cpp" />
     <ClCompile Include="src\Overlay\Window\BgmReplacementWindow.cpp" />
     <ClCompile Include="src\Audio\CustomMusicConverter.cpp" />
+    <ClCompile Include="src\Audio\AudioDecode.cpp" />
+    <ClCompile Include="src\Audio\AudioPreviewPlayer.cpp" />
+    <ClCompile Include="src\Audio\MiniaudioImpl.cpp" />
     <ClCompile Include="src\Overlay\Window\JukeboxWindow.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
@@ -153,6 +156,7 @@
     <ClCompile Include="src\Core\HotkeyManager.cpp" />
     <ClCompile Include="src\Core\InputDevices.cpp" />
     <ClCompile Include="src\Core\Settings.cpp" />
+    <ClCompile Include="src\Core\EmbeddedResources.cpp" />
     <ClCompile Include="src\Core\SystemSpecsLogger.cpp" />
     <ClCompile Include="src\Palette\impl_templates.cpp" />
     <ClCompile Include="src\Palette\PaletteManager.cpp" />
@@ -320,6 +324,7 @@
     <ClInclude Include="src\Core\HotkeyManager.h" />
     <ClInclude Include="src\Core\InputDevices.h" />
     <ClInclude Include="src\Core\Settings.h" />
+    <ClInclude Include="src\Core\EmbeddedResources.h" />
     <ClInclude Include="src\Core\SystemSpecsLogger.h" />
     <ClInclude Include="src\Game\gamestates.h" />
     <ClInclude Include="src\Palette\PaletteManager.h" />
@@ -344,6 +349,8 @@
     <ClInclude Include="src\Audio\BgmReplacementManager.h" />
     <ClInclude Include="src\Overlay\Window\BgmReplacementWindow.h" />
     <ClInclude Include="src\Audio\CustomMusicConverter.h" />
+    <ClInclude Include="src\Audio\AudioDecode.h" />
+    <ClInclude Include="src\Audio\AudioPreviewPlayer.h" />
     <ClInclude Include="src\Overlay\Window\JukeboxWindow.h" />
     <ClInclude Include="src\Web\update_check.h" />
     <ClInclude Include="src\Core\utils.h" />
@@ -442,7 +449,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>dinput8</TargetName>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\miniaudio;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>build\$(Configuration)\</IntDir>
@@ -457,7 +464,7 @@
     <LocalDebuggerCommand>$(BbcfDebuggerCommand)</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>$(BbcfDebuggerArguments)</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(BbcfDebuggerWorkingDirectory)</LocalDebuggerWorkingDirectory>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\winhttpclient\Include;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\miniaudio;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\DebugDeploy\</OutDir>
     <IntDir>build\DebugDeploy\</IntDir>
@@ -466,7 +473,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>dinput8</TargetName>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\miniaudio;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>build\$(Configuration)\</IntDir>
@@ -482,7 +489,7 @@
     <LocalDebuggerCommand>$(ComSpec)</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>/c exit 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
-    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\src;$(SolutionDir)\depends\imgui;$(SolutionDir)\depends\miniaudio;$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Include;$(SolutionDir)\depends\steam_api\public\steam;$(SolutionDir)\depends\winhttpclient\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\depends\detour;$(SolutionDir)\depends\directx_sdk\Lib\x86;$(SolutionDir)\depends\steam_api\redistributable_bin;$(LibraryPath)</LibraryPath>
     <OutDir>bin\Release\</OutDir>
     <IntDir>build\ReleaseDeploy\</IntDir>
@@ -620,18 +627,9 @@
   <Target Name="AfterBuild">
     <Delete Files="$(ProjectDir)$(OutDir)$(TargetName).exp;$(ProjectDir)$(OutDir)$(TargetName).lib" />
     <Delete Files="$(ProjectDir)$(OutDir)$(TargetName).pdb" Condition="'$(Configuration)'!='DebugDeploy'" />
-    <Copy SourceFiles="$(ProjectDir)resource\settings.ini" DestinationFolder="$(ProjectDir)$(OutDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
-    <Copy SourceFiles="$(ProjectDir)resource\palettes.ini" DestinationFolder="$(ProjectDir)$(OutDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(ProjectDir)$(OutDir)$(TargetName).dll" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfCopyDll)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\palettes.ini" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfCopyPalettes)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\settings.ini" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfCopySettings)'=='true' and '$(BbcfInstallDir)'!=''" />
     <Copy SourceFiles="$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!='' and Exists('$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe')" />
     <Copy SourceFiles="$(ProjectDir)USER_README.txt" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <MakeDir Directories="$(BbcfInstallDir)\BBCF_IM\Updater\defaults" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\settings.ini" DestinationFiles="$(BbcfInstallDir)\settings.ini.default" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\settings.ini" DestinationFiles="$(BbcfInstallDir)\BBCF_IM\Updater\defaults\settings.ini.default" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\palettes.ini" DestinationFiles="$(BbcfInstallDir)\palettes.ini.default" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
-    <Copy SourceFiles="$(ProjectDir)resource\palettes.ini" DestinationFiles="$(BbcfInstallDir)\BBCF_IM\Updater\defaults\palettes.ini.default" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\package_release.ps1&quot; -Configuration &quot;$(Configuration)&quot; -Channel prerelease" Condition="'$(Configuration)'=='Debug'" />
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\package_release.ps1&quot; -Configuration &quot;$(Configuration)&quot; -Channel stable" Condition="'$(Configuration)'=='Release'" />
     <Exec Command="$(BbcfLaunchCommand)" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfLaunchAfterDeploy)'=='true' and '$(BbcfLaunchCommand)'!=''" />

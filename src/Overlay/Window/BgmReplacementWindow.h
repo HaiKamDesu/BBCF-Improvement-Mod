@@ -1,5 +1,6 @@
 #pragma once
 #include "IWindow.h"
+#include "Audio/AudioDecode.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ private:
 	void DrawFilters();
 	void DrawTrackList();
 	void DrawTrackRow(int tableIndex);
+	void DrawGainRow(int tableIndex);
+	void StartGainPreview(int tableIndex);
 
 	void OpenPickerFor(int tableIndex);
 	void PollPicker();
@@ -29,6 +32,9 @@ private:
 	bool m_onlyReplaced = false;
 	int  m_categoryFilter = 0;      // 0 = all
 	int  m_pendingPickIndex = -1;   // track whose picker is open
+	int  m_gainEditIndex = -1;      // track whose gain draft m_gainDraft holds
+	int  m_previewIndex = -1;       // track currently auditioning, or -1
+	AudioDecode::GainSpec m_gainDraft;
 	std::string m_lastMessage;
 	std::vector<std::string> m_categories;
 };

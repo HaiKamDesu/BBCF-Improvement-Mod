@@ -1,5 +1,7 @@
 #include "BgmReplacementWindow.h"
 
+#include "Audio/AudioDecode.h"
+#include "Audio/AudioPreviewPlayer.h"
 #include "Audio/BgmReplacementManager.h"
 #include "Audio/MusicManager.h"
 #include "Core/Localization.h"
@@ -317,7 +319,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		if (ImGui::Button(L("Replace...").c_str()))
 			OpenPickerFor(tableIndex);
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltipWrapped(L("Pick an MP3 to play instead of this track.").c_str());
+			ImGui::SetTooltipWrapped(L("Pick a song to play instead of this track.").c_str());
 	}
 	else if (state == BgmReplacementState::Converting)
 	{
@@ -350,9 +352,126 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 			ImGui::SetTooltipWrapped(L("Put the original back and delete the converted file.").c_str());
 	}
 
+	if (state == BgmReplacementState::Active || state == BgmReplacementState::Missing ||
+		state == BgmReplacementState::Failed)
+	{
+		DrawGainRow(tableIndex);
+	}
+
 	ImGui::Unindent(22.0f);
 	ImGui::Spacing();
 	ImGui::PopID();
+}
+
+// Gain has to be baked into the converted .pac - the game plays it through its own XACT
+// engine and the mod has no volume control there. So the slider does NOT re-encode as it
+// moves: it drives AudioPreviewPlayer, which plays the decoded source out of the default
+// output device with the gain applied live. Only "Apply" spends a conversion.
+void BgmReplacementWindow::DrawGainRow(int tableIndex)
+{
+	BgmReplacementManager& mgr = GetBgmReplacements();
+	AudioDecode::GainSpec saved = mgr.GetGain(tableIndex);
+
+	// The draft is per-row and only exists while the user is editing this track.
+	if (m_gainEditIndex != tableIndex)
+	{
+		m_gainDraft = saved;
+		m_gainEditIndex = tableIndex;
+	}
+
+	ImGui::Spacing();
+
+	bool automatic = m_gainDraft.automatic;
+	if (ImGui::Checkbox(L("Match the game's music level").c_str(), &automatic))
+		m_gainDraft.automatic = automatic;
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltipWrapped(
+			L("Measures the song and levels it against the rest of the game's music, so one "
+			  "track isn't twice as loud as the next. Untick to set the volume yourself.").c_str());
+	}
+
+	if (!m_gainDraft.automatic)
+	{
+		ImGui::SetNextItemWidth(180.0f);
+		ImGui::SliderFloat(L("Volume").c_str(), &m_gainDraft.manualDb, -24.0f, 12.0f, "%+.1f dB");
+	}
+
+	AudioPreviewPlayer& player = AudioPreviewPlayer::Get();
+
+	// Keep a running preview in step with the slider.
+	if (player.IsPlaying() && m_previewIndex == tableIndex && !m_gainDraft.automatic)
+		player.SetGainDb(m_gainDraft.manualDb);
+
+	const bool previewingThis = player.IsPlaying() && m_previewIndex == tableIndex;
+	if (ImGui::Button(previewingThis ? L("Stop").c_str() : L("Listen").c_str()))
+	{
+		if (previewingThis)
+		{
+			player.Stop();
+			m_previewIndex = -1;
+		}
+		else
+		{
+			StartGainPreview(tableIndex);
+		}
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltipWrapped(
+			L("Plays your song at this volume right now, without converting anything. "
+			  "Works anywhere, including outside a match.").c_str());
+	}
+
+	const bool dirty = (m_gainDraft.automatic != saved.automatic) ||
+		(!m_gainDraft.automatic && m_gainDraft.manualDb != saved.manualDb);
+	if (dirty)
+	{
+		ImGui::SameLine();
+		if (ImGui::Button(L("Apply volume").c_str()))
+		{
+			player.Stop();
+			m_previewIndex = -1;
+			mgr.SetGain(tableIndex, m_gainDraft);
+			m_lastMessage = L("Reconverting at the new volume") + "...";
+		}
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltipWrapped(L("Converts the song again so the game plays it at this volume.").c_str());
+	}
+}
+
+void BgmReplacementWindow::StartGainPreview(int tableIndex)
+{
+	BgmReplacementManager& mgr = GetBgmReplacements();
+	const std::string source = mgr.GetSourcePath(tableIndex);
+	if (source.empty())
+	{
+		m_lastMessage = L("That song's original file isn't there any more.");
+		return;
+	}
+
+	// Decoding a full track is a disk read plus a decode, so it does not belong on the
+	// render thread. Anything longer than a moment would need to move off it; in practice
+	// this is a few hundred milliseconds and the alternative (a second worker plus its
+	// lifetime) buys nothing for a button the user pressed deliberately.
+	std::vector<unsigned char> pcm;
+	std::string error;
+	if (!AudioDecode::DecodeFile(source, 44100, 2, pcm, &error))
+	{
+		m_lastMessage = L("Could not play that song") + ": " + error;
+		return;
+	}
+
+	const float gainDb = AudioDecode::ResolveGainDb(m_gainDraft, pcm);
+	AudioPreviewPlayer& player = AudioPreviewPlayer::Get();
+	player.SetGainDb(gainDb);
+	if (!player.Play(std::move(pcm), 44100, 2))
+	{
+		m_lastMessage = L("Could not play that song") + ": " + player.LastError();
+		m_previewIndex = -1;
+		return;
+	}
+	m_previewIndex = tableIndex;
 }
 
 void BgmReplacementWindow::OpenPickerFor(int tableIndex)
@@ -366,7 +485,7 @@ void BgmReplacementWindow::OpenPickerFor(int tableIndex)
 
 	NativeFileDialog::Request request;
 	request.title = L("Choose a song to play instead of") + " " + track->displayName;
-	request.filters.push_back({ "MP3 audio (*.mp3)", "*.mp3" });
+	request.filters.push_back({ AudioDecode::FilterDescription(), AudioDecode::FilterPattern() });
 	request.defaultExtension = "mp3";
 	request.contextId = tableIndex;
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "AudioDecode.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -66,6 +67,13 @@ public:
 
 	// Queues a conversion. The pointer is patched only once it succeeds.
 	void Assign(int tableIndex, const std::string& mp3Path);
+
+	// Gain is baked into the converted .pac, because the game plays it through its own
+	// XACT engine where the mod has no volume control. Changing it therefore re-runs the
+	// conversion; the UI auditions a gain with AudioPreviewPlayer first so that only
+	// happens once the user has settled on a value.
+	AudioDecode::GainSpec GetGain(int tableIndex) const;
+	void SetGain(int tableIndex, const AudioDecode::GainSpec& gain);
 	// Restores the pointer, forgets the assignment and deletes the converted file.
 	void Unassign(int tableIndex);
 	// Drops every assignment.
@@ -93,11 +101,12 @@ private:
 
 	struct Assignment
 	{
-		std::string          sourcePath;   // the .mp3 the user picked
+		std::string          sourcePath;   // the audio file the user picked
 		std::string          pacPath;      // converted file on disk
 		std::string          relPath;      // what goes in the table, e.g. "BBCFIM_Music/x.pac"
 		BgmReplacementState  state = BgmReplacementState::Original;
 		std::string          error;
+		AudioDecode::GainSpec gain;    // baked into pacPath; changing it forces a rebuild
 	};
 
 	struct Job
@@ -106,6 +115,7 @@ private:
 		std::string mp3Path;
 		std::string originalPac;
 		std::string outPac;
+		AudioDecode::GainSpec gain;
 	};
 
 	struct JobResult

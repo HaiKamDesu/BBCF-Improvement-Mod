@@ -355,7 +355,7 @@ void BgmReplacementManager::StartNextJob()
 		JobResult result;
 		result.tableIndex = job.tableIndex;
 		std::string error;
-		result.ok = ConvertMp3ToReplacementPac(job.mp3Path, job.originalPac, job.outPac, &error);
+		result.ok = ConvertAudioToReplacementPac(job.mp3Path, job.gain, job.originalPac, job.outPac, &error);
 		result.error = error;
 		return result;
 	});
@@ -473,8 +473,18 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	const std::string outDir = GamePath(track->originalDir + "/" + kReplacementDir);
 	CreateDirectoryA(outDir.c_str(), NULL);
 
+	// Carry the gain over when this is a re-conversion of the same file - that is what
+	// SetGain and Retry both go through. A genuinely new song starts on auto again.
+	AudioDecode::GainSpec carriedGain;
+	{
+		auto prior = m_assignments.find(tableIndex);
+		if (prior != m_assignments.end() && prior->second.sourcePath == mp3Path)
+			carriedGain = prior->second.gain;
+	}
+
 	Assignment assignment;
 	assignment.sourcePath = mp3Path;
+	assignment.gain = carriedGain;
 	assignment.pacPath = outDir + "/" + track->fileName;
 	assignment.relPath = std::string(kReplacementDir) + "/" + track->fileName;
 	assignment.state = BgmReplacementState::Converting;
@@ -489,6 +499,7 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	job.mp3Path = mp3Path;
 	job.originalPac = GamePath(track->originalDir + "/" + track->fileName);
 	job.outPac = assignment.pacPath;
+	job.gain = assignment.gain;
 	m_pending.push_back(job);
 
 	if (m_batchTotal == 0)
@@ -497,6 +508,32 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 
 	Save();
 	StartNextJob();
+}
+
+AudioDecode::GainSpec BgmReplacementManager::GetGain(int tableIndex) const
+{
+	auto it = m_assignments.find(tableIndex);
+	return it == m_assignments.end() ? AudioDecode::GainSpec() : it->second.gain;
+}
+
+void BgmReplacementManager::SetGain(int tableIndex, const AudioDecode::GainSpec& gain)
+{
+	auto it = m_assignments.find(tableIndex);
+	if (it == m_assignments.end())
+		return;
+	if (it->second.gain.automatic == gain.automatic &&
+		it->second.gain.manualDb == gain.manualDb)
+		return; // nothing to re-encode for
+
+	it->second.gain = gain;
+	const std::string source = it->second.sourcePath;
+	if (source.empty())
+	{
+		Save();
+		return;
+	}
+	// Assign() carries the gain we just stored forward into the new job.
+	Assign(tableIndex, source);
 }
 
 void BgmReplacementManager::Retry(int tableIndex)
@@ -640,6 +677,25 @@ void BgmReplacementManager::Save()
 			continue;
 		file << track->baseName << "=" << entry.second.sourcePath << "\n";
 	}
+
+	// Kept in its own section so that an ini written by an older build - which had no
+	// concept of gain - still loads, and so a hand-edited file can drop the section
+	// entirely to go back to automatic levelling.
+	file << "\n";
+	file << "# Playback gain per track. \"auto\" levels the song against the rest of the\n";
+	file << "# game's music; a number is a manual offset in dB.\n";
+	file << "[Gain]\n";
+	for (const auto& entry : m_assignments)
+	{
+		const BgmReplaceableTrack* track = FindTrack(entry.first);
+		if (!track || entry.second.sourcePath.empty())
+			continue;
+		file << track->baseName << "=";
+		if (entry.second.gain.automatic)
+			file << "auto\n";
+		else
+			file << entry.second.gain.manualDb << "\n";
+	}
 }
 
 void BgmReplacementManager::Load()
@@ -659,7 +715,7 @@ void BgmReplacementManager::Load()
 			section = line.substr(1, line.size() - 2);
 			continue;
 		}
-		if (section != "Replacements")
+		if (section != "Replacements" && section != "Gain")
 			continue;
 
 		const size_t eq = line.find('=');
@@ -678,6 +734,24 @@ void BgmReplacementManager::Load()
 		{
 			LogRepl("Saved replacement for unknown or missing track \"%s\" - ignored\n",
 				baseName.c_str());
+			continue;
+		}
+
+		if (section == "Gain")
+		{
+			// [Gain] is written after [Replacements], so the assignment already exists.
+			auto existing = m_assignments.find(track->tableIndex);
+			if (existing == m_assignments.end())
+				continue;
+			if (_stricmp(source.c_str(), "auto") == 0)
+			{
+				existing->second.gain.automatic = true;
+			}
+			else
+			{
+				existing->second.gain.automatic = false;
+				existing->second.gain.manualDb = (float)atof(source.c_str());
+			}
 			continue;
 		}
 
