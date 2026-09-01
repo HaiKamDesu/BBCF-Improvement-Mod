@@ -8,7 +8,8 @@ What this mod provides
 - Adds hitbox overlay
 - Adds framedata advantage info
 - Adds an in-game Jukebox with music rotation, search, and manual track selection
-- Supports custom .mp3 music through the Jukebox's [ custom ] category
+- Supports custom music (mp3, wav, flac, ogg, m4a, wma) through the Jukebox's [ custom ] category
+- Replace any of the game's own tracks with your own song, with per-song volume
 - Create and load custom palettes and effects without file modifications
 - See each other's custom palettes in online matches
 - Options to improve the performance of the game even further
@@ -22,10 +23,14 @@ The game must be up-to-date
 
 How to install
 ==========================
-1. Download and extract the latest BBCF_IM.zip
-2. Put dinput8.dll and settings.ini into the game's folder (where BBCF.exe is located)
+1. Download and extract the latest release zip
+2. Put dinput8.dll and BBCFIMUpdater.exe into the game's folder (where BBCF.exe is located)
 (Should be at "..\Steam\SteamApps\common\BlazBlue Centralfiction")
-3. Adjust the values in settings.ini as desired
+3. Launch the game and press F1
+
+That is the whole install. settings.ini, palettes.ini and every folder the mod uses are
+created for you on first launch, and the mod updates itself from then on. You can change
+anything from the F1 menu, or edit settings.ini by hand once it exists.
 
 Uninstall
 ==========================
@@ -43,10 +48,10 @@ How to use the mod's overlay
 How to add custom songs to the Jukebox
 ==========================
 1. Open the game's "data\Sound\BGM\" directory and create a folder named "custom" if it does not already exist.
-2. Place your .mp3 files in "data\Sound\BGM\custom\". Keep the original MP3 files there so the mod can discover the tracks on future launches.
-3. Launch the game and open the Jukebox (default hotkey: F6). New or changed MP3 files are converted asynchronously; conversion status and progress appear in the Jukebox.
+2. Place your audio files in "data\Sound\BGM\custom\". mp3, wav, flac, ogg, m4a/aac and wma all work. Keep the original files there so the mod can discover the tracks on future launches.
+3. Launch the game and open the Jukebox (default hotkey: F10). New or changed files are converted in the background; conversion status and progress appear in the Jukebox.
 4. When conversion finishes, the songs appear immediately under the cyan [ custom ] category. Enter a match before selecting a song for playback.
-5. Converted .pac files are cached in "data\Sound\BGM\". They are rebuilt when the source MP3 changes or the converter format is updated.
+5. Converted .pac files are cached in "data\Sound\BGM\". They are rebuilt when the source file changes or the converter format is updated.
 
 For example, "C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\custom\3.02 You Will Recall Our Names.mp3" remains in place and produces the cache file "C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfiction\data\Sound\BGM\c58370_3_02_yo.pac". The Jukebox still displays the full title "3.02 You Will Recall Our Names" under [ custom ].
 
@@ -65,11 +70,11 @@ How to switch between custom palettes
 ==========================
 - The palette switching buttons can be accessed under the "Custom palettes" section whenever you are in a match.
 - In online matches you can only switch your own character's palette. (You can reset your opponent's palette with the button found next to the palette switching button).
-- Using the "palettes.ini" file in the game's root folder you can assign custom palettes to the ingame palette slots.
+- Using the "palettes.ini" file in the game's root folder you can assign custom palettes to the ingame palette slots. The mod creates that file for you on first launch.
 
 How to set a custom palette as default so it gets automatically switched to upon the start of a match
 ==========================
-See "palettes.ini" file that you placed in the game's root folder.
+See the "palettes.ini" file in the game's root folder (the mod creates it on first launch).
 
 How to access the hitbox overlay
 ==========================
@@ -113,7 +118,6 @@ Make sure that RenderingWidth and RenderingHeight values in the .ini file are co
 If their values are higher than your monitor's native resolution, then you might get blackscreen.
 
 3. Game crashes when launched:
-Make sure that the settings.ini file is present in the game's folder.
 Check if the problem still occurs after you remove, or rename dinput8.dll
 Turn off tools such as MSI Afterburner, Plays.tv, or other recording softwares and overlays that manipulate D3D.
 Make sure you are running both Steam and the game with administrator privileges, and remove any steam_appid.txt file if present in the game's directory.

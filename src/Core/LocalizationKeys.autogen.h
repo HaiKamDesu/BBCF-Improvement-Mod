@@ -2931,8 +2931,8 @@ struct LocalizationKeysAccessor
         // Replace...
         inline const char* Replace() const { return Get("Replace..."); }
 
-        // Pick an MP3 to play instead of this track.
-        inline const char* Pick_an_MP3_to_play_instead_of_this_track() const { return Get("Pick an MP3 to play instead of this track."); }
+        // Pick a song to play instead of this track.
+        inline const char* Pick_a_song_to_play_instead_of_this_track() const { return Get("Pick a song to play instead of this track."); }
 
         // please wait
         inline const char* please_wait() const { return Get("please wait"); }
@@ -2946,11 +2946,44 @@ struct LocalizationKeysAccessor
         // Rebuilding
         inline const char* Rebuilding() const { return Get("Rebuilding"); }
 
-        // Convert the same MP3 again.
-        inline const char* Convert_the_same_MP3_again() const { return Get("Convert the same MP3 again."); }
+        // Convert the same song again.
+        inline const char* Convert_the_same_song_again() const { return Get("Convert the same song again."); }
 
         // is back to normal.
         inline const char* is_back_to_normal() const { return Get("is back to normal."); }
+
+        // Match the game's music level
+        inline const char* Match_the_game_s_music_level() const { return Get("Match the game's music level"); }
+
+        // Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.
+        inline const char* Measures_the_song_and_levels_it_against_the_rest_of_the_game_s_music_so_one_track_isn_t_twice_as_loud_as_the_next_Untick_to_set_the_volume_yourself() const { return Get("Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself."); }
+
+        // Volume
+        inline const char* Volume() const { return Get("Volume"); }
+
+        // Listen
+        inline const char* Listen() const { return Get("Listen"); }
+
+        // Stop
+        inline const char* Stop() const { return Get("Stop"); }
+
+        // Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.
+        inline const char* Plays_your_song_at_this_volume_right_now_without_converting_anything_Works_anywhere_including_outside_a_match() const { return Get("Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match."); }
+
+        // Apply volume
+        inline const char* Apply_volume() const { return Get("Apply volume"); }
+
+        // Converts the song again so the game plays it at this volume.
+        inline const char* Converts_the_song_again_so_the_game_plays_it_at_this_volume() const { return Get("Converts the song again so the game plays it at this volume."); }
+
+        // Reconverting at the new volume
+        inline const char* Reconverting_at_the_new_volume() const { return Get("Reconverting at the new volume"); }
+
+        // That song's original file isn't there any more.
+        inline const char* That_song_s_original_file_isn_t_there_any_more() const { return Get("That song's original file isn't there any more."); }
+
+        // Could not play that song
+        inline const char* Could_not_play_that_song() const { return Get("Could not play that song"); }
 
         // Put the original back and delete the converted file.
         inline const char* Put_the_original_back_and_delete_the_converted_file() const { return Get("Put the original back and delete the converted file."); }

@@ -1153,13 +1153,24 @@ Hear the game's own version of this track.,Hear the game's own version of this t
 Play yours,Play yours,Escuchar la tuya
 Hear the song you put in its place.,Hear the song you put in its place.,Escucha la canción que pusiste en su lugar.
 Replace...,Replace...,Reemplazar...
-Pick an MP3 to play instead of this track.,Pick an MP3 to play instead of this track.,Elige un MP3 para que suene en lugar de esta pista.
+Pick a song to play instead of this track.,Pick a song to play instead of this track.,Elige una canción para que suene en lugar de esta pista.
 please wait,please wait,espera un momento
 Change...,Change...,Cambiar...
 Rebuild,Rebuild,Reconstruir
 Rebuilding,Rebuilding,Reconstruyendo
-Convert the same MP3 again.,Convert the same MP3 again.,Vuelve a convertir el mismo MP3.
+Convert the same song again.,Convert the same song again.,Vuelve a convertir la misma canción.
 is back to normal.,is back to normal.,volvió a la normalidad.
+Match the game's music level,Match the game's music level,Igualar el volumen del juego
+"Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.","Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.","Mide la canción y la nivela con el resto de la música del juego, para que una pista no suene al doble de volumen que la siguiente. Desmarca esta opción para ajustar el volumen tú mismo."
+Volume,Volume,Volumen
+Listen,Listen,Escuchar
+Stop,Stop,Detener
+"Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.","Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.","Reproduce tu canción a este volumen ahora mismo, sin convertir nada. Funciona en cualquier parte, incluso fuera de una partida."
+Apply volume,Apply volume,Aplicar volumen
+Converts the song again so the game plays it at this volume.,Converts the song again so the game plays it at this volume.,Vuelve a convertir la canción para que el juego la reproduzca a este volumen.
+Reconverting at the new volume,Reconverting at the new volume,Reconvirtiendo al nuevo volumen
+That song's original file isn't there any more.,That song's original file isn't there any more.,El archivo original de esa canción ya no está.
+Could not play that song,Could not play that song,No se pudo reproducir esa canción
 Put the original back and delete the converted file.,Put the original back and delete the converted file.,Restaura la original y borra el archivo convertido.
 Choose a song to play instead of,Choose a song to play instead of,Elige una canción para reemplazar a
 Converting your song for,Converting your song for,Convirtiendo tu canción para
