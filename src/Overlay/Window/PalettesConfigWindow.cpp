@@ -317,9 +317,9 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 
 	if (isPng)
 	{
-		char characterFile[IMPL_PALETTE_DATALEN];
+		PngPalette::Imported imported;
 		std::string error;
-		if (!PngPalette::ReadPaletteFile(sourcePath, characterFile, error))
+		if (!PngPalette::ReadPaletteFileEx(sourcePath, imported, error))
 		{
 			ReportPaletteOutcome(("[error] Unable to import '" + fileName + "' : " + error + "\n").c_str(),
 				"Could not import " + fileName + ": " + error);
@@ -337,7 +337,22 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 		IMPL_data_t palData;
 		bool built = false;
 
-		const int existingIndex =
+		// Best case: the PNG carries everything itself, so the import is lossless no
+		// matter whose machine it is on or whether the original .cfpl was ever here.
+		if (imported.hasExtras)
+		{
+			palData.palInfo = imported.info;
+			memcpy(palData.file0, imported.characterFile, IMPL_PALETTE_DATALEN);
+			char* files[IMPL_PALETTE_FILES_COUNT - 1] = {
+				palData.file1, palData.file2, palData.file3,
+				palData.file4, palData.file5, palData.file6, palData.file7
+			};
+			for (int i = 0; i < IMPL_PALETTE_FILES_COUNT - 1; i++)
+				memcpy(files[i], imported.effects[i], IMPL_PALETTE_DATALEN);
+			built = true;
+		}
+
+		const int existingIndex = built ? -1 :
 			g_interfaces.pPaletteManager->FindCustomPalIndex((CharIndex)charIndex, baseName.c_str());
 		if (existingIndex >= 0)
 		{
@@ -346,7 +361,7 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 			if (existing)
 			{
 				palData = *existing;
-				memcpy(palData.file0, characterFile, IMPL_PALETTE_DATALEN);
+				memcpy(palData.file0, imported.characterFile, IMPL_PALETTE_DATALEN);
 				memset(palData.palInfo.palName, 0, IMPL_PALNAME_LENGTH);
 				strncpy(palData.palInfo.palName, finalName.c_str(), IMPL_PALNAME_LENGTH - 1);
 				built = true;
@@ -356,8 +371,12 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 		if (!built)
 		{
 			built = g_interfaces.pPaletteManager->CreatePaletteFromCharacterFile(
-				(CharIndex)charIndex, finalName, characterFile, palData);
+				(CharIndex)charIndex, finalName, imported.characterFile, palData);
 		}
+
+		// Whatever the source, the file on disk is named after where it landed.
+		memset(palData.palInfo.palName, 0, IMPL_PALNAME_LENGTH);
+		strncpy(palData.palInfo.palName, finalName.c_str(), IMPL_PALNAME_LENGTH - 1);
 
 		if (!built ||
 			!g_interfaces.pPaletteManager->WritePaletteToFile((CharIndex)charIndex, &palData))
@@ -476,20 +495,20 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 				// A PNG palette only holds the character colors, so the effect files are
 				// dropped; .cfpl stays the lossless format.
 				const IMPL_t* paletteFile = (const IMPL_t*)g_pendingExportPaletteBytes.data();
-				const char* characterColors = paletteFile->palData.file0;
+				const IMPL_data_t& palData = paletteFile->palData;
 				const int charIndex = paletteFile->header.charIndex;
 
 				// Paint the palette onto the character's reference sheet: recolouring a
 				// picture of the character beats recolouring 256 numbered squares. Falls
 				// back to a plain swatch grid if the sheet is somehow unavailable, so an
 				// export always produces something importable.
-				written = PaletteSheet::Write(charIndex, characterColors, path, error);
+				written = PaletteSheet::Write(charIndex, palData, path, error);
 				if (!written)
 				{
 					g_imGuiLogger->Log("[system] No reference sheet for this character (%s); exporting a swatch grid instead.\n",
 						error.c_str());
 					error.clear();
-					written = PngPalette::WritePaletteFile(path, characterColors, error, charIndex);
+					written = PngPalette::WritePaletteFile(path, palData.file0, error, charIndex, &palData);
 				}
 			}
 			else
@@ -554,13 +573,12 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 		// marker from, or a legacy .hpl - still has to be asked about.
 		if (HasExtension(fileName, kPngFileExtension))
 		{
-			char probe[IMPL_PALETTE_DATALEN];
-			int stampedChar = -1;
+			PngPalette::Imported probe;
 			std::string probeError;
-			if (PngPalette::ReadPaletteFileWithCharacter(path, probe, &stampedChar, probeError) &&
-				stampedChar >= 0 && !isCharacterIndexOutOfBound(stampedChar))
+			if (PngPalette::ReadPaletteFileEx(path, probe, probeError) &&
+				probe.charIndex >= 0 && !isCharacterIndexOutOfBound(probe.charIndex))
 			{
-				ImportPaletteFile(path, stampedChar);
+				ImportPaletteFile(path, probe.charIndex);
 				return;
 			}
 			if (!probeError.empty())

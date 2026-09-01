@@ -1,4 +1,6 @@
 #pragma once
+#include "impl_format.h"
+
 #include <string>
 
 // Exports a palette as a reference sheet: a picture of the character, drawn in the
@@ -18,9 +20,10 @@ namespace PaletteSheet
 	// True when a sheet for this character is embedded in this build.
 	bool IsAvailable(int charIndex);
 
-	// Writes the sheet for `charIndex` to `outPath`, coloured with `paletteData`
-	// (IMPL_PALETTE_DATALEN bytes of BGRA, i.e. a palette's file0). Returns false and
-	// fills outError with a user-facing message.
-	bool Write(int charIndex, const char* paletteData, const std::string& outPath,
+	// Writes the sheet for `charIndex` to `outPath`, coloured with the palette's character
+	// colours. The whole palette is taken, not just those colours, so the effect files and
+	// metadata can be embedded too - that is what lets the PNG be re-imported without
+	// losing anything. Returns false and fills outError with a user-facing message.
+	bool Write(int charIndex, const IMPL_data_t& palette, const std::string& outPath,
 		std::string& outError);
 }

@@ -87,20 +87,16 @@ namespace PaletteSheet
 		return FindSheet(charIndex, data, size, width, height);
 	}
 
-	bool Write(int charIndex, const char* paletteData, const std::string& outPath,
+	bool Write(int charIndex, const IMPL_data_t& palette, const std::string& outPath,
 		std::string& outError)
 	{
+		const char* paletteData = palette.file0;
+
 		if (isCharacterIndexOutOfBound(charIndex))
 		{
 			outError = "unknown character";
 			return false;
 		}
-		if (!paletteData)
-		{
-			outError = "no palette to apply";
-			return false;
-		}
-
 		const unsigned char* compressed = NULL;
 		unsigned int compressedSize = 0, width = 0, height = 0;
 		if (!FindSheet(charIndex, compressed, compressedSize, width, height))
@@ -115,6 +111,6 @@ namespace PaletteSheet
 			getCharacterNameByIndexA(charIndex).c_str(), width, height);
 
 		return PngPalette::WriteIndexedPngPrecompressed(outPath, (int)width, (int)height,
-			paletteData, compressed, compressedSize, outError, charIndex);
+			paletteData, compressed, compressedSize, outError, charIndex, &palette);
 	}
 }

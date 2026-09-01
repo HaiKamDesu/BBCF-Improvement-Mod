@@ -19,6 +19,20 @@ namespace
 	// tEXt keyword carrying the CharIndex an exported palette belongs to.
 	const char* const kCharacterTextKeyword = "BBCFIM_Character";
 
+	// Private chunk carrying what a PLTE cannot: the seven effect palettes and the
+	// creator/description/bloom metadata. The name is chosen against the PNG chunk-naming
+	// rules so that a spec-following editor treats it correctly:
+	//   'b' lowercase -> ancillary   (a decoder may ignore it)
+	//   'b' lowercase -> private     (not a registered chunk)
+	//   'I' UPPERCASE -> reserved bit clear, as required
+	//   'm' lowercase -> safe to copy (an editor that changes the image may keep it)
+	// Contents: "BBIM", u32 version, IMPL_info_t, then files 1..7 back to back.
+	const char kExtrasChunk[4] = { 'b', 'b', 'I', 'm' };
+	const char kExtrasMagic[4] = { 'B', 'B', 'I', 'M' };
+	const unsigned int kExtrasVersion = 1;
+	const size_t kExtrasSize = 4 + 4 + sizeof(IMPL_info_t) +
+		(IMPL_PALETTE_FILES_COUNT - 1) * IMPL_PALETTE_DATALEN;
+
 	// PLTE holds RGB triples only, so a full palette is 256 * 3 bytes.
 	const int kPaletteEntryCount = IMPL_PALETTE_DATALEN / 4;
 	const int kPlteLength = kPaletteEntryCount * 3;
@@ -141,11 +155,12 @@ namespace
 
 namespace PngPalette
 {
-	bool ReadPaletteFileWithCharacter(const std::string& path, char* outPaletteData,
-		int* outCharIndex, std::string& outError)
+	bool ReadPaletteFileEx(const std::string& path, Imported& out, std::string& outError)
 	{
-		if (outCharIndex)
-			*outCharIndex = -1;
+		char* outPaletteData = out.characterFile;
+		int* outCharIndex = &out.charIndex;
+		out.charIndex = -1;
+		out.hasExtras = false;
 
 		std::vector<unsigned char> bytes;
 		if (!ReadAllBytes(path, bytes))
@@ -194,6 +209,21 @@ namespace PngPalette
 			{
 				trns = data;
 				trnsLen = length;
+			}
+			else if (memcmp(type, kExtrasChunk, 4) == 0 && !out.hasExtras &&
+				length >= kExtrasSize &&
+				memcmp(data, kExtrasMagic, 4) == 0 &&
+				ReadBE32(data + 4) == kExtrasVersion)
+			{
+				const unsigned char* cursor = data + 8;
+				memcpy(&out.info, cursor, sizeof(IMPL_info_t));
+				cursor += sizeof(IMPL_info_t);
+				for (int i = 0; i < IMPL_PALETTE_FILES_COUNT - 1; i++)
+				{
+					memcpy(out.effects[i], cursor, IMPL_PALETTE_DATALEN);
+					cursor += IMPL_PALETTE_DATALEN;
+				}
+				out.hasExtras = true;
 			}
 			else if (memcmp(type, "tEXt", 4) == 0 && outCharIndex && *outCharIndex < 0)
 			{
@@ -250,7 +280,7 @@ namespace PngPalette
 	// Shared tail of both writers: everything except where IDAT's bytes come from.
 	static bool WritePngWithImageStream(const std::string& path, int width, int height,
 		const char* paletteData, const unsigned char* imageStream, size_t imageStreamLength,
-		std::string& outError, int charIndex)
+		std::string& outError, int charIndex, const IMPL_data_t* extras)
 	{
 
 		unsigned char plte[kPlteLength];
@@ -302,6 +332,28 @@ namespace PngPalette
 			text.insert(text.end(), value.begin(), value.end());
 			AppendChunk(png, "tEXt", text.data(), text.size());
 		}
+		// Everything a PLTE cannot hold, so that re-importing this file can be lossless
+		// even on a machine that has never seen the original .cfpl.
+		if (extras)
+		{
+			std::vector<unsigned char> blob;
+			blob.reserve(kExtrasSize);
+			blob.insert(blob.end(), kExtrasMagic, kExtrasMagic + 4);
+			AppendBE32(blob, kExtrasVersion);
+
+			const unsigned char* info = (const unsigned char*)&extras->palInfo;
+			blob.insert(blob.end(), info, info + sizeof(IMPL_info_t));
+
+			const char* files[IMPL_PALETTE_FILES_COUNT - 1] = {
+				extras->file1, extras->file2, extras->file3,
+				extras->file4, extras->file5, extras->file6, extras->file7
+			};
+			for (int i = 0; i < IMPL_PALETTE_FILES_COUNT - 1; i++)
+				blob.insert(blob.end(), files[i], files[i] + IMPL_PALETTE_DATALEN);
+
+			AppendChunk(png, kExtrasChunk, blob.data(), blob.size());
+		}
+
 		AppendChunk(png, "IDAT", imageStream, imageStreamLength);
 		AppendChunk(png, "IEND", nullptr, 0);
 
@@ -316,7 +368,7 @@ namespace PngPalette
 
 	bool WriteIndexedPng(const std::string& path, int width, int height,
 		const char* paletteData, const unsigned char* pixels, std::string& outError,
-		int charIndex)
+		int charIndex, const IMPL_data_t* extras)
 	{
 		if (width <= 0 || height <= 0 || !pixels)
 		{
@@ -340,12 +392,12 @@ namespace PngPalette
 		ZlibStore(raw, idat);
 
 		return WritePngWithImageStream(path, width, height, paletteData,
-			idat.data(), idat.size(), outError, charIndex);
+			idat.data(), idat.size(), outError, charIndex, extras);
 	}
 
 	bool WriteIndexedPngPrecompressed(const std::string& path, int width, int height,
 		const char* paletteData, const unsigned char* imageStream, size_t imageStreamLength,
-		std::string& outError, int charIndex)
+		std::string& outError, int charIndex, const IMPL_data_t* extras)
 	{
 		if (width <= 0 || height <= 0 || !imageStream || imageStreamLength == 0)
 		{
@@ -354,7 +406,19 @@ namespace PngPalette
 		}
 
 		return WritePngWithImageStream(path, width, height, paletteData,
-			imageStream, imageStreamLength, outError, charIndex);
+			imageStream, imageStreamLength, outError, charIndex, extras);
+	}
+
+	bool ReadPaletteFileWithCharacter(const std::string& path, char* outPaletteData,
+		int* outCharIndex, std::string& outError)
+	{
+		Imported imported;
+		if (!ReadPaletteFileEx(path, imported, outError))
+			return false;
+		memcpy(outPaletteData, imported.characterFile, IMPL_PALETTE_DATALEN);
+		if (outCharIndex)
+			*outCharIndex = imported.charIndex;
+		return true;
 	}
 
 	bool ReadPaletteFile(const std::string& path, char* outPaletteData, std::string& outError)
@@ -363,7 +427,7 @@ namespace PngPalette
 	}
 
 	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError,
-		int charIndex)
+		int charIndex, const IMPL_data_t* extras)
 	{
 		// The plain swatch grid: one pixel per colour, index 0 top-left. This is the
 		// fallback for characters whose sprite archive we cannot read; the nicer export
@@ -372,6 +436,7 @@ namespace PngPalette
 		for (int i = 0; i < kSheetWidth * kSheetHeight; i++)
 			pixels[i] = (unsigned char)i;
 
-		return WriteIndexedPng(path, kSheetWidth, kSheetHeight, paletteData, pixels, outError, charIndex);
+		return WriteIndexedPng(path, kSheetWidth, kSheetHeight, paletteData, pixels, outError,
+			charIndex, extras);
 	}
 }
