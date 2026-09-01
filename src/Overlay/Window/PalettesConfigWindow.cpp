@@ -11,6 +11,7 @@
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "Palette/impl_templates.h"
 #include "Palette/PaletteManager.h"
+#include "Overlay/NotificationBar/NotificationBar.h"
 #include "Palette/HipReference.h"
 #include "Palette/PngPalette.h"
 
@@ -254,6 +255,21 @@ void PalettesConfigWindow::AssignSlot(CharacterGroup& group, PaletteRow& row, in
 	row.assignedSlot = newSlot;
 }
 
+namespace
+{
+	// Import and export used to report only through g_imGuiLogger, which lives in the Log
+	// window almost nobody has open - so a failed import looked exactly like the button
+	// doing nothing at all. Every outcome now also goes to the on-screen notification bar,
+	// which is visible whatever window has focus.
+	void ReportPaletteOutcome(const char* logLine, const std::string& notification)
+	{
+		if (g_imGuiLogger)
+			g_imGuiLogger->Log("%s", logLine);
+		if (g_notificationBar)
+			g_notificationBar->AddNotification(notification.c_str());
+	}
+}
+
 void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int charIndex)
 {
 	const std::string fileName = FileNameFromPath(sourcePath);
@@ -297,7 +313,8 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 		std::string error;
 		if (!PngPalette::ReadPaletteFile(sourcePath, characterFile, error))
 		{
-			g_imGuiLogger->Log("[error] Unable to import '%s' : %s\n", fileName.c_str(), error.c_str());
+			ReportPaletteOutcome(("[error] Unable to import '" + fileName + "' : " + error + "\n").c_str(),
+				"Could not import " + fileName + ": " + error);
 			return;
 		}
 
@@ -308,20 +325,21 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 			(CharIndex)charIndex, finalName, characterFile, palData) ||
 			!g_interfaces.pPaletteManager->WritePaletteToFile((CharIndex)charIndex, &palData))
 		{
-			g_imGuiLogger->Log("[error] Failed to import palette '%s' into '%s'\n",
-				fileName.c_str(), destPath.c_str());
+			ReportPaletteOutcome(("[error] Failed to import palette '" + fileName + "' into '" + destPath + "'\n").c_str(),
+				"Could not save the imported palette to " + destPath);
 			return;
 		}
 	}
 	else if (CopyFileA(sourcePath.c_str(), destPath.c_str(), TRUE) != TRUE)
 	{
-		g_imGuiLogger->Log("[error] Failed to import palette '%s' into '%s'\n",
-			fileName.c_str(), destPath.c_str());
+		ReportPaletteOutcome(("[error] Failed to import palette '" + fileName + "' into '" + destPath + "'\n").c_str(),
+			"Could not copy the palette to " + destPath);
 		return;
 	}
 
-	g_imGuiLogger->Log("[system] Imported palette '%s' for %s\n",
-		(finalName + extension).c_str(), getCharacterNameByIndexA(charIndex).c_str());
+	ReportPaletteOutcome(("[system] Imported palette '" + finalName + extension + "' for " +
+			getCharacterNameByIndexA(charIndex) + "\n").c_str(),
+		"Imported " + finalName + extension + " for " + getCharacterNameByIndexA(charIndex));
 
 	// Register the new file. This re-reads palette folders and palettes.ini, but
 	// the modal keeps its own draft, so unsaved assignment edits survive.
@@ -435,7 +453,7 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 					g_imGuiLogger->Log("[system] No reference sheet for this character (%s); exporting a swatch grid instead.\n",
 						error.c_str());
 					error.clear();
-					written = PngPalette::WritePaletteFile(path, characterColors, error);
+					written = PngPalette::WritePaletteFile(path, characterColors, error, charIndex);
 				}
 			}
 			else
@@ -445,12 +463,16 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 		}
 
 		if (written)
-			g_imGuiLogger->Log("[system] Exported palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
-		else if (error.empty())
-			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
+		{
+			ReportPaletteOutcome(("[system] Exported palette '" + g_pendingExportPalName + "' to '" + path + "'\n").c_str(),
+				"Exported " + g_pendingExportPalName + " to " + FileNameFromPath(path));
+		}
 		else
-			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s' : %s\n",
-				g_pendingExportPalName.c_str(), path.c_str(), error.c_str());
+		{
+			const std::string why = error.empty() ? std::string("unable to write the file") : error;
+			ReportPaletteOutcome(("[error] Failed to export palette '" + g_pendingExportPalName + "' to '" + path + "' : " + why + "\n").c_str(),
+				"Could not export " + g_pendingExportPalName + ": " + why);
+		}
 		return;
 	}
 
@@ -465,20 +487,23 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 		IMPL_t fileContents;
 		if (!utils_ReadFile(path.c_str(), &fileContents, sizeof(fileContents), true))
 		{
-			g_imGuiLogger->Log("[error] Unable to open '%s' : %s\n", fileName.c_str(), strerror(errno));
+			ReportPaletteOutcome(("[error] Unable to open '" + fileName + "' : " + strerror(errno) + "\n").c_str(),
+				"Could not open " + fileName);
 			return;
 		}
 
 		if (strncmp(fileContents.header.fileSig, IMPL_FILESIG, sizeof(fileContents.header.fileSig)) != 0 ||
 			fileContents.header.dataLen != sizeof(IMPL_data_t))
 		{
-			g_imGuiLogger->Log("[error] '%s' unrecognized palette file format!\n", fileName.c_str());
+			ReportPaletteOutcome(("[error] '" + fileName + "' unrecognized palette file format!\n").c_str(),
+				fileName + " is not a palette file this build recognises");
 			return;
 		}
 
 		if (isCharacterIndexOutOfBound(fileContents.header.charIndex))
 		{
-			g_imGuiLogger->Log("[error] '%s' has an invalid character index in the header\n", fileName.c_str());
+			ReportPaletteOutcome(("[error] '" + fileName + "' has an invalid character index in the header\n").c_str(),
+				fileName + " names a character this build does not know");
 			return;
 		}
 
@@ -488,14 +513,42 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 		HasExtension(fileName, kPngFileExtension))
 	{
 		// Legacy .hpl files and PNG palettes carry no character info: ask the user.
+		// A PNG we exported ourselves names its character, so a round trip needs no prompt
+		// at all. Anything else - a PNG from another tool, or one an editor stripped the
+		// marker from, or a legacy .hpl - still has to be asked about.
+		if (HasExtension(fileName, kPngFileExtension))
+		{
+			char probe[IMPL_PALETTE_DATALEN];
+			int stampedChar = -1;
+			std::string probeError;
+			if (PngPalette::ReadPaletteFileWithCharacter(path, probe, &stampedChar, probeError) &&
+				stampedChar >= 0 && !isCharacterIndexOutOfBound(stampedChar))
+			{
+				ImportPaletteFile(path, stampedChar);
+				return;
+			}
+			if (!probeError.empty())
+			{
+				ReportPaletteOutcome(("[error] Unable to import '" + fileName + "' : " + probeError + "\n").c_str(),
+					"Could not import " + fileName + ": " + probeError);
+				return;
+			}
+		}
+
+		// No character on the file, so the import is finished in the character-select
+		// popup. Say so: if that popup ever fails to appear, the user still sees that the
+		// file arrived rather than nothing at all.
 		m_pendingImportPath = path;
 		m_pendingImportCharIndex = 0;
 		m_openImportCharSelect = true;
+		if (g_notificationBar)
+			g_notificationBar->AddNotification(("Pick a character for " + fileName).c_str());
 	}
 	else
 	{
-		g_imGuiLogger->Log("[error] Unable to import '%s' : not a %s, %s or %s file\n",
-			fileName.c_str(), IMPL_FILE_EXTENSION, LEGACY_HPL_FILE_EXTENSION, kPngFileExtension);
+		ReportPaletteOutcome(("[error] Unable to import '" + fileName + "' : not a " + IMPL_FILE_EXTENSION +
+				", " + LEGACY_HPL_FILE_EXTENSION + " or " + kPngFileExtension + " file\n").c_str(),
+			fileName + " is not a palette file (.cfpl, .hpl or .png)");
 	}
 }
 

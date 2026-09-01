@@ -7,12 +7,17 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace
 {
 	const unsigned char kPngSignature[8] = { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A };
+
+	// tEXt keyword carrying the CharIndex an exported palette belongs to.
+	const char* const kCharacterTextKeyword = "BBCFIM_Character";
 
 	// PLTE holds RGB triples only, so a full palette is 256 * 3 bytes.
 	const int kPaletteEntryCount = IMPL_PALETTE_DATALEN / 4;
@@ -136,8 +141,12 @@ namespace
 
 namespace PngPalette
 {
-	bool ReadPaletteFile(const std::string& path, char* outPaletteData, std::string& outError)
+	bool ReadPaletteFileWithCharacter(const std::string& path, char* outPaletteData,
+		int* outCharIndex, std::string& outError)
 	{
+		if (outCharIndex)
+			*outCharIndex = -1;
+
 		std::vector<unsigned char> bytes;
 		if (!ReadAllBytes(path, bytes))
 		{
@@ -186,6 +195,20 @@ namespace PngPalette
 				trns = data;
 				trnsLen = length;
 			}
+			else if (memcmp(type, "tEXt", 4) == 0 && outCharIndex && *outCharIndex < 0)
+			{
+				// "<keyword>\0<value>"; ours names the character the palette is for.
+				const size_t keywordLen = strlen(kCharacterTextKeyword);
+				if (length > keywordLen &&
+					memcmp(data, kCharacterTextKeyword, keywordLen) == 0 &&
+					data[keywordLen] == 0)
+				{
+					const std::string value((const char*)data + keywordLen + 1,
+						length - keywordLen - 1);
+					if (!value.empty() && value.find_first_not_of("0123456789") == std::string::npos)
+						*outCharIndex = atoi(value.c_str());
+				}
+			}
 			else if (memcmp(type, "IEND", 4) == 0)
 			{
 				break;
@@ -225,7 +248,8 @@ namespace PngPalette
 	}
 
 	bool WriteIndexedPng(const std::string& path, int width, int height,
-		const char* paletteData, const unsigned char* pixels, std::string& outError)
+		const char* paletteData, const unsigned char* pixels, std::string& outError,
+		int charIndex)
 	{
 		if (width <= 0 || height <= 0 || !pixels)
 		{
@@ -280,6 +304,21 @@ namespace PngPalette
 		AppendChunk(png, "IHDR", ihdr, sizeof(ihdr));
 		AppendChunk(png, "PLTE", plte, sizeof(plte));
 		AppendChunk(png, "tRNS", trns, sizeof(trns));
+
+		// Record which character this palette belongs to, so a round trip through our own
+		// export does not have to ask. tEXt is a standard ancillary chunk that every
+		// editor ignores; some strip it on save, which is why import treats it as a hint
+		// and falls back to asking rather than relying on it.
+		if (charIndex >= 0)
+		{
+			std::vector<unsigned char> text;
+			const char* keyword = kCharacterTextKeyword;
+			text.insert(text.end(), keyword, keyword + strlen(keyword));
+			text.push_back(0); // keyword/value separator
+			const std::string value = std::to_string(charIndex);
+			text.insert(text.end(), value.begin(), value.end());
+			AppendChunk(png, "tEXt", text.data(), text.size());
+		}
 		AppendChunk(png, "IDAT", idat.data(), idat.size());
 		AppendChunk(png, "IEND", nullptr, 0);
 
@@ -292,7 +331,13 @@ namespace PngPalette
 		return true;
 	}
 
-	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError)
+	bool ReadPaletteFile(const std::string& path, char* outPaletteData, std::string& outError)
+	{
+		return ReadPaletteFileWithCharacter(path, outPaletteData, nullptr, outError);
+	}
+
+	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError,
+		int charIndex)
 	{
 		// The plain swatch grid: one pixel per colour, index 0 top-left. This is the
 		// fallback for characters whose sprite archive we cannot read; the nicer export
@@ -301,6 +346,6 @@ namespace PngPalette
 		for (int i = 0; i < kSheetWidth * kSheetHeight; i++)
 			pixels[i] = (unsigned char)i;
 
-		return WriteIndexedPng(path, kSheetWidth, kSheetHeight, paletteData, pixels, outError);
+		return WriteIndexedPng(path, kSheetWidth, kSheetHeight, paletteData, pixels, outError, charIndex);
 	}
 }

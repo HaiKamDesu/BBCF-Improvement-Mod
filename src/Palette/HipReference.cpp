@@ -9,6 +9,7 @@
 
 #include <Windows.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -333,6 +334,57 @@ namespace
 	}
 }
 
+
+	// Layout of the composed sheet. The swatch block is HIKARI's idea, kept because it is
+	// genuinely the useful half: the sprites tell you what a colour is FOR, the swatches
+	// let you find an index you cannot see on the character (unused slots, effect-only
+	// entries) and give you something to click in an editor.
+	const int kSwatchCell = 16;              // px per palette entry
+	const int kSwatchCols = 16;              // 16x16 entries = the whole 256-colour table
+	const int kSwatchSize = kSwatchCell * kSwatchCols;
+	const int kPadding = 8;
+	const int kMaxPoses = 4;
+	const int kMaxCanvasPixels = 6 * 1024 * 1024; // keep a 32-bit process comfortable
+
+	struct Pose
+	{
+		HipInfo hip;
+		int distinct;
+		unsigned int solid;
+		unsigned int animation;
+	};
+
+	void BlitSprite(std::vector<unsigned char>& canvas, int canvasWidth,
+		const std::vector<unsigned char>& pixels, const HipInfo& hip, int destX, int destY)
+	{
+		for (unsigned int y = 0; y < hip.height; y++)
+		{
+			const unsigned char* src = &pixels[(size_t)y * hip.width];
+			unsigned char* dst = &canvas[(size_t)(destY + y) * canvasWidth + destX];
+			for (unsigned int x = 0; x < hip.width; x++)
+			{
+				// Index 0 is transparent, so leave the canvas showing through rather than
+				// punching a hole in whatever is already there.
+				if (src[x] != 0)
+					dst[x] = src[x];
+			}
+		}
+	}
+
+	void DrawSwatches(std::vector<unsigned char>& canvas, int canvasWidth, int originX, int originY)
+	{
+		for (int entry = 0; entry < 256; entry++)
+		{
+			const int cellX = originX + (entry % kSwatchCols) * kSwatchCell;
+			const int cellY = originY + (entry / kSwatchCols) * kSwatchCell;
+			for (int y = 1; y < kSwatchCell - 1; y++)
+			{
+				unsigned char* row = &canvas[(size_t)(cellY + y) * canvasWidth + cellX];
+				for (int x = 1; x < kSwatchCell - 1; x++)
+					row[x] = (unsigned char)entry;
+			}
+		}
+	}
 namespace HipReference
 {
 	bool IsAvailable(int charIndex)
@@ -386,13 +438,11 @@ namespace HipReference
 			return false;
 		}
 
-		// Pick the sprite that shows the most of the palette, breaking ties on how much
-		// of it is actually drawn, so the sheet is a big recognisable pose rather than a
-		// stray hand or a puff of smoke.
-		const PacEntry* bestEntry = NULL;
-		HipInfo bestHip = {};
-		int bestDistinct = 0;
-		unsigned int bestSolid = 0;
+		// Gather one candidate per animation, best frame first. Grouping by animation is
+		// what stops the sheet being four near-identical frames of the same move: the
+		// name is "<prefix><animation>_<frame>", so a different animation is a different
+		// pose. Scored on how much of the palette each shows, since that is the point.
+		std::vector<Pose> poses;
 
 		for (size_t i = 0; i < entries.size(); i++)
 		{
@@ -408,36 +458,120 @@ namespace HipReference
 			if (!ScoreSprite(hip, distinct, solid))
 				continue;
 
-			if (distinct > bestDistinct || (distinct == bestDistinct && solid > bestSolid))
+			unsigned int animation = 0;
+			for (size_t c = prefix.size(); c < entries[i].name.size(); c++)
 			{
-				bestEntry = &entries[i];
-				bestHip = hip;
-				bestDistinct = distinct;
-				bestSolid = solid;
+				if (entries[i].name[c] < '0' || entries[i].name[c] > '9')
+					break;
+				animation = animation * 10 + (unsigned int)(entries[i].name[c] - '0');
 			}
+
+			Pose candidate;
+			candidate.hip = hip;
+			candidate.distinct = distinct;
+			candidate.solid = solid;
+			candidate.animation = animation;
+
+			bool merged = false;
+			for (size_t p = 0; p < poses.size(); p++)
+			{
+				if (poses[p].animation != animation)
+					continue;
+				merged = true;
+				if (distinct > poses[p].distinct ||
+					(distinct == poses[p].distinct && solid > poses[p].solid))
+					poses[p] = candidate;
+				break;
+			}
+			if (!merged)
+				poses.push_back(candidate);
 		}
 
-		if (!bestEntry)
+		if (poses.empty())
 		{
 			outError = "no usable sprite found for this character";
 			return false;
 		}
 
-		std::vector<unsigned char> pixels;
-		if (!DecodeSprite(bestHip, pixels))
+		// Partial selection sort: only the few we actually draw need ordering.
+		const int poseCount = (int)((poses.size() < (size_t)kMaxPoses) ? poses.size() : (size_t)kMaxPoses);
+		for (int slot = 0; slot < poseCount; slot++)
 		{
-			outError = "that sprite could not be decoded";
+			size_t best = slot;
+			for (size_t j = slot + 1; j < poses.size(); j++)
+			{
+				if (poses[j].distinct > poses[best].distinct ||
+					(poses[j].distinct == poses[best].distinct && poses[j].solid > poses[best].solid))
+					best = j;
+			}
+			std::swap(poses[slot], poses[best]);
+		}
+		poses.resize(poseCount);
+
+		// Lay the poses out in a row with the swatch table to their left.
+		int stripWidth = 0;
+		int stripHeight = 0;
+		for (int i = 0; i < poseCount; i++)
+		{
+			stripWidth += (int)poses[i].hip.width + kPadding;
+			if ((int)poses[i].hip.height > stripHeight)
+				stripHeight = (int)poses[i].hip.height;
+		}
+
+		int canvasWidth = kSwatchSize + kPadding * 2 + stripWidth;
+		int canvasHeight = (stripHeight > kSwatchSize ? stripHeight : kSwatchSize) + kPadding * 2;
+
+		// Drop poses from the right until the canvas is a sane size, rather than refusing
+		// to export at all for a character with unusually large sprites.
+		while (poseCount > 1 && (long long)canvasWidth * canvasHeight > kMaxCanvasPixels)
+		{
+			stripWidth -= (int)poses.back().hip.width + kPadding;
+			poses.pop_back();
+			stripHeight = 0;
+			for (size_t i = 0; i < poses.size(); i++)
+			{
+				if ((int)poses[i].hip.height > stripHeight)
+					stripHeight = (int)poses[i].hip.height;
+			}
+			canvasWidth = kSwatchSize + kPadding * 2 + stripWidth;
+			canvasHeight = (stripHeight > kSwatchSize ? stripHeight : kSwatchSize) + kPadding * 2;
+		}
+
+		std::vector<unsigned char> canvas;
+		try
+		{
+			canvas.assign((size_t)canvasWidth * canvasHeight, 0); // 0 = transparent
+		}
+		catch (const std::bad_alloc&)
+		{
+			outError = "not enough memory to build the sheet";
 			return false;
 		}
 
-		LOG(2, "HipReference: %s -> %s (%ux%u, %d colors used)\n",
-			getCharacterNameByIndexA(charIndex).c_str(), bestEntry->name.c_str(),
-			bestHip.width, bestHip.height, bestDistinct);
+		DrawSwatches(canvas, canvasWidth, kPadding, kPadding);
 
-		// Note the palette written is the caller's, NOT the one embedded in the sprite:
+		int penX = kSwatchSize + kPadding * 2;
+		for (size_t i = 0; i < poses.size(); i++)
+		{
+			std::vector<unsigned char> pixels;
+			if (!DecodeSprite(poses[i].hip, pixels))
+				continue;
+
+			// Sit the poses on a common baseline; a row of figures floating at different
+			// heights reads as broken rather than as a sheet.
+			const int destY = kPadding + (canvasHeight - kPadding * 2 - (int)poses[i].hip.height);
+			BlitSprite(canvas, canvasWidth, pixels, poses[i].hip, penX, destY);
+			penX += (int)poses[i].hip.width + kPadding;
+		}
+
+		LOG(2, "HipReference: %s -> %d pose(s), %dx%d sheet\n",
+			getCharacterNameByIndexA(charIndex).c_str(), (int)poses.size(), canvasWidth, canvasHeight);
+
+		// Note the palette written is the caller's, NOT the one embedded in the sprites:
 		// the embedded copy is only what that frame happened to ship with, while the
 		// indices mean the same thing across all of a character's sprites.
-		return PngPalette::WriteIndexedPng(outPath, (int)bestHip.width, (int)bestHip.height,
-			paletteData, pixels.data(), outError);
+		return PngPalette::WriteIndexedPng(outPath, canvasWidth, canvasHeight,
+			paletteData, canvas.data(), outError, charIndex);
+
 	}
 }
