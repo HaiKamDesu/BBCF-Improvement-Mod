@@ -1,7 +1,6 @@
 #include "WindowManager.h"
 
 #include "Branding.h"
-#include "Palette/CharSelectPalettes.h"
 #include "Palette/PaletteThumbnails.h"
 #include "fonts.h"
 #include "NotificationBar/NotificationBar.h"
@@ -327,8 +326,6 @@ void WindowManager::Shutdown()
 
 	ImGui_ImplDX9_Shutdown();
 	PaletteThumbnails::Shutdown();
-	// Hand the game's own character select filename back before we go.
-	CharSelectPalettes::Restore();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 }

@@ -1,6 +1,5 @@
 #include "PaletteManager.h"
 
-#include "CharSelectPalettes.h"
 #include "impl_templates.h"
 
 #include "Core/logger.h"
@@ -468,9 +467,6 @@ void PaletteManager::LoadPaletteSettingsFile()
 		}
 	}
 
-	// Slot assignments are what the character select preview shows, so keep the copy the
-	// game reads in step with them. Cheap when nothing changed.
-	CharSelectPalettes::Refresh();
 }
 
 const IMPL_data_t* PaletteManager::GetCustomPalData(CharIndex charIndex, int palIndex) const
@@ -531,7 +527,6 @@ bool PaletteManager::SavePaletteSettingsFile(const std::vector<std::vector<std::
 	}
 
 	m_paletteSlots = slots;
-	CharSelectPalettes::Refresh();
 	return true;
 }
 
