@@ -326,11 +326,40 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 			return;
 		}
 
-		// A PNG only carries the character colors; the effect files come from the
-		// character's built-in template so they are never left blank.
+		// A PNG carries only the 1024 bytes of character colors - not the seven effect
+		// files, and not the creator/description/bloom metadata. Where that data comes
+		// from decides how lossy an import is.
+		//
+		// The usual workflow is export a palette, recolor it, import it back, and in that
+		// case the original is still installed under the same name: base on it, so
+		// everything a PNG cannot carry survives and only the colors change. Falling back
+		// to the character's built-in template is for a PNG that came from somewhere else.
 		IMPL_data_t palData;
-		if (!g_interfaces.pPaletteManager->CreatePaletteFromCharacterFile(
-			(CharIndex)charIndex, finalName, characterFile, palData) ||
+		bool built = false;
+
+		const int existingIndex =
+			g_interfaces.pPaletteManager->FindCustomPalIndex((CharIndex)charIndex, baseName.c_str());
+		if (existingIndex >= 0)
+		{
+			const IMPL_data_t* existing =
+				g_interfaces.pPaletteManager->GetCustomPalData((CharIndex)charIndex, existingIndex);
+			if (existing)
+			{
+				palData = *existing;
+				memcpy(palData.file0, characterFile, IMPL_PALETTE_DATALEN);
+				memset(palData.palInfo.palName, 0, IMPL_PALNAME_LENGTH);
+				strncpy(palData.palInfo.palName, finalName.c_str(), IMPL_PALNAME_LENGTH - 1);
+				built = true;
+			}
+		}
+
+		if (!built)
+		{
+			built = g_interfaces.pPaletteManager->CreatePaletteFromCharacterFile(
+				(CharIndex)charIndex, finalName, characterFile, palData);
+		}
+
+		if (!built ||
 			!g_interfaces.pPaletteManager->WritePaletteToFile((CharIndex)charIndex, &palData))
 		{
 			ReportPaletteOutcome(("[error] Failed to import palette '" + fileName + "' into '" + destPath + "'\n").c_str(),
@@ -752,18 +781,13 @@ void PalettesConfigWindow::DrawSection(int groupIndex)
 
 	if (ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
 	{
+		// Random and Random_Exclude_Default are controls, not palettes: there is nothing to
+		// preview and nothing to export or delete, so they are a row with a combo box and
+		// are deliberately not selectable.
 		for (int index : specials)
 		{
 			PaletteRow& row = group.rows[index];
 			ImGui::PushID(index);
-
-			const bool selected = (groupIndex == m_selectedGroup && index == m_selectedRow);
-			if (ImGui::Selectable("##specialrow", selected, 0, ImVec2(0, ImGui::GetFrameHeight())))
-			{
-				m_selectedGroup = groupIndex;
-				m_selectedRow = index;
-			}
-			ImGui::SameLine(0.0f, 0.0f);
 
 			ImGui::AlignTextToFramePadding();
 			ImGui::TextUnformatted(DisplayNameForSlotValue(row.name).c_str());
@@ -997,27 +1021,25 @@ void PalettesConfigWindow::DrawDetailPanel()
 
 	CharacterGroup& group = m_groups[m_selectedGroup];
 	PaletteRow& row = group.rows[m_selectedRow];
-	const bool special = row.isSpecial;
+
+	// Specials are drawn as controls in the grid and are not selectable, so nothing
+	// should ever land here; if it somehow does, show the hint rather than a panel with
+	// an export button for something that cannot be exported.
+	if (row.isSpecial)
+	{
+		ImGui::TextWrapped("%s", Messages.Palette_select_hint());
+		return;
+	}
 
 	// Character, then palette, then what it is bound to - most general to most specific.
 	ImGui::TextDisabled("%s", group.charName.c_str());
 	ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.15f);
-	ImGui::TextWrapped("%s", special ? DisplayNameForSlotValue(row.name).c_str() : row.name.c_str());
+	ImGui::TextWrapped("%s", row.name.c_str());
 	ImGui::PopFont();
-
-	if (special)
-	{
-		ImGui::TextWrapped("%s", NamesEqual(row.name, kRandomIniValue)
-			? Messages.Palette_random_tooltip()
-			: Messages.Palette_random_exclude_tooltip());
-	}
 
 	ImGui::Spacing();
 	ImGui::TextUnformatted(Messages.Palette_ingame_color());
 	DrawSlotCombo(group, row);
-
-	if (special)
-		return;
 
 	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
 	const char* paletteData = customPalettes[group.charIndex][row.palIndex].file0;

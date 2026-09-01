@@ -76,8 +76,11 @@ How to edit a palette in an image editor
   on the character.
 - Import that .png back in the same window. A PNG the mod exported remembers which
   character it is for, so it imports in one step. A PNG from anywhere else asks you.
-- Only the character colours travel in a PNG, so the effect colours stay at their
-  defaults - .cfpl is still the lossless format.
+- A PNG carries only the character colours - not the seven effect palettes, and not the
+  creator/description/bloom info. If you are re-importing a palette you exported and the
+  original is still installed under the same name, all of that is kept and only the
+  colours change. A PNG from anywhere else gets the character's default effect colours.
+  .cfpl is still the lossless format and the one to share.
 - PNGs must be indexed / 8-bit. An RGB screenshot of a palette will be rejected.
 - The background is transparent. Viewers with a dark theme draw that as black.
 - This follows the convention HIKARI's CFPL-PNG / PNG-CFPL converters established, so
