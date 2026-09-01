@@ -11,6 +11,7 @@
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "Palette/impl_templates.h"
 #include "Palette/PaletteManager.h"
+#include "Palette/HipReference.h"
 #include "Palette/PngPalette.h"
 
 #include "imgui_internal.h"
@@ -420,7 +421,22 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 				// A PNG palette only holds the character colors, so the effect files are
 				// dropped; .cfpl stays the lossless format.
 				const IMPL_t* paletteFile = (const IMPL_t*)g_pendingExportPaletteBytes.data();
-				written = PngPalette::WritePaletteFile(path, paletteFile->palData.file0, error);
+				const char* characterColors = paletteFile->palData.file0;
+				const int charIndex = paletteFile->header.charIndex;
+
+				// Prefer painting the palette onto one of the character's own sprites,
+				// read out of the player's install: recolouring a picture of the character
+				// beats recolouring 256 numbered squares. Falls back to the swatch grid
+				// when the sprite archive is missing or unreadable, so the export always
+				// produces something importable.
+				written = HipReference::WriteReferenceSheet(charIndex, characterColors, path, error);
+				if (!written)
+				{
+					g_imGuiLogger->Log("[system] No reference sheet for this character (%s); exporting a swatch grid instead.\n",
+						error.c_str());
+					error.clear();
+					written = PngPalette::WritePaletteFile(path, characterColors, error);
+				}
 			}
 			else
 			{

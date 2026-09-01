@@ -18,6 +18,13 @@ namespace PngPalette
 	bool ReadPaletteFile(const std::string& path, char* outPaletteData, std::string& outError);
 
 	// Writes a 16x16 8-bit indexed PNG (one pixel per color, row-major, index 0
-	// top-left) whose PLTE/tRNS chunks carry the 256 palette entries.
+	// top-left) whose PLTE/tRNS chunks carry the 256 palette entries. This is the
+	// fallback export; HipReference paints the palette onto the character's own sprite.
 	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError);
+
+	// Writes an arbitrary 8-bit indexed PNG: `pixels` is width*height palette indices,
+	// `paletteData` is IMPL_PALETTE_DATALEN bytes of BGRA. Index 0 is always written
+	// fully transparent, since that is BBCF's transparency slot.
+	bool WriteIndexedPng(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* pixels, std::string& outError);
 }

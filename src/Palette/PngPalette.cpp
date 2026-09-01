@@ -224,17 +224,17 @@ namespace PngPalette
 		return true;
 	}
 
-	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError)
+	bool WriteIndexedPng(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* pixels, std::string& outError)
 	{
-		// TODO: the long-term plan is to export a reference sheet built from the user's
-		// own game install -- decode the character's HIP sprite with this palette applied
-		// so the PNG doubles as a preview you can recolor in an image editor. That needs a
-		// HIP pixel decoder (see the DFASFPAC/FPAC notes), which does not exist yet, so for
-		// now the sheet is a plain 16x16 swatch grid. Whatever replaces it only has to keep
-		// the PLTE/tRNS chunks below intact for import to keep working.
+		if (width <= 0 || height <= 0 || !pixels)
+		{
+			outError = "nothing to write";
+			return false;
+		}
+
 		unsigned char plte[kPlteLength];
 		unsigned char trns[kPaletteEntryCount];
-		bool needsTrns = false;
 
 		for (int i = 0; i < kPaletteEntryCount; i++)
 		{
@@ -243,25 +243,33 @@ namespace PngPalette
 			plte[i * 3 + 1] = src[1]; // G
 			plte[i * 3 + 2] = src[0]; // B
 			trns[i] = src[3];
-			if (src[3] != 0xFF)
-				needsTrns = true;
 		}
+		// Index 0 is BBCF's transparency slot -- in a sprite it is the background. Forcing
+		// it clear here is what makes an exported sheet come out on transparency instead of
+		// on the palette's stand-in colour, and it matches the importer leaving 0 alone.
+		trns[0] = 0;
 
 		unsigned char ihdr[13] = {};
-		ihdr[3] = kSheetWidth;
-		ihdr[7] = kSheetHeight;
+		ihdr[0] = (unsigned char)((width >> 24) & 0xFF);
+		ihdr[1] = (unsigned char)((width >> 16) & 0xFF);
+		ihdr[2] = (unsigned char)((width >> 8) & 0xFF);
+		ihdr[3] = (unsigned char)(width & 0xFF);
+		ihdr[4] = (unsigned char)((height >> 24) & 0xFF);
+		ihdr[5] = (unsigned char)((height >> 16) & 0xFF);
+		ihdr[6] = (unsigned char)((height >> 8) & 0xFF);
+		ihdr[7] = (unsigned char)(height & 0xFF);
 		ihdr[8] = 8; // bit depth
 		ihdr[9] = 3; // color type: indexed
 		// compression / filter / interlace all stay 0
 
 		// One filter byte per scanline, then one palette index per pixel.
 		std::vector<unsigned char> raw;
-		raw.reserve(kSheetHeight * (1 + kSheetWidth));
-		for (int y = 0; y < kSheetHeight; y++)
+		raw.reserve((size_t)height * (1 + (size_t)width));
+		for (int y = 0; y < height; y++)
 		{
 			raw.push_back(0); // filter: none
-			for (int x = 0; x < kSheetWidth; x++)
-				raw.push_back((unsigned char)(y * kSheetWidth + x));
+			const unsigned char* row = pixels + (size_t)y * (size_t)width;
+			raw.insert(raw.end(), row, row + width);
 		}
 
 		std::vector<unsigned char> idat;
@@ -271,8 +279,7 @@ namespace PngPalette
 		png.insert(png.end(), kPngSignature, kPngSignature + sizeof(kPngSignature));
 		AppendChunk(png, "IHDR", ihdr, sizeof(ihdr));
 		AppendChunk(png, "PLTE", plte, sizeof(plte));
-		if (needsTrns)
-			AppendChunk(png, "tRNS", trns, sizeof(trns));
+		AppendChunk(png, "tRNS", trns, sizeof(trns));
 		AppendChunk(png, "IDAT", idat.data(), idat.size());
 		AppendChunk(png, "IEND", nullptr, 0);
 
@@ -283,5 +290,17 @@ namespace PngPalette
 		}
 
 		return true;
+	}
+
+	bool WritePaletteFile(const std::string& path, const char* paletteData, std::string& outError)
+	{
+		// The plain swatch grid: one pixel per colour, index 0 top-left. This is the
+		// fallback for characters whose sprite archive we cannot read; the nicer export
+		// is HipReference, which paints the palette onto the character's own sprite.
+		unsigned char pixels[kSheetWidth * kSheetHeight];
+		for (int i = 0; i < kSheetWidth * kSheetHeight; i++)
+			pixels[i] = (unsigned char)i;
+
+		return WriteIndexedPng(path, kSheetWidth, kSheetHeight, paletteData, pixels, outError);
 	}
 }
