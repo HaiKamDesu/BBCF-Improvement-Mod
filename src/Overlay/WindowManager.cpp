@@ -7,6 +7,7 @@
 #include "WindowContainer/WindowContainer.h"
 #include "Window/LogWindow.h"
 #include "Window/MainWindow.h"
+#include "Window/PalettesConfigWindow.h"
 #include "Window/NetworkSquareColorWindow.h"
 #include "Window/Ranked/RankedProgressWindow.h"
 #include "Window/UnlimitedPlaybackWindow.h"
@@ -142,6 +143,10 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	// instead so the vendored files stay pristine. Must be set before the first NewFrame(), which
 	// is when ImGui loads the file. The pointer is not copied, so it needs static lifetime.
 	ImGui::GetIO().IniFilename = "menus.ini";
+
+	// Before the first frame: that file is parsed then, and a handler registered after it
+	// never sees its own lines.
+	PalettesConfigWindow::RegisterLayoutSettings();
 
 	m_initialized = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
 	if (!m_initialized)

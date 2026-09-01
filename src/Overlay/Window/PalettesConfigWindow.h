@@ -10,6 +10,10 @@
 class PalettesConfigWindow
 {
 public:
+	// Registers the handler that keeps the detail panel's width in ImGui's own ini.
+	// Must run before the first frame, which is when that file is parsed.
+	static void RegisterLayoutSettings();
+
 	void DrawOpenButton();
 	void DrawModal();
 
@@ -52,8 +56,6 @@ private:
 	// m_groups / its rows; the selection is cleared whenever the grid is rebuilt.
 	int m_selectedGroup = -1;
 	int m_selectedRow = -1;
-	// Width of the detail panel, dragged by the splitter between it and the grid.
-	float m_detailPanelWidth = 340.0f;
 	// Draft copy of the palettes.ini slot table (per character, one string per color).
 	// This is what gets written on save; Cancel throws it away.
 	std::vector<std::vector<std::string>> m_draftSlots;

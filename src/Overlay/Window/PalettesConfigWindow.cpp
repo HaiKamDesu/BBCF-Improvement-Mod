@@ -69,6 +69,33 @@ namespace
 	// PNG palette interchange (PLTE chunk), the format UNI2 Improvement Mod and unPAC use.
 	constexpr const char* kPngFileExtension = ".png";
 
+	// The width of the detail panel is window geometry, so it lives with the window
+	// geometry - in ImGui's own menus.ini, next to the size and position of the window it
+	// belongs to - rather than in settings.ini, where it would show up as a row asking the
+	// user to type a pixel count.
+	//
+	// ImGui parses that file on the first frame, so the handler has to be registered
+	// during init; a handler added later never sees the lines it was meant to read.
+	float g_detailPanelWidth = 340.0f;
+
+	void* PalettesLayout_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* name)
+	{
+		return strcmp(name, "Layout") == 0 ? (void*)1 : nullptr;
+	}
+
+	void PalettesLayout_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line)
+	{
+		float width = 0.0f;
+		if (sscanf_s(line, "DetailPanelWidth=%f", &width) == 1 && width > 0.0f)
+			g_detailPanelWidth = width;
+	}
+
+	void PalettesLayout_WriteAll(ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
+	{
+		buf->appendf("[%s][Layout]\n", handler->TypeName);
+		buf->appendf("DetailPanelWidth=%.0f\n\n", g_detailPanelWidth);
+	}
+
 	constexpr const char* kFileDialogOwner = "palettes_window";
 	constexpr int kFileDialogExportPalette = 0;
 	constexpr int kFileDialogImportPalette = 1;
@@ -134,6 +161,22 @@ namespace
 		} while (FindNextFileA(hFind, &data));
 		FindClose(hFind);
 	}
+}
+
+void PalettesConfigWindow::RegisterLayoutSettings()
+{
+	// AddSettingsHandler asserts if the type is already registered, and initialization can
+	// run again after a device loss.
+	if (ImGui::FindSettingsHandler("BBCFIMPalettes"))
+		return;
+
+	ImGuiSettingsHandler handler;
+	handler.TypeName = "BBCFIMPalettes";
+	handler.TypeHash = ImHashStr("BBCFIMPalettes");
+	handler.ReadOpenFn = PalettesLayout_ReadOpen;
+	handler.ReadLineFn = PalettesLayout_ReadLine;
+	handler.WriteAllFn = PalettesLayout_WriteAll;
+	ImGui::AddSettingsHandler(&handler);
 }
 
 void PalettesConfigWindow::DrawOpenButton()
@@ -1154,9 +1197,9 @@ void PalettesConfigWindow::DrawModal()
 		const float totalWidth = ImGui::GetContentRegionAvail().x;
 		const float minPanel = 220.0f;
 		const float maxPanel = (std::max)(minPanel, totalWidth - 260.0f);
-		m_detailPanelWidth = ImClamp(m_detailPanelWidth, minPanel, maxPanel);
+		g_detailPanelWidth = ImClamp(g_detailPanelWidth, minPanel, maxPanel);
 
-		const float gridWidth = totalWidth - m_detailPanelWidth - splitterWidth;
+		const float gridWidth = totalWidth - g_detailPanelWidth - splitterWidth;
 
 		ImGui::BeginChild("##palettes_grid", ImVec2(gridWidth, -64.0f), true);
 		for (int i = 0; i < (int)m_groups.size(); i++)
@@ -1166,8 +1209,13 @@ void PalettesConfigWindow::DrawModal()
 		ImGui::SameLine(0.0f, 0.0f);
 
 		ImGui::InvisibleButton("##palettes_splitter", ImVec2(splitterWidth, ImGui::GetContentRegionAvail().y - 64.0f));
-		if (ImGui::IsItemActive())
-			m_detailPanelWidth -= ImGui::GetIO().MouseDelta.x;
+		if (ImGui::IsItemActive() && ImGui::GetIO().MouseDelta.x != 0.0f)
+		{
+			g_detailPanelWidth -= ImGui::GetIO().MouseDelta.x;
+			// Tell ImGui the ini is stale, or the new width is only written if something
+			// else happens to dirty it.
+			ImGui::MarkIniSettingsDirty();
+		}
 		if (ImGui::IsItemHovered() || ImGui::IsItemActive())
 			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
