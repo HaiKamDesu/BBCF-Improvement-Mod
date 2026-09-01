@@ -1,10 +1,9 @@
 #include "BgmReplacementWindow.h"
 
-#include "Audio/AudioDecode.h"
-#include "Audio/AudioPreviewPlayer.h"
 #include "Audio/BgmReplacementManager.h"
 #include "Audio/MusicManager.h"
 #include "Core/Localization.h"
+#include "Core/Settings.h"
 #include "Core/NativeFileDialog.h"
 #include "Overlay/imgui_utils.h"
 
@@ -14,6 +13,13 @@
 namespace
 {
 	const char* kPickerToken = "BgmReplacementWindow";
+
+	std::string FormatDb(float value)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "%+.1f dB", value);
+		return buf;
+	}
 
 	// One colour per state, so a glance down the list tells you what is going on without
 	// reading any of it.
@@ -70,6 +76,7 @@ void BgmReplacementWindow::BeforeDraw()
 void BgmReplacementWindow::Draw()
 {
 	BgmReplacementManager& mgr = GetBgmReplacements();
+	PollRestartAfterApply();
 
 	if (!mgr.IsInitialized())
 	{
@@ -363,14 +370,13 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 	ImGui::PopID();
 }
 
-// Gain has to be baked into the converted .pac - the game plays it through its own XACT
-// engine and the mod has no volume control there. So the slider does NOT re-encode as it
-// moves: it drives AudioPreviewPlayer, which plays the decoded source out of the default
-// output device with the gain applied live. Only "Apply" spends a conversion.
+// Gain is baked into the converted .pac: the game plays that file through its own XACT
+// engine and the mod has no volume control there. So changing the slider costs nothing
+// until Apply, which re-converts.
 void BgmReplacementWindow::DrawGainRow(int tableIndex)
 {
 	BgmReplacementManager& mgr = GetBgmReplacements();
-	AudioDecode::GainSpec saved = mgr.GetGain(tableIndex);
+	const float saved = mgr.GetGainDb(tableIndex);
 
 	// The draft is per-row and only exists while the user is editing this track.
 	if (m_gainEditIndex != tableIndex)
@@ -381,97 +387,101 @@ void BgmReplacementWindow::DrawGainRow(int tableIndex)
 
 	ImGui::Spacing();
 
-	bool automatic = m_gainDraft.automatic;
-	if (ImGui::Checkbox(L("Match the game's music level").c_str(), &automatic))
-		m_gainDraft.automatic = automatic;
-	if (ImGui::IsItemHovered())
+	// If the song carries a loudness tag it has already been levelled by it, and this
+	// slider adjusts from there rather than from the raw file.
+	float tagGain = 0.0f;
+	if (mgr.GetTagGainDb(tableIndex, tagGain))
 	{
-		ImGui::SetTooltipWrapped(
-			L("Measures the song and levels it against the rest of the game's music, so one "
-			  "track isn't twice as loud as the next. Untick to set the volume yourself.").c_str());
+		char note[160];
+		snprintf(note, sizeof(note), "%s %+.1f dB",
+			L("Levelled by the song's own tag:").c_str(), tagGain);
+		ImGui::TextDisabled("%s", note);
 	}
 
-	if (!m_gainDraft.automatic)
+	// Ctrl+click to type an exact value.
+	ImGui::SetNextItemWidth(180.0f);
+	ImGui::SliderFloat(L("Adjust").c_str(), &m_gainDraft, -40.0f, 40.0f, "%+.1f dB");
+
+	// How much of that is free. Up to the song's own headroom nothing is altered at all;
+	// past it the loud parts have to be held down to fit, and the song is being squashed
+	// rather than turned up. Saying so is the difference between a slider that sounds
+	// broken and one whose limits are understood.
+	const float headroom = mgr.GetHeadroomDb(tableIndex);
+	if (headroom > -200.0f)
 	{
-		ImGui::SetNextItemWidth(180.0f);
-		ImGui::SliderFloat(L("Volume").c_str(), &m_gainDraft.manualDb, -24.0f, 12.0f, "%+.1f dB");
-	}
-
-	AudioPreviewPlayer& player = AudioPreviewPlayer::Get();
-
-	// Keep a running preview in step with the slider.
-	if (player.IsPlaying() && m_previewIndex == tableIndex && !m_gainDraft.automatic)
-		player.SetGainDb(m_gainDraft.manualDb);
-
-	const bool previewingThis = player.IsPlaying() && m_previewIndex == tableIndex;
-	if (ImGui::Button(previewingThis ? L("Stop").c_str() : L("Listen").c_str()))
-	{
-		if (previewingThis)
+		if (m_gainDraft > headroom)
 		{
-			player.Stop();
-			m_previewIndex = -1;
+			ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s",
+				(L("Above") + " " + FormatDb(headroom) + " " + L("this song gets squashed to fit.")).c_str());
 		}
 		else
 		{
-			StartGainPreview(tableIndex);
+			ImGui::TextDisabled("%s",
+				(L("Untouched up to") + " " + FormatDb(headroom)).c_str());
 		}
 	}
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::SetTooltipWrapped(
-			L("Plays your song at this volume right now, without converting anything. "
-			  "Works anywhere, including outside a match.").c_str());
-	}
 
-	const bool dirty = (m_gainDraft.automatic != saved.automatic) ||
-		(!m_gainDraft.automatic && m_gainDraft.manualDb != saved.manualDb);
+	const bool dirty = (m_gainDraft != saved);
 	if (dirty)
 	{
-		ImGui::SameLine();
 		if (ImGui::Button(L("Apply volume").c_str()))
 		{
-			player.Stop();
-			m_previewIndex = -1;
-			mgr.SetGain(tableIndex, m_gainDraft);
+			mgr.SetGainDb(tableIndex, m_gainDraft);
 			m_lastMessage = L("Reconverting at the new volume") + "...";
+
+			// The game is holding the old .pac. If this track is being previewed, play it
+			// again once the rebuild lands, or the new volume is not heard at all.
+			m_restartAfterApplyIndex = tableIndex;
 		}
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltipWrapped(L("Converts the song again so the game plays it at this volume.").c_str());
+
+		// Say so plainly. Without this the slider looks like it did something, and the
+		// song keeps playing at the old volume with no indication why.
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s", L("not applied yet").c_str());
 	}
 }
 
-void BgmReplacementWindow::StartGainPreview(int tableIndex)
+// A rebuild writes a new .pac, but the game is still holding the one it already loaded,
+// so a track that is playing keeps playing at the old volume. Once the rebuild lands, ask
+// the game to load it again - the same thing "Play yours" does - so the change is audible
+// straight away instead of only after the track next starts.
+void BgmReplacementWindow::PollRestartAfterApply()
 {
+	if (m_restartAfterApplyIndex < 0)
+		return;
+
 	BgmReplacementManager& mgr = GetBgmReplacements();
-	const std::string source = mgr.GetSourcePath(tableIndex);
-	if (source.empty())
-	{
-		m_lastMessage = L("That song's original file isn't there any more.");
-		return;
-	}
+	const BgmReplacementState state = mgr.GetState(m_restartAfterApplyIndex);
+	if (state == BgmReplacementState::Converting)
+		return; // still rebuilding
 
-	// Decoding a full track is a disk read plus a decode, so it does not belong on the
-	// render thread. Anything longer than a moment would need to move off it; in practice
-	// this is a few hundred milliseconds and the alternative (a second worker plus its
-	// lifetime) buys nothing for a button the user pressed deliberately.
-	std::vector<unsigned char> pcm;
-	std::string error;
-	if (!AudioDecode::DecodeFile(source, 44100, 2, pcm, &error))
-	{
-		m_lastMessage = L("Could not play that song") + ": " + error;
-		return;
-	}
+	const int tableIndex = m_restartAfterApplyIndex;
+	m_restartAfterApplyIndex = -1;
 
-	const float gainDb = AudioDecode::ResolveGainDb(m_gainDraft, pcm);
-	AudioPreviewPlayer& player = AudioPreviewPlayer::Get();
-	player.SetGainDb(gainDb);
-	if (!player.Play(std::move(pcm), 44100, 2))
-	{
-		m_lastMessage = L("Could not play that song") + ": " + player.LastError();
-		m_previewIndex = -1;
+	// The "reconverting" note has served its purpose either way.
+	if (m_lastMessage == L("Reconverting at the new volume") + "...")
+		m_lastMessage.clear();
+
+	if (state != BgmReplacementState::Active)
 		return;
-	}
-	m_previewIndex = tableIndex;
+
+	const BgmReplaceableTrack* track = mgr.FindTrack(tableIndex);
+	if (!track)
+		return;
+
+	const std::string relPath = mgr.GetReplacementPreviewPath(tableIndex);
+	if (relPath.empty())
+		return;
+
+	// Only in a match: this is the game's own playback path and it has nowhere to play
+	// otherwise. Outside one, the next time the track starts is soon enough.
+	if (!MusicManager::GetInstance().IsInMatch())
+		return;
+
+	MusicManager::GetInstance().PreviewPac(relPath, track->baseName);
+	m_lastMessage = track->displayName + " " + L("is playing at the new volume.");
 }
 
 void BgmReplacementWindow::OpenPickerFor(int tableIndex)

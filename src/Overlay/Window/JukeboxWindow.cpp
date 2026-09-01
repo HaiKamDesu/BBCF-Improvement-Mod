@@ -5,12 +5,32 @@
 #include "Core/Localization.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Logger/ImGuiLogger.h"
+#include "Overlay/NotificationBar/NotificationBar.h"
+#include "Audio/AudioDecode.h"
+#include "Core/NativeFileDialog.h"
+#include "Core/utils.h"
+
+#include <Windows.h>
 
 #include <algorithm>
 #include <iomanip>
 #include <chrono>
 #include <cstdio>
 #include <string>
+
+namespace
+{
+	const char* const kJukeboxDialogOwner = "jukebox_window";
+	const char* const kCustomDirRel = "data/Sound/BGM/custom";
+	// Matches MusicManager: custom tracks are numbered from here up.
+	const int kCustomTrackIdBase = 10000;
+
+	std::string FileNameOf(const std::string& path)
+	{
+		const size_t slash = path.find_last_of("\\/");
+		return slash == std::string::npos ? path : path.substr(slash + 1);
+	}
+}
 
 JukeboxWindow::JukeboxWindow(const std::string& windowTitle, bool windowClosable, ImGuiWindowFlags windowFlags)
 	: IWindow(windowTitle, windowClosable, windowFlags)
@@ -27,8 +47,12 @@ void JukeboxWindow::Draw() {
 	MusicManager& musicManager = GetMusicManager();
 	musicManager.StartCustomMusicDiscovery();
 	musicManager.PollCustomMusicDiscovery();
+	PollImportDialog();
+	PollRestartAfterVolume();
 
 	DrawControls();
+	ImGui::SameLine();
+	DrawImportButton();
 	ImGui::Separator();
 	DrawCurrentTrackInfo();
 	ImGui::Separator();
@@ -155,6 +179,147 @@ void JukeboxWindow::DrawControls() {
     }
     ImGui::SameLine();
     ImGui::ShowHelpMarker(L("Reset all settings and re-enable all tracks").c_str());
+}
+
+// Copies a chosen audio file into the custom folder and rescans. Adding music otherwise
+// meant finding data/Sound/BGM/custom yourself and restarting the game.
+void JukeboxWindow::DrawImportButton() {
+	MusicManager& musicManager = GetMusicManager();
+
+	const bool busy = NativeFileDialog::IsOpen() || musicManager.IsCustomMusicLoading();
+	ImGui::BeginDisabled(busy);
+	if (ImGui::Button(L("Add music...").c_str())) {
+		NativeFileDialog::Request request;
+		request.title = "Add music to the Jukebox";
+		request.filters.push_back({ AudioDecode::FilterDescription(), AudioDecode::FilterPattern() });
+		NativeFileDialog::Open(kJukeboxDialogOwner, request);
+	}
+	ImGui::EndDisabled();
+
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltipWrapped(
+			L("Copies a song into the Jukebox's custom folder and converts it. Accepts "
+			  "every format the mod can read, not just MP3.").c_str());
+	}
+}
+
+void JukeboxWindow::PollImportDialog() {
+	NativeFileDialog::Result result;
+	if (!NativeFileDialog::Consume(kJukeboxDialogOwner, &result))
+		return;
+	if (!result.accepted || result.path.empty())
+		return;
+
+	const std::string fileName = FileNameOf(result.path);
+	const std::string destDir = GamePath(kCustomDirRel);
+	CreateDirectoryW(utf8_to_utf16(destDir).c_str(), NULL);
+	const std::string destPath = destDir + "\\" + fileName;
+
+	// The source file has to stay somewhere the scan can find it on later launches, which
+	// is what the custom folder is; copying rather than referencing is what makes the
+	// track survive the user moving or deleting the original.
+	// Wide copy: the chosen path and the name it keeps can both be outside the system
+	// codepage, and an ANSI copy would silently mangle them.
+	if (CopyFileW(utf8_to_utf16(result.path).c_str(), utf8_to_utf16(destPath).c_str(), FALSE) == 0) {
+		const DWORD error = GetLastError();
+		if (g_imGuiLogger)
+			g_imGuiLogger->Log("[error] Could not copy '%s' into the custom folder (error %lu)\n",
+				fileName.c_str(), error);
+		if (g_notificationBar)
+			g_notificationBar->AddNotification(("Could not add " + fileName).c_str());
+		return;
+	}
+
+	if (g_imGuiLogger)
+		g_imGuiLogger->Log("[system] Added '%s' to the Jukebox's custom folder\n", fileName.c_str());
+	if (g_notificationBar)
+		g_notificationBar->AddNotification(("Converting " + fileName + "...").c_str());
+
+	GetMusicManager().RescanCustomMusic();
+}
+
+// Reload a track whose volume was just changed, if it is the one playing. The volume is
+// baked into the converted file, so until the game reads the new one it keeps playing at
+// the old level with nothing to show that anything happened.
+void JukeboxWindow::PollRestartAfterVolume() {
+	if (m_restartAfterVolumeTrackId < 0)
+		return;
+
+	MusicManager& musicManager = GetMusicManager();
+	if (musicManager.IsCustomMusicLoading())
+		return; // still reconverting
+
+	const int trackId = m_restartAfterVolumeTrackId;
+	m_restartAfterVolumeTrackId = -1;
+
+	// Only if it is actually playing; reloading anything else would interrupt the music
+	// for no reason.
+	if (musicManager.GetCurrentTrackId() != trackId)
+		return;
+
+	musicManager.PlayTrack(trackId, true);
+}
+
+// A small button per custom track opening a volume popup. A slider on every row would
+// swamp a list that is mostly there for choosing what to play.
+void JukeboxWindow::DrawCustomTrackVolume(int trackId) {
+	MusicManager& musicManager = GetMusicManager();
+
+	const std::string popupId = "##vol" + std::to_string(trackId);
+	const float current = musicManager.GetCustomTrackVolumeDb(trackId);
+
+	char label[48];
+	if (current == 0.0f)
+		snprintf(label, sizeof(label), "%s%s", L("vol").c_str(), popupId.c_str());
+	else
+		snprintf(label, sizeof(label), "%+.0f dB%s", current, popupId.c_str());
+
+	if (ImGui::SmallButton(label))
+		ImGui::OpenPopup(popupId.c_str());
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Set how loud this song is. The file is converted again when you apply it.").c_str());
+
+	if (ImGui::BeginPopup(popupId.c_str())) {
+		// The draft only exists while this popup is open.
+		if (m_volumePopupTrackId != trackId) {
+			m_volumePopupTrackId = trackId;
+			m_volumeDraft = current;
+		}
+
+		// If the song carries a loudness tag it has already been levelled by it, and this
+		// slider is an adjustment on top rather than the whole story. Saying so is the
+		// difference between "0 dB means untouched" and "0 dB means whatever the tag said".
+		float tagGain = 0.0f;
+		if (musicManager.GetCustomTrackTagGainDb(trackId, tagGain)) {
+			char note[128];
+			snprintf(note, sizeof(note), "%s %+.1f dB", L("Levelled by the song's own tag:").c_str(), tagGain);
+			ImGui::TextDisabled("%s", note);
+		}
+
+		ImGui::SetNextItemWidth(200.0f);
+		ImGui::SliderFloat(L("Adjust").c_str(), &m_volumeDraft, -40.0f, 40.0f, "%+.1f dB");
+
+		const bool busy = musicManager.IsCustomMusicLoading();
+		ImGui::BeginDisabled(busy || m_volumeDraft == current);
+		if (ImGui::Button(L("Apply volume").c_str())) {
+			musicManager.SetCustomTrackVolumeDb(trackId, m_volumeDraft);
+			// The rebuild is asynchronous, and the game is still holding the old file. If
+			// this is what is playing, it has to be reloaded once the new one exists.
+			m_restartAfterVolumeTrackId = trackId;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndDisabled();
+
+		if (m_volumeDraft != current) {
+			ImGui::SameLine();
+			ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s", L("not applied yet").c_str());
+		}
+
+		ImGui::EndPopup();
+	} else if (m_volumePopupTrackId == trackId) {
+		m_volumePopupTrackId = -1;
+	}
 }
 
 void JukeboxWindow::DrawCurrentTrackInfo() {
@@ -302,13 +467,30 @@ void JukeboxWindow::DrawTrackList() {
 		}
 
 		ImGui::SameLine();
+
+		// Custom tracks get a volume of their own. Native ones are already balanced
+		// against each other by the game, so there is nothing to fix there.
+		const bool isCustom = track->id >= kCustomTrackIdBase;
+
+		// A Selectable spans the rest of the line by default, which puts it underneath
+		// anything drawn after it on the same row - that is why the volume button could
+		// not be clicked, the row was swallowing the press. Reserve the space instead.
+		const float volumeWidth = isCustom ? 70.0f : 0.0f;
+		const float selectableWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x - volumeWidth);
+
 		if (ImGui::Selectable((std::to_string(track->id) + ": " + track->name + "##Sel" + std::to_string(track->id)).c_str(),
-			isCurrent, ImGuiSelectableFlags_AllowDoubleClick) && ImGui::IsMouseDoubleClicked(0)) {
+			isCurrent, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap,
+			ImVec2(selectableWidth, 0.0f)) && ImGui::IsMouseDoubleClicked(0)) {
 			musicManager.PlayTrack(track->id);
 		}
 
 		if (isCurrent) {
 			ImGui::PopStyleColor();
+		}
+
+		if (isCustom) {
+			ImGui::SameLine();
+			DrawCustomTrackVolume(track->id);
 		}
 	}
 

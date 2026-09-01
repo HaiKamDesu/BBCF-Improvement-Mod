@@ -23,7 +23,7 @@ private:
 	void DrawTrackList();
 	void DrawTrackRow(int tableIndex);
 	void DrawGainRow(int tableIndex);
-	void StartGainPreview(int tableIndex);
+	void PollRestartAfterApply();
 
 	void OpenPickerFor(int tableIndex);
 	void PollPicker();
@@ -33,8 +33,10 @@ private:
 	int  m_categoryFilter = 0;      // 0 = all
 	int  m_pendingPickIndex = -1;   // track whose picker is open
 	int  m_gainEditIndex = -1;      // track whose gain draft m_gainDraft holds
-	int  m_previewIndex = -1;       // track currently auditioning, or -1
-	AudioDecode::GainSpec m_gainDraft;
+	float m_gainDraft = 0.0f;
+	// Track whose rebuild we are waiting on, so the game can be told to play it again
+	// once the new file exists. -1 when nothing is pending.
+	int  m_restartAfterApplyIndex = -1;
 	std::string m_lastMessage;
 	std::vector<std::string> m_categories;
 };

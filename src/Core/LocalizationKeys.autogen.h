@@ -2970,23 +2970,29 @@ struct LocalizationKeysAccessor
         // is back to normal.
         inline const char* is_back_to_normal() const { return Get("is back to normal."); }
 
-        // Match the game's music level
-        inline const char* Match_the_game_s_music_level() const { return Get("Match the game's music level"); }
-
-        // Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.
-        inline const char* Measures_the_song_and_levels_it_against_the_rest_of_the_game_s_music_so_one_track_isn_t_twice_as_loud_as_the_next_Untick_to_set_the_volume_yourself() const { return Get("Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself."); }
-
         // Volume
         inline const char* Volume() const { return Get("Volume"); }
 
-        // Listen
-        inline const char* Listen() const { return Get("Listen"); }
+        // Adjust
+        inline const char* Adjust() const { return Get("Adjust"); }
+
+        // Levelled by the song's own tag:
+        inline const char* Levelled_by_the_song_s_own_tag() const { return Get("Levelled by the song's own tag:"); }
+
+        // Add music...
+        inline const char* Add_music() const { return Get("Add music..."); }
+
+        // vol
+        inline const char* vol() const { return Get("vol"); }
+
+        // Set how loud this song is. The file is converted again when you apply it.
+        inline const char* Set_how_loud_this_song_is_The_file_is_converted_again_when_you_apply_it() const { return Get("Set how loud this song is. The file is converted again when you apply it."); }
+
+        // Copies a song into the Jukebox's custom folder and converts it. Accepts every format the mod can read, not just MP3.
+        inline const char* Copies_a_song_into_the_Jukebox_s_custom_folder_and_converts_it_Accepts_every_format_the_mod_can_read_not_just_MP3() const { return Get("Copies a song into the Jukebox's custom folder and converts it. Accepts every format the mod can read, not just MP3."); }
 
         // Stop
         inline const char* Stop() const { return Get("Stop"); }
-
-        // Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.
-        inline const char* Plays_your_song_at_this_volume_right_now_without_converting_anything_Works_anywhere_including_outside_a_match() const { return Get("Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match."); }
 
         // Apply volume
         inline const char* Apply_volume() const { return Get("Apply volume"); }
@@ -2996,12 +3002,6 @@ struct LocalizationKeysAccessor
 
         // Reconverting at the new volume
         inline const char* Reconverting_at_the_new_volume() const { return Get("Reconverting at the new volume"); }
-
-        // That song's original file isn't there any more.
-        inline const char* That_song_s_original_file_isn_t_there_any_more() const { return Get("That song's original file isn't there any more."); }
-
-        // Could not play that song
-        inline const char* Could_not_play_that_song() const { return Get("Could not play that song"); }
 
         // Put the original back and delete the converted file.
         inline const char* Put_the_original_back_and_delete_the_converted_file() const { return Get("Put the original back and delete the converted file."); }
@@ -3395,6 +3395,21 @@ struct LocalizationKeysAccessor
 
         // You cannot use this feature while searching for a ranked match.
         inline const char* You_cannot_use_this_feature_while_searching_for_a_ranked_match() const { return Get("You cannot use this feature while searching for a ranked match."); }
+
+        // not applied yet
+        inline const char* not_applied_yet() const { return Get("not applied yet"); }
+
+        // Untouched up to
+        inline const char* Untouched_up_to() const { return Get("Untouched up to"); }
+
+        // Above
+        inline const char* Above() const { return Get("Above"); }
+
+        // this song gets squashed to fit.
+        inline const char* this_song_gets_squashed_to_fit() const { return Get("this song gets squashed to fit."); }
+
+        // is playing at the new volume.
+        inline const char* is_playing_at_the_new_volume() const { return Get("is playing at the new volume."); }
 };
 
 

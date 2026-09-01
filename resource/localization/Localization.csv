@@ -1166,17 +1166,17 @@ Rebuild,Rebuild,Reconstruir
 Rebuilding,Rebuilding,Reconstruyendo
 Convert the same song again.,Convert the same song again.,Vuelve a convertir la misma canción.
 is back to normal.,is back to normal.,volvió a la normalidad.
-Match the game's music level,Match the game's music level,Igualar el volumen del juego
-"Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.","Measures the song and levels it against the rest of the game's music, so one track isn't twice as loud as the next. Untick to set the volume yourself.","Mide la canción y la nivela con el resto de la música del juego, para que una pista no suene al doble de volumen que la siguiente. Desmarca esta opción para ajustar el volumen tú mismo."
 Volume,Volume,Volumen
-Listen,Listen,Escuchar
+Adjust,Adjust,Ajustar
+Levelled by the song's own tag:,Levelled by the song's own tag:,Nivelada por la etiqueta de la canción:
+Add music...,Add music...,Añadir música...
+vol,vol,vol
+Set how loud this song is. The file is converted again when you apply it.,Set how loud this song is. The file is converted again when you apply it.,Ajusta el volumen de esta canción. El archivo se convierte de nuevo al aplicarlo.
+"Copies a song into the Jukebox's custom folder and converts it. Accepts every format the mod can read, not just MP3.","Copies a song into the Jukebox's custom folder and converts it. Accepts every format the mod can read, not just MP3.","Copia una canción a la carpeta personalizada del Jukebox y la convierte. Acepta todos los formatos que el mod puede leer, no solo MP3."
 Stop,Stop,Detener
-"Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.","Plays your song at this volume right now, without converting anything. Works anywhere, including outside a match.","Reproduce tu canción a este volumen ahora mismo, sin convertir nada. Funciona en cualquier parte, incluso fuera de una partida."
 Apply volume,Apply volume,Aplicar volumen
 Converts the song again so the game plays it at this volume.,Converts the song again so the game plays it at this volume.,Vuelve a convertir la canción para que el juego la reproduzca a este volumen.
 Reconverting at the new volume,Reconverting at the new volume,Reconvirtiendo al nuevo volumen
-That song's original file isn't there any more.,That song's original file isn't there any more.,El archivo original de esa canción ya no está.
-Could not play that song,Could not play that song,No se pudo reproducir esa canción
 Put the original back and delete the converted file.,Put the original back and delete the converted file.,Restaura la original y borra el archivo convertido.
 Choose a song to play instead of,Choose a song to play instead of,Elige una canción para reemplazar a
 Converting your song for,Converting your song for,Convirtiendo tu canción para
@@ -1308,3 +1308,8 @@ this menu,this menu,este menú
 Releases,Releases,Versiones
 You must be in a mode where state can be saved.,You must be in a mode where state can be saved.,Tienes que estar en un modo donde se pueda guardar el estado.
 You cannot use this feature while searching for a ranked match.,You cannot use this feature while searching for a ranked match.,No puedes usar esta función mientras buscas una partida clasificatoria.
+not applied yet,not applied yet,sin aplicar todavía
+Untouched up to,Untouched up to,Sin alterar hasta
+Above,Above,Por encima de
+this song gets squashed to fit.,this song gets squashed to fit.,esta canción se comprime para caber.
+is playing at the new volume.,is playing at the new volume.,suena ahora al nuevo volumen.
