@@ -26,6 +26,7 @@ void JukeboxWindow::BeforeDraw() {
 void JukeboxWindow::Draw() {
 	MusicManager& musicManager = GetMusicManager();
 	musicManager.StartCustomMusicDiscovery();
+	musicManager.PollCustomMusicDiscovery();
 
 	DrawControls();
 	ImGui::Separator();

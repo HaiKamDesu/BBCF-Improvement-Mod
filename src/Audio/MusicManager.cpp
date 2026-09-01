@@ -509,6 +509,11 @@ void MusicManager::StartCustomMusicDiscovery() {
 }
 
 void MusicManager::PollCustomMusicDiscovery() {
+    if (!m_customMusicLoading) return;
+
+    // Update() and JukeboxWindow::Draw() can both reach this method. Serialize
+    // completion so the future is consumed and custom tracks are registered once.
+    std::lock_guard<std::mutex> completionLock(m_customMusicPollMutex);
     if (!m_customMusicLoading || !m_customMusicFuture.valid()) return;
     if (m_customMusicFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) return;
     std::vector<CustomTrackInfo> customTracks = m_customMusicFuture.get();
@@ -1694,14 +1699,13 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 				int playResult = -1;
 				typedef void (__thiscall *BankPlayFuncType)(void* bank, int* resultOut, const char* cueName, void* param3);
 				BankPlayFuncType playCue = (BankPlayFuncType)(modBase + 0x0515B0);
-				// Every .pac's cue is named after its own base filename - native
-				// tracks and, since the converter learned to write arbitrary cue
-				// names, custom ones too. So the cue to request is always just the
-				// bgm name. (Custom banks used to inherit the template's literal
-				// "000_btl_rg" cue and needed a special case here.)
-				// A preview loads a .pac from a subfolder, so its path and its cue name
-				// are not the same string; everything else plays by its own base name.
-				const char* playCueName = cueOverride ? cueOverride : bgmName;
+				// Jukebox custom tracks use the complete native 000_btl_rg XACT bank
+				// template; only their outer .pac filename is custom. Replacement
+				// previews supply their real cue explicitly, while native tracks use
+				// their normal filename.
+				const char* playCueName = cueOverride
+					? cueOverride
+					: ((trackId >= 10000) ? "000_btl_rg" : bgmName);
 				playCue(bank13, &playResult, playCueName, dummyParams);
 				LogMusic("MusicManager: Direct CSoundBank_XACT::Play(\"%s\") returned %d\n", playCueName, playResult);
 			}
