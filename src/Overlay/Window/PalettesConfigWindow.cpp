@@ -12,7 +12,7 @@
 #include "Palette/impl_templates.h"
 #include "Palette/PaletteManager.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
-#include "Palette/HipReference.h"
+#include "Palette/PaletteSheet.h"
 #include "Palette/PngPalette.h"
 
 #include "imgui_internal.h"
@@ -442,12 +442,11 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 				const char* characterColors = paletteFile->palData.file0;
 				const int charIndex = paletteFile->header.charIndex;
 
-				// Prefer painting the palette onto one of the character's own sprites,
-				// read out of the player's install: recolouring a picture of the character
-				// beats recolouring 256 numbered squares. Falls back to the swatch grid
-				// when the sprite archive is missing or unreadable, so the export always
-				// produces something importable.
-				written = HipReference::WriteReferenceSheet(charIndex, characterColors, path, error);
+				// Paint the palette onto the character's reference sheet: recolouring a
+				// picture of the character beats recolouring 256 numbered squares. Falls
+				// back to a plain swatch grid if the sheet is somehow unavailable, so an
+				// export always produces something importable.
+				written = PaletteSheet::Write(charIndex, characterColors, path, error);
 				if (!written)
 				{
 					g_imGuiLogger->Log("[system] No reference sheet for this character (%s); exporting a swatch grid instead.\n",

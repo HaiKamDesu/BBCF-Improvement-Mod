@@ -247,15 +247,11 @@ namespace PngPalette
 		return true;
 	}
 
-	bool WriteIndexedPng(const std::string& path, int width, int height,
-		const char* paletteData, const unsigned char* pixels, std::string& outError,
-		int charIndex)
+	// Shared tail of both writers: everything except where IDAT's bytes come from.
+	static bool WritePngWithImageStream(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* imageStream, size_t imageStreamLength,
+		std::string& outError, int charIndex)
 	{
-		if (width <= 0 || height <= 0 || !pixels)
-		{
-			outError = "nothing to write";
-			return false;
-		}
 
 		unsigned char plte[kPlteLength];
 		unsigned char trns[kPaletteEntryCount];
@@ -286,19 +282,6 @@ namespace PngPalette
 		ihdr[9] = 3; // color type: indexed
 		// compression / filter / interlace all stay 0
 
-		// One filter byte per scanline, then one palette index per pixel.
-		std::vector<unsigned char> raw;
-		raw.reserve((size_t)height * (1 + (size_t)width));
-		for (int y = 0; y < height; y++)
-		{
-			raw.push_back(0); // filter: none
-			const unsigned char* row = pixels + (size_t)y * (size_t)width;
-			raw.insert(raw.end(), row, row + width);
-		}
-
-		std::vector<unsigned char> idat;
-		ZlibStore(raw, idat);
-
 		std::vector<unsigned char> png;
 		png.insert(png.end(), kPngSignature, kPngSignature + sizeof(kPngSignature));
 		AppendChunk(png, "IHDR", ihdr, sizeof(ihdr));
@@ -319,7 +302,7 @@ namespace PngPalette
 			text.insert(text.end(), value.begin(), value.end());
 			AppendChunk(png, "tEXt", text.data(), text.size());
 		}
-		AppendChunk(png, "IDAT", idat.data(), idat.size());
+		AppendChunk(png, "IDAT", imageStream, imageStreamLength);
 		AppendChunk(png, "IEND", nullptr, 0);
 
 		if (!utils_WriteFile(path.c_str(), png.data(), (unsigned long)png.size(), true))
@@ -329,6 +312,49 @@ namespace PngPalette
 		}
 
 		return true;
+	}
+
+	bool WriteIndexedPng(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* pixels, std::string& outError,
+		int charIndex)
+	{
+		if (width <= 0 || height <= 0 || !pixels)
+		{
+			outError = "nothing to write";
+			return false;
+		}
+
+		// One filter byte per scanline, then one palette index per pixel. Deflated as
+		// stored blocks - see WriteIndexedPngPrecompressed for why that is the ceiling
+		// here, and why the reference sheets do not go through this path.
+		std::vector<unsigned char> raw;
+		raw.reserve((size_t)height * (1 + (size_t)width));
+		for (int y = 0; y < height; y++)
+		{
+			raw.push_back(0); // filter: none
+			const unsigned char* row = pixels + (size_t)y * (size_t)width;
+			raw.insert(raw.end(), row, row + width);
+		}
+
+		std::vector<unsigned char> idat;
+		ZlibStore(raw, idat);
+
+		return WritePngWithImageStream(path, width, height, paletteData,
+			idat.data(), idat.size(), outError, charIndex);
+	}
+
+	bool WriteIndexedPngPrecompressed(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* imageStream, size_t imageStreamLength,
+		std::string& outError, int charIndex)
+	{
+		if (width <= 0 || height <= 0 || !imageStream || imageStreamLength == 0)
+		{
+			outError = "nothing to write";
+			return false;
+		}
+
+		return WritePngWithImageStream(path, width, height, paletteData,
+			imageStream, imageStreamLength, outError, charIndex);
 	}
 
 	bool ReadPaletteFile(const std::string& path, char* outPaletteData, std::string& outError)

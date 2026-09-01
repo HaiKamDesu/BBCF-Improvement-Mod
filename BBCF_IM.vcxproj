@@ -160,7 +160,7 @@
     <ClCompile Include="src\Core\SystemSpecsLogger.cpp" />
     <ClCompile Include="src\Palette\impl_templates.cpp" />
     <ClCompile Include="src\Palette\PaletteManager.cpp" />
-    <ClCompile Include="src\Palette\HipReference.cpp" />
+    <ClCompile Include="src\Palette\PaletteSheet.cpp" />
     <ClCompile Include="src\Palette\PngPalette.cpp" />
     <ClCompile Include="src\SteamApiWrapper\SteamApiHelper.cpp" />
     <ClCompile Include="src\SteamApiWrapper\SteamFriendsWrapper.cpp" />
@@ -330,7 +330,7 @@
     <ClInclude Include="src\Core\SystemSpecsLogger.h" />
     <ClInclude Include="src\Game\gamestates.h" />
     <ClInclude Include="src\Palette\PaletteManager.h" />
-    <ClInclude Include="src\Palette\HipReference.h" />
+    <ClInclude Include="src\Palette\PaletteSheet.h" />
     <ClInclude Include="src\Palette\PngPalette.h" />
     <ClInclude Include="src\Updater\FileUtil.h" />
     <ClInclude Include="src\Updater\GitHubReleaseClient.h" />

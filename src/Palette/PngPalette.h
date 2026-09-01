@@ -38,4 +38,13 @@ namespace PngPalette
 	bool WriteIndexedPng(const std::string& path, int width, int height,
 		const char* paletteData, const unsigned char* pixels, std::string& outError,
 		int charIndex = -1);
+
+	// As above, but `imageStream` is an already-deflated PNG image stream (filtered
+	// scanlines) that is copied straight into IDAT. The mod has a zlib decompressor but
+	// no compressor, so anything it deflates itself has to use stored blocks; letting a
+	// caller supply a stream prepared ahead of time is what keeps exported sheets a
+	// sensible size. See tools/build_palette_templates.py.
+	bool WriteIndexedPngPrecompressed(const std::string& path, int width, int height,
+		const char* paletteData, const unsigned char* imageStream, size_t imageStreamLength,
+		std::string& outError, int charIndex = -1);
 }

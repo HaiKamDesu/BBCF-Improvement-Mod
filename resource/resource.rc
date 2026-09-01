@@ -13,3 +13,7 @@
 // out itself on first run (and refreshes the updater's ".default" copies every launch).
 "settings.ini" RCDATA "settings.ini"
 "palettes.ini" RCDATA "palettes.ini"
+
+// Per-character palette reference sheets (HIKARI's, see tools/build_palette_templates.py).
+// Pixel indices only, deflated: 43 MB of sheets in 2.4 MB.
+"palette_templates" RCDATA "palette_templates.bin"
