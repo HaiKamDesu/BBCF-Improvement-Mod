@@ -2116,6 +2116,67 @@ unsigned int count_entities(bool unk_status2) {
 
   
 
+namespace
+{
+    // Taking over rebinds which controller slot each side reads, so that whichever side
+    // you take over is driven by your P1 device. Those are game globals that persist for
+    // the rest of the session: leaving them rewritten means P1 and P2 input sources stay
+    // swapped in ordinary Training and Versus afterwards, until something else happens to
+    // set them back. So the originals are kept and put back on the way out.
+    struct TakeoverInputBinding
+    {
+        unsigned char trainingSide;
+        unsigned char slotForP1;
+        unsigned char slotForP2;
+        bool saved = false;
+    };
+
+    TakeoverInputBinding g_savedInputBinding;
+
+    const int kTrainingSideOffset = 0x891A38;
+    const int kSlotForP2Offset    = 0x8929A8;
+    const int kSlotForP1Offset    = 0x8929A4;
+
+    // Which controller slot drives the character during a takeover.
+    //
+    // Takeover binds whichever side you took over to one slot, so that a single player can
+    // take over either side without swapping pads. Slot 0 is the natural choice and is
+    // also the only one that merges the keyboard in, which is why it is the default - but
+    // a pad configured as player 2 lives in slot 1 and is then completely dead during a
+    // takeover, which is the whole of the "takeover is keyboard only" report.
+    //
+    // Merging both slots so any pad works regardless would have to happen inside the
+    // game's own controller read, since that is the only place both pads exist as mapped
+    // BBCF inputs; the mod's battle-input hook is per player, and during a takeover the
+    // other player IS the replay playback.
+    unsigned char TakeoverInputSlot()
+    {
+        return Settings::settingsIni.takeoverInputSlot == 1 ? 1 : 0;
+    }
+
+    void SaveTakeoverInputBinding(char* bbcf_base)
+    {
+        // Only the first takeover of a session captures the real values; a second one
+        // would otherwise save the rebound state as if it were the original.
+        if (g_savedInputBinding.saved)
+            return;
+        g_savedInputBinding.trainingSide = *(bbcf_base + kTrainingSideOffset);
+        g_savedInputBinding.slotForP1    = *(bbcf_base + kSlotForP1Offset);
+        g_savedInputBinding.slotForP2    = *(bbcf_base + kSlotForP2Offset);
+        g_savedInputBinding.saved = true;
+    }
+
+    void RestoreTakeoverInputBinding(char* bbcf_base)
+    {
+        if (!g_savedInputBinding.saved)
+            return;
+        *(bbcf_base + kTrainingSideOffset) = g_savedInputBinding.trainingSide;
+        *(bbcf_base + kSlotForP1Offset)    = g_savedInputBinding.slotForP1;
+        *(bbcf_base + kSlotForP2Offset)    = g_savedInputBinding.slotForP2;
+        g_savedInputBinding.saved = false;
+    }
+}
+
 void ScrWindow::DrawReplayTakeoverBody() {
   
     
@@ -2188,9 +2249,12 @@ void ScrWindow::DrawReplayTakeoverBody() {
                         replay_action_load.push_back(*recorded_input);
                     }
                     facing_left_replay_takeover = g_interfaces.player2.GetData()->facingLeft2;
+                    SaveTakeoverInputBinding(bbcf_base);
                     *(bbcf_base + 0x891A38) = 0; // sets training mode to be "p1" sided
-                    *(bbcf_base + 0x8929A8) = 1; //p1 control related
-                    *(bbcf_base + 0x8929A4) = 0; //p1 control related
+                    // Your side reads the chosen slot; the replay's side keeps the other
+                    // one, so the two never point at the same device.
+                    *(bbcf_base + 0x8929A4) = TakeoverInputSlot();
+                    *(bbcf_base + 0x8929A8) = 1 - TakeoverInputSlot();
                 }
 
             }
@@ -2220,9 +2284,10 @@ void ScrWindow::DrawReplayTakeoverBody() {
                     auto len_replay = replay_action_load.size();
                     facing_left_replay_takeover = g_interfaces.player1.GetData()->facingLeft2;
                     //bypasses necessary to make p2 control 
+                    SaveTakeoverInputBinding(bbcf_base);
                     *(bbcf_base + 0x891A38) = 1; // sets training mode to be "p2" sided
-                    *(bbcf_base + 0x8929A8) = 0; //p2 control related
-                    *(bbcf_base + 0x8929A4) = 1; //p2 control related
+                    *(bbcf_base + 0x8929A8) = TakeoverInputSlot();
+                    *(bbcf_base + 0x8929A4) = 1 - TakeoverInputSlot();
 
                 }
             }
@@ -2283,6 +2348,7 @@ void ScrWindow::DrawReplayTakeoverBody() {
         if (*g_gameVals.pGameMode == GameMode_Training) {
             if (ImGui::Button("Return to replay")) {
                 playback_manager.set_playback_control(0); //makes sure the playback is stopped before going back to the replay
+                RestoreTakeoverInputBinding(bbcf_base);
                 *g_gameVals.pGameMode = GameMode_ReplayTheater;
                 snap_apparatus_takeover->load_snapshot(0);
             }

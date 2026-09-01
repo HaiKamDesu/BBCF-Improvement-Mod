@@ -198,6 +198,11 @@ namespace {
 
 	// Both of these are consent settings whose -1 means "the mod has not asked you yet", which
 	// is impossible to guess from a number box.
+	static const SettingEnumOption kTakeoverSlotOptions[] = {
+		{ 0, "Player 1 controller (or keyboard)" },
+		{ 1, "Player 2 controller" },
+	};
+
 	static const SettingEnumOption kAskNoYesOptions[] = {
 		{ -1, "Ask me in-game" },
 		{ 0, "No" },
@@ -206,6 +211,7 @@ namespace {
 
 	static const SettingEnumMetadata kSettingEnumMetadata[] = {
 		{ "AllowPaletteDownloads", kAskNoYesOptions, _countof(kAskNoYesOptions) },
+		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },
 		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
 		{ "D3D9IatFallbackHook", kD3D9IatFallbackHookOptions, _countof(kD3D9IatFallbackHookOptions) },
