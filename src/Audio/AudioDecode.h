@@ -6,17 +6,23 @@
 //
 // Everything downstream of this header speaks one format only: interleaved
 // signed 16-bit PCM at the rate/channel count the caller asks for (in practice
-// 44100 Hz stereo, the geometry the XACT converter needs). Two decoders sit
+// 44100 Hz stereo, the geometry the XACT converter needs). Three decoders sit
 // behind it:
 //
 //   miniaudio  - wav, mp3, flac, ogg/vorbis. Handles resampling and channel
 //                conversion itself, so it always returns the requested layout.
+//   Opus       - opus (and Opus carried in a .ogg). The Ogg container is
+//                unwrapped by hand in AudioDecode.cpp and the packets go to
+//                Windows' Opus decoder MFT, because Media Foundation ships the
+//                codec but no Ogg demuxer to feed it.
 //   Media Foundation - the fallback, which covers the container formats
 //                miniaudio does not know (m4a/aac, wma) using whatever codecs
 //                the user's Windows install happens to have.
 //
 // miniaudio is tried first because its coverage is identical on every machine;
-// MF's is not, and its failure modes are less legible.
+// MF's is not, and its failure modes are less legible. Opus sits between them:
+// it only claims files that really start with an OpusHead, so everything else
+// still ends up at MF with MF's own error.
 namespace AudioDecode
 {
     // Peak and RMS of a decoded buffer, in dBFS (0 dB = full scale, negative
