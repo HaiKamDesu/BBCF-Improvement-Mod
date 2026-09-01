@@ -17,3 +17,7 @@
 // Per-character palette reference sheets (HIKARI's, see tools/build_palette_templates.py).
 // Pixel indices only, deflated: 43 MB of sheets in 2.4 MB.
 "palette_templates" RCDATA "palette_templates.bin"
+
+// One idle sprite per character, as palette indices, for the palette grid's thumbnails.
+// See tools/build_palette_thumbnails.py.
+"palette_thumbnails" RCDATA "palette_thumbnails.bin"
