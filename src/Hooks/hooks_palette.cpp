@@ -1,4 +1,5 @@
 #include "hooks_palette.h"
+#include "Palette/CharSelectPalettes.h"
 
 #include "HookManager.h"
 
@@ -112,6 +113,7 @@ void __declspec(naked)GetGameStateCharacterSelect()
 	// Slot 0x3F still holds that anchor, so the game's exit validation sees a
 	// selectable track instead of erroring into the red debug screen.
 	GetMusicManager().UnloadCustomBgm();
+	CharSelectPalettes::OnLeaveCharacterSelect();
 
 	__asm popad
 
@@ -394,6 +396,57 @@ void __declspec(naked) PlatVoiceLoadDbP2Hook() // 0x556488 vbtldb slot1 (eax)
 		jmp [PlatVoiceLoadDbP2JmpBackAddr] }
 }
 
+
+// Character select bakes every character's 24 colours once on entry, reading each palette
+// straight out of char_<tag>_pal.pac - the ordinary gameplay archive - and copying it into
+// its own buffers. This sits on that read and hands the baker a custom palette instead.
+//
+// The patched instruction is the `call FPAC::GetEntryPtr` whose result is the HPAL entry
+// about to be consumed, so replacing EAX replaces the palette. The frame still belongs to
+// the bake loop at this point, which is where the character and colour indices come from.
+//
+// Nothing else branches into the five bytes being replaced - checked across the whole
+// image, including as a dword in any jump table - which an interior branch target would
+// turn into a 0xC0000409.
+DWORD CssDotPaletteFetchJmpBackAddr = 0;
+// FPAC::GetEntryPtr, the call this hook replaces and therefore has to make itself.
+// Resolved from the module base at hook install: the exe relocates, so the absolute
+// address it happens to have in a static analysis is not the one at runtime.
+static DWORD g_fpacGetEntryPtr = 0;
+
+void __declspec(naked) CssDotPaletteFetch()
+{
+	static int charIndex = 0;
+	static int colourIndex = 0;
+	static const char* sourceEntry = NULL;
+	static const char* replacement = NULL;
+
+	__asm
+	{
+		// The instruction we replaced. ECX and the argument are already set by the game.
+		call [g_fpacGetEntryPtr]
+		mov sourceEntry, eax
+
+		// Bake-loop locals: character index and colour index for this entry.
+		mov eax, [ebp - 2A4h]
+		mov charIndex, eax
+		mov eax, [ebp - 2A0h]
+		mov colourIndex, eax
+
+		pushad
+	}
+
+	replacement = CharSelectPalettes::SubstituteEntry(charIndex, colourIndex, sourceEntry);
+
+	__asm
+	{
+		// popad restores EAX too, so the result has to be put back afterwards.
+		popad
+		mov eax, replacement
+		jmp [CssDotPaletteFetchJmpBackAddr]
+	}
+}
+
 DWORD GetPaletteIndexPointersJmpBackAddr = 0;
 void __declspec(naked) GetPaletteIndexPointers()
 {
@@ -486,6 +539,14 @@ bool placeHooks_palette()
 	// reads are 7-byte `mov eax,[eax+ecx+164Ch]`.
 	const DWORD bbcfBase = reinterpret_cast<DWORD>(GetBbcfBaseAdress());
 	// PLAY resolvers (FUN_005CFC80 / FUN_005D1440)
+	// The `call FPAC::GetEntryPtr` inside the character select palette bake. Patched by
+	// address, not signature, so exactly this one 5-byte instruction is replaced and the
+	// hook has only that one instruction to replay. Verified against the image: the bytes
+	// there are E8 FD 68 E4 FF, the call resolves to 0x00457AD0, and nothing branches into
+	// the five bytes (checked as a dword across the whole image).
+	g_fpacGetEntryPtr = bbcfBase + ADDR_FpacGetEntryPtr; // the call the hook makes itself
+	CssDotPaletteFetchJmpBackAddr    = HookManager::SetHook("CssDotPaletteFetch",   bbcfBase + ADDR_CssDotPaletteEntryFetch, 5, CssDotPaletteFetch);
+
 	PlatVoiceResolverAJmpBackAddr    = HookManager::SetHook("PlatVoiceResolverA",  bbcfBase + 0x001CFF57, 7, PlatVoiceResolverAHook);
 	PlatVoiceResolverBJmpBackAddr    = HookManager::SetHook("PlatVoiceResolverB",  bbcfBase + 0x001D15E2, 7, PlatVoiceResolverBHook);
 	// LOAD reads (voice-bank mount routine FUN_00555A20): 3 categories x 2 player slots

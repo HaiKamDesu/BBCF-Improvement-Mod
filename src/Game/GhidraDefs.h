@@ -781,6 +781,23 @@ static constexpr uintptr_t ADDR_PaletteTextureRefresh_Alt  = 0x001B6980; // FUN_
 // player's pick. UpdatePalette()'s redraw toggle must therefore be undone on entry to character
 // select and nowhere later. See PaletteManager::OnCharacterSelect and
 // docs/Research/TaokakaPaletteRefreshInvestigation.md.
+// Character select colour-preview palettes. The preview is indexed "dot art" and it draws
+// with the ORDINARY GAMEPLAY palettes: the bake reads char_<tag>_pal.pac out of resource
+// slot (ADDR_CssPaletteResourceSlot + charIndex). It never touches paldata.pac inside
+// char_select_dot.pac - verified by disassembly of the builder, which pushes "palimg.pac"
+// once and "paldata.pac" not at all, which is why replacing that file did nothing.
+//
+// The bake runs ONCE on entry to character select, over every character x 24 colours, and
+// copies each palette into its own buffers (duplicated at +0x800, the same pattern
+// CharPaletteHandle::ReplacePalArrayInMemory already handles). There is no per-colour and
+// no per-player re-read, so one substitution covers both players - and a palette changed
+// while sitting on the screen is not picked up until the screen is entered again.
+static constexpr uintptr_t ADDR_CssDotPaletteBake       = 0x00210470; // FUN_00610470, bake loop
+static constexpr uintptr_t ADDR_CssDotPaletteEntryFetch = 0x002111CE; // call FPAC::GetEntryPtr (hook site)
+static constexpr uintptr_t ADDR_FpacGetEntryPtr         = 0x00057AD0; // FUN_00457AD0, returns the HPAL entry
+static constexpr uintptr_t ADDR_CssPaletteResourceSlot  = 0x000000B6; // + charIndex -> char_<tag>_pal.pac
+static constexpr uintptr_t ADDR_CssDotPacResourceSlot   = 0x000000FB; // char_select_dot.pac (sprites only)
+
 static constexpr uintptr_t ADDR_CharSelectConfigCommit = 0x0007D910; // FUN_0047D910
 static constexpr uintptr_t OFFSET_PendingPalBlockP1    = 0x1648;     // +8 = native color index
 static constexpr uintptr_t OFFSET_PendingPalBlockP2    = 0x1668;
