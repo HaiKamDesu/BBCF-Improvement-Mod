@@ -1,5 +1,7 @@
 #include "MainMenuNav.h"
 
+#include "imgui_internal.h"
+
 #include "Core/Localization.h"
 #include "Overlay/imgui_utils.h"
 
@@ -58,6 +60,30 @@ namespace MainMenu
 		};
 
 		PageId g_currentPage = Page_Game;
+
+		// Which page the menu was left on, kept in ImGui's own menus.ini next to the
+		// window sizes and positions - it is the same kind of "where things were" state,
+		// and putting it in settings.ini would add a row nobody wants to edit by hand.
+		//
+		// ImGui parses that file on the first frame, so the handler has to be registered
+		// during init; one added later never sees its own lines.
+		void* MenuLayout_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* name)
+		{
+			return strcmp(name, "Layout") == 0 ? (void*)1 : nullptr;
+		}
+
+		void MenuLayout_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line)
+		{
+			int page = 0;
+			if (sscanf_s(line, "Page=%d", &page) == 1 && page >= 0 && page < Page_Count)
+				g_currentPage = (PageId)page;
+		}
+
+		void MenuLayout_WriteAll(ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
+		{
+			buf->appendf("[%s][Layout]\n", handler->TypeName);
+			buf->appendf("Page=%d\n\n", (int)g_currentPage);
+		}
 		EntryId g_pendingFocus = Entry_Count;
 
 		// True on the one frame the search sent the user to this entry. Consumes the request,
@@ -151,6 +177,22 @@ namespace MainMenu
 		ImGui::TextDisabledWrapped("%s", text.c_str());
 	}
 
+	void RegisterLayoutSettings()
+	{
+		// AddSettingsHandler asserts on a duplicate type, and init can run again after a
+		// device loss.
+		if (ImGui::FindSettingsHandler("BBCFIMMenu"))
+			return;
+
+		ImGuiSettingsHandler handler;
+		handler.TypeName = "BBCFIMMenu";
+		handler.TypeHash = ImHashStr("BBCFIMMenu");
+		handler.ReadOpenFn = MenuLayout_ReadOpen;
+		handler.ReadLineFn = MenuLayout_ReadLine;
+		handler.WriteAllFn = MenuLayout_WriteAll;
+		ImGui::AddSettingsHandler(&handler);
+	}
+
 	PageId CurrentPage()
 	{
 		return g_currentPage;
@@ -158,7 +200,12 @@ namespace MainMenu
 
 	void GoToPage(PageId page)
 	{
+		if (g_currentPage == page)
+			return;
 		g_currentPage = page;
+		// Remember it for next session. Marking here rather than on every frame means the
+		// ini is only rewritten when the page actually changes.
+		ImGui::MarkIniSettingsDirty();
 	}
 
 	void GoToEntry(EntryId entry)

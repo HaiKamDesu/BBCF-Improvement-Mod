@@ -7,6 +7,7 @@
 #include "WindowContainer/WindowContainer.h"
 #include "Window/LogWindow.h"
 #include "Window/MainWindow.h"
+#include "Window/MainMenu/MainMenuNav.h"
 #include "Window/PalettesConfigWindow.h"
 #include "Window/NetworkSquareColorWindow.h"
 #include "Window/Ranked/RankedProgressWindow.h"
@@ -147,6 +148,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	// Before the first frame: that file is parsed then, and a handler registered after it
 	// never sees its own lines.
 	PalettesConfigWindow::RegisterLayoutSettings();
+	MainMenu::RegisterLayoutSettings();
 
 	m_initialized = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
 	if (!m_initialized)

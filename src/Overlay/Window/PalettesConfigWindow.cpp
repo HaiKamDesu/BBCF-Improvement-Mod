@@ -429,7 +429,8 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 			return;
 		}
 	}
-	else if (CopyFileA(sourcePath.c_str(), destPath.c_str(), TRUE) != TRUE)
+	// Wide: an imported file can be named anything the user's filesystem allows.
+	else if (CopyFileW(utf8_to_utf16(sourcePath).c_str(), utf8_to_utf16(destPath).c_str(), TRUE) != TRUE)
 	{
 		ReportPaletteOutcome(("[error] Failed to import palette '" + fileName + "' into '" + destPath + "'\n").c_str(),
 			"Could not copy the palette to " + destPath);

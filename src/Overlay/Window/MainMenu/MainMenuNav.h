@@ -131,6 +131,10 @@ namespace MainMenu
 	// Dim, wrapped supporting text (what a section is for, where a thing ended up).
 	void Hint(const std::string& text);
 
+	// Registers the handler that remembers which page the menu was left on. Must run
+	// before the first frame, which is when ImGui parses its ini.
+	void RegisterLayoutSettings();
+
 	PageId CurrentPage();
 	void GoToPage(PageId page);
 	void GoToEntry(EntryId entry);
