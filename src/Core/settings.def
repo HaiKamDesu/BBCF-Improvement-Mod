@@ -187,6 +187,8 @@ SETTING(std::string, language, "Language", "en");
 // virtual-key codes before 8.4.
 SETTING(std::string, unlimitedPlaybackTriggerKey, "UnlimitedPlaybackTriggerKeyCode", "F6");
 SETTING(std::string, unlimitedPlaybackLoopKey, "UnlimitedPlaybackLoopKeyCode", "F7");
+SETTING(std::string, replayTakeoverTriggerKey, "ReplayTakeoverTriggerKey", "F7");
+SETTING(std::string, replayTakeoverCancelKey, "ReplayTakeoverCancelKey", "F8");
 SETTING(float, unlimitedPlaybackLoopSetupSeconds, "UnlimitedPlaybackLoopSetupSeconds", "0.0");
 SETTING(float, unlimitedPlaybackLoopEndingSeconds, "UnlimitedPlaybackLoopEndingSeconds", "0.0");
 SETTING(bool, unlimitedPlaybackLoopRestartLabState, "UnlimitedPlaybackLoopRestartLabState", "0");

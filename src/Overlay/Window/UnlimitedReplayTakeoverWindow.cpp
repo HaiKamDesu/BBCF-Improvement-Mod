@@ -1,7 +1,9 @@
 #include "UnlimitedReplayTakeoverWindow.h"
 
 #include "Game/ReplayTakeover/UnlimitedReplayTakeoverManager.h"
+#include "Core/HotkeyManager.h"
 #include "Core/NativeFileDialog.h"
+#include "Overlay/Widget/HotkeyBindWidget.h"
 #include "Core/logger.h"
 #include "Core/interfaces.h"
 #include "Game/gamestates.h"
@@ -48,39 +50,29 @@ void LogUrtWindowContext(const char* tag, int selectedEntry, size_t entryCount, 
         io.MousePos.y);
 }
 
-int CaptureNextPressedVirtualKey() {
-    for (int vk = 1; vk < 256; ++vk) {
-        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-            continue;
-        }
-        if (GetAsyncKeyState(vk) & 0x1) {
-            return vk;
-        }
-    }
-    return 0;
-}
+// Both binds are ordinary hotkeys, so this is the same "click, then press it" control the
+// Settings window uses - which is what lets a stick or hitbox button be bound here at all.
+void DrawTakeoverHotkeyRow(const char* label, HotkeyManager::Action action) {
+    HotkeyBinding binding = HotkeyManager::GetBinding(action);
 
-bool AnyBindableKeyCurrentlyDown() {
-    for (int vk = 1; vk < 256; ++vk) {
-        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON || vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-            continue;
-        }
-        if (GetAsyncKeyState(vk) & 0x8000) {
-            return true;
-        }
+    std::string warning;
+    const HotkeyManager::Action conflict = HotkeyManager::FindConflict(binding, action);
+    if (conflict != HotkeyManager::Hotkey_Count) {
+        warning = std::string("Already used by \"") + HotkeyManager::DisplayName(conflict) +
+            "\". Pressing it will do both.";
+    } else if (HotkeyManager::IsControllerBinding(binding)) {
+        warning = "Controller button: this also works during a match, so pick one you never "
+            "press while playing.";
     }
-    return false;
-}
 
-const char* KeyName(int key) {
-    static char name[64];
-    const int scanCode = MapVirtualKeyA(static_cast<UINT>(key), MAPVK_VK_TO_VSC);
-    const long lParam = (scanCode << 16);
-    const int len = GetKeyNameTextA(lParam, name, static_cast<int>(sizeof(name)));
-    if (len <= 0) {
-        std::snprintf(name, sizeof(name), "VK_%d", key);
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine(170.0f);
+    if (ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
+            HotkeyManager::DefaultBindingString(action),
+            warning.empty() ? nullptr : warning.c_str())) {
+        // Persists to settings.ini and re-arms controller polling for the new binding.
+        HotkeyManager::SetBinding(action, binding);
     }
-    return name;
 }
 
 bool DrawContextButton(const char* label, bool enabled) {
@@ -127,10 +119,6 @@ void UnlimitedReplayTakeoverWindow::Draw() {
     static int renameEntryIdx = -1;
     static char renameBuf[128] = "";
     static char recordName[128] = "";
-    static bool mapTriggerMode = false;
-    static bool mapTriggerWaitingRelease = false;
-    static bool mapCancelMode = false;
-    static bool mapCancelWaitingRelease = false;
     static size_t lastEntryCount = 0;
     static bool debugAutoPlayArmed = false;
 
@@ -156,36 +144,6 @@ void UnlimitedReplayTakeoverWindow::Draw() {
         ImGui::TextDisabled("Mode: Training runtime available.");
     } else {
         ImGui::TextDisabled("Mode: Open replay to capture, training to run entries.");
-    }
-
-    if (mapTriggerMode) {
-        if (mapTriggerWaitingRelease) {
-            if (!AnyBindableKeyCurrentlyDown()) {
-                mapTriggerWaitingRelease = false;
-            }
-        } else {
-            const int mapped = CaptureNextPressedVirtualKey();
-            if (mapped != 0) {
-                mgr.SetTriggerKeyCode(mapped);
-                mapTriggerMode = false;
-                mgr.PushToast(std::string("Replay takeover trigger key: ") + KeyName(mapped));
-            }
-        }
-    }
-
-    if (mapCancelMode) {
-        if (mapCancelWaitingRelease) {
-            if (!AnyBindableKeyCurrentlyDown()) {
-                mapCancelWaitingRelease = false;
-            }
-        } else {
-            const int mapped = CaptureNextPressedVirtualKey();
-            if (mapped != 0) {
-                mgr.SetCancelKeyCode(mapped);
-                mapCancelMode = false;
-                mgr.PushToast(std::string("Replay takeover cancel key: ") + KeyName(mapped));
-            }
-        }
     }
 
     ImGui::Separator();
@@ -417,19 +375,8 @@ void UnlimitedReplayTakeoverWindow::Draw() {
         mgr.SetSetupDelaySeconds(setupDelay);
     }
 
-    if (ImGui::Button(mapTriggerMode ? "Press trigger key..." : "Map Trigger Key")) {
-        mapTriggerMode = true;
-        mapTriggerWaitingRelease = true;
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", KeyName(mgr.GetTriggerKeyCode()));
-
-    if (ImGui::Button(mapCancelMode ? "Press cancel key..." : "Map Cancel Key")) {
-        mapCancelMode = true;
-        mapCancelWaitingRelease = true;
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", KeyName(mgr.GetCancelKeyCode()));
+    DrawTakeoverHotkeyRow("Take over now", HotkeyManager::Hotkey_ReplayTakeoverTrigger);
+    DrawTakeoverHotkeyRow("Cancel takeover", HotkeyManager::Hotkey_ReplayTakeoverCancel);
 
     const auto& toasts = mgr.GetToasts();
     if (!toasts.empty()) {

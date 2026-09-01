@@ -38,6 +38,14 @@ HOTKEY(LoadReplayState, loadReplayStateKeybind, "LoadReplayStateKeybind", "F4",
 	"Load replay takeover state",
 	"While watching a replay, jumps back to the saved moment so you can take over and try something different from there.")
 
+HOTKEY(ReplayTakeoverTrigger, replayTakeoverTriggerKey, "ReplayTakeoverTriggerKey", "F7",
+	"Replay takeover: take over now",
+	"While replay takeover is armed in training, drops you straight into the saved situation instead of waiting for it. Bind it to a spare button on your stick if you would rather not reach for the keyboard.")
+
+HOTKEY(ReplayTakeoverCancel, replayTakeoverCancelKey, "ReplayTakeoverCancelKey", "F8",
+	"Replay takeover: cancel",
+	"Stops the replay takeover that is running right now and hands you normal training mode back.")
+
 HOTKEY(FreezeFrame, freezeFrameKeybind, "freezeFrameKeybind", "C",
 	"Pause / unpause the match",
 	"Freezes the action so you can look at a single frame. Press again to let the match run normally.")

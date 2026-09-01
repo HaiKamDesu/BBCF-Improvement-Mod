@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/HotkeyManager.h"
 #include "Game/Playbacks/PlaybackManager.h"
 #include "Game/Playbacks/PlaybackSlot.h"
 #include "Game/SnapshotApparatus/SnapshotApparatus.h"
@@ -78,10 +79,8 @@ public:
     void SetSetupDelaySeconds(float seconds);
     bool IsSetupDelayActive() const;
     float GetSetupDelayRemainingSeconds() const;
-    int GetTriggerKeyCode() const;
-    void SetTriggerKeyCode(int keyCode);
-    int GetCancelKeyCode() const;
-    void SetCancelKeyCode(int keyCode);
+    // The trigger and cancel binds are ordinary hotkeys now (HotkeyManager::Hotkey_ReplayTakeover*),
+    // so they live in settings.ini and can sit on a controller button. Nothing is stored here.
 
     std::string GetStatusText() const;
     const std::deque<ToastMessage>& GetToasts() const;
@@ -103,7 +102,9 @@ private:
 
     bool IsReplayMatchActive() const;
     bool IsTrainingMatchActive() const;
-    bool IsKeyPressedEdge(int virtualKey) const;
+    // Adopts a raw virtual-key code out of an old .urt profile as a keyboard binding, unless
+    // the player has since bound the action to something of their own.
+    void MigrateLegacyProfileKey(HotkeyManager::Action action, int virtualKey, int legacyDefaultKey);
     bool PickEntryIndex(size_t* outIndex);
     bool LoadEntryData(const ReplayTakeoverEntry& entry, LoadedEntryData* outData);
     bool SaveEntryData(const std::string& fullPath, const LoadedEntryData& data);
@@ -132,8 +133,6 @@ private:
     bool m_continuousPicking = false;
     bool m_continuousSessionActive = false;
     float m_setupDelaySeconds = 0.0f;
-    int m_triggerKeyCode = VK_F7;
-    int m_cancelKeyCode = VK_F8;
 
     bool m_initialized = false;
 

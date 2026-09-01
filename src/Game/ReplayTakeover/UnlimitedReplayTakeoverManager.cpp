@@ -28,6 +28,17 @@ const char* kEntryMagic = "URTE";
 const unsigned char kEntryVersionMajor = 1;
 const unsigned char kEntryVersionMinor = 1;
 const int kMaxReplayTakeoverFramesPerEntry = 1200;
+// What trigger_key / cancel_key defaulted to back when profiles owned these keys themselves.
+const int kLegacyTriggerKeyDefault = VK_F7;
+const int kLegacyCancelKeyDefault = VK_F8;
+
+int LegacyKeyForBinding(HotkeyManager::Action action, int legacyDefaultKey) {
+    const HotkeyBinding& binding = HotkeyManager::GetBinding(action);
+    if (binding.source == HotkeyBinding::Source_Keyboard && binding.virtualKey > 0) {
+        return binding.virtualKey;
+    }
+    return legacyDefaultKey;
+}
 const size_t kSnapshotBytesSize = sizeof(Snapshot);
 const int kUrtDedicatedLiveSnapshotSlot = 9;
 const int kPreviewFrameByteCount = 24;
@@ -1132,11 +1143,13 @@ void UnlimitedReplayTakeoverManager::Tick() {
         return;
     }
 
-    if (IsKeyPressedEdge(m_cancelKeyCode)) {
+    // ConsumePress, not WasPressed: this runs off a game hook, which can tick more than once
+    // between HotkeyManager::Update() calls and would otherwise act on the same press twice.
+    if (HotkeyManager::ConsumePress(HotkeyManager::Hotkey_ReplayTakeoverCancel)) {
         CancelActiveTakeover();
     }
 
-    if (IsKeyPressedEdge(m_triggerKeyCode)) {
+    if (HotkeyManager::ConsumePress(HotkeyManager::Hotkey_ReplayTakeoverTrigger)) {
         TriggerNow();
     }
 }
@@ -1441,8 +1454,11 @@ bool UnlimitedReplayTakeoverManager::SaveProfile(const std::string& profilePath)
     out << "format_kind=" << kProfileKind << "\n";
     out << "format_version=1.0\n";
     out << "selection_mode=" << m_selectionMode << "\n";
-    out << "trigger_key=" << m_triggerKeyCode << "\n";
-    out << "cancel_key=" << m_cancelKeyCode << "\n";
+    // The binds live in settings.ini now, but these two lines are still written as raw
+    // virtual-key codes so a profile saved here keeps loading in older builds. A controller
+    // binding has no virtual key, so those fall back to what the key always defaulted to.
+    out << "trigger_key=" << LegacyKeyForBinding(HotkeyManager::Hotkey_ReplayTakeoverTrigger, kLegacyTriggerKeyDefault) << "\n";
+    out << "cancel_key=" << LegacyKeyForBinding(HotkeyManager::Hotkey_ReplayTakeoverCancel, kLegacyCancelKeyDefault) << "\n";
     out << "setup_delay_seconds=" << m_setupDelaySeconds << "\n";
     out << "continuous=" << (m_continuousPicking ? 1 : 0) << "\n";
     for (const auto& e : m_entries) {
@@ -1495,8 +1511,9 @@ bool UnlimitedReplayTakeoverManager::LoadProfile(const std::string& profilePath)
     unsigned int parsedFormatMajor = 0;
     unsigned int parsedFormatMinor = 0;
     int parsedSelectionMode = m_selectionMode;
-    int parsedTriggerKey = m_triggerKeyCode;
-    int parsedCancelKey = m_cancelKeyCode;
+    // 0 means "the profile said nothing about it", so nothing gets migrated below.
+    int parsedTriggerKey = 0;
+    int parsedCancelKey = 0;
     float parsedSetupDelaySeconds = m_setupDelaySeconds;
     bool parsedContinuous = m_continuousPicking;
 
@@ -1599,8 +1616,8 @@ bool UnlimitedReplayTakeoverManager::LoadProfile(const std::string& profilePath)
     m_entries = parsedEntries;
     m_selectionMode = (parsedSelectionMode >= Selection_Random && parsedSelectionMode <= Selection_NonRepeatingRandom)
         ? parsedSelectionMode : Selection_Random;
-    m_triggerKeyCode = parsedTriggerKey;
-    m_cancelKeyCode = parsedCancelKey;
+    MigrateLegacyProfileKey(HotkeyManager::Hotkey_ReplayTakeoverTrigger, parsedTriggerKey, kLegacyTriggerKeyDefault);
+    MigrateLegacyProfileKey(HotkeyManager::Hotkey_ReplayTakeoverCancel, parsedCancelKey, kLegacyCancelKeyDefault);
     m_setupDelaySeconds = (std::max)(0.0f, parsedSetupDelaySeconds);
     m_continuousPicking = parsedContinuous;
     m_sequentialIndex = 0;
@@ -1681,10 +1698,6 @@ float UnlimitedReplayTakeoverManager::GetSetupDelayRemainingSeconds() const {
     const unsigned long long remainingMs = m_setupUnfreezeAtMs - now;
     return static_cast<float>(remainingMs) / 1000.0f;
 }
-int UnlimitedReplayTakeoverManager::GetTriggerKeyCode() const { return m_triggerKeyCode; }
-void UnlimitedReplayTakeoverManager::SetTriggerKeyCode(int keyCode) { m_triggerKeyCode = keyCode; }
-int UnlimitedReplayTakeoverManager::GetCancelKeyCode() const { return m_cancelKeyCode; }
-void UnlimitedReplayTakeoverManager::SetCancelKeyCode(int keyCode) { m_cancelKeyCode = keyCode; }
 
 std::string UnlimitedReplayTakeoverManager::GetStatusText() const { return m_statusText; }
 const std::deque<UnlimitedReplayTakeoverManager::ToastMessage>& UnlimitedReplayTakeoverManager::GetToasts() const { return m_toasts; }
@@ -1816,16 +1829,28 @@ bool UnlimitedReplayTakeoverManager::IsTrainingMatchActive() const {
         !g_interfaces.player2.IsCharDataNullPtr();
 }
 
-bool UnlimitedReplayTakeoverManager::IsKeyPressedEdge(int virtualKey) const {
+void UnlimitedReplayTakeoverManager::MigrateLegacyProfileKey(HotkeyManager::Action action, int virtualKey, int legacyDefaultKey) {
     if (virtualKey <= 0 || virtualKey >= 256) {
-        return false;
+        return;
     }
-    if (IsTypingInImGuiTextField()) {
-        // Swallow the edge as well, so the keypress isn't queued up for after typing ends.
-        (void)(GetAsyncKeyState(virtualKey) & 0x1);
-        return false;
+
+    const HotkeyBinding& current = HotkeyManager::GetBinding(action);
+    // Never take a bind away from someone who chose it: only a binding still sitting on the
+    // key these profiles used to hardcode is up for migration.
+    if (current.source != HotkeyBinding::Source_Keyboard ||
+        current.ctrl || current.shift || current.alt ||
+        current.virtualKey != legacyDefaultKey) {
+        return;
     }
-    return (GetAsyncKeyState(virtualKey) & 0x1) != 0;
+    if (virtualKey == legacyDefaultKey) {
+        return;
+    }
+
+    HotkeyBinding migrated;
+    migrated.source = HotkeyBinding::Source_Keyboard;
+    migrated.virtualKey = virtualKey;
+    HotkeyManager::SetBinding(action, migrated);
+    LOG(2, "[URT] Migrated legacy profile key %d for %s\n", virtualKey, HotkeyManager::IniKey(action));
 }
 
 bool UnlimitedReplayTakeoverManager::PickEntryIndex(size_t* outIndex) {
