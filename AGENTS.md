@@ -2,6 +2,15 @@
 
 Keep this file small. It is always loaded; deeper context is opt-in.
 
+## Never Commit Unprompted
+- Do NOT run `git commit` unless the user's most recent message explicitly asked for a
+  commit. Finishing a piece of work is not permission to commit it. Build it, say what
+  changed, and leave it staged or unstaged for the user to review.
+- The same goes for anything else that publishes or is hard to undo: no `git push`, no
+  tags, no releases, no deploy configs, unless that message asked.
+- `git checkout -- .`, `git reset --hard` and similar are destructive to uncommitted work.
+  Do not reach for them to tidy up.
+
 ## Token Budget Rules
 - Use caveman skill by default for user-facing replies in this repo. Stop only if user asks for normal mode.
 - Use grep-and-read skill by default for repo exploration and cross-file searches.
