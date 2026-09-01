@@ -95,15 +95,79 @@ def decode_hip(blob):
     return width, height, bytes(pixels)
 
 
+# A component smaller than this fraction of the biggest one is treated as debris rather
+# than part of the character. Several shipped sprites carry a detached fragment in a
+# corner - Kokonoe's idle has a ~25x12 blob up in the top right - and including it in the
+# bounding box is what made her render at half everyone else's size.
+DEBRIS_FRACTION = 0.05
+
+
+def connected_components(width, height, pixels):
+    """Label 8-connected runs of non-transparent pixels. Yields (area, bounding box).
+
+    Iterative, because a character is one component of a hundred thousand pixels and a
+    recursive flood fill would blow the stack.
+    """
+    seen = bytearray(width * height)
+    components = []
+
+    for start in range(width * height):
+        if seen[start] or not pixels[start]:
+            continue
+
+        stack = [start]
+        seen[start] = 1
+        area = 0
+        min_x = max_x = start % width
+        min_y = max_y = start // width
+
+        while stack:
+            index = stack.pop()
+            x, y = index % width, index // width
+            area += 1
+            if x < min_x: min_x = x
+            elif x > max_x: max_x = x
+            if y < min_y: min_y = y
+            elif y > max_y: max_y = y
+
+            for dy in (-1, 0, 1):
+                ny = y + dy
+                if ny < 0 or ny >= height:
+                    continue
+                for dx in (-1, 0, 1):
+                    nx = x + dx
+                    if nx < 0 or nx >= width:
+                        continue
+                    n = ny * width + nx
+                    if not seen[n] and pixels[n]:
+                        seen[n] = 1
+                        stack.append(n)
+
+        components.append((area, min_x, min_y, max_x, max_y))
+
+    return components
+
+
 def crop_to_content(width, height, pixels):
-    """Bounding box of everything that is not index 0 (the transparency slot)."""
-    rows = [y for y in range(height) if any(pixels[y * width:(y + 1) * width])]
-    if not rows:
+    """Bounding box of the character, ignoring detached debris.
+
+    Not simply the box of every non-transparent pixel: a stray fragment in a corner
+    stretches that box across the whole sprite, and since the thumbnail is scaled to fit
+    it, the character ends up tiny. Components far smaller than the biggest one are
+    dropped; genuinely detached parts that matter (a weapon, a summon) are nowhere near
+    that small and are kept.
+    """
+    components = connected_components(width, height, pixels)
+    if not components:
         raise ValueError("sprite is entirely transparent")
-    top, bottom = rows[0], rows[-1]
-    columns = [x for x in range(width)
-               if any(pixels[y * width + x] for y in range(top, bottom + 1))]
-    left, right = columns[0], columns[-1]
+
+    largest = max(component[0] for component in components)
+    kept = [c for c in components if c[0] >= largest * DEBRIS_FRACTION]
+
+    left = min(c[1] for c in kept)
+    top = min(c[2] for c in kept)
+    right = max(c[3] for c in kept)
+    bottom = max(c[4] for c in kept)
     return left, top, right - left + 1, bottom - top + 1
 
 

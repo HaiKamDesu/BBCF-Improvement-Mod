@@ -35,6 +35,12 @@ namespace PaletteThumbnails
 	ImTextureID Get(int charIndex, const std::string& key, const char* paletteData,
 		int* outWidth, int* outHeight);
 
+	// The full reference sheet for a palette, as a texture, for the detail panel. Only
+	// one is ever held: it is ~4.8 MB as RGBA, so selecting another palette releases the
+	// previous one. Returns nullptr if this build has no sheet for the character.
+	ImTextureID GetSheet(int charIndex, const std::string& key, const char* paletteData,
+		int* outWidth, int* outHeight);
+
 	// Drops a single palette's texture, for when its colours change underneath us.
 	void Invalidate(int charIndex, const std::string& key);
 

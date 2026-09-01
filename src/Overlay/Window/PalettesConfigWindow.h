@@ -2,6 +2,8 @@
 
 #include "imgui.h"
 
+#include "Palette/impl_format.h"
+
 #include <string>
 #include <vector>
 
@@ -30,11 +32,14 @@ private:
 	void BuildRows();
 	void RebuildGroupsFromDraft();
 	void AssignSlot(CharacterGroup& group, PaletteRow& row, int newSlot);
-	void DrawCharacterPicker();
-	void DrawGrid(CharacterGroup& group);
-	void DrawDetailPanel(CharacterGroup& group);
+	void DrawSection(int groupIndex);
+	void DrawPaletteCells(int groupIndex, const std::vector<int>& rowIndices,
+		const std::vector<std::vector<IMPL_data_t>>& customPalettes);
+	void DrawCellLabel(const std::string& name, const ImVec2& cursor,
+		float cellWidth, float spriteHeight, float labelHeight);
+	void DrawDetailPanel();
 	void DrawSlotCombo(CharacterGroup& group, PaletteRow& row);
-	void ExportPalette(const CharacterGroup& group, const PaletteRow& row);
+	void ExportPalette(const CharacterGroup& group, const PaletteRow& row, bool asPng);
 	void DrawImportButton();
 	void ConsumeFinishedFileDialog();
 	void ImportPaletteFile(const std::string& sourcePath, int charIndex);
@@ -45,8 +50,10 @@ private:
 	std::vector<CharacterGroup> m_groups;
 	// Which character's grid is showing, and which cell in it is selected. Indices into
 	// m_groups / its rows; the selection is cleared whenever the grid is rebuilt.
-	int m_selectedGroup = 0;
+	int m_selectedGroup = -1;
 	int m_selectedRow = -1;
+	// Width of the detail panel, dragged by the splitter between it and the grid.
+	float m_detailPanelWidth = 340.0f;
 	// Draft copy of the palettes.ini slot table (per character, one string per color).
 	// This is what gets written on save; Cancel throws it away.
 	std::vector<std::vector<std::string>> m_draftSlots;

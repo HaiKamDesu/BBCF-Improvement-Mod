@@ -818,7 +818,11 @@ Color_used_by,Color %d  (used by %s),Color %d  (usado por %s)
 Export,Export,Exportar
 Palette_export_tooltip,Save a copy of this palette as a .cfpl file anywhere you like.,Guarda una copia de esta paleta como archivo .cfpl donde quieras.
 Palette_select_hint,Pick a palette to see what you can do with it.,Elige una paleta para ver qué puedes hacer con ella.
-Palette_colour_slot,In-game colour,Color del juego
+Palette_ingame_color,In-game color,Color del juego
+Palette_no_preview,No preview image for this character in this build.,No hay imagen de vista previa para este personaje en esta versión.
+Palette_export_cfpl,Export .cfpl,Exportar .cfpl
+Palette_export_png,Export .png,Exportar .png
+Palette_export_png_tooltip,Saves a picture of your character in this palette. Recolor it in an image editor and import it back.,Guarda una imagen de tu personaje con esta paleta. Recolorearla en un editor de imágenes y vuelve a importarla.
 Palette_delete_tooltip,Delete this palette's file from disk (asks for confirmation).,Elimina el archivo de esta paleta del disco (pide confirmación).
 Delete palette,Delete palette,Eliminar paleta
 Palette_delete_confirm,"Delete ""%s"" (%s)?","¿Eliminar ""%s"" (%s)?"

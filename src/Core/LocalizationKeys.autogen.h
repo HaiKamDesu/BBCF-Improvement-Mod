@@ -1926,8 +1926,20 @@ struct LocalizationKeysAccessor
         // Palette_select_hint
         inline const char* Palette_select_hint() const { return Get("Palette_select_hint"); }
 
-        // Palette_colour_slot
-        inline const char* Palette_colour_slot() const { return Get("Palette_colour_slot"); }
+        // Palette_ingame_color
+        inline const char* Palette_ingame_color() const { return Get("Palette_ingame_color"); }
+
+        // Palette_no_preview
+        inline const char* Palette_no_preview() const { return Get("Palette_no_preview"); }
+
+        // Palette_export_cfpl
+        inline const char* Palette_export_cfpl() const { return Get("Palette_export_cfpl"); }
+
+        // Palette_export_png
+        inline const char* Palette_export_png() const { return Get("Palette_export_png"); }
+
+        // Palette_export_png_tooltip
+        inline const char* Palette_export_png_tooltip() const { return Get("Palette_export_png_tooltip"); }
 
         // Palette_delete_tooltip
         inline const char* Palette_delete_tooltip() const { return Get("Palette_delete_tooltip"); }

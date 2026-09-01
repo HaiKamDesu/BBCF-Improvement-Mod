@@ -125,7 +125,7 @@ namespace
 
 	struct CacheKey
 	{
-		int charIndex;
+		int charIndex = -1;
 		std::string key;
 
 		bool operator<(const CacheKey& other) const
@@ -204,6 +204,88 @@ namespace
 		return texture;
 	}
 
+	// --- Full reference sheet, for the detail panel -------------------------------------
+	// Same substitution, but over the big multi-pose sheet rather than the idle thumbnail.
+	// The sheet blob stores a ready-made PNG image stream, so getting pixels back out of
+	// it means inflating and dropping the per-scanline filter byte.
+	const char kSheetBlobMagic[4] = { 'B', 'B', 'P', 'T' };
+	const unsigned int kSheetBlobVersion = 2;
+	const wchar_t* const kSheetResourceName = L"palette_templates";
+
+	IDirect3DTexture9* g_sheetTexture = NULL;
+	CacheKey g_sheetKey;
+	int g_sheetWidth = 0;
+	int g_sheetHeight = 0;
+
+	const std::string* SheetBlob()
+	{
+		static std::string blob;
+		static bool tried = false;
+		if (!tried)
+		{
+			tried = true;
+			if (!LoadEmbeddedResource(kSheetResourceName, blob))
+				blob.clear();
+		}
+		return blob.empty() ? NULL : &blob;
+	}
+
+	bool DecodeSheet(int charIndex, std::vector<unsigned char>& outIndices,
+		int& outWidth, int& outHeight)
+	{
+		const std::string* blob = SheetBlob();
+		if (!blob || blob->size() < 20)
+			return false;
+
+		const unsigned char* base = (const unsigned char*)blob->data();
+		if (memcmp(base, kSheetBlobMagic, 4) != 0 || ReadU32(base + 4) != kSheetBlobVersion)
+			return false;
+
+		const unsigned int count = ReadU32(base + 8);
+		const unsigned int width = ReadU32(base + 12);
+		const unsigned int height = ReadU32(base + 16);
+		if (charIndex < 0 || (unsigned int)charIndex >= count)
+			return false;
+		if (width == 0 || height == 0 || width > 4096 || height > 4096)
+			return false;
+		if (blob->size() < 20 + (size_t)count * 8)
+			return false;
+
+		const unsigned char* entry = base + 20 + (size_t)charIndex * 8;
+		const unsigned int offset = ReadU32(entry);
+		const unsigned int size = ReadU32(entry + 4);
+		if (size == 0 || (size_t)offset + size > blob->size())
+			return false;
+
+		// Inflate to filtered scanlines, then drop the filter byte on each row. Every row
+		// uses filter 0 (see the packer), so there is nothing to undo beyond that.
+		std::vector<unsigned char> scanlines;
+		try
+		{
+			scanlines.resize((size_t)height * (width + 1));
+		}
+		catch (const std::bad_alloc&)
+		{
+			return false;
+		}
+
+		if (stbi_zlib_decode_buffer((char*)scanlines.data(), (int)scanlines.size(),
+			(const char*)(base + offset), (int)size) != (int)scanlines.size())
+		{
+			return false;
+		}
+
+		outIndices.resize((size_t)width * height);
+		for (unsigned int y = 0; y < height; y++)
+		{
+			memcpy(&outIndices[(size_t)y * width],
+				&scanlines[(size_t)y * (width + 1) + 1], width);
+		}
+		outWidth = (int)width;
+		outHeight = (int)height;
+		return true;
+	}
+
 	void Evict(std::map<CacheKey, Entry>::iterator it)
 	{
 		if (it->second.texture)
@@ -272,6 +354,50 @@ namespace PaletteThumbnails
 		return (ImTextureID)(uintptr_t)texture;
 	}
 
+	ImTextureID GetSheet(int charIndex, const std::string& key, const char* paletteData,
+		int* outWidth, int* outHeight)
+	{
+		if (!paletteData)
+			return 0;
+
+		CacheKey wanted;
+		wanted.charIndex = charIndex;
+		wanted.key = key;
+
+		if (g_sheetTexture && !(g_sheetKey < wanted) && !(wanted < g_sheetKey))
+		{
+			if (outWidth) *outWidth = g_sheetWidth;
+			if (outHeight) *outHeight = g_sheetHeight;
+			return (ImTextureID)(uintptr_t)g_sheetTexture;
+		}
+
+		std::vector<unsigned char> indices;
+		int width = 0, height = 0;
+		if (!DecodeSheet(charIndex, indices, width, height))
+			return 0;
+
+		Sprite sheet;
+		sheet.width = width;
+		sheet.height = height;
+		sheet.indices.swap(indices);
+
+		IDirect3DTexture9* texture = BuildTexture(sheet, paletteData);
+		if (!texture)
+			return 0;
+
+		// One at a time: this is several megabytes as RGBA.
+		if (g_sheetTexture)
+			g_sheetTexture->Release();
+		g_sheetTexture = texture;
+		g_sheetKey = wanted;
+		g_sheetWidth = width;
+		g_sheetHeight = height;
+
+		if (outWidth) *outWidth = width;
+		if (outHeight) *outHeight = height;
+		return (ImTextureID)(uintptr_t)texture;
+	}
+
 	void Invalidate(int charIndex, const std::string& key)
 	{
 		CacheKey cacheKey;
@@ -292,6 +418,13 @@ namespace PaletteThumbnails
 		}
 		g_cache.clear();
 		g_recency.clear();
+
+		if (g_sheetTexture)
+		{
+			g_sheetTexture->Release();
+			g_sheetTexture = NULL;
+		}
+		g_sheetKey = CacheKey();
 	}
 
 	void Shutdown()

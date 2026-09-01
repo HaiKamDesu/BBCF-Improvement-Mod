@@ -20,6 +20,7 @@
 
 #include <Windows.h>
 
+#include <cfloat>
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
@@ -637,7 +638,7 @@ void PalettesConfigWindow::DrawImportButton()
 }
 
 // Export is reachable from the detail panel; kept separate so the panel stays readable.
-void PalettesConfigWindow::ExportPalette(const CharacterGroup& group, const PaletteRow& row)
+void PalettesConfigWindow::ExportPalette(const CharacterGroup& group, const PaletteRow& row, bool asPng)
 {
 	if (NativeFileDialog::IsOpen())
 		return;
@@ -657,10 +658,20 @@ void PalettesConfigWindow::ExportPalette(const CharacterGroup& group, const Pale
 	NativeFileDialog::Request request;
 	request.save = true;
 	request.title = "Export palette";
-	request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
-	request.filters.push_back({ "PNG Palette (*.png)", "*.png" });
-	request.defaultExtension = "cfpl";
-	request.initialPath = row.name + IMPL_FILE_EXTENSION;
+	// One button per format, so the format is chosen before the dialog rather than by
+	// remembering to change the extension inside it.
+	if (asPng)
+	{
+		request.filters.push_back({ "PNG Palette (*.png)", "*.png" });
+		request.defaultExtension = "png";
+		request.initialPath = row.name + ".png";
+	}
+	else
+	{
+		request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
+		request.defaultExtension = "cfpl";
+		request.initialPath = row.name + IMPL_FILE_EXTENSION;
+	}
 	request.contextId = kFileDialogExportPalette;
 	NativeFileDialog::Open(kFileDialogOwner, request);
 }
@@ -706,175 +717,78 @@ void PalettesConfigWindow::DrawSlotCombo(CharacterGroup& group, PaletteRow& row)
 	ImGui::PopItemWidth();
 }
 
-void PalettesConfigWindow::DrawCharacterPicker()
+// One character: a header, the Random entries as plain rows (they have no sprite to
+// show, so a grid cell would be a lie), then the palettes themselves as a grid.
+void PalettesConfigWindow::DrawSection(int groupIndex)
 {
-	if (m_selectedGroup < 0 || m_selectedGroup >= (int)m_groups.size())
-		m_selectedGroup = 0;
-
-	ImGui::PushItemWidth(200.0f);
-	if (ImGui::BeginCombo("##palettes_character", m_groups[m_selectedGroup].charName.c_str()))
-	{
-		for (int i = 0; i < (int)m_groups.size(); i++)
-		{
-			const CharacterGroup& group = m_groups[i];
-
-			int paletteCount = 0;
-			for (const PaletteRow& row : group.rows)
-				if (!row.isSpecial)
-					++paletteCount;
-
-			char label[160];
-			snprintf(label, sizeof(label), "%s (%d)###palchar_%d",
-				group.charName.c_str(), paletteCount, group.charIndex);
-
-			if (ImGui::Selectable(label, i == m_selectedGroup))
-			{
-				m_selectedGroup = i;
-				m_selectedRow = -1;
-			}
-		}
-		ImGui::EndCombo();
-	}
-	ImGui::PopItemWidth();
-	ImGui::SameLine();
-	ImGui::TextDisabled("%s", Messages.Palette_assignments_hint());
-}
-
-void PalettesConfigWindow::DrawGrid(CharacterGroup& group)
-{
+	CharacterGroup& group = m_groups[groupIndex];
 	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
 
-	// Cells are sized from the sprite's own aspect so nothing is stretched, and the
-	// column count follows the window rather than being fixed, so the grid reflows.
-	const float cellWidth = 96.0f;
-	const float cellHeight = 120.0f;
-	const float labelHeight = ImGui::GetTextLineHeightWithSpacing();
-	const float spacing = ImGui::GetStyle().ItemSpacing.x;
-	const float available = ImGui::GetContentRegionAvail().x;
-	int columns = (int)((available + spacing) / (cellWidth + spacing));
-	if (columns < 1)
-		columns = 1;
-
-	int drawn = 0;
-	for (int rowIndex = 0; rowIndex < (int)group.rows.size(); rowIndex++)
+	// Collect what passes the filter first, so a character with nothing matching is
+	// skipped entirely rather than leaving an empty heading behind.
+	std::vector<int> specials;
+	std::vector<int> palettes;
+	for (int i = 0; i < (int)group.rows.size(); i++)
 	{
-		PaletteRow& row = group.rows[rowIndex];
+		const PaletteRow& row = group.rows[i];
 		const std::string displayName = row.isSpecial ? DisplayNameForSlotValue(row.name) : row.name;
-
 		if (!m_filter.PassFilter(displayName.c_str()) && !m_filter.PassFilter(group.charName.c_str()))
 			continue;
-
-		if (drawn % columns != 0)
-			ImGui::SameLine();
-		drawn++;
-
-		ImGui::PushID(rowIndex);
-		ImGui::BeginGroup();
-
-		const bool selected = (rowIndex == m_selectedRow);
-		const ImVec2 cursor = ImGui::GetCursorScreenPos();
-
-		// One invisible button covers the whole cell, so the sprite, the name and the
-		// gap between them are all the same click target.
-		const ImVec2 cellSize(cellWidth, cellHeight + labelHeight);
-		if (ImGui::InvisibleButton("##cell", cellSize))
-			m_selectedRow = rowIndex;
-		const bool hovered = ImGui::IsItemHovered();
-
-		ImDrawList* draw = ImGui::GetWindowDrawList();
-		if (selected || hovered)
-		{
-			const ImU32 fill = ImGui::GetColorU32(selected ? ImGuiCol_Header : ImGuiCol_HeaderHovered);
-			draw->AddRectFilled(cursor, ImVec2(cursor.x + cellSize.x, cursor.y + cellSize.y), fill, 3.0f);
-		}
-
-		if (row.isSpecial)
-		{
-			// No sprite behind "Random": the palette is not decided until the match starts.
-			const char* mark = "?";
-			const ImVec2 markSize = ImGui::CalcTextSize(mark);
-			draw->AddText(ImVec2(cursor.x + (cellWidth - markSize.x) * 0.5f,
-				cursor.y + (cellHeight - markSize.y) * 0.5f),
-				ImGui::GetColorU32(ImGuiCol_TextDisabled), mark);
-		}
-		else
-		{
-			int texWidth = 0, texHeight = 0;
-			const ImTextureID texture = PaletteThumbnails::Get(group.charIndex, row.name,
-				customPalettes[group.charIndex][row.palIndex].file0, &texWidth, &texHeight);
-
-			if (texture && texWidth > 0 && texHeight > 0)
-			{
-				const float scale = (std::min)(cellWidth / texWidth, cellHeight / texHeight);
-				const float drawW = texWidth * scale;
-				const float drawH = texHeight * scale;
-				const ImVec2 topLeft(cursor.x + (cellWidth - drawW) * 0.5f,
-					cursor.y + (cellHeight - drawH));
-				draw->AddImage(ImTextureRef(texture), topLeft,
-					ImVec2(topLeft.x + drawW, topLeft.y + drawH));
-			}
-			else
-			{
-				// No sprite for this character in this build, or the texture could not be
-				// made: fall back to the colour strip rather than an empty cell.
-				const float swatchHeight = cellHeight / 8.0f;
-				for (int i = 0; i < 8; i++)
-				{
-					const unsigned char* bytes =
-						(const unsigned char*)customPalettes[group.charIndex][row.palIndex].file0
-						+ (1 + i * 12) * 4;
-					const ImU32 colour = IM_COL32(bytes[2], bytes[1], bytes[0], 255);
-					draw->AddRectFilled(ImVec2(cursor.x + 16.0f, cursor.y + i * swatchHeight),
-						ImVec2(cursor.x + cellWidth - 16.0f, cursor.y + (i + 1) * swatchHeight),
-						colour);
-				}
-			}
-		}
-
-		// Colour-slot badge, so an assignment is visible without selecting the cell.
-		if (row.assignedSlot > 0)
-		{
-			char badge[16];
-			snprintf(badge, sizeof(badge), "%d", row.assignedSlot);
-			const ImVec2 badgeSize = ImGui::CalcTextSize(badge);
-			const ImVec2 badgeMin(cursor.x + cellWidth - badgeSize.x - 8.0f, cursor.y + 2.0f);
-			draw->AddRectFilled(badgeMin,
-				ImVec2(badgeMin.x + badgeSize.x + 6.0f, badgeMin.y + badgeSize.y + 2.0f),
-				IM_COL32(30, 30, 30, 200), 3.0f);
-			draw->AddText(ImVec2(badgeMin.x + 3.0f, badgeMin.y + 1.0f),
-				ImGui::GetColorU32(kAssignedColor), badge);
-		}
-
-		// Name, clipped to the cell so a long one cannot push the grid out of shape.
-		const ImVec2 clipMin(cursor.x + 2.0f, cursor.y + cellHeight);
-		const ImVec2 clipMax(cursor.x + cellWidth - 2.0f, cursor.y + cellHeight + labelHeight);
-		draw->PushClipRect(clipMin, clipMax, true);
-		draw->AddText(clipMin, ImGui::GetColorU32(ImGuiCol_Text), displayName.c_str());
-		draw->PopClipRect();
-
-		ImGui::EndGroup();
-
-		if (hovered)
-			ImGui::SetTooltip("%s", displayName.c_str());
-
-		ImGui::PopID();
+		(row.isSpecial ? specials : palettes).push_back(i);
 	}
+	if (specials.empty() && palettes.empty())
+		return;
 
-	if (drawn == 0)
-		ImGui::TextDisabled("%s", Messages.Palettes_none_found());
-}
+	ImGui::PushID(groupIndex);
 
-void PalettesConfigWindow::DrawDetailPanel(CharacterGroup& group)
-{
-	std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
+	int assignedCount = 0;
+	for (const PaletteRow& row : group.rows)
+		if (row.assignedSlot > 0)
+			++assignedCount;
 
-	if (m_selectedRow < 0 || m_selectedRow >= (int)group.rows.size())
+	char header[192];
+	snprintf(header, sizeof(header), "%s  (%d, %d assigned)###palsec_%d",
+		group.charName.c_str(), (int)palettes.size(), assignedCount, group.charIndex);
+
+	if (ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::TextDisabled("%s", Messages.Palette_select_hint());
+		for (int index : specials)
+		{
+			PaletteRow& row = group.rows[index];
+			ImGui::PushID(index);
 
-		// Entries typed into palettes.ini by hand (comma lists, missing files) have no
-		// cell in the grid. Keep them visible so saving is not a surprise.
-		bool anyManual = false;
+			const bool selected = (groupIndex == m_selectedGroup && index == m_selectedRow);
+			if (ImGui::Selectable("##specialrow", selected, 0, ImVec2(0, ImGui::GetFrameHeight())))
+			{
+				m_selectedGroup = groupIndex;
+				m_selectedRow = index;
+			}
+			ImGui::SameLine(0.0f, 0.0f);
+
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(DisplayNameForSlotValue(row.name).c_str());
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(NamesEqual(row.name, kRandomIniValue)
+				? Messages.Palette_random_tooltip()
+				: Messages.Palette_random_exclude_tooltip());
+
+			ImGui::SameLine(220.0f);
+			ImGui::PushItemWidth(220.0f);
+			DrawSlotCombo(group, row);
+			ImGui::PopItemWidth();
+
+			ImGui::PopID();
+		}
+
+		if (!specials.empty() && !palettes.empty())
+			ImGui::Spacing();
+
+		DrawPaletteCells(groupIndex, palettes, customPalettes);
+
+		// Entries typed into palettes.ini by hand - comma lists, missing files, names that
+		// match no palette - have no cell to appear in. Keep them visible under their own
+		// character so saving does not quietly discard them.
+		std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
 		for (int slot = 1; slot <= kPaletteSlotCount; slot++)
 		{
 			const std::string& value = charSlots[slot - 1];
@@ -882,8 +796,8 @@ void PalettesConfigWindow::DrawDetailPanel(CharacterGroup& group)
 				continue;
 
 			bool matchesRow = false;
-			for (const PaletteRow& row : group.rows)
-				if (NamesEqual(value, row.name) && row.assignedSlot == slot)
+			for (const PaletteRow& existing : group.rows)
+				if (NamesEqual(value, existing.name) && existing.assignedSlot == slot)
 				{
 					matchesRow = true;
 					break;
@@ -891,75 +805,276 @@ void PalettesConfigWindow::DrawDetailPanel(CharacterGroup& group)
 
 			if (!matchesRow)
 			{
-				if (!anyManual)
-				{
-					ImGui::Separator();
-					anyManual = true;
-				}
+				ImGui::PushTextWrapPos(0.0f);
 				ImGui::TextDisabled(Messages.Palette_manual_entry(), slot, value.c_str());
+				ImGui::PopTextWrapPos();
 			}
 		}
+	}
+
+	ImGui::PopID();
+	ImGui::Spacing();
+}
+
+void PalettesConfigWindow::DrawPaletteCells(int groupIndex, const std::vector<int>& rowIndices,
+	const std::vector<std::vector<IMPL_data_t>>& customPalettes)
+{
+	CharacterGroup& group = m_groups[groupIndex];
+
+	const float cellWidth = 108.0f;
+	const float spriteHeight = 132.0f;
+	// Two lines of name under the sprite, so a longer one wraps instead of vanishing.
+	const float labelHeight = ImGui::GetTextLineHeight() * 2.0f + 2.0f;
+	const float spacing = ImGui::GetStyle().ItemSpacing.x;
+	const float available = ImGui::GetContentRegionAvail().x;
+	int columns = (int)((available + spacing) / (cellWidth + spacing));
+	if (columns < 1)
+		columns = 1;
+
+	int drawn = 0;
+	for (int index : rowIndices)
+	{
+		PaletteRow& row = group.rows[index];
+
+		if (drawn % columns != 0)
+			ImGui::SameLine();
+		drawn++;
+
+		ImGui::PushID(index);
+		ImGui::BeginGroup();
+
+		const bool selected = (groupIndex == m_selectedGroup && index == m_selectedRow);
+		const ImVec2 cursor = ImGui::GetCursorScreenPos();
+		const ImVec2 cellSize(cellWidth, spriteHeight + labelHeight);
+
+		if (ImGui::InvisibleButton("##cell", cellSize))
+		{
+			m_selectedGroup = groupIndex;
+			m_selectedRow = index;
+		}
+		const bool hovered = ImGui::IsItemHovered();
+
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		if (selected || hovered)
+		{
+			draw->AddRectFilled(cursor, ImVec2(cursor.x + cellSize.x, cursor.y + cellSize.y),
+				ImGui::GetColorU32(selected ? ImGuiCol_Header : ImGuiCol_HeaderHovered), 3.0f);
+		}
+
+		int texWidth = 0, texHeight = 0;
+		const ImTextureID texture = PaletteThumbnails::Get(group.charIndex, row.name,
+			customPalettes[group.charIndex][row.palIndex].file0, &texWidth, &texHeight);
+
+		if (texture && texWidth > 0 && texHeight > 0)
+		{
+			const float scale = (std::min)(cellWidth / texWidth, spriteHeight / texHeight);
+			const float drawW = texWidth * scale;
+			const float drawH = texHeight * scale;
+			const ImVec2 topLeft(cursor.x + (cellWidth - drawW) * 0.5f,
+				cursor.y + (spriteHeight - drawH));
+			draw->AddImage(ImTextureRef(texture), topLeft,
+				ImVec2(topLeft.x + drawW, topLeft.y + drawH));
+		}
+		else
+		{
+			// No sprite in this build, or the texture could not be made: show the colours
+			// themselves rather than an empty cell.
+			const float swatchHeight = spriteHeight / 8.0f;
+			for (int i = 0; i < 8; i++)
+			{
+				const unsigned char* bytes =
+					(const unsigned char*)customPalettes[group.charIndex][row.palIndex].file0
+					+ (1 + i * 12) * 4;
+				draw->AddRectFilled(ImVec2(cursor.x + 20.0f, cursor.y + i * swatchHeight),
+					ImVec2(cursor.x + cellWidth - 20.0f, cursor.y + (i + 1) * swatchHeight),
+					IM_COL32(bytes[2], bytes[1], bytes[0], 255));
+			}
+		}
+
+		// Assignment badge. Spelled out rather than a bare number, which reads as an
+		// index into something rather than as the in-game colour it actually is.
+		if (row.assignedSlot > 0)
+		{
+			char badge[32];
+			snprintf(badge, sizeof(badge), Messages.Color_d(), row.assignedSlot);
+			ImVec2 badgeSize = ImGui::CalcTextSize(badge);
+			if (badgeSize.x > cellWidth - 8.0f)
+			{
+				snprintf(badge, sizeof(badge), "%d", row.assignedSlot);
+				badgeSize = ImGui::CalcTextSize(badge);
+			}
+			const ImVec2 badgeMin(cursor.x + cellWidth - badgeSize.x - 8.0f, cursor.y + 2.0f);
+			draw->AddRectFilled(badgeMin,
+				ImVec2(badgeMin.x + badgeSize.x + 6.0f, badgeMin.y + badgeSize.y + 2.0f),
+				IM_COL32(25, 25, 25, 210), 3.0f);
+			draw->AddText(ImVec2(badgeMin.x + 3.0f, badgeMin.y + 1.0f),
+				ImGui::GetColorU32(kAssignedColor), badge);
+		}
+
+		DrawCellLabel(row.name, cursor, cellWidth, spriteHeight, labelHeight);
+
+		ImGui::EndGroup();
+
+		if (hovered)
+			ImGui::SetTooltip("%s", row.name.c_str());
+
+		ImGui::PopID();
+	}
+}
+
+// Centred, wrapped to at most two lines, with the second line ellipsised. A name too long
+// for the cell is common, and clipping it mid-word leaves something unreadable.
+void PalettesConfigWindow::DrawCellLabel(const std::string& name, const ImVec2& cursor,
+	float cellWidth, float spriteHeight, float labelHeight)
+{
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	const float maxWidth = cellWidth - 4.0f;
+	const float lineHeight = ImGui::GetTextLineHeight();
+	const ImU32 colour = ImGui::GetColorU32(ImGuiCol_Text);
+
+	// How much of the name fits on one line.
+	const char* begin = name.c_str();
+	const char* end = begin + name.size();
+	const char* firstEnd = ImGui::GetFont()->CalcWordWrapPosition(
+		ImGui::GetFontSize(), begin, end, maxWidth);
+	if (firstEnd == begin)
+		firstEnd = end; // a single word wider than the cell: let the clip handle it
+
+	auto drawCentred = [&](const char* from, const char* to, float y)
+	{
+		const ImVec2 size = ImGui::CalcTextSize(from, to);
+		const float x = cursor.x + (cellWidth - size.x) * 0.5f;
+		draw->AddText(NULL, 0.0f, ImVec2(x, y), colour, from, to);
+	};
+
+	const float firstY = cursor.y + spriteHeight + 1.0f;
+	if (firstEnd >= end)
+	{
+		drawCentred(begin, end, firstY);
 		return;
 	}
 
-	PaletteRow& row = group.rows[m_selectedRow];
-	const std::string displayName = row.isSpecial ? DisplayNameForSlotValue(row.name) : row.name;
+	// Second line, ellipsised if the rest still does not fit.
+	const char* secondBegin = firstEnd;
+	while (secondBegin < end && *secondBegin == ' ')
+		secondBegin++;
 
-	ImGui::TextWrapped("%s", displayName.c_str());
-	if (row.isSpecial)
+	const char* secondEnd = ImGui::GetFont()->CalcWordWrapPosition(
+		ImGui::GetFontSize(), secondBegin, end, maxWidth);
+
+	draw->PushClipRect(ImVec2(cursor.x, firstY),
+		ImVec2(cursor.x + cellWidth, firstY + labelHeight), true);
+	drawCentred(begin, firstEnd, firstY);
+
+	if (secondEnd >= end)
 	{
-		ImGui::TextDisabled("%s", NamesEqual(row.name, kRandomIniValue)
+		drawCentred(secondBegin, end, firstY + lineHeight);
+	}
+	else
+	{
+		std::string tail(secondBegin, secondEnd);
+		while (!tail.empty() &&
+			ImGui::CalcTextSize((tail + "...").c_str()).x > maxWidth)
+		{
+			tail.erase(tail.size() - 1);
+		}
+		tail += "...";
+		const ImVec2 size = ImGui::CalcTextSize(tail.c_str());
+		draw->AddText(ImVec2(cursor.x + (cellWidth - size.x) * 0.5f, firstY + lineHeight),
+			colour, tail.c_str());
+	}
+	draw->PopClipRect();
+}
+
+void PalettesConfigWindow::DrawDetailPanel()
+{
+	if (m_selectedGroup < 0 || m_selectedGroup >= (int)m_groups.size() ||
+		m_selectedRow < 0 || m_selectedRow >= (int)m_groups[m_selectedGroup].rows.size())
+	{
+		ImGui::TextWrapped("%s", Messages.Palette_select_hint());
+		return;
+	}
+
+	CharacterGroup& group = m_groups[m_selectedGroup];
+	PaletteRow& row = group.rows[m_selectedRow];
+	const bool special = row.isSpecial;
+
+	// Character, then palette, then what it is bound to - most general to most specific.
+	ImGui::TextDisabled("%s", group.charName.c_str());
+	ImGui::PushFont(NULL, ImGui::GetFontSize() * 1.15f);
+	ImGui::TextWrapped("%s", special ? DisplayNameForSlotValue(row.name).c_str() : row.name.c_str());
+	ImGui::PopFont();
+
+	if (special)
+	{
+		ImGui::TextWrapped("%s", NamesEqual(row.name, kRandomIniValue)
 			? Messages.Palette_random_tooltip()
 			: Messages.Palette_random_exclude_tooltip());
 	}
-	ImGui::Separator();
 
-	ImGui::TextUnformatted(Messages.Palette_colour_slot());
+	ImGui::Spacing();
+	ImGui::TextUnformatted(Messages.Palette_ingame_color());
 	DrawSlotCombo(group, row);
 
-	if (!row.isSpecial)
+	if (special)
+		return;
+
+	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
+	const char* paletteData = customPalettes[group.charIndex][row.palIndex].file0;
+
+	// The same sheet the PNG export produces, so what you see here is what you get.
+	ImGui::Spacing();
+	int sheetWidth = 0, sheetHeight = 0;
+	const ImTextureID sheet = PaletteThumbnails::GetSheet(group.charIndex, row.name,
+		paletteData, &sheetWidth, &sheetHeight);
+
+	// Everything below the sheet is pinned to the bottom, so the buttons do not move
+	// around as the panel is resized.
+	const float buttonHeight = ImGui::GetFrameHeightWithSpacing();
+	const float reserved = buttonHeight * 3.0f + ImGui::GetStyle().ItemSpacing.y * 2.0f;
+	const float sheetArea = (std::max)(60.0f, ImGui::GetContentRegionAvail().y - reserved);
+
+	ImGui::BeginChild("##sheet", ImVec2(0, sheetArea), false,
+		ImGuiWindowFlags_HorizontalScrollbar);
+	if (sheet && sheetWidth > 0 && sheetHeight > 0)
 	{
-		const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
-
-		ImGui::Spacing();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, 1.0f));
-		for (int colorIdx = 1; colorIdx <= kSwatchColorCount; colorIdx++)
-		{
-			unsigned char* colorBytes =
-				(unsigned char*)customPalettes[group.charIndex][row.palIndex].file0 + colorIdx * 4;
-			char swatchId[32];
-			snprintf(swatchId, sizeof(swatchId), "##swatch_%d", colorIdx);
-			ImGui::ColorButtonOn32Bit(swatchId, colorIdx, colorBytes,
-				ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip, ImVec2(10.0f, 17.0f));
-			if (colorIdx % 16 != 0)
-				ImGui::SameLine();
-		}
-		ImGui::PopStyleVar();
-
-		ImGui::Spacing();
-		ImGui::Separator();
-
-		if (ImGui::Button(Messages.Export(), ImVec2(-1.0f, 0.0f)))
-			ExportPalette(group, row);
-		ImGui::HoverTooltip(Messages.Palette_export_tooltip());
-
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
-		if (ImGui::Button(Messages.Delete(), ImVec2(-1.0f, 0.0f)))
-		{
-			m_pendingDeleteCharIndex = group.charIndex;
-			m_pendingDeletePalName = row.name;
-			m_openDeleteConfirm = true;
-		}
-		ImGui::PopStyleColor();
-		ImGui::HoverTooltip(Messages.Palette_delete_tooltip());
+		const float width = ImGui::GetContentRegionAvail().x;
+		const float scale = width / sheetWidth;
+		ImGui::Image(ImTextureRef(sheet), ImVec2(width, sheetHeight * scale));
 	}
+	else
+	{
+		ImGui::TextWrapped("%s", Messages.Palette_no_preview());
+	}
+	ImGui::EndChild();
+
+	if (ImGui::Button(Messages.Palette_export_cfpl(), ImVec2(-1.0f, 0.0f)))
+		ExportPalette(group, row, false);
+	ImGui::HoverTooltip(Messages.Palette_export_tooltip());
+
+	if (ImGui::Button(Messages.Palette_export_png(), ImVec2(-1.0f, 0.0f)))
+		ExportPalette(group, row, true);
+	ImGui::HoverTooltip(Messages.Palette_export_png_tooltip());
+
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
+	if (ImGui::Button(Messages.Delete(), ImVec2(-1.0f, 0.0f)))
+	{
+		m_pendingDeleteCharIndex = group.charIndex;
+		m_pendingDeletePalName = row.name;
+		m_openDeleteConfirm = true;
+	}
+	ImGui::PopStyleColor();
+	ImGui::HoverTooltip(Messages.Palette_delete_tooltip());
 }
 
 void PalettesConfigWindow::DrawModal()
 {
 	const std::string modalTitle = std::string(Messages.Palettes()) + "###palettes_modal";
-	ImGui::SetNextWindowSize(ImVec2(640, 560), ImGuiCond_Always);
-	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, ImGuiWindowFlags_NoResize))
+	// Twice the old size, and resizable: the grid wants room, and how much is a matter of
+	// how many palettes someone has. FirstUseEver so a resize sticks for the session.
+	ImGui::SetNextWindowSize(ImVec2(1280, 1000), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(700, 480), ImVec2(FLT_MAX, FLT_MAX));
+	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, 0))
 		return;
 
 	if (!g_interfaces.pPaletteManager)
@@ -973,9 +1088,10 @@ void PalettesConfigWindow::DrawModal()
 
 	ConsumeFinishedFileDialog();
 
+	ImGui::PushTextWrapPos(0.0f);
 	ImGui::TextUnformatted(Messages.Palette_assignments());
-	ImGui::SameLine();
 	ImGui::TextDisabled("%s", Messages.Palette_assignments_hint());
+	ImGui::PopTextWrapPos();
 	const std::string filterLabel = std::string(Messages.Palettes_search_hint()) + "###palettes_filter";
 	m_filter.Draw(filterLabel.c_str(), -1.0f);
 
@@ -991,19 +1107,34 @@ void PalettesConfigWindow::DrawModal()
 	}
 	else
 	{
-		DrawCharacterPicker();
+		// Grid on the left, details for whatever is selected on the right, with a
+		// draggable divider: how much room each wants depends on how long the palette
+		// names are and how big the preview should be, which is the user's call.
+		const float splitterWidth = 6.0f;
+		const float totalWidth = ImGui::GetContentRegionAvail().x;
+		const float minPanel = 220.0f;
+		const float maxPanel = (std::max)(minPanel, totalWidth - 260.0f);
+		m_detailPanelWidth = ImClamp(m_detailPanelWidth, minPanel, maxPanel);
 
-		// Grid on the left, details for whatever is selected on the right. The grid is
-		// what you scan; the panel is where the controls live, so cells stay clean.
-		const float panelWidth = 250.0f;
-		ImGui::BeginChild("##palettes_grid", ImVec2(-panelWidth, -64.0f), true);
-		DrawGrid(m_groups[m_selectedGroup]);
+		const float gridWidth = totalWidth - m_detailPanelWidth - splitterWidth;
+
+		ImGui::BeginChild("##palettes_grid", ImVec2(gridWidth, -64.0f), true);
+		for (int i = 0; i < (int)m_groups.size(); i++)
+			DrawSection(i);
 		ImGui::EndChild();
 
-		ImGui::SameLine();
+		ImGui::SameLine(0.0f, 0.0f);
+
+		ImGui::InvisibleButton("##palettes_splitter", ImVec2(splitterWidth, ImGui::GetContentRegionAvail().y - 64.0f));
+		if (ImGui::IsItemActive())
+			m_detailPanelWidth -= ImGui::GetIO().MouseDelta.x;
+		if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+		ImGui::SameLine(0.0f, 0.0f);
 
 		ImGui::BeginChild("##palettes_detail", ImVec2(0, -64.0f), true);
-		DrawDetailPanel(m_groups[m_selectedGroup]);
+		DrawDetailPanel();
 		ImGui::EndChild();
 	}
 
