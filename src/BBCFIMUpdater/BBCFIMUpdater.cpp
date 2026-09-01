@@ -338,6 +338,9 @@ namespace
 			return false;
 		}
 		std::vector<std::wstring> touched;
+		// Everything the update can overwrite, so a failure can be rolled back. The
+		// ".default" files are not shipped any more, but the DLL writes them into the install
+		// and the merge below reads the backed-up copies as its "old default".
 		const std::vector<std::wstring> files = {
 			L"dinput8.dll",
 			L"BBCF_IM\\Updater\\BBCFIMUpdater.exe",
@@ -358,12 +361,12 @@ namespace
 			Log(h, "palettes.ini pre-update backup copy skipped or failed (Windows error %lu)", GetLastError());
 
 		struct CopyOp { const wchar_t* src; const wchar_t* dst; };
+		// The package only carries these three; the ini templates and their ".default"
+		// copies are written by the DLL itself on the next launch.
 		const CopyOp ops[] = {
 			{ L"dinput8.dll", L"dinput8.dll" },
 			{ L"BBCFIMUpdater.exe", L"BBCF_IM\\Updater\\BBCFIMUpdater.exe" },
-			{ L"USER_README.txt", L"USER_README.txt" },
-			{ L"BBCF_IM\\Updater\\defaults\\settings.ini.default", L"BBCF_IM\\Updater\\defaults\\settings.ini.default" },
-			{ L"BBCF_IM\\Updater\\defaults\\palettes.ini.default", L"BBCF_IM\\Updater\\defaults\\palettes.ini.default" }
+			{ L"USER_README.txt", L"USER_README.txt" }
 		};
 
 		for (size_t i = 0; i < sizeof(ops) / sizeof(ops[0]); ++i)
@@ -377,6 +380,11 @@ namespace
 			}
 		}
 
+		// Three-way merge against the ".default" files the previous DLL wrote. A package no
+		// longer carries a new default, so MergeIni finds no newDefaultPath and leaves the
+		// user's ini untouched; the updated DLL refreshes the defaults on its next launch and
+		// fills in any key it does not find. Kept wired up so a package that does carry one
+		// (or a future in-DLL merge) still works.
 		if (!MergeIni(Combine(h.installRoot, L"settings.ini"),
 			Combine(backupDir, L"BBCF_IM\\Updater\\defaults\\settings.ini.default"),
 			Combine(h.stagedRoot, L"BBCF_IM\\Updater\\defaults\\settings.ini.default")))

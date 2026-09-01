@@ -1,6 +1,8 @@
 #include "Settings.h"
 #include "logger.h"
 #include "HotkeyManager.h"
+#include "EmbeddedResources.h"
+#include "utils.h"
 #include <regex>
 #include "Core/interfaces.h"
 
@@ -23,6 +25,83 @@ bool IsSettingMissingInIni(LPCWSTR key, LPCWSTR filename)
         WCHAR buffer[2];
         DWORD charsRead = GetPrivateProfileString(L"Settings", key, L"", buffer, ARRAYSIZE(buffer), filename);
         return charsRead == 0;
+}
+
+// A release is only dinput8.dll plus the updater - every config file the mod reads is
+// compiled into the DLL (see resource/resource.rc) and written out here.
+struct EmbeddedIni
+{
+        const wchar_t* resourceName;
+        const char* iniPath;      // game-folder-relative, created only when absent
+        const char* defaultPath;  // updater's merge baseline, rewritten every launch
+};
+
+const EmbeddedIni kEmbeddedInis[] = {
+        { L"settings.ini", "settings.ini", "BBCF_IM\\Updater\\defaults\\settings.ini.default" },
+        { L"palettes.ini", "palettes.ini", "BBCF_IM\\Updater\\defaults\\palettes.ini.default" },
+};
+
+// Creates every missing directory along `absolutePath`'s parent chain. Win32 rather
+// than std::filesystem: this project builds on the toolset's default language standard,
+// which predates <filesystem>.
+void CreateParentDirectories(const std::string& absolutePath)
+{
+        const size_t lastSlash = absolutePath.find_last_of("\\/");
+        if (lastSlash == std::string::npos)
+                return;
+
+        const std::string parent = absolutePath.substr(0, lastSlash);
+        for (size_t i = 0; i < parent.size(); ++i)
+        {
+                if (parent[i] != '\\' && parent[i] != '/')
+                        continue;
+                // Skip the root itself ("C:\") so we never call CreateDirectory on a drive.
+                if (i > 0 && parent[i - 1] != ':')
+                        CreateDirectoryA(parent.substr(0, i).c_str(), NULL);
+        }
+        CreateDirectoryA(parent.c_str(), NULL);
+}
+
+bool WriteTextFile(const std::string& absolutePath, const std::string& contents)
+{
+        CreateParentDirectories(absolutePath);
+
+        std::ofstream out(absolutePath.c_str(), std::ios::binary | std::ios::trunc);
+        if (!out)
+                return false;
+
+        out.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+        return out.good();
+}
+
+void WriteEmbeddedConfigFiles()
+{
+        for (const EmbeddedIni& ini : kEmbeddedInis)
+        {
+                std::string contents;
+                if (!LoadEmbeddedResource(ini.resourceName, contents) || contents.empty())
+                {
+                        ForceLog("[Init][Settings] embedded template '%s' not found in the DLL\n", ini.iniPath);
+                        continue;
+                }
+
+                // First run: no ini on disk yet, so lay down the template before anything reads it.
+                const std::string iniPath = GamePath(ini.iniPath);
+                if (GetFileAttributesA(iniPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+                {
+                        ForceLog("[Init][Settings] creating missing '%s' (ok=%d)\n",
+                                ini.iniPath, WriteTextFile(iniPath, contents) ? 1 : 0);
+                }
+
+                // The updater's three-way merge wants an "old default" that matches the build
+                // actually running, so rewrite it unconditionally instead of shipping a copy
+                // that can drift out of sync with the DLL.
+                const std::string defaultPath = GamePath(ini.defaultPath);
+                if (!WriteTextFile(defaultPath, contents))
+                {
+                        ForceLog("[Init][Settings] failed to write '%s'\n", ini.defaultPath);
+                }
+        }
 }
 }
 
@@ -133,11 +212,13 @@ std::string Settings::readSettingsFilePropertyString(LPCWSTR key, LPCWSTR defaul
 
 bool Settings::loadSettingsFile()
 {
-	CString strINIPath;
 	ForceLog("[Init][Settings] loadSettingsFile enter\n");
 
-	_wfullpath((wchar_t*)strINIPath.GetBuffer(MAX_PATH), L"settings.ini", MAX_PATH);
-	strINIPath.ReleaseBuffer();
+	WriteEmbeddedConfigFiles();
+
+	// Anchored to the game folder, never the working directory - the shell can move the
+	// CWD out from under us while a file dialog is open (see GamePath in utils.h).
+	CString strINIPath(GamePathW(L"settings.ini").c_str());
 	{
 		CT2CA iniPathAnsi(strINIPath);
 		ForceLog("[Init][Settings] resolved path='%s'\n", iniPathAnsi.m_psz ? iniPathAnsi.m_psz : "<null>");
@@ -176,19 +257,6 @@ bool Settings::loadSettingsFile()
         if (debugLoggingSettingMissing)
         {
                 settingsIni.generateDebugLogs = true;
-        }
-
-        // Seed new keys into existing settings.ini files that pre-date them.
-        // Without this, the first save via changeSetting hits the slow "append" path and
-        // any I/O failure silently discards the value. After seeding, the key already
-        // exists so subsequent saves use the fast "replace" path.
-        if (IsSettingMissingInIni(L"FrameHistoryEnabled", strINIPath)) {
-                ForceLog("[Init][Settings] seeding missing key FrameHistoryEnabled\n");
-                changeSetting("FrameHistoryEnabled", settingsIni.frameHistoryEnabled ? "1" : "0");
-        }
-        if (IsSettingMissingInIni(L"FrameHistoryAutoReset", strINIPath)) {
-                ForceLog("[Init][Settings] seeding missing key FrameHistoryAutoReset\n");
-                changeSetting("FrameHistoryAutoReset", settingsIni.frameHistoryAutoReset ? "1" : "0");
         }
 
 	ForceLog("[Init][Settings] raw settings read complete\n");
@@ -257,13 +325,11 @@ bool Settings::WasDebugLoggingSettingMissing()
 // WritePrivateProfileStringW targets the first matching section by spec, handles both
 // updating existing keys and inserting new ones, and requires no temp-file dance.
 int Settings::changeSetting(std::string setting_name, std::string new_value) {
-	// Resolve absolute path — WritePrivateProfileString ignores relative paths (looks in
-	// Windows dir instead of CWD), so we must pass a full path.
-	wchar_t wAbsPath[MAX_PATH] = {};
-	if (_wfullpath(wAbsPath, L"settings.ini", MAX_PATH) == nullptr) {
-		LOG(2, "[error] Settings::changeSetting: Unable to resolve absolute path.");
-		return 1;
-	}
+	// Absolute path required — WritePrivateProfileString ignores relative paths (looks in
+	// the Windows dir instead of the CWD), and it has to be the game folder rather than the
+	// working directory so it matches the file loadSettingsFile reads.
+	const std::wstring absPath = GamePathW(L"settings.ini");
+	const wchar_t* wAbsPath = absPath.c_str();
 
 	wchar_t wKey[512] = {};
 	wchar_t wVal[4096] = {};

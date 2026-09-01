@@ -74,25 +74,13 @@ namespace Updater
 			if (!normalized.empty() && normalized[normalized.size() - 1] == '/')
 				return true;
 
+			// A release is only the DLL, the updater and the readme. The ini templates are
+			// embedded in the DLL and written out by the mod itself on first run, so they no
+			// longer appear in the package.
 			const std::string lower = ToLower(normalized);
-			if (lower == "dinput8.dll" ||
+			return lower == "dinput8.dll" ||
 				lower == "bbcfimupdater.exe" ||
-				lower == "settings.ini.default" ||
-				lower == "palettes.ini.default" ||
-				lower == "settings.ini" ||
-				lower == "palettes.ini" ||
-				lower == "user_readme.txt")
-			{
-				return true;
-			}
-
-			const std::string prefix = "bbcf_im/updater/defaults/";
-			if (lower.compare(0, prefix.size(), prefix) != 0)
-				return false;
-
-			const std::string fileName = lower.substr(prefix.size());
-			return fileName == "settings.ini.default" ||
-				fileName == "palettes.ini.default";
+				lower == "user_readme.txt";
 		}
 
 		std::wstring GetParentDirectory(const std::wstring& path)

@@ -8,3 +8,8 @@
 "Logo_Oceanya.png" RCDATA "branding\\Logo_Oceanya.png"
 "Logo_Laboratories.png" RCDATA "branding\\Logo_Laboratories.png"
 "Logo_O_Centered.png" RCDATA "branding\\Logo_O_Centered.png"
+
+// Config templates. Releases ship only the DLL and the updater, so the mod writes these
+// out itself on first run (and refreshes the updater's ".default" copies every launch).
+"settings.ini" RCDATA "settings.ini"
+"palettes.ini" RCDATA "palettes.ini"

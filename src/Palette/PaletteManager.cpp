@@ -436,7 +436,7 @@ void PaletteManager::LoadPaletteSettingsFile()
 	if (!PathFileExists(wFullPath.c_str()))
 	{
 		LOG(2, "\t'palettes.ini' file was not found!\n");
-		g_imGuiLogger->Log("[error] 'palettes.ini' file was not found!\n");
+		g_imGuiLogger->Log("[system] 'palettes.ini' file was not found, using defaults.\n");
 		return;
 	}
 
