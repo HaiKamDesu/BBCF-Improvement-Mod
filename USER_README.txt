@@ -66,6 +66,16 @@ How to access the palette editor
 - The palette editor's button can be accessed under the "Custom palettes" section on the main window while you are in a match in the following modes: Training, Versus.
 - Custom palettes saved in the editor can be found at "..\BlazBlue Centralfiction\BBCF_IM\Palettes\"
 
+How to edit a palette in an image editor
+==========================
+- In the palette config window, Export a palette and give it a .png name.
+- You get an indexed PNG of your character painted in that palette, pulled from your own
+  game files. Open it in an editor that can edit an indexed palette (Aseprite, GIMP,
+  Photoshop), recolour the palette entries, and save.
+- Import that .png back in the same window. Only the character colours travel in a PNG,
+  so the effect colours stay at their defaults - .cfpl is still the lossless format.
+- PNGs must be indexed / 8-bit. An RGB screenshot of a palette will be rejected.
+
 How to switch between custom palettes
 ==========================
 - The palette switching buttons can be accessed under the "Custom palettes" section whenever you are in a match.
