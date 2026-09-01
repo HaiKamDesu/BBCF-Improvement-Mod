@@ -69,9 +69,11 @@ How to access the palette editor
 How to edit a palette in an image editor
 ==========================
 - In the palette config window, Export a palette and give it a .png name.
-- You get an indexed PNG of your character painted in that palette, pulled from your own
-  game files. Open it in an editor that can edit an indexed palette (Aseprite, GIMP,
-  Photoshop), recolour the palette entries, and save.
+- You get an indexed PNG: a sheet of your character in several poses, plus their
+  effects and a block of colour swatches, all painted in that palette. Open it in an
+  editor that can edit an indexed palette (Aseprite, GIMP, Photoshop), recolour the
+  palette entries, and save. The swatch block covers the entries that are not visible
+  on the character.
 - Import that .png back in the same window. A PNG the mod exported remembers which
   character it is for, so it imports in one step. A PNG from anywhere else asks you.
 - Only the character colours travel in a PNG, so the effect colours stay at their
