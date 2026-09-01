@@ -46,7 +46,7 @@ Nothing the mod does modifies the files Steam installed, so "Verify integrity of
 
 ### Look and sound
 - **Custom palettes** — create, edit and load palettes and effects, with no file modification at all. Export one as a PNG and you get a sheet of your character — several poses, their effects, and a swatch block — *painted in that palette*, ready to recolour in any image editor and import straight back
-- **Music replacement** — hand any track the game ships with (including Astral themes) a song of your own. Supports **mp3, wav, flac, ogg, m4a/aac and wma**, with per-song volume you can hear before you commit to it
+- **Music replacement** — hand any track the game ships with (including Astral themes) a song of your own. Supports **mp3, wav, flac, ogg, opus, m4a/aac and wma**, with per-song volume, applied on the spot
 - **Jukebox** — an in-game player with rotation, search and manual track selection, plus a `[ custom ]` category fed from your own files
 - **Graphics options** beyond what the game exposes, and performance options
 
