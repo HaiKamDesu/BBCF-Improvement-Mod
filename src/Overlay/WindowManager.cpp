@@ -1,6 +1,7 @@
 #include "WindowManager.h"
 
 #include "Branding.h"
+#include "Palette/PaletteThumbnails.h"
 #include "fonts.h"
 #include "NotificationBar/NotificationBar.h"
 #include "WindowContainer/WindowContainer.h"
@@ -157,6 +158,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 
 	// After the ImGui DX9 backend, which is what proves the device is usable.
 	Branding::Initialize(device);
+	PaletteThumbnails::Initialize(device);
 
 	m_pLogger = g_imGuiLogger;
 
@@ -323,6 +325,7 @@ void WindowManager::Shutdown()
 	delete m_instance;
 
 	ImGui_ImplDX9_Shutdown();
+	PaletteThumbnails::Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 }
@@ -337,6 +340,9 @@ void WindowManager::InvalidateDeviceObjects()
 	LOG(2, "WindowManager::InvalidateDeviceObjects\n");
 	ImGui_ImplDX9_InvalidateDeviceObjects();
 	Branding::InvalidateDeviceObjects();
+	// Palette thumbnails are D3DPOOL_DEFAULT, so a reset invalidates them too. They are
+	// rebuilt lazily the next time the grid draws.
+	PaletteThumbnails::ReleaseAll();
 }
 
 void WindowManager::CreateDeviceObjects()
