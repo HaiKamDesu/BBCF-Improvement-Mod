@@ -1,5 +1,6 @@
 #include "PaletteManager.h"
 
+#include "CharSelectPalettes.h"
 #include "impl_templates.h"
 
 #include "Core/logger.h"
@@ -466,6 +467,19 @@ void PaletteManager::LoadPaletteSettingsFile()
 			m_paletteSlots[i][iSlot-1] = pszConvertedAnsiString;
 		}
 	}
+
+	// Slot assignments are what the character select preview shows, so keep the copy the
+	// game reads in step with them. Cheap when nothing changed.
+	CharSelectPalettes::Refresh();
+}
+
+const IMPL_data_t* PaletteManager::GetCustomPalData(CharIndex charIndex, int palIndex) const
+{
+	if (isCharacterIndexOutOfBound(charIndex) || (size_t)charIndex >= m_customPalettes.size())
+		return nullptr;
+	if (palIndex < 0 || (size_t)palIndex >= m_customPalettes[charIndex].size())
+		return nullptr;
+	return &m_customPalettes[charIndex][palIndex];
 }
 
 bool PaletteManager::SavePaletteSettingsFile(const std::vector<std::vector<std::string>>& slots)
@@ -517,6 +531,7 @@ bool PaletteManager::SavePaletteSettingsFile(const std::vector<std::vector<std::
 	}
 
 	m_paletteSlots = slots;
+	CharSelectPalettes::Refresh();
 	return true;
 }
 

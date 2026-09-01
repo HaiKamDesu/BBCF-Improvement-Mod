@@ -52,6 +52,9 @@ public:
 	const IMPL_data_t& GetCurrentPalData(CharPaletteHandle& palHandle);
 	void LoadPaletteSettingsFile();
 	const std::vector<std::vector<std::string>>& GetPaletteSlots() const { return m_paletteSlots; }
+	// A custom palette's data by index, without needing a live CharPaletteHandle - the
+	// character select preview has no handle to go through. Null if out of range.
+	const IMPL_data_t* GetCustomPalData(CharIndex charIndex, int palIndex) const;
 	bool SavePaletteSettingsFile(const std::vector<std::vector<std::string>>& slots);
 
 	// Call it ONCE per frame

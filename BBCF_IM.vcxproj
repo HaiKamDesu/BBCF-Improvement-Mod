@@ -160,6 +160,7 @@
     <ClCompile Include="src\Core\SystemSpecsLogger.cpp" />
     <ClCompile Include="src\Palette\impl_templates.cpp" />
     <ClCompile Include="src\Palette\PaletteManager.cpp" />
+    <ClCompile Include="src\Palette\CharSelectPalettes.cpp" />
     <ClCompile Include="src\Palette\PaletteSheet.cpp" />
     <ClCompile Include="src\Palette\PaletteThumbnails.cpp" />
     <ClCompile Include="src\Palette\PngPalette.cpp" />
@@ -331,6 +332,7 @@
     <ClInclude Include="src\Core\SystemSpecsLogger.h" />
     <ClInclude Include="src\Game\gamestates.h" />
     <ClInclude Include="src\Palette\PaletteManager.h" />
+    <ClInclude Include="src\Palette\CharSelectPalettes.h" />
     <ClInclude Include="src\Palette\PaletteSheet.h" />
     <ClInclude Include="src\Palette\PaletteThumbnails.h" />
     <ClInclude Include="src\Palette\PngPalette.h" />
