@@ -1,5 +1,21 @@
 #include "PaletteEditorWindow.h"
 
+#include <cfloat>
+
+#include "Palette/PaletteThumbnails.h"
+
+namespace
+{
+	// The in-match cell: header, name, sprite, button. Tall enough for a two-line name
+	// without the button moving.
+	const float kPaletteCellHeight = 190.0f;
+	const float kPaletteSpriteHeight = 200.0f;
+	// Cells in the picker grid. Big enough that the sprite is the thing you read, not a
+	// stamp next to the name.
+	const float kPalettePickCellWidth = 130.0f;
+	const float kPalettePickSpriteHeight = 152.0f;
+}
+
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/Localization.h"
@@ -9,6 +25,7 @@
 #include "Palette/impl_format.h"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <Shlwapi.h>
 
@@ -23,6 +40,53 @@ static char palNameBuf[IMPL_PALNAME_LENGTH] = "";
 static char palDescBuf[IMPL_DESC_LENGTH] = "";
 static char palCreatorBuf[IMPL_CREATOR_LENGTH] = "";
 static bool palBoolEffect = false;
+
+namespace
+{
+	// The picker's size, remembered across sessions. It is a context menu, and ImGui never
+	// saves a popup's size itself (BeginPopup forces NoSavedSettings), so it is kept here
+	// and written to the layout ini alongside the other palette UI sizes.
+	float g_pickerWidth = 560.0f;
+	float g_pickerHeight = 480.0f;
+
+	void* PickerLayout_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* name)
+	{
+		return strcmp(name, "Layout") == 0 ? (void*)1 : nullptr;
+	}
+
+	void PickerLayout_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line)
+	{
+		float value = 0.0f;
+		if (sscanf_s(line, "PickerWidth=%f", &value) == 1 && value > 0.0f)
+			g_pickerWidth = value;
+		else if (sscanf_s(line, "PickerHeight=%f", &value) == 1 && value > 0.0f)
+			g_pickerHeight = value;
+	}
+
+	void PickerLayout_WriteAll(ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
+	{
+		buf->appendf("[%s][Layout]\n", handler->TypeName);
+		buf->appendf("PickerWidth=%.0f\n", g_pickerWidth);
+		buf->appendf("PickerHeight=%.0f\n\n", g_pickerHeight);
+	}
+}
+
+void PaletteEditorWindow::RegisterLayoutSettings()
+{
+	// AddSettingsHandler asserts on a duplicate, and initialization can run again after a
+	// device loss.
+	if (ImGui::FindSettingsHandler("BBCFIMPalettePicker"))
+		return;
+
+	ImGuiSettingsHandler handler;
+	handler.TypeName = "BBCFIMPalettePicker";
+	handler.TypeHash = ImHashStr("BBCFIMPalettePicker");
+	handler.ReadOpenFn = PickerLayout_ReadOpen;
+	handler.ReadLineFn = PickerLayout_ReadLine;
+	handler.WriteAllFn = PickerLayout_WriteAll;
+	ImGui::AddSettingsHandler(&handler);
+}
+
 
 void PaletteEditorWindow::ClearUndoHistory()
 {
@@ -178,8 +242,10 @@ void PaletteEditorWindow::ShowAllPaletteSelections(const std::string& windowID)
 		return;
 	}
 
-	const char* p1BtnText = " Player1 ";
-	const char* p2BtnText = " Player2 ";
+	// Localized now; these were hardcoded literals and the only untranslated strings left
+	// in this section.
+	const char* p1BtnText = Messages.Player_1();
+	const char* p2BtnText = Messages.Player_2();
 	const std::string p1PopupID = "select1-1" + windowID;
 	const std::string p2PopupID = "select2-1" + windowID;
 
@@ -187,38 +253,249 @@ void PaletteEditorWindow::ShowAllPaletteSelections(const std::string& windowID)
 	{
 		uint16_t thisPlayerMatchPlayerIndex = g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex();
 
-		ImGui::BeginGroup();
-
-		if (thisPlayerMatchPlayerIndex == 0)
-		{
-			ShowPaletteSelectButton(g_interfaces.player1, p1BtnText, p1PopupID.c_str());
-		}
-		else
-		{
-			ShowOnlinePaletteResetButton(g_interfaces.player1, 0, p1BtnText);
-		}
-
-		if (thisPlayerMatchPlayerIndex == 1)
-		{
-			ShowPaletteSelectButton(g_interfaces.player2, p2BtnText, p2PopupID.c_str());
-		}
-		else
-		{
-			ShowOnlinePaletteResetButton(g_interfaces.player2, 1, p2BtnText);
-		}
-
-		ImGui::EndGroup();
+		ShowPaletteSelectionColumns(
+			[&]() {
+				if (thisPlayerMatchPlayerIndex == 0)
+					ShowPaletteSelectButton(g_interfaces.player1, p1BtnText, p1PopupID.c_str());
+				else
+					ShowOnlinePaletteResetButton(g_interfaces.player1, 0, p1BtnText);
+			},
+			[&]() {
+				if (thisPlayerMatchPlayerIndex == 1)
+					ShowPaletteSelectButton(g_interfaces.player2, p2BtnText, p2PopupID.c_str());
+				else
+					ShowOnlinePaletteResetButton(g_interfaces.player2, 1, p2BtnText);
+			});
 
 		return;
 	}
 
+	// Offline: both players side by side, each in its own cell.
+	ShowPaletteSelectionColumns(
+		[&]() { ShowPaletteSelectButton(g_interfaces.player1, p1BtnText, p1PopupID.c_str()); },
+		[&]() { ShowPaletteSelectButton(g_interfaces.player2, p2BtnText, p2PopupID.c_str()); });
+}
+
+// Two equal halves with a rule between them. Palettes are a per-player thing and reading
+// them as one stacked list meant working out which row belonged to whom.
+void PaletteEditorWindow::ShowPaletteSelectionColumns(
+	const std::function<void()>& drawLeft, const std::function<void()>& drawRight)
+{
+	const float spacing = ImGui::GetStyle().ItemSpacing.x;
+	const float total = ImGui::GetContentRegionAvail().x;
+	const float columnWidth = (std::max)(120.0f, (total - spacing * 3.0f) * 0.5f);
+
+	// AutoResizeY, so each half is exactly as tall as it needs to be. A fixed height meant
+	// a scrollbar inside the section, which is the wrong place to scroll - the page around
+	// it already does that.
+	const ImGuiChildFlags childFlags = ImGuiChildFlags_AutoResizeY;
+	const ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+
 	ImGui::BeginGroup();
 
-	ShowPaletteSelectButton(g_interfaces.player1, p1BtnText, p1PopupID.c_str());
-	ShowPaletteSelectButton(g_interfaces.player2, p2BtnText, p2PopupID.c_str());
+	ImGui::BeginChild("##pal_left", ImVec2(columnWidth, 0.0f), childFlags, windowFlags);
+	drawLeft();
+	ImGui::EndChild();
+
+	ImGui::SameLine(0.0f, spacing * 2.0f);
+
+	ImGui::BeginChild("##pal_right", ImVec2(columnWidth, 0.0f), childFlags, windowFlags);
+	drawRight();
+	ImGui::EndChild();
 
 	ImGui::EndGroup();
+
+	// The divider goes in afterwards, once both halves have been laid out and their
+	// height is actually known.
+	const ImVec2 groupMin = ImGui::GetItemRectMin();
+	const ImVec2 groupMax = ImGui::GetItemRectMax();
+	const float midX = groupMin.x + columnWidth + spacing;
+	ImGui::GetWindowDrawList()->AddLine(
+		ImVec2(midX, groupMin.y + 2.0f), ImVec2(midX, groupMax.y - 2.0f),
+		ImGui::GetColorU32(ImGuiCol_Separator));
 }
+
+// Centred, wrapped to the cell, ellipsised if it still does not fit. Palette names are
+// user-chosen and plenty are longer than a cell; clipping mid-word hides the only thing
+// telling one apart from another.
+void PaletteEditorWindow::DrawWrappedCellLabel(const char* text, const ImVec2& origin,
+	float cellWidth, float labelTop, float labelHeight)
+{
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	ImFont* font = ImGui::GetFont();
+	const float fontSize = ImGui::GetFontSize();
+	const float lineHeight = ImGui::GetTextLineHeight();
+	const float maxWidth = cellWidth - 4.0f;
+	const ImU32 colour = ImGui::GetColorU32(ImGuiCol_Text);
+	const int maxLines = (int)(labelHeight / lineHeight);
+
+	draw->PushClipRect(ImVec2(origin.x, origin.y + labelTop),
+		ImVec2(origin.x + cellWidth, origin.y + labelTop + labelHeight), true);
+
+	const char* cursor = text;
+	const char* end = text + strlen(text);
+	for (int line = 0; line < maxLines && cursor < end; line++)
+	{
+		const char* lineEnd = font->CalcWordWrapPosition(fontSize, cursor, end, maxWidth);
+		if (lineEnd == cursor)
+			lineEnd = cursor + 1; // a word wider than the cell still has to advance
+
+		const bool lastLine = (line == maxLines - 1);
+		std::string piece(cursor, lineEnd);
+		if (lastLine && lineEnd < end)
+		{
+			while (!piece.empty() && ImGui::CalcTextSize((piece + "...").c_str()).x > maxWidth)
+				piece.erase(piece.size() - 1);
+			piece += "...";
+		}
+
+		const ImVec2 size = ImGui::CalcTextSize(piece.c_str());
+		draw->AddText(ImVec2(origin.x + (cellWidth - size.x) * 0.5f,
+			origin.y + labelTop + line * lineHeight), colour, piece.c_str());
+
+		cursor = lineEnd;
+		while (cursor < end && *cursor == ' ')
+			cursor++;
+	}
+
+	draw->PopClipRect();
+}
+
+// Which bytes to draw a palette preview from.
+//
+// The "Default" entry is a placeholder with an empty colour table - it means "put the
+// game's own palette back", not a palette of its own - so drawing it directly gives a
+// black silhouette. The real colours are the ones captured when the match started, which
+// is whichever in-game colour the player actually picked, so use those instead.
+const char* PaletteEditorWindow::PaletteDataForPreview(CharPaletteHandle& charPalHandle,
+	CharIndex charIndex, int palIndex)
+{
+	if (palIndex == 0)
+		return g_interfaces.pPaletteManager->GetOrigPalFileAddr(PaletteFile_Character, charPalHandle);
+	return m_customPaletteVector[charIndex][palIndex].file0;
+}
+
+// Centred single line, clipped rather than allowed to widen the cell.
+void PaletteEditorWindow::CenteredText(const char* text)
+{
+	const float width = ImGui::GetContentRegionAvail().x;
+	const ImVec2 size = ImGui::CalcTextSize(text);
+	if (size.x < width)
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (width - size.x) * 0.5f);
+	ImGui::TextUnformatted(text);
+}
+
+// Centred and wrapped. Palette names are user-chosen and some are long; wrapping keeps
+// them readable where clipping would hide the end of the one thing identifying a palette.
+void PaletteEditorWindow::WrappedCenteredText(const char* text)
+{
+	const float width = ImGui::GetContentRegionAvail().x;
+	ImFont* font = ImGui::GetFont();
+	const float fontSize = ImGui::GetFontSize();
+
+	const char* cursor = text;
+	const char* end = text + strlen(text);
+	while (cursor < end)
+	{
+		const char* lineEnd = font->CalcWordWrapPosition(fontSize, cursor, end, width);
+		if (lineEnd == cursor)
+			lineEnd = cursor + 1; // a single word wider than the cell still has to advance
+
+		const ImVec2 size = ImGui::CalcTextSize(cursor, lineEnd);
+		const float indent = (size.x < width) ? (width - size.x) * 0.5f : 0.0f;
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+		ImGui::TextUnformatted(cursor, lineEnd);
+
+		cursor = lineEnd;
+		while (cursor < end && *cursor == ' ')
+			cursor++;
+	}
+}
+
+// The character drawn in a palette, into a rectangle of the caller's choosing. Falls back
+// to a strip of the palette's own colours when this build has no sprite for the character,
+// so a cell is never blank.
+// Cache key for a palette's thumbnail. The index alone is not enough for Default: its
+// colours are whichever of the game's own palettes the player picked, so P1 and P2 would
+// otherwise share one cached texture and the wrong one would win. Fold the bytes in.
+void PaletteEditorWindow::PaletteThumbKey(char* out, size_t outSize, int palIndex,
+	const char* paletteData)
+{
+	unsigned int hash = 2166136261u;
+	if (palIndex == 0 && paletteData)
+	{
+		for (int i = 0; i < IMPL_PALETTE_DATALEN; i++)
+			hash = (hash ^ (unsigned char)paletteData[i]) * 16777619u;
+	}
+	sprintf_s(out, outSize, "sel%d_%08x", palIndex, hash);
+}
+
+void PaletteEditorWindow::DrawPaletteSpriteAt(CharIndex charIndex, int palIndex,
+	const char* paletteData, const ImVec2& origin, float width, float height)
+{
+	if (!paletteData)
+	{
+		// Nothing to draw from - out of a match the original palette has no address yet.
+		DrawWrappedCellLabel(Messages.No_preview_available(), origin, width, 0.0f, height);
+		return;
+	}
+
+	char key[64];
+	PaletteThumbKey(key, sizeof(key), palIndex, paletteData);
+
+	int texWidth = 0, texHeight = 0;
+	const ImTextureID texture =
+		PaletteThumbnails::Get((int)charIndex, key, paletteData, &texWidth, &texHeight);
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+
+	if (texture && texWidth > 0 && texHeight > 0)
+	{
+		const float scale = (std::min)(width / texWidth, height / texHeight);
+		const float drawnW = texWidth * scale;
+		const float drawnH = texHeight * scale;
+		const ImVec2 topLeft(origin.x + (width - drawnW) * 0.5f, origin.y + (height - drawnH));
+		draw->AddImage(ImTextureRef(texture), topLeft,
+			ImVec2(topLeft.x + drawnW, topLeft.y + drawnH));
+		return;
+	}
+
+	const float swatch = height / 8.0f;
+	for (int i = 0; i < 8; i++)
+	{
+		const unsigned char* bytes = (const unsigned char*)paletteData + (1 + i * 12) * 4;
+		draw->AddRectFilled(ImVec2(origin.x + width * 0.25f, origin.y + i * swatch),
+			ImVec2(origin.x + width * 0.75f, origin.y + (i + 1) * swatch),
+			IM_COL32(bytes[2], bytes[1], bytes[0], 255));
+	}
+}
+
+// Same thing at the cursor, advancing the layout.
+void PaletteEditorWindow::DrawPaletteSprite(CharIndex charIndex, int palIndex,
+	const char* paletteData, float height)
+{
+	// Fill the column rather than sitting in a fixed box with dead space under it: scale
+	// to the available width and take whatever height the aspect ratio asks for, capped so
+	// a wide sprite cannot push the button off the bottom.
+	const float width = ImGui::GetContentRegionAvail().x;
+
+	int texWidth = 0, texHeight = 0;
+	if (paletteData)
+	{
+		char key[64];
+		PaletteThumbKey(key, sizeof(key), palIndex, paletteData);
+		PaletteThumbnails::Get((int)charIndex, key, paletteData, &texWidth, &texHeight);
+	}
+
+	float drawnHeight = height;
+	if (texWidth > 0 && texHeight > 0)
+		drawnHeight = (std::min)(height, width * (float)texHeight / (float)texWidth);
+
+	DrawPaletteSpriteAt(charIndex, palIndex, paletteData, ImGui::GetCursorScreenPos(),
+		width, drawnHeight);
+	ImGui::Dummy(ImVec2(width, drawnHeight));
+}
+
 
 void PaletteEditorWindow::ShowReloadAllPalettesButton()
 {
@@ -800,21 +1077,34 @@ void PaletteEditorWindow::ShowPaletteSelectButton(Player& playerHandle, const ch
 		return;
 	}
 
-	ShowPaletteRandomizerButton(popupID, playerHandle);
-	ImGui::SameLine();
+	const IMPL_info_t& palInfo = m_customPaletteVector[charIndex][selected_pal_index].palInfo;
 
-	if (ImGui::Button(btnText))
+	// Which player this is, then what they are wearing, then a picture of it. The name on
+	// its own never told you what a palette actually looked like, which is the one thing
+	// you want to know when picking one.
+	//
+	// The player label is small and grey on purpose: it is a heading, and it should not
+	// compete with the thing it is labelling.
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+	ImGui::PushFont(NULL, ImGui::GetFontSize() * 0.85f);
+	CenteredText(btnText);
+	ImGui::PopFont();
+	ImGui::PopStyleColor();
+	ImGui::HoverTooltip(getCharacterNameByIndexA(playerHandle.GetData()->charIndex).c_str());
+
+	// Name and sprite share one hover region, so the palette's details come up wherever on
+	// the cell you happen to point at rather than only over the line of text.
+	ImGui::BeginGroup();
+	WrappedCenteredText(palInfo.palName);
+	DrawPaletteSprite(charIndex, selected_pal_index,
+		PaletteDataForPreview(charPalHandle, charIndex, selected_pal_index), kPaletteSpriteHeight);
+	ImGui::EndGroup();
+	ShowHoveredPaletteInfoToolTip(palInfo, charIndex, selected_pal_index);
+
+	if (ImGui::Button(Messages.Assign_Palette(), ImVec2(-1.0f, 0.0f)))
 	{
 		ImGui::OpenPopup(popupID);
 	}
-
-	ImGui::HoverTooltip(getCharacterNameByIndexA(playerHandle.GetData()->charIndex).c_str());
-
-	const IMPL_info_t& palInfo = m_customPaletteVector[charIndex][selected_pal_index].palInfo;
-
-	ImGui::SameLine();
-	ImGui::TextUnformatted(palInfo.palName);
-	ShowHoveredPaletteInfoToolTip(palInfo, charIndex, 0);
 
 	ShowPaletteSelectPopup(charPalHandle, charIndex, popupID);
 }
@@ -824,56 +1114,176 @@ void PaletteEditorWindow::ShowPaletteSelectPopup(CharPaletteHandle& charPalHandl
 	static int hoveredPalIndex = 0;
 	bool pressed = false;
 	int onlinePalsStartIndex = g_interfaces.pPaletteManager->GetOnlinePalsStartIndex(charIndex);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(-1.0f, 25.0f), ImVec2(-1.0f, 300.0f));
 
-	if (ImGui::BeginPopup(popupID))
+	// A context menu, as before - it closes when you click away and it does not block the
+	// rest of the UI. BeginPopup would force AlwaysAutoResize, which is what stops a popup
+	// from being resizable, so this goes through BeginPopupEx and sets the flags itself.
+	// The size is seeded on open from the remembered one and read back every frame, since
+	// popups are also NoSavedSettings and ImGui will not store it for us.
+	const ImGuiID popupIDHash = ImGui::GetCurrentWindow()->GetID(popupID);
+
+	ImGui::SetNextWindowSize(ImVec2(g_pickerWidth, g_pickerHeight), ImGuiCond_Appearing);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 200.0f), ImVec2(FLT_MAX, FLT_MAX));
+
+	if (ImGui::BeginPopupEx(popupIDHash,
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings))
 	{
-		ImGui::TextUnformatted(getCharacterNameByIndexA(charIndex).c_str());
-		ImGui::Separator();
-		for (int i = 0; i < m_customPaletteVector[charIndex].size(); i++)
+		const ImVec2 pickerSize = ImGui::GetWindowSize();
+		if (pickerSize.x != g_pickerWidth || pickerSize.y != g_pickerHeight)
 		{
-			const IMPL_info_t& palInfo = m_customPaletteVector[charIndex][i].palInfo;
-
-			if (i == onlinePalsStartIndex)
-			{
-				ImGui::PushStyleColor(ImGuiCol_Separator, COLOR_ONLINE);
-				ImGui::Separator();
-				ImGui::PopStyleColor();
-			}
-
-			if (ImGui::Selectable(palInfo.palName))
-			{
-				pressed = true;
-				g_interfaces.pPaletteManager->SwitchPalette(charIndex, charPalHandle, i);
-
-				// Updating palette editor's array if this is the currently selected character
-				if (&charPalHandle == m_selectedCharPalHandle)
-				{
-					m_selectedPalIndex = i;
-					CopyPalFileToEditorArray(m_selectedFile, charPalHandle);
-					DisableHighlightModes();
-
-					CopyImplDataToEditorFields(charPalHandle);
-				}
-
-				if (g_interfaces.pRoomManager->IsRoomFunctional())
-				{
-					g_interfaces.pOnlinePaletteManager->SendPalettePackets();
-				}
-			}
-
-			if (ImGui::IsItemHovered())
-			{
-				hoveredPalIndex = i;
-			}
-
-			ShowHoveredPaletteInfoToolTip(palInfo, charIndex, i);
+			g_pickerWidth = pickerSize.x;
+			g_pickerHeight = pickerSize.y;
+			ImGui::MarkIniSettingsDirty();
 		}
 
+		ImGui::TextUnformatted(getCharacterNameByIndexA(charIndex).c_str());
+		ImGui::Separator();
+
+		const auto& palettes = m_customPaletteVector[charIndex];
+
+		// A grid rather than a list of names: the whole point is being able to tell the
+		// palettes apart at a glance, which a column of text cannot do. The column count
+		// follows the window, so resizing it reflows rather than clipping.
+		const float labelHeight = ImGui::GetTextLineHeight() * 2.0f + 2.0f;
+		const float cellHeight = kPalettePickSpriteHeight + labelHeight;
+		const float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+		ImGui::BeginChild("##palette_grid", ImVec2(0.0f, 0.0f), false);
+
+		const float avail = ImGui::GetContentRegionAvail().x;
+		int columns = (int)((avail + spacing) / (kPalettePickCellWidth + spacing));
+		if (columns < 1)
+			columns = 1;
+
+		// Widen the cells to use the whole row rather than leaving a ragged strip on the
+		// right; the sprite inside keeps its aspect ratio either way.
+		const float cellWidth = (avail - spacing * (columns - 1)) / columns;
+
+		int drawn = 0;
+		const auto beginCell = [&]()
+		{
+			if (drawn % columns != 0)
+				ImGui::SameLine();
+			drawn++;
+		};
+
+		// Random first, as a tile with no sprite - there is nothing to show, because what
+		// it lands on is not decided until it is pressed.
+		beginCell();
+		ImGui::PushID("random");
+		ImGui::BeginGroup();
+		{
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			if (ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight)) && palettes.size() > 1)
+			{
+				const int current = g_interfaces.pPaletteManager->GetCurrentCustomPalIndex(charPalHandle);
+				int next = current;
+				while (current == next)
+					next = rand() % palettes.size();
+
+				pressed = true;
+				ApplyPaletteSelection(charPalHandle, charIndex, next);
+			}
+			const bool hovered = ImGui::IsItemHovered();
+
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			if (hovered)
+			{
+				draw->AddRectFilled(origin, ImVec2(origin.x + cellWidth, origin.y + cellHeight),
+					ImGui::GetColorU32(ImGuiCol_HeaderHovered), 3.0f);
+			}
+
+			const char* mark = "?";
+			const ImVec2 markSize = ImGui::CalcTextSize(mark);
+			draw->AddText(ImVec2(origin.x + (cellWidth - markSize.x) * 0.5f,
+				origin.y + (kPalettePickSpriteHeight - markSize.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_Text), mark);
+
+			DrawWrappedCellLabel(Messages.Pick_Random(), origin, cellWidth,
+				kPalettePickSpriteHeight, cellHeight - kPalettePickSpriteHeight);
+
+			ImGui::EndGroup();
+			if (hovered)
+				ImGui::SetTooltip("%s", Messages.Random_selection());
+		}
+		ImGui::PopID();
+
+		for (int i = 0; i < (int)palettes.size(); i++)
+		{
+			const IMPL_info_t& palInfo = palettes[i].palInfo;
+
+			beginCell();
+			ImGui::PushID(i);
+			ImGui::BeginGroup();
+
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			const bool selected =
+				(i == g_interfaces.pPaletteManager->GetCurrentCustomPalIndex(charPalHandle));
+
+			if (ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight)))
+			{
+				pressed = true;
+				ApplyPaletteSelection(charPalHandle, charIndex, i);
+			}
+			const bool hovered = ImGui::IsItemHovered();
+			if (hovered)
+				hoveredPalIndex = i;
+
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			if (selected || hovered)
+			{
+				draw->AddRectFilled(origin, ImVec2(origin.x + cellWidth, origin.y + cellHeight),
+					ImGui::GetColorU32(selected ? ImGuiCol_Header : ImGuiCol_HeaderHovered), 3.0f);
+			}
+
+			// Downloaded palettes get the same colour the list used to mark them with.
+			if (i >= onlinePalsStartIndex)
+			{
+				draw->AddRect(origin, ImVec2(origin.x + cellWidth, origin.y + cellHeight),
+					ImGui::GetColorU32(COLOR_ONLINE), 3.0f);
+			}
+
+			DrawPaletteSpriteAt(charIndex, i, PaletteDataForPreview(charPalHandle, charIndex, i),
+				origin, cellWidth, kPalettePickSpriteHeight);
+
+			DrawWrappedCellLabel(palInfo.palName, origin, cellWidth,
+				kPalettePickSpriteHeight, labelHeight);
+
+			ImGui::EndGroup();
+
+			// The same tooltip the list has always shown: creator, description, bloom,
+			// and whether it came from another player.
+			ShowHoveredPaletteInfoToolTip(palInfo, charIndex, i);
+
+			ImGui::PopID();
+		}
+
+		ImGui::EndChild();
 		ImGui::EndPopup();
 	}
 
 	HandleHoveredPaletteSelection(&charPalHandle, charIndex, hoveredPalIndex, popupID, pressed);
+}
+
+// Everything that has to happen when a palette is chosen, wherever it was chosen from.
+void PaletteEditorWindow::ApplyPaletteSelection(CharPaletteHandle& charPalHandle,
+	CharIndex charIndex, int palIndex)
+{
+	g_interfaces.pPaletteManager->SwitchPalette(charIndex, charPalHandle, palIndex);
+
+	// Keep the editor's own arrays in step if this is the character it has open.
+	if (&charPalHandle == m_selectedCharPalHandle)
+	{
+		m_selectedPalIndex = palIndex;
+		CopyPalFileToEditorArray(m_selectedFile, charPalHandle);
+		DisableHighlightModes();
+		CopyImplDataToEditorFields(charPalHandle);
+	}
+
+	if (g_interfaces.pRoomManager->IsRoomFunctional())
+	{
+		g_interfaces.pOnlinePaletteManager->SendPalettePackets();
+	}
 }
 
 void PaletteEditorWindow::ShowHoveredPaletteInfoToolTip(const IMPL_info_t& palInfo, CharIndex charIndex, int palIndex)

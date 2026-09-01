@@ -102,6 +102,11 @@ Creator: %s,Creator: %s,Creador: %s
 Description: %s,Description: %s,Descripcion: %s
 Has bloom effect,Has bloom effect,Tiene efecto Bloom
 Random selection,Random selection,Selección Aleatoria
+Assign Palette,Assign Palette,Asignar paleta
+Pick Random,Pick Random,Elegir al azar
+No preview available,No preview available,Sin vista previa
+Player 1,Player 1,Jugador 1
+Player 2,Player 2,Jugador 2
 Start index,Start index,Index de inicio
 End index,End index,Index final
 Start color,Start color,Color de inicio

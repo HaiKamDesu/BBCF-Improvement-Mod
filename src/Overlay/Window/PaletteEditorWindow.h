@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include "IWindow.h"
 
 #include "Core/interfaces.h"
@@ -63,6 +64,7 @@ public:
 		OnMatchInit();
 	}
 	~PaletteEditorWindow() override = default;
+	static void RegisterLayoutSettings();
 	void ShowAllPaletteSelections(const std::string& windowID);
 	void ShowReloadAllPalettesButton();
 	void OnMatchInit();
@@ -83,6 +85,18 @@ private:
 	void CheckSelectedPalOutOfBound();
 	void ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t matchPlayerIndex, const char* btnText);
 	void DownloadOnlinePalette(Player& playerHandle, uint16_t matchPlayerIndex);
+	void ShowPaletteSelectionColumns(const std::function<void()>& drawLeft,
+		const std::function<void()>& drawRight);
+	void ApplyPaletteSelection(CharPaletteHandle& charPalHandle, CharIndex charIndex, int palIndex);
+	const char* PaletteDataForPreview(CharPaletteHandle& charPalHandle, CharIndex charIndex, int palIndex);
+	void PaletteThumbKey(char* out, size_t outSize, int palIndex, const char* paletteData);
+	void DrawWrappedCellLabel(const char* text, const ImVec2& origin, float cellWidth,
+		float labelTop, float labelHeight);
+	void CenteredText(const char* text);
+	void WrappedCenteredText(const char* text);
+	void DrawPaletteSprite(CharIndex charIndex, int palIndex, const char* paletteData, float height);
+	void DrawPaletteSpriteAt(CharIndex charIndex, int palIndex, const char* paletteData,
+		const ImVec2& origin, float width, float height);
 	void ShowPaletteSelectButton(Player & playerHandle, const char* btnText, const char* popupID);
 	void ShowPaletteSelectPopup(CharPaletteHandle& charPalHandle, CharIndex charIndex, const char* popupID);
 	void ShowHoveredPaletteInfoToolTip(const IMPL_info_t& palInfo, CharIndex charIndex, int palIndex);

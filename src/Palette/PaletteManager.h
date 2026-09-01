@@ -45,6 +45,10 @@ public:
 	void ReplacePaletteFile(const char* newPalData, PaletteFile palFile, CharPaletteHandle& palHandle);
 	void RestoreOrigPal(CharPaletteHandle& palHandle);
 	const char* GetCurPalFileAddr(PaletteFile palFile, CharPaletteHandle& palHandle);
+	// The palette the character had when the match started - i.e. whichever in-game colour
+	// the player picked. This is what "Default" means, and the only place its actual
+	// colours exist: the Default entry in the custom list is an empty placeholder.
+	const char* GetOrigPalFileAddr(PaletteFile palFile, CharPaletteHandle& palHandle);
 	const char* GetCustomPalFile(CharIndex charIndex, int palIndex, PaletteFile palFile, CharPaletteHandle& palHandle);
 	int GetCurrentCustomPalIndex(CharPaletteHandle& palHandle) const;
 	const IMPL_info_t& GetCurrentPalInfo(CharPaletteHandle& palHandle) const;

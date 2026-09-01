@@ -788,6 +788,11 @@ const char * PaletteManager::GetCurPalFileAddr(PaletteFile palFile, CharPaletteH
 	return palHandle.GetCurPalFileAddr(palFile);
 }
 
+const char * PaletteManager::GetOrigPalFileAddr(PaletteFile palFile, CharPaletteHandle& palHandle)
+{
+	return palHandle.GetOrigPalFileAddr(palFile);
+}
+
 const char * PaletteManager::GetCustomPalFile(CharIndex charIndex, int palIndex, PaletteFile palFile, CharPaletteHandle& palHandle)
 {
 	if (charIndex > getCharactersCount())

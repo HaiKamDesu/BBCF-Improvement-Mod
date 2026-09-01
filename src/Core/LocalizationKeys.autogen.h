@@ -255,6 +255,21 @@ struct LocalizationKeysAccessor
         // Random selection
         inline const char* Random_selection() const { return Get("Random selection"); }
 
+        // Assign Palette
+        inline const char* Assign_Palette() const { return Get("Assign Palette"); }
+
+        // Pick Random
+        inline const char* Pick_Random() const { return Get("Pick Random"); }
+
+        // No preview available
+        inline const char* No_preview_available() const { return Get("No preview available"); }
+
+        // Player 1
+        inline const char* Player_1_3() const { return Get("Player 1"); }
+
+        // Player 2
+        inline const char* Player_2_3() const { return Get("Player 2"); }
+
         // Start index
         inline const char* Start_index() const { return Get("Start index"); }
 
