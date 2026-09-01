@@ -2224,12 +2224,14 @@ void ScrWindow::DrawReplayTakeoverBody() {
         if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
         }
         else {
-            ImGui::Text("Cannot access replay takeover outside of a replay");
+            ImGui::TextWrapped("%s", L("Cannot access replay takeover outside of a replay.").c_str());
             return;
         }
-        ImGui::Text("time: %d", *g_gameVals.pMatchTimer);
+        ImGui::Text("%s %d", L("Time:").c_str(), *g_gameVals.pMatchTimer);
         if (*g_gameVals.pGameMode == GameMode_ReplayTheater) {
-            if (ImGui::Button("Takeover as P1")) {
+            const std::string takeoverP1 = L("Takeover as P1");
+            const std::string takeoverP2 = L("Takeover as P2");
+            if (ImGui::Button(takeoverP1.c_str())) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
                     SnapshotApparatus* apparatus = ensure_snapshot_apparatus_takeover();
                     if (!apparatus) {
@@ -2258,10 +2260,9 @@ void ScrWindow::DrawReplayTakeoverBody() {
                 }
 
             }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Takeover_as_p1_tooltip());
-            ImGui::SameLine();
-            if (ImGui::Button("Takeover as P2")) {
+            ImGui::ShowHelpMarkerSameLine(Messages.Takeover_as_p1_tooltip());
+            ImGui::SameLineOrWrap(ImGui::ButtonWidth(takeoverP2.c_str()));
+            if (ImGui::Button(takeoverP2.c_str())) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
                     SnapshotApparatus* apparatus = ensure_snapshot_apparatus_takeover();
                     if (!apparatus) {
@@ -2291,11 +2292,10 @@ void ScrWindow::DrawReplayTakeoverBody() {
 
                 }
             }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Takeover_as_p2_tooltip());
+            ImGui::ShowHelpMarkerSameLine(Messages.Takeover_as_p2_tooltip());
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
-            if ((ImGui::Button("Load Replay State") ||
+            if ((ImGui::Button(L("Load Replay State").c_str()) ||
                 HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadReplayState))
                 && snap_apparatus_takeover->snapshot_count > 0) {
                 if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
@@ -2317,15 +2317,13 @@ void ScrWindow::DrawReplayTakeoverBody() {
 
                 }
             }
+            ImGui::ShowHelpMarkerSameLine(Messages.Load_replay_state_tooltip());
         }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Load_replay_state_tooltip());
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker("You can use a hotkey to activate it, default is F4 but can be changed in settings.ini between F1-9.");
 
-        ImGui::InputFloat("Setup time(s)", &wait_before_exec_s2, 0.3f);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker("This pauses the game once you load a state for the amount set in order to adjust hand position. Set to 0 if no delay is desired.");
+        ImGui::SetNextItemWidth(140.0f);
+        ImGui::InputFloat(L("Setup time (s)").c_str(), &wait_before_exec_s2, 0.3f);
+        ImGui::ShowHelpMarkerSameLine(
+            L("Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.").c_str());
         if (is_setup_time_running == true) {
             this->base_time -= ImGui::GetIO().DeltaTime;
             ImGui::OpenPopup("progress_bar_replay_takeover");
@@ -2346,21 +2344,23 @@ void ScrWindow::DrawReplayTakeoverBody() {
             }
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
-            if (ImGui::Button("Return to replay")) {
+            const std::string returnToReplay = L("Return to replay");
+            const std::string fixPlayback = L("Fix playback");
+            if (ImGui::Button(returnToReplay.c_str())) {
                 playback_manager.set_playback_control(0); //makes sure the playback is stopped before going back to the replay
                 RestoreTakeoverInputBinding(bbcf_base);
                 *g_gameVals.pGameMode = GameMode_ReplayTheater;
                 snap_apparatus_takeover->load_snapshot(0);
             }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Return_to_replay_tooltip());
+            ImGui::ShowHelpMarkerSameLine(Messages.Return_to_replay_tooltip());
 
-            if (ImGui::Button("FIX PLAYBACK")) {
+            ImGui::SameLineOrWrap(ImGui::ButtonWidth(fixPlayback.c_str()));
+            if (ImGui::Button(fixPlayback.c_str())) {
                 facing_left_replay_takeover = !facing_left_replay_takeover;
             }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker("Use this if the takeover appears to be faulty before reporting an issue, it should correct it most of the time. \n\nIf you use it when it is already working it will make it appear faulty, clicking again should return it to the previous state.");
-            
+            ImGui::ShowHelpMarkerSameLine(
+                L("Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.").c_str());
+
         }
 
         if (*g_gameVals.pGameMode == GameMode_Training) {

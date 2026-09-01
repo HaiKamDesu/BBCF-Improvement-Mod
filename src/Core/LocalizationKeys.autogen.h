@@ -3425,6 +3425,33 @@ struct LocalizationKeysAccessor
 
         // is playing at the new volume.
         inline const char* is_playing_at_the_new_volume() const { return Get("is playing at the new volume."); }
+
+        // Cannot access replay takeover outside of a replay.
+        inline const char* Cannot_access_replay_takeover_outside_of_a_replay() const { return Get("Cannot access replay takeover outside of a replay."); }
+
+        // Takeover as P1
+        inline const char* Takeover_as_P1() const { return Get("Takeover as P1"); }
+
+        // Takeover as P2
+        inline const char* Takeover_as_P2() const { return Get("Takeover as P2"); }
+
+        // Load Replay State
+        inline const char* Load_Replay_State() const { return Get("Load Replay State"); }
+
+        // Setup time (s)
+        inline const char* Setup_time_s() const { return Get("Setup time (s)"); }
+
+        // Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.
+        inline const char* Pauses_the_game_for_this_long_after_a_state_loads_so_you_have_time_to_get_your_hands_in_position_Set_it_to_0_for_no_delay() const { return Get("Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay."); }
+
+        // Return to replay
+        inline const char* Return_to_replay() const { return Get("Return to replay"); }
+
+        // Fix playback
+        inline const char* Fix_playback() const { return Get("Fix playback"); }
+
+        // Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.
+        inline const char* Try_this_if_the_takeover_looks_wrong_before_reporting_a_problem_it_corrects_it_most_of_the_time_Using_it_while_the_takeover_is_already_working_will_break_it_instead_and_clicking_again_puts_it_back() const { return Get("Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back."); }
 };
 
 

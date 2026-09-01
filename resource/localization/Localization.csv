@@ -1318,3 +1318,13 @@ Untouched up to,Untouched up to,Sin alterar hasta
 Above,Above,Por encima de
 this song gets squashed to fit.,this song gets squashed to fit.,esta canción se comprime para caber.
 is playing at the new volume.,is playing at the new volume.,suena ahora al nuevo volumen.
+
+Cannot access replay takeover outside of a replay.,Cannot access replay takeover outside of a replay.,No puedes usar el takeover de replay fuera de un replay.
+Takeover as P1,Takeover as P1,Tomar el control de P1
+Takeover as P2,Takeover as P2,Tomar el control de P2
+Load Replay State,Load Replay State,Cargar estado del replay
+Setup time (s),Setup time (s),Tiempo de preparacion (s)
+"Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.","Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.","Pausa el juego este tiempo despues de cargar un estado, para que puedas colocar las manos. Ponlo en 0 para no tener pausa."
+Return to replay,Return to replay,Volver al replay
+Fix playback,Fix playback,Arreglar la reproduccion
+"Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.","Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.","Prueba esto si el takeover se ve mal antes de reportar un problema: lo corrige la mayoria de las veces. Usarlo cuando ya funciona lo rompera, y volver a pulsarlo lo deja como estaba."
