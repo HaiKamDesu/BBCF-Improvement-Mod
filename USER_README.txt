@@ -72,9 +72,14 @@ How to edit a palette in an image editor
 - You get an indexed PNG of your character painted in that palette, pulled from your own
   game files. Open it in an editor that can edit an indexed palette (Aseprite, GIMP,
   Photoshop), recolour the palette entries, and save.
-- Import that .png back in the same window. Only the character colours travel in a PNG,
-  so the effect colours stay at their defaults - .cfpl is still the lossless format.
+- Import that .png back in the same window. A PNG the mod exported remembers which
+  character it is for, so it imports in one step. A PNG from anywhere else asks you.
+- Only the character colours travel in a PNG, so the effect colours stay at their
+  defaults - .cfpl is still the lossless format.
 - PNGs must be indexed / 8-bit. An RGB screenshot of a palette will be rejected.
+- The background is transparent. Viewers with a dark theme draw that as black.
+- This follows the convention HIKARI's CFPL-PNG / PNG-CFPL converters established, so
+  palettes made with those tools can be imported here and vice versa.
 
 How to switch between custom palettes
 ==========================

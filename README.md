@@ -146,6 +146,7 @@ This mod is a fork of **[libreofficecalc](https://github.com/libreofficecalc/BBC
 - **SJS** — the TAS combo tool, built from scratch and brought to the Discord
 - **aikuxa** — the Jukebox
 - **rekijitsu** — custom Jukebox track fixes
+- **HIKARI** — the CFPL↔PNG converters that established how BBCF palettes travel as images. The mod's PNG palette support follows their convention, so palettes move between the two freely
 - **Tadatys (sublimacija)** — replay list downloader fixes, and a great deal of Ghidra reverse engineering
 - **libreofficecalc** — the replay database, and its migration to the current server
 - **KDing0**, **philippejaram**, **LGriebsch**, **GrimFlash**, **SIY**, **PC_volt**, **MorphRed**, **Unisectyn**, **Tyler Coble**, **gauntlet36**, **AnthonyYoManz** — code contributions across the project's history
