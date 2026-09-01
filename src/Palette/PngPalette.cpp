@@ -105,7 +105,8 @@ namespace
 
 	bool ReadAllBytes(const std::string& path, std::vector<unsigned char>& out)
 	{
-		HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+		// Wide: `path` is UTF-8 and may name a file outside the system codepage.
+		HANDLE hFile = CreateFileW(utf8_to_utf16(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (hFile == INVALID_HANDLE_VALUE)
 			return false;

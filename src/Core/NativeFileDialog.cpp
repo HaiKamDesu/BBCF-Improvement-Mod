@@ -1,5 +1,7 @@
 #include "NativeFileDialog.h"
 
+#include "utils.h"
+
 #include "Core/logger.h"
 
 #include <Windows.h>
@@ -23,15 +25,23 @@ namespace
 
 	DialogState g_state;
 
-	// OPENFILENAMEA wants description and pattern as NUL-separated pairs terminated by a
-	// second NUL, which a plain std::string literal cannot express without embedded nulls
-	// going wrong somewhere. Build the buffer explicitly instead.
-	std::vector<char> BuildFilterBuffer(const std::vector<NativeFileDialog::Filter>& filters)
+	// The dialog is the wide one throughout, and paths come back as UTF-8.
+	//
+	// The ANSI dialog cannot represent a filename outside the system codepage: a song
+	// named in Japanese on an English install comes back as question marks, and every
+	// later attempt to open it reports that the file does not exist. That was a real
+	// report, and it is why nothing here uses the A functions.
+	//
+	// OPENFILENAMEW wants description and pattern as NUL-separated pairs terminated by a
+	// second NUL, which a plain string literal cannot express without embedded nulls going
+	// wrong somewhere. Build the buffer explicitly instead.
+	std::vector<wchar_t> BuildFilterBuffer(const std::vector<NativeFileDialog::Filter>& filters)
 	{
-		std::vector<char> buffer;
+		std::vector<wchar_t> buffer;
 		const auto append = [&buffer](const std::string& text) {
-			buffer.insert(buffer.end(), text.begin(), text.end());
-			buffer.push_back('\0');
+			const std::wstring wide = utf8_to_utf16(text);
+			buffer.insert(buffer.end(), wide.begin(), wide.end());
+			buffer.push_back(L'\0');
 		};
 
 		for (const NativeFileDialog::Filter& filter : filters)
@@ -41,32 +51,31 @@ namespace
 		}
 		append("All Files (*.*)");
 		append("*.*");
-		buffer.push_back('\0');
+		buffer.push_back(L'\0');
 		return buffer;
 	}
 
-	void SeedPath(const std::string& initialPath, char* selectedPath, char* initialDir, OPENFILENAMEA& ofn)
+	void SeedPath(const std::string& initialPathUtf8, wchar_t* selectedPath, wchar_t* initialDir, OPENFILENAMEW& ofn)
 	{
-		if (initialPath.empty())
+		if (initialPathUtf8.empty())
 		{
 			return;
 		}
 
-		const DWORD attributes = GetFileAttributesA(initialPath.c_str());
+		const std::wstring initialPath = utf8_to_utf16(initialPathUtf8);
+		const DWORD attributes = GetFileAttributesW(initialPath.c_str());
 		if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
 		{
-			std::strncpy(initialDir, initialPath.c_str(), MAX_PATH - 1);
-			initialDir[MAX_PATH - 1] = '\0';
+			wcsncpy_s(initialDir, MAX_PATH, initialPath.c_str(), _TRUNCATE);
 			ofn.lpstrInitialDir = initialDir;
 			return;
 		}
 
-		std::strncpy(selectedPath, initialPath.c_str(), MAX_PATH - 1);
-		selectedPath[MAX_PATH - 1] = '\0';
+		wcsncpy_s(selectedPath, MAX_PATH, initialPath.c_str(), _TRUNCATE);
 
-		char* const backslash = std::strrchr(selectedPath, '\\');
-		char* const slash = std::strrchr(selectedPath, '/');
-		char* const separator = (std::max)(backslash, slash);
+		wchar_t* const backslash = wcsrchr(selectedPath, L'\\');
+		wchar_t* const slash = wcsrchr(selectedPath, L'/');
+		wchar_t* const separator = (std::max)(backslash, slash);
 		if (separator == nullptr)
 		{
 			return;
@@ -75,13 +84,13 @@ namespace
 		const size_t directoryLength = static_cast<size_t>(separator - selectedPath);
 		if (directoryLength < MAX_PATH)
 		{
-			std::memcpy(initialDir, selectedPath, directoryLength);
-			initialDir[directoryLength] = '\0';
+			std::memcpy(initialDir, selectedPath, directoryLength * sizeof(wchar_t));
+			initialDir[directoryLength] = L'\0';
 			ofn.lpstrInitialDir = initialDir;
 		}
 
-		const char* const fileName = separator + 1;
-		std::memmove(selectedPath, fileName, std::strlen(fileName) + 1);
+		const wchar_t* const fileName = separator + 1;
+		std::memmove(selectedPath, fileName, (wcslen(fileName) + 1) * sizeof(wchar_t));
 	}
 }
 
@@ -102,14 +111,16 @@ bool NativeFileDialog::Open(const char* ownerToken, const Request& request)
 	}
 
 	std::thread([request]() {
-		char selectedPath[MAX_PATH] = {};
-		char initialDir[MAX_PATH] = {};
-		char originalWorkingDirectory[MAX_PATH] = {};
-		GetCurrentDirectoryA(MAX_PATH, originalWorkingDirectory);
+		wchar_t selectedPath[MAX_PATH] = {};
+		wchar_t initialDir[MAX_PATH] = {};
+		wchar_t originalWorkingDirectory[MAX_PATH] = {};
+		GetCurrentDirectoryW(MAX_PATH, originalWorkingDirectory);
 
-		const std::vector<char> filterBuffer = BuildFilterBuffer(request.filters);
+		const std::vector<wchar_t> filterBuffer = BuildFilterBuffer(request.filters);
+		const std::wstring title = utf8_to_utf16(request.title);
+		const std::wstring defaultExtension = utf8_to_utf16(request.defaultExtension);
 
-		OPENFILENAMEA ofn;
+		OPENFILENAMEW ofn;
 		std::memset(&ofn, 0, sizeof(ofn));
 		ofn.lStructSize = sizeof(ofn);
 		// Deliberately unowned: an owned modal would tie its message loop to a window the
@@ -118,8 +129,8 @@ bool NativeFileDialog::Open(const char* ownerToken, const Request& request)
 		ofn.lpstrFile = selectedPath;
 		ofn.nMaxFile = MAX_PATH;
 		ofn.lpstrFilter = filterBuffer.data();
-		ofn.lpstrTitle = request.title.empty() ? nullptr : request.title.c_str();
-		ofn.lpstrDefExt = request.defaultExtension.empty() ? nullptr : request.defaultExtension.c_str();
+		ofn.lpstrTitle = title.empty() ? nullptr : title.c_str();
+		ofn.lpstrDefExt = defaultExtension.empty() ? nullptr : defaultExtension.c_str();
 
 		SeedPath(request.initialPath, selectedPath, initialDir, ofn);
 
@@ -127,24 +138,26 @@ bool NativeFileDialog::Open(const char* ownerToken, const Request& request)
 		if (request.save)
 		{
 			ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-			accepted = GetSaveFileNameA(&ofn) == TRUE;
+			accepted = GetSaveFileNameW(&ofn) == TRUE;
 		}
 		else
 		{
 			ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-			accepted = GetOpenFileNameA(&ofn) == TRUE;
+			accepted = GetOpenFileNameW(&ofn) == TRUE;
 		}
 
 		// Belt and braces: OFN_NOCHANGEDIR covers the documented path, but some shell
 		// extensions loaded into the dialog change it anyway.
-		if (originalWorkingDirectory[0] != '\0')
+		if (originalWorkingDirectory[0] != L'\0')
 		{
-			SetCurrentDirectoryA(originalWorkingDirectory);
+			SetCurrentDirectoryW(originalWorkingDirectory);
 		}
 
 		std::lock_guard<std::mutex> lock(g_state.mutex);
 		g_state.result.accepted = accepted;
-		g_state.result.path = accepted ? selectedPath : "";
+		// Back to UTF-8 for everyone else. Callers must open these with the wide file APIs
+		// (see utils' utf8_to_utf16), or a non-ASCII name is lost again on the way in.
+		g_state.result.path = accepted ? utf16_to_utf8(selectedPath) : std::string();
 		g_state.result.contextId = request.contextId;
 		g_state.completed = true;
 		g_state.active = false;

@@ -325,6 +325,10 @@ DWORD QuickChecksum(DWORD* pData, int size)
 	return sum;
 }
 
+// `path` is UTF-8. MSVC's fstream accepts a wide path, and going through one is what lets
+// a filename outside the system codepage - a song or palette named in Japanese on an
+// English install, say - actually open instead of reporting that it does not exist.
+// ASCII paths are unaffected, being valid UTF-8 already.
 bool utils_WriteFile(const char* path, void* inBuffer, unsigned long bufferSize, bool binaryFile, bool append)
 {
 	std::ofstream file;
@@ -336,7 +340,7 @@ bool utils_WriteFile(const char* path, void* inBuffer, unsigned long bufferSize,
 	if (append)
 		openMode |= std::fstream::ate;
 
-	file.open(path, openMode);
+	file.open(utf8_to_utf16(path), openMode);
 
 	if (!file.is_open())
 	{
@@ -349,6 +353,7 @@ bool utils_WriteFile(const char* path, void* inBuffer, unsigned long bufferSize,
 	return true;
 }
 
+// `path` is UTF-8; see utils_WriteFile.
 bool utils_ReadFile(const char* path, void* outBuffer, unsigned long bufferSize, bool binaryFile)
 {
 	std::ifstream file;
@@ -358,7 +363,7 @@ bool utils_ReadFile(const char* path, void* outBuffer, unsigned long bufferSize,
 	if (binaryFile)
 		openMode = std::fstream::binary;
 
-	file.open(path, openMode);
+	file.open(utf8_to_utf16(path), openMode);
 
 	if (!file.is_open())
 	{
