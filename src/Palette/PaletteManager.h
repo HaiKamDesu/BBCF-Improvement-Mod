@@ -27,6 +27,13 @@ public:
 	int GetOnlinePalsStartIndex(CharIndex charIndex);
 	void OverwriteIMPLDataPalName(std::string fileName, IMPL_data_t& palData);
 
+	// Builds a palette from the character's built-in template with only the character
+	// color file replaced. Used by the PNG importer: a PNG carries a single 256-color
+	// palette, so the seven effect files are taken from the template instead of being
+	// left as zeroes (which would render every effect black).
+	bool CreatePaletteFromCharacterFile(CharIndex charIndex, const std::string& palName,
+		const char* characterFileData, IMPL_data_t& outPalData);
+
 	// Return values:
 	// ret > 0, index found
 	// ret == -1, index not found

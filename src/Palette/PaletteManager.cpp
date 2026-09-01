@@ -697,6 +697,27 @@ void PaletteManager::OverwriteIMPLDataPalName(std::string fileName, IMPL_data_t 
 	strncpy(palData.palInfo.palName, fileNameWithoutExt.c_str(), IMPL_PALNAME_LENGTH - 1);
 }
 
+bool PaletteManager::CreatePaletteFromCharacterFile(CharIndex charIndex, const std::string& palName,
+	const char* characterFileData, IMPL_data_t& outPalData)
+{
+	LOG(2, "CreatePaletteFromCharacterFile\n");
+
+	if (isCharacterIndexOutOfBound(charIndex))
+		return false;
+
+	// Same trick the legacy .hpl loader uses: start from the character's template so the
+	// effect files hold the stock colors, then overwrite the character color file.
+	IMPL_t implTemplate;
+	memcpy_s(&implTemplate, sizeof(IMPL_t), implTemplates[charIndex], sizeof(IMPL_t));
+	memcpy_s(&implTemplate.palData.file0, IMPL_PALETTE_DATALEN, characterFileData, IMPL_PALETTE_DATALEN);
+
+	memset(implTemplate.palData.palInfo.palName, 0, IMPL_PALNAME_LENGTH);
+	strncpy(implTemplate.palData.palInfo.palName, palName.c_str(), IMPL_PALNAME_LENGTH - 1);
+
+	outPalData = implTemplate.palData;
+	return true;
+}
+
 // Return values:
 // ret > 0, index found
 // ret == -1, index not found

@@ -11,6 +11,7 @@
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "Palette/impl_templates.h"
 #include "Palette/PaletteManager.h"
+#include "Palette/PngPalette.h"
 
 #include "imgui_internal.h"
 
@@ -60,6 +61,9 @@ namespace
 			return false;
 		return _stricmp(fileName.c_str() + dot, extension) == 0;
 	}
+
+	// PNG palette interchange (PLTE chunk), the format UNI2 Improvement Mod and unPAC use.
+	constexpr const char* kPngFileExtension = ".png";
 
 	constexpr const char* kFileDialogOwner = "palettes_window";
 	constexpr int kFileDialogExportPalette = 0;
@@ -254,6 +258,8 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 	const std::string fileName = FileNameFromPath(sourcePath);
 	const std::string folder = std::string("BBCF_IM\\Palettes\\") + getCharacterNameByIndexA(charIndex) + "\\";
 
+	const bool isPng = HasExtension(fileName, kPngFileExtension);
+
 	std::string baseName = fileName;
 	std::string extension;
 	const size_t dot = fileName.rfind('.');
@@ -261,6 +267,15 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 	{
 		baseName = fileName.substr(0, dot);
 		extension = fileName.substr(dot);
+	}
+
+	if (isPng)
+	{
+		// A PNG is converted on the way in; what lands in the folder is a .cfpl whose
+		// name has to survive the palInfo.palName field WritePaletteToFile builds its
+		// path from.
+		extension = IMPL_FILE_EXTENSION;
+		baseName = baseName.substr(0, IMPL_PALNAME_LENGTH - 5);
 	}
 
 	std::string finalName = baseName;
@@ -275,7 +290,29 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 
 	const std::string destPath = folder + finalName + extension;
 
-	if (CopyFileA(sourcePath.c_str(), destPath.c_str(), TRUE) != TRUE)
+	if (isPng)
+	{
+		char characterFile[IMPL_PALETTE_DATALEN];
+		std::string error;
+		if (!PngPalette::ReadPaletteFile(sourcePath, characterFile, error))
+		{
+			g_imGuiLogger->Log("[error] Unable to import '%s' : %s\n", fileName.c_str(), error.c_str());
+			return;
+		}
+
+		// A PNG only carries the character colors; the effect files come from the
+		// character's built-in template so they are never left blank.
+		IMPL_data_t palData;
+		if (!g_interfaces.pPaletteManager->CreatePaletteFromCharacterFile(
+			(CharIndex)charIndex, finalName, characterFile, palData) ||
+			!g_interfaces.pPaletteManager->WritePaletteToFile((CharIndex)charIndex, &palData))
+		{
+			g_imGuiLogger->Log("[error] Failed to import palette '%s' into '%s'\n",
+				fileName.c_str(), destPath.c_str());
+			return;
+		}
+	}
+	else if (CopyFileA(sourcePath.c_str(), destPath.c_str(), TRUE) != TRUE)
 	{
 		g_imGuiLogger->Log("[error] Failed to import palette '%s' into '%s'\n",
 			fileName.c_str(), destPath.c_str());
@@ -373,12 +410,31 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 
 	if (result.contextId == kFileDialogExportPalette)
 	{
-		const bool written = g_pendingExportPaletteBytes.size() == sizeof(IMPL_t) &&
-			utils_WriteFile(path.c_str(), g_pendingExportPaletteBytes.data(), sizeof(IMPL_t), true);
+		bool written = false;
+		std::string error;
+
+		if (g_pendingExportPaletteBytes.size() == sizeof(IMPL_t))
+		{
+			if (HasExtension(FileNameFromPath(path), kPngFileExtension))
+			{
+				// A PNG palette only holds the character colors, so the effect files are
+				// dropped; .cfpl stays the lossless format.
+				const IMPL_t* paletteFile = (const IMPL_t*)g_pendingExportPaletteBytes.data();
+				written = PngPalette::WritePaletteFile(path, paletteFile->palData.file0, error);
+			}
+			else
+			{
+				written = utils_WriteFile(path.c_str(), g_pendingExportPaletteBytes.data(), sizeof(IMPL_t), true);
+			}
+		}
+
 		if (written)
 			g_imGuiLogger->Log("[system] Exported palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
-		else
+		else if (error.empty())
 			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s'\n", g_pendingExportPalName.c_str(), path.c_str());
+		else
+			g_imGuiLogger->Log("[error] Failed to export palette '%s' to '%s' : %s\n",
+				g_pendingExportPalName.c_str(), path.c_str(), error.c_str());
 		return;
 	}
 
@@ -412,17 +468,18 @@ void PalettesConfigWindow::ConsumeFinishedFileDialog()
 
 		ImportPaletteFile(path, fileContents.header.charIndex);
 	}
-	else if (HasExtension(fileName, LEGACY_HPL_FILE_EXTENSION))
+	else if (HasExtension(fileName, LEGACY_HPL_FILE_EXTENSION) ||
+		HasExtension(fileName, kPngFileExtension))
 	{
-		// Legacy .hpl files carry no character info: ask the user.
+		// Legacy .hpl files and PNG palettes carry no character info: ask the user.
 		m_pendingImportPath = path;
 		m_pendingImportCharIndex = 0;
 		m_openImportCharSelect = true;
 	}
 	else
 	{
-		g_imGuiLogger->Log("[error] Unable to import '%s' : not a %s or %s file\n",
-			fileName.c_str(), IMPL_FILE_EXTENSION, LEGACY_HPL_FILE_EXTENSION);
+		g_imGuiLogger->Log("[error] Unable to import '%s' : not a %s, %s or %s file\n",
+			fileName.c_str(), IMPL_FILE_EXTENSION, LEGACY_HPL_FILE_EXTENSION, kPngFileExtension);
 	}
 }
 
@@ -494,7 +551,7 @@ void PalettesConfigWindow::DrawImportButton()
 	{
 		NativeFileDialog::Request request;
 		request.title = "Import palette";
-		request.filters.push_back({ "BBCF Palettes (*.cfpl;*.hpl)", "*.cfpl;*.hpl" });
+		request.filters.push_back({ "BBCF Palettes (*.cfpl;*.hpl;*.png)", "*.cfpl;*.hpl;*.png" });
 		request.contextId = kFileDialogImportPalette;
 		NativeFileDialog::Open(kFileDialogOwner, request);
 	}
@@ -631,6 +688,7 @@ void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
 				request.save = true;
 				request.title = "Export palette";
 				request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
+				request.filters.push_back({ "PNG Palette (*.png)", "*.png" });
 				request.defaultExtension = "cfpl";
 				request.initialPath = row.name + IMPL_FILE_EXTENSION;
 				request.contextId = kFileDialogExportPalette;
