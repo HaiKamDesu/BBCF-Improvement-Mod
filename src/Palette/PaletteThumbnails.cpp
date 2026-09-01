@@ -245,7 +245,7 @@ namespace PaletteThumbnails
 			// Touch: move to the front so the least recently drawn is what gets evicted.
 			g_recency.splice(g_recency.begin(), g_recency, hit->second.recency);
 			hit->second.recency = g_recency.begin();
-			return (ImTextureID)hit->second.texture;
+			return (ImTextureID)(uintptr_t)hit->second.texture;
 		}
 
 		IDirect3DTexture9* texture = BuildTexture(*sprite, paletteData);
@@ -269,7 +269,7 @@ namespace PaletteThumbnails
 		entry.recency = g_recency.begin();
 		g_cache[cacheKey] = entry;
 
-		return (ImTextureID)texture;
+		return (ImTextureID)(uintptr_t)texture;
 	}
 
 	void Invalidate(int charIndex, const std::string& key)

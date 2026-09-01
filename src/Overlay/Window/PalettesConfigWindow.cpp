@@ -13,6 +13,7 @@
 #include "Palette/PaletteManager.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
 #include "Palette/PaletteSheet.h"
+#include "Palette/PaletteThumbnails.h"
 #include "Palette/PngPalette.h"
 
 #include "imgui_internal.h"
@@ -230,6 +231,12 @@ void PalettesConfigWindow::RebuildGroupsFromDraft()
 
 		m_groups.push_back(group);
 	}
+
+	// The grid was just rebuilt, so any selection points at a row that may no longer
+	// exist. Drop it rather than risk indexing past the end.
+	m_selectedRow = -1;
+	if (m_selectedGroup < 0 || m_selectedGroup >= (int)m_groups.size())
+		m_selectedGroup = 0;
 }
 
 void PalettesConfigWindow::AssignSlot(CharacterGroup& group, PaletteRow& row, int newSlot)
@@ -629,183 +636,323 @@ void PalettesConfigWindow::DrawImportButton()
 	ImGui::ShowHelpMarker(Messages.Palette_import_help());
 }
 
-void PalettesConfigWindow::DrawGroup(CharacterGroup& group)
+// Export is reachable from the detail panel; kept separate so the panel stays readable.
+void PalettesConfigWindow::ExportPalette(const CharacterGroup& group, const PaletteRow& row)
 {
-	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
-	std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
-
-	int assignedCount = 0;
-	int paletteCount = 0;
-	for (const PaletteRow& row : group.rows)
-	{
-		if (row.assignedSlot > 0)
-			++assignedCount;
-		if (!row.isSpecial)
-			++paletteCount;
-	}
-
-	char headerText[160];
-	if (paletteCount == 1)
-		snprintf(headerText, sizeof(headerText), Messages.Palette_group_header_single(),
-			group.charName.c_str(), assignedCount);
-	else
-		snprintf(headerText, sizeof(headerText), Messages.Palette_group_header_plural(),
-			group.charName.c_str(), paletteCount, assignedCount);
-
-	char header[192];
-	snprintf(header, sizeof(header), "%s###palcfg_%d", headerText, group.charIndex);
-
-	if (!ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
+	if (NativeFileDialog::IsOpen())
 		return;
 
-	ImGui::PushID(group.charIndex);
-	ImGui::Columns(2, "##palcfg_cols", false);
-	ImGui::SetColumnWidth(0, 330.0f);
+	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
 
-	for (PaletteRow& row : group.rows)
+	IMPL_t paletteFile{};
+	paletteFile.header.headerLen = sizeof(IMPL_header_t);
+	paletteFile.header.dataLen = sizeof(IMPL_data_t);
+	paletteFile.header.charIndex = (short)group.charIndex;
+	paletteFile.palData = customPalettes[group.charIndex][row.palIndex];
+
+	g_pendingExportPaletteBytes.resize(sizeof(IMPL_t));
+	std::memcpy(g_pendingExportPaletteBytes.data(), &paletteFile, sizeof(IMPL_t));
+	g_pendingExportPalName = row.name;
+
+	NativeFileDialog::Request request;
+	request.save = true;
+	request.title = "Export palette";
+	request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
+	request.filters.push_back({ "PNG Palette (*.png)", "*.png" });
+	request.defaultExtension = "cfpl";
+	request.initialPath = row.name + IMPL_FILE_EXTENSION;
+	request.contextId = kFileDialogExportPalette;
+	NativeFileDialog::Open(kFileDialogOwner, request);
+}
+
+void PalettesConfigWindow::DrawSlotCombo(CharacterGroup& group, PaletteRow& row)
+{
+	std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
+
+	char preview[64];
+	if (row.assignedSlot > 0)
+		snprintf(preview, sizeof(preview), Messages.Color_d(), row.assignedSlot);
+	else
+		snprintf(preview, sizeof(preview), "%s", Messages.Not_assigned());
+
+	if (row.assignedSlot > 0)
+		ImGui::PushStyleColor(ImGuiCol_Text, kAssignedColor);
+
+	ImGui::PushItemWidth(-1.0f);
+	const bool comboOpen = ImGui::BeginCombo("##slot", preview);
+	if (row.assignedSlot > 0)
+		ImGui::PopStyleColor();
+
+	if (comboOpen)
 	{
+		if (ImGui::Selectable(Messages.Not_assigned(), row.assignedSlot == 0))
+			AssignSlot(group, row, 0);
+
+		for (int slot = 1; slot <= kPaletteSlotCount; slot++)
+		{
+			const std::string& occupant = charSlots[slot - 1];
+			char label[128];
+			if (!occupant.empty() && !NamesEqual(occupant, row.name))
+				snprintf(label, sizeof(label), Messages.Color_used_by(),
+					slot, DisplayNameForSlotValue(occupant).c_str());
+			else
+				snprintf(label, sizeof(label), Messages.Color_d(), slot);
+
+			if (ImGui::Selectable(label, row.assignedSlot == slot))
+				AssignSlot(group, row, slot);
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::PopItemWidth();
+}
+
+void PalettesConfigWindow::DrawCharacterPicker()
+{
+	if (m_selectedGroup < 0 || m_selectedGroup >= (int)m_groups.size())
+		m_selectedGroup = 0;
+
+	ImGui::PushItemWidth(200.0f);
+	if (ImGui::BeginCombo("##palettes_character", m_groups[m_selectedGroup].charName.c_str()))
+	{
+		for (int i = 0; i < (int)m_groups.size(); i++)
+		{
+			const CharacterGroup& group = m_groups[i];
+
+			int paletteCount = 0;
+			for (const PaletteRow& row : group.rows)
+				if (!row.isSpecial)
+					++paletteCount;
+
+			char label[160];
+			snprintf(label, sizeof(label), "%s (%d)###palchar_%d",
+				group.charName.c_str(), paletteCount, group.charIndex);
+
+			if (ImGui::Selectable(label, i == m_selectedGroup))
+			{
+				m_selectedGroup = i;
+				m_selectedRow = -1;
+			}
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
+	ImGui::TextDisabled("%s", Messages.Palette_assignments_hint());
+}
+
+void PalettesConfigWindow::DrawGrid(CharacterGroup& group)
+{
+	const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
+
+	// Cells are sized from the sprite's own aspect so nothing is stretched, and the
+	// column count follows the window rather than being fixed, so the grid reflows.
+	const float cellWidth = 96.0f;
+	const float cellHeight = 120.0f;
+	const float labelHeight = ImGui::GetTextLineHeightWithSpacing();
+	const float spacing = ImGui::GetStyle().ItemSpacing.x;
+	const float available = ImGui::GetContentRegionAvail().x;
+	int columns = (int)((available + spacing) / (cellWidth + spacing));
+	if (columns < 1)
+		columns = 1;
+
+	int drawn = 0;
+	for (int rowIndex = 0; rowIndex < (int)group.rows.size(); rowIndex++)
+	{
+		PaletteRow& row = group.rows[rowIndex];
 		const std::string displayName = row.isSpecial ? DisplayNameForSlotValue(row.name) : row.name;
 
 		if (!m_filter.PassFilter(displayName.c_str()) && !m_filter.PassFilter(group.charName.c_str()))
 			continue;
 
-		ImGui::PushID(row.palIndex);
+		if (drawn % columns != 0)
+			ImGui::SameLine();
+		drawn++;
+
+		ImGui::PushID(rowIndex);
+		ImGui::BeginGroup();
+
+		const bool selected = (rowIndex == m_selectedRow);
+		const ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+		// One invisible button covers the whole cell, so the sprite, the name and the
+		// gap between them are all the same click target.
+		const ImVec2 cellSize(cellWidth, cellHeight + labelHeight);
+		if (ImGui::InvisibleButton("##cell", cellSize))
+			m_selectedRow = rowIndex;
+		const bool hovered = ImGui::IsItemHovered();
+
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		if (selected || hovered)
+		{
+			const ImU32 fill = ImGui::GetColorU32(selected ? ImGuiCol_Header : ImGuiCol_HeaderHovered);
+			draw->AddRectFilled(cursor, ImVec2(cursor.x + cellSize.x, cursor.y + cellSize.y), fill, 3.0f);
+		}
 
 		if (row.isSpecial)
 		{
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(displayName.c_str());
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(NamesEqual(row.name, kRandomIniValue)
-				? Messages.Palette_random_tooltip()
-				: Messages.Palette_random_exclude_tooltip());
+			// No sprite behind "Random": the palette is not decided until the match starts.
+			const char* mark = "?";
+			const ImVec2 markSize = ImGui::CalcTextSize(mark);
+			draw->AddText(ImVec2(cursor.x + (cellWidth - markSize.x) * 0.5f,
+				cursor.y + (cellHeight - markSize.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_TextDisabled), mark);
 		}
 		else
 		{
-			// Color strip preview taken straight from the palette's character colors
-			ImGui::AlignTextToFramePadding();
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, 1.0f));
-			for (int colorIdx = 1; colorIdx <= kSwatchColorCount; colorIdx++)
+			int texWidth = 0, texHeight = 0;
+			const ImTextureID texture = PaletteThumbnails::Get(group.charIndex, row.name,
+				customPalettes[group.charIndex][row.palIndex].file0, &texWidth, &texHeight);
+
+			if (texture && texWidth > 0 && texHeight > 0)
 			{
-				unsigned char* colorBytes =
-					(unsigned char*)customPalettes[group.charIndex][row.palIndex].file0 + colorIdx * 4;
-				char swatchId[32];
-				snprintf(swatchId, sizeof(swatchId), "##swatch_%d", colorIdx);
-				ImGui::ColorButtonOn32Bit(swatchId, colorIdx, colorBytes,
-					ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip, ImVec2(10.0f, 17.0f));
-				ImGui::SameLine();
+				const float scale = (std::min)(cellWidth / texWidth, cellHeight / texHeight);
+				const float drawW = texWidth * scale;
+				const float drawH = texHeight * scale;
+				const ImVec2 topLeft(cursor.x + (cellWidth - drawW) * 0.5f,
+					cursor.y + (cellHeight - drawH));
+				draw->AddImage(ImTextureRef(texture), topLeft,
+					ImVec2(topLeft.x + drawW, topLeft.y + drawH));
 			}
-			ImGui::PopStyleVar();
-
-			ImGui::TextUnformatted(displayName.c_str());
+			else
+			{
+				// No sprite for this character in this build, or the texture could not be
+				// made: fall back to the colour strip rather than an empty cell.
+				const float swatchHeight = cellHeight / 8.0f;
+				for (int i = 0; i < 8; i++)
+				{
+					const unsigned char* bytes =
+						(const unsigned char*)customPalettes[group.charIndex][row.palIndex].file0
+						+ (1 + i * 12) * 4;
+					const ImU32 colour = IM_COL32(bytes[2], bytes[1], bytes[0], 255);
+					draw->AddRectFilled(ImVec2(cursor.x + 16.0f, cursor.y + i * swatchHeight),
+						ImVec2(cursor.x + cellWidth - 16.0f, cursor.y + (i + 1) * swatchHeight),
+						colour);
+				}
+			}
 		}
-		ImGui::NextColumn();
 
-		char preview[64];
+		// Colour-slot badge, so an assignment is visible without selecting the cell.
 		if (row.assignedSlot > 0)
-			snprintf(preview, sizeof(preview), Messages.Color_d(), row.assignedSlot);
-		else
-			snprintf(preview, sizeof(preview), "%s", Messages.Not_assigned());
-
-		if (row.assignedSlot > 0)
-			ImGui::PushStyleColor(ImGuiCol_Text, kAssignedColor);
-
-		ImGui::PushItemWidth(-114.0f);
-		const bool comboOpen = ImGui::BeginCombo("##slot", preview);
-		if (row.assignedSlot > 0)
-			ImGui::PopStyleColor();
-
-		if (comboOpen)
 		{
-			if (ImGui::Selectable(Messages.Not_assigned(), row.assignedSlot == 0))
-				AssignSlot(group, row, 0);
-
-			for (int slot = 1; slot <= kPaletteSlotCount; slot++)
-			{
-				const std::string& occupant = charSlots[slot - 1];
-				char label[128];
-				if (!occupant.empty() && !NamesEqual(occupant, row.name))
-					snprintf(label, sizeof(label), Messages.Color_used_by(),
-						slot, DisplayNameForSlotValue(occupant).c_str());
-				else
-					snprintf(label, sizeof(label), Messages.Color_d(), slot);
-
-				if (ImGui::Selectable(label, row.assignedSlot == slot))
-					AssignSlot(group, row, slot);
-			}
-			ImGui::EndCombo();
-		}
-		ImGui::PopItemWidth();
-
-		if (!row.isSpecial)
-		{
-			ImGui::SameLine();
-			if (ImGui::Button(Messages.Export()) && !NativeFileDialog::IsOpen())
-			{
-				IMPL_t paletteFile{};
-				paletteFile.header.headerLen = sizeof(IMPL_header_t);
-				paletteFile.header.dataLen = sizeof(IMPL_data_t);
-				paletteFile.header.charIndex = (short)group.charIndex;
-				paletteFile.palData = customPalettes[group.charIndex][row.palIndex];
-
-				g_pendingExportPaletteBytes.resize(sizeof(IMPL_t));
-				std::memcpy(g_pendingExportPaletteBytes.data(), &paletteFile, sizeof(IMPL_t));
-				g_pendingExportPalName = row.name;
-
-				NativeFileDialog::Request request;
-				request.save = true;
-				request.title = "Export palette";
-				request.filters.push_back({ "BBCF Palette (*.cfpl)", "*.cfpl" });
-				request.filters.push_back({ "PNG Palette (*.png)", "*.png" });
-				request.defaultExtension = "cfpl";
-				request.initialPath = row.name + IMPL_FILE_EXTENSION;
-				request.contextId = kFileDialogExportPalette;
-				NativeFileDialog::Open(kFileDialogOwner, request);
-			}
-			ImGui::HoverTooltip(Messages.Palette_export_tooltip());
-
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
-			if (ImGui::Button("X"))
-			{
-				m_pendingDeleteCharIndex = group.charIndex;
-				m_pendingDeletePalName = row.name;
-				m_openDeleteConfirm = true;
-			}
-			ImGui::PopStyleColor();
-			ImGui::HoverTooltip(Messages.Palette_delete_tooltip());
+			char badge[16];
+			snprintf(badge, sizeof(badge), "%d", row.assignedSlot);
+			const ImVec2 badgeSize = ImGui::CalcTextSize(badge);
+			const ImVec2 badgeMin(cursor.x + cellWidth - badgeSize.x - 8.0f, cursor.y + 2.0f);
+			draw->AddRectFilled(badgeMin,
+				ImVec2(badgeMin.x + badgeSize.x + 6.0f, badgeMin.y + badgeSize.y + 2.0f),
+				IM_COL32(30, 30, 30, 200), 3.0f);
+			draw->AddText(ImVec2(badgeMin.x + 3.0f, badgeMin.y + 1.0f),
+				ImGui::GetColorU32(kAssignedColor), badge);
 		}
 
-		ImGui::NextColumn();
+		// Name, clipped to the cell so a long one cannot push the grid out of shape.
+		const ImVec2 clipMin(cursor.x + 2.0f, cursor.y + cellHeight);
+		const ImVec2 clipMax(cursor.x + cellWidth - 2.0f, cursor.y + cellHeight + labelHeight);
+		draw->PushClipRect(clipMin, clipMax, true);
+		draw->AddText(clipMin, ImGui::GetColorU32(ImGuiCol_Text), displayName.c_str());
+		draw->PopClipRect();
+
+		ImGui::EndGroup();
+
+		if (hovered)
+			ImGui::SetTooltip("%s", displayName.c_str());
+
 		ImGui::PopID();
 	}
 
-	ImGui::Columns(1);
+	if (drawn == 0)
+		ImGui::TextDisabled("%s", Messages.Palettes_none_found());
+}
 
-	// Entries written by hand into palettes.ini (comma lists, missing files,
-	// duplicated names) have no matching palette row; keep them visible so
-	// saving is not a surprise. Assigning a palette to that color replaces the
-	// manual entry.
-	for (int slot = 1; slot <= kPaletteSlotCount; slot++)
+void PalettesConfigWindow::DrawDetailPanel(CharacterGroup& group)
+{
+	std::vector<std::string>& charSlots = m_draftSlots[group.charIndex];
+
+	if (m_selectedRow < 0 || m_selectedRow >= (int)group.rows.size())
 	{
-		const std::string& value = charSlots[slot - 1];
-		if (value.empty())
-			continue;
+		ImGui::TextDisabled("%s", Messages.Palette_select_hint());
 
-		bool matchesRow = false;
-		for (const PaletteRow& row : group.rows)
-			if (NamesEqual(value, row.name) && row.assignedSlot == slot)
+		// Entries typed into palettes.ini by hand (comma lists, missing files) have no
+		// cell in the grid. Keep them visible so saving is not a surprise.
+		bool anyManual = false;
+		for (int slot = 1; slot <= kPaletteSlotCount; slot++)
+		{
+			const std::string& value = charSlots[slot - 1];
+			if (value.empty())
+				continue;
+
+			bool matchesRow = false;
+			for (const PaletteRow& row : group.rows)
+				if (NamesEqual(value, row.name) && row.assignedSlot == slot)
+				{
+					matchesRow = true;
+					break;
+				}
+
+			if (!matchesRow)
 			{
-				matchesRow = true;
-				break;
+				if (!anyManual)
+				{
+					ImGui::Separator();
+					anyManual = true;
+				}
+				ImGui::TextDisabled(Messages.Palette_manual_entry(), slot, value.c_str());
 			}
-
-		if (!matchesRow)
-			ImGui::TextDisabled(Messages.Palette_manual_entry(), slot, value.c_str());
+		}
+		return;
 	}
 
-	ImGui::Spacing();
-	ImGui::PopID();
+	PaletteRow& row = group.rows[m_selectedRow];
+	const std::string displayName = row.isSpecial ? DisplayNameForSlotValue(row.name) : row.name;
+
+	ImGui::TextWrapped("%s", displayName.c_str());
+	if (row.isSpecial)
+	{
+		ImGui::TextDisabled("%s", NamesEqual(row.name, kRandomIniValue)
+			? Messages.Palette_random_tooltip()
+			: Messages.Palette_random_exclude_tooltip());
+	}
+	ImGui::Separator();
+
+	ImGui::TextUnformatted(Messages.Palette_colour_slot());
+	DrawSlotCombo(group, row);
+
+	if (!row.isSpecial)
+	{
+		const auto& customPalettes = g_interfaces.pPaletteManager->GetCustomPalettesVector();
+
+		ImGui::Spacing();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.0f, 1.0f));
+		for (int colorIdx = 1; colorIdx <= kSwatchColorCount; colorIdx++)
+		{
+			unsigned char* colorBytes =
+				(unsigned char*)customPalettes[group.charIndex][row.palIndex].file0 + colorIdx * 4;
+			char swatchId[32];
+			snprintf(swatchId, sizeof(swatchId), "##swatch_%d", colorIdx);
+			ImGui::ColorButtonOn32Bit(swatchId, colorIdx, colorBytes,
+				ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoTooltip, ImVec2(10.0f, 17.0f));
+			if (colorIdx % 16 != 0)
+				ImGui::SameLine();
+		}
+		ImGui::PopStyleVar();
+
+		ImGui::Spacing();
+		ImGui::Separator();
+
+		if (ImGui::Button(Messages.Export(), ImVec2(-1.0f, 0.0f)))
+			ExportPalette(group, row);
+		ImGui::HoverTooltip(Messages.Palette_export_tooltip());
+
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.42f, 1.0f));
+		if (ImGui::Button(Messages.Delete(), ImVec2(-1.0f, 0.0f)))
+		{
+			m_pendingDeleteCharIndex = group.charIndex;
+			m_pendingDeletePalName = row.name;
+			m_openDeleteConfirm = true;
+		}
+		ImGui::PopStyleColor();
+		ImGui::HoverTooltip(Messages.Palette_delete_tooltip());
+	}
 }
 
 void PalettesConfigWindow::DrawModal()
@@ -834,21 +981,31 @@ void PalettesConfigWindow::DrawModal()
 
 	DrawImportButton();
 
-	ImGui::BeginChild("##palettes_scroll", ImVec2(0, -64.0f), true);
-
 	if (m_groups.empty())
 	{
+		ImGui::BeginChild("##palettes_scroll", ImVec2(0, -64.0f), true);
 		ImGui::TextWrapped("%s", Messages.Palettes_none_found());
 		ImGui::Spacing();
 		ImGui::TextWrapped("%s", Messages.Palettes_none_found_help());
+		ImGui::EndChild();
 	}
 	else
 	{
-		for (CharacterGroup& group : m_groups)
-			DrawGroup(group);
-	}
+		DrawCharacterPicker();
 
-	ImGui::EndChild();
+		// Grid on the left, details for whatever is selected on the right. The grid is
+		// what you scan; the panel is where the controls live, so cells stay clean.
+		const float panelWidth = 250.0f;
+		ImGui::BeginChild("##palettes_grid", ImVec2(-panelWidth, -64.0f), true);
+		DrawGrid(m_groups[m_selectedGroup]);
+		ImGui::EndChild();
+
+		ImGui::SameLine();
+
+		ImGui::BeginChild("##palettes_detail", ImVec2(0, -64.0f), true);
+		DrawDetailPanel(m_groups[m_selectedGroup]);
+		ImGui::EndChild();
+	}
 
 	bool allowDownloadsChecked = (m_draftAllowDownloads == 1);
 	if (ImGui::Checkbox(Messages.Palette_allow_downloads(), &allowDownloadsChecked))

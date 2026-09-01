@@ -817,6 +817,8 @@ Not assigned,Not assigned,Sin asignar
 Color_used_by,Color %d  (used by %s),Color %d  (usado por %s)
 Export,Export,Exportar
 Palette_export_tooltip,Save a copy of this palette as a .cfpl file anywhere you like.,Guarda una copia de esta paleta como archivo .cfpl donde quieras.
+Palette_select_hint,Pick a palette to see what you can do with it.,Elige una paleta para ver qué puedes hacer con ella.
+Palette_colour_slot,In-game colour,Color del juego
 Palette_delete_tooltip,Delete this palette's file from disk (asks for confirmation).,Elimina el archivo de esta paleta del disco (pide confirmación).
 Delete palette,Delete palette,Eliminar paleta
 Palette_delete_confirm,"Delete ""%s"" (%s)?","¿Eliminar ""%s"" (%s)?"

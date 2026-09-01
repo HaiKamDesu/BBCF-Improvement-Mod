@@ -1923,6 +1923,12 @@ struct LocalizationKeysAccessor
         // Palette_export_tooltip
         inline const char* Palette_export_tooltip() const { return Get("Palette_export_tooltip"); }
 
+        // Palette_select_hint
+        inline const char* Palette_select_hint() const { return Get("Palette_select_hint"); }
+
+        // Palette_colour_slot
+        inline const char* Palette_colour_slot() const { return Get("Palette_colour_slot"); }
+
         // Palette_delete_tooltip
         inline const char* Palette_delete_tooltip() const { return Get("Palette_delete_tooltip"); }
 

@@ -30,7 +30,11 @@ private:
 	void BuildRows();
 	void RebuildGroupsFromDraft();
 	void AssignSlot(CharacterGroup& group, PaletteRow& row, int newSlot);
-	void DrawGroup(CharacterGroup& group);
+	void DrawCharacterPicker();
+	void DrawGrid(CharacterGroup& group);
+	void DrawDetailPanel(CharacterGroup& group);
+	void DrawSlotCombo(CharacterGroup& group, PaletteRow& row);
+	void ExportPalette(const CharacterGroup& group, const PaletteRow& row);
 	void DrawImportButton();
 	void ConsumeFinishedFileDialog();
 	void ImportPaletteFile(const std::string& sourcePath, int charIndex);
@@ -39,6 +43,10 @@ private:
 	void DrawDeleteConfirmModal();
 
 	std::vector<CharacterGroup> m_groups;
+	// Which character's grid is showing, and which cell in it is selected. Indices into
+	// m_groups / its rows; the selection is cleared whenever the grid is rebuilt.
+	int m_selectedGroup = 0;
+	int m_selectedRow = -1;
 	// Draft copy of the palettes.ini slot table (per character, one string per color).
 	// This is what gets written on save; Cancel throws it away.
 	std::vector<std::vector<std::string>> m_draftSlots;
