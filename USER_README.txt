@@ -28,6 +28,20 @@ How to install
 (Should be at "..\Steam\SteamApps\common\BlazBlue Centralfiction")
 3. Launch the game and press F1
 
+Linux / Steam Deck (Proton)
+==========================
+Add this to the game's Steam launch options, or the mod may not load at all:
+
+    WINEDLLOVERRIDES="dinput8=n,b" %command%
+
+Known limits under Proton:
+- Controller features (assignment, keyboard separation, pad hotkeys, TAS mode) are
+  disabled. Set ForceEnableControllerSettingHooks = 1 in settings.ini to override,
+  at your own risk.
+- Custom music works, but converted tracks are stored uncompressed and are about
+  ten times larger than on Windows. This is automatic.
+- .opus / .m4a / .aac / .wma may not import. Use .mp3, .wav, .flac or .ogg.
+
 That is the whole install. settings.ini, palettes.ini and every folder the mod uses are
 created for you on first launch, and the mod updates itself from then on. You can change
 anything from the F1 menu, or edit settings.ini by hand once it exists.

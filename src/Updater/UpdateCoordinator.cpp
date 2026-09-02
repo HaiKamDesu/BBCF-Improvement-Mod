@@ -298,7 +298,7 @@ namespace Updater
 		m_snapshot.statusText = "Extracting staged update...";
 		LeaveCriticalSection(&m_lock);
 
-		if (!ExtractZipWithShell(packagePath, stageRoot, error))
+		if (!ExtractUpdateZip(packagePath, zip, stageRoot, error))
 		{
 			SetErrorLocked(error);
 			return;

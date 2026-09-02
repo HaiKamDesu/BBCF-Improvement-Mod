@@ -126,6 +126,18 @@ SETTING(int, d3d9IatFallbackHook, "D3D9IatFallbackHook", "1");
 // correlated with this override actually changing something online - see the block comment
 // there for details. See docs/Research/PlatinumVoiceChoiceInvestigation.md for the full RE writeup.
 SETTING(int, platinumVoiceChoice, "PlatinumVoiceChoice", "0");
+
+// Wave-bank format the custom-music converter writes into its .pac files.
+// enum: 0 = Auto, 1 = WMA, 2 = PCM - keep in step with kMusicWaveBankFormatOptions
+// in SettingsIniWindow.cpp and with ChooseBankFormat() in CustomMusicConverter.cpp.
+//
+// Auto picks WMA when a PCM->WMAudioV8 encoder MFT exists and PCM when it does not.
+// That is the whole Windows/Proton split: Wine's Media Foundation registers no audio
+// encoder of any kind, so WMA cannot be produced there, while the XACT runtime plays
+// PCM wave banks perfectly well (the game's own voice banks are PCM). Forcing PCM on
+// Windows is supported, and is the only way to exercise that path on a machine that
+// has the encoder. PCM files are roughly ten times larger.
+SETTING(int, musicWaveBankFormat, "MusicWaveBankFormat", "0");
 // Keep the last N sessions' DEBUG.txt files in BBCF_IM\DebugHistory (rotated at
 // launch). 0 = old behavior, DEBUG.txt is overwritten every launch.
 SETTING(int, debugLogSessionHistory, "DebugLogSessionHistory", "10");

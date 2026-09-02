@@ -69,7 +69,7 @@ namespace {
 		{ "CustomPalettesInCharSelect", "Show custom colours on character select", "Palettes", "Makes the colour preview on the character select screen use your custom palettes, so it matches what you will actually see in the match. The mod writes a modified copy of one of the game's data files into its own folder to do this - nothing the game shipped is changed. Turn it off if you would rather it did not write that file." },
 		{ "SwapControllerPos", "Swap player 1 and 2 controllers", "Controller", "Swaps which physical controller counts as player 1 and which as player 2. Currently forced off at startup because it can crash the game; turn it on again during a session if you need it." },
 		{ "EnableControllerHooks", "Controller tools", "Controller", "Powers the mod's controller features (assignment, keyboard separation). Turn it off only if you suspect them of causing trouble." },
-		{ "ForceEnableControllerSettingHooks", "Force controller tools on Linux/Steam Deck", "Controller", "The mod switches the controller tools off automatically under Wine/Proton because they misbehave there. This forces them back on. Expect problems." },
+		{ "ForceEnableControllerSettingHooks", "Force controller tools on Linux/Steam Deck", "Controller", "The mod switches the controller tools off automatically under Wine/Proton because they misbehave there. This forces them back on, and overrides the platform check on its own - you do not also need to turn Controller tools back on. Unsupported: expect problems, and turn it off again before reporting a bug." },
 		{ "PrimaryKeyboardDeviceId", "Main keyboard", "Controller", "Which physical keyboard counts as the main one when you have more than one plugged in. Set this from the controller menu rather than by hand." },
 		{ "IgnoredKeyboardIds", "Ignored keyboards", "Controller", "Keyboards the mod should pretend do not exist - handy for a wireless dongle or a laptop's built-in keyboard. Set this from the controller menu rather than by hand." },
 		{ "KeyboardRenameMap", "Keyboard names", "Controller", "The friendly names you gave your keyboards. Set from the controller menu; not meant to be edited here." },
@@ -97,6 +97,7 @@ namespace {
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop: restart position", "Unlimited Playback", "Where the characters are put when the loop restarts - middle of the stage, a corner, or your own saved snapshot." },
 		{ "D3D9IatFallbackHook", "Overlay rescue mode", "Graphics", "For the rare PC where the mod loads but no mod window ever appears, usually a dual-graphics laptop where NVIDIA's software gets in the way first. Automatic fixes it on affected PCs and does nothing on all the others - leave it there. Requires a restart." },
 		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks whether YOUR Platinum speaks as Sena or Luna instead of the game rolling for it. Offline only (training, versus CPU, replays, local versus) - it is switched off in online matches while a reported desync is investigated. Only affects the Platinum you control." },
+		{ "MusicWaveBankFormat", "Custom music file format", "Other", "How converted custom music is stored. Auto is almost always right: it writes compact WMA on Windows and switches to PCM under Wine/Proton, where Windows supplies no audio encoder and WMA cannot be made at all. PCM files play identically but take about ten times the disk space. Changing this rebuilds every converted track." },
 	};
 
 	// The draft being edited, so a hotkey's bind widget can warn about a collision with
@@ -196,6 +197,13 @@ namespace {
 		{ 2, "Sena" },
 	};
 
+	// Order must match the enum comment in settings.def and ChooseBankFormat().
+	static const SettingEnumOption kMusicWaveBankFormatOptions[] = {
+		{ 0, "Auto (WMA if available, else PCM)" },
+		{ 1, "Always WMA (smaller; Windows only)" },
+		{ 2, "Always PCM (larger; works everywhere)" },
+	};
+
 	// Both of these are consent settings whose -1 means "the mod has not asked you yet", which
 	// is impossible to guess from a number box.
 	static const SettingEnumOption kTakeoverSlotOptions[] = {
@@ -214,6 +222,7 @@ namespace {
 		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },
 		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
+		{ "MusicWaveBankFormat", kMusicWaveBankFormatOptions, _countof(kMusicWaveBankFormatOptions) },
 		{ "D3D9IatFallbackHook", kD3D9IatFallbackHookOptions, _countof(kD3D9IatFallbackHookOptions) },
 	};
 
@@ -398,13 +407,27 @@ namespace {
 
 	static void RestartGame()
 	{
-		wchar_t exePath[MAX_PATH] = {};
-		GetModuleFileNameW(NULL, exePath, MAX_PATH);
-		STARTUPINFOW si = { sizeof(si) };
-		PROCESS_INFORMATION pi = {};
-		CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
-		CloseHandle(pi.hProcess);
-		CloseHandle(pi.hThread);
+		// Prefer relaunching through Steam. Spawning BBCF.exe directly starts it outside
+		// the Steam wrapper, which loses the overlay and Cloud saves; under Proton it also
+		// bypasses the launcher that set the prefix up in the first place.
+		const HINSTANCE viaSteam = ShellExecuteW(
+			nullptr, L"open", L"steam://rungameid/586140", nullptr, nullptr, SW_SHOWNORMAL);
+
+		// ShellExecute reports failure as a value of 32 or less. That happens when the
+		// steam:// handler is not registered, which is normal in a bare Wine prefix, so
+		// fall back to launching the executable rather than leaving the game closed.
+		if (reinterpret_cast<UINT_PTR>(viaSteam) <= 32)
+		{
+			wchar_t exePath[MAX_PATH] = {};
+			GetModuleFileNameW(NULL, exePath, MAX_PATH);
+			STARTUPINFOW si = { sizeof(si) };
+			PROCESS_INFORMATION pi = {};
+			if (CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+			{
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+			}
+		}
 		ExitProcess(0);
 	}
 }

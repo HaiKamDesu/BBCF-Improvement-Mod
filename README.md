@@ -20,6 +20,37 @@ That's the whole install. Everything else — `settings.ini`, `palettes.ini`, ev
 
 Nothing the mod does modifies the files Steam installed, so "Verify integrity of game files" has nothing to undo. To uninstall, delete `dinput8.dll`.
 
+### On Linux and Steam Deck
+
+The mod runs under Proton, with one extra step and a few known limits.
+
+**Add this to the game's launch options** (right-click BlazBlue Centralfiction → Properties → General → Launch Options):
+
+```
+WINEDLLOVERRIDES="dinput8=n,b" %command%
+```
+
+Without it Wine may load its own built-in `dinput8` in preference to the one you just
+dropped in, and the mod never loads at all — no error, no log, nothing in the F1 menu. If
+the mod appears to do nothing on Linux, check this first.
+
+What is different once it is running:
+
+- **Controller features are switched off.** Assignment and reordering, keyboard separation,
+  multiple keyboards, controller position swap, pad hotkeys and TAS mode are disabled under
+  Wine, because they misbehave there in ways that have not yet been diagnosed. You can
+  force them on with `ForceEnableControllerSettingHooks = 1` in `settings.ini`, at your own
+  risk. The game's own controller support is unaffected either way.
+- **Custom music works, and the files are larger.** Wine provides no audio encoder, so the
+  mod stores converted tracks uncompressed instead — roughly ten times the size of the same
+  track on Windows. It selects this automatically; you do not need to change anything.
+- **`.opus`, `.m4a`, `.aac` and `.wma` may not import.** These rely on codecs Windows
+  supplies and Wine does not. `.mp3`, `.wav`, `.flac` and `.ogg` work everywhere.
+
+If something else misbehaves, `BBCF_IM/DEBUG.txt` now records your Wine version, distro and
+Deck/gamescope status at the top, so a bug report with that file attached is far easier to
+act on.
+
 ---
 
 ## What this mod provides

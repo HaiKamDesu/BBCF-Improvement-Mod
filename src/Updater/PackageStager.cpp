@@ -5,19 +5,26 @@
 #include <Windows.h>
 #include <wincrypt.h>
 #include <wininet.h>
-#include <shlobj.h>
-#include <objbase.h>
-#include <comdef.h>
+
+// miniz, for inflate. stb_image's inflate was tried first, since the DLL already
+// compiles it, but it rejects valid deflate streams: anything compressed heavily
+// enough to leave a single distance code (repetitive text, long runs) comes back
+// as an error, while ordinary binaries decode fine. A decoder that works or not
+// depending on what the compressor happened to pick is not something an updater
+// can be built on, so this uses a complete implementation instead.
+// Without this miniz defines zlib-compatible aliases, one of which is a bare
+// `crc32` macro that rewrites the ZipEntryRecord field of the same name.
+#define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+#include "miniz.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <set>
 #include <string>
+#include <vector>
 
 #pragma comment(lib, "advapi32.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
 #pragma comment(lib, "wininet.lib")
 
 namespace Updater
@@ -36,6 +43,29 @@ namespace Updater
 		unsigned int ReadU32(const unsigned char* p)
 		{
 			return static_cast<unsigned int>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+		}
+
+		// The shell used to verify entry CRCs for us. Doing it ourselves is the
+		// difference between "extracted" and "extracted correctly".
+		unsigned int Crc32(const unsigned char* data, size_t length)
+		{
+			static unsigned int table[256];
+			static bool built = false;
+			if (!built)
+			{
+				for (unsigned int i = 0; i < 256; ++i)
+				{
+					unsigned int c = i;
+					for (int bit = 0; bit < 8; ++bit)
+						c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+					table[i] = c;
+				}
+				built = true;
+			}
+			unsigned int c = 0xFFFFFFFFu;
+			for (size_t i = 0; i < length; ++i)
+				c = table[(c ^ data[i]) & 0xFF] ^ (c >> 8);
+			return c ^ 0xFFFFFFFFu;
 		}
 
 		std::string ToLower(std::string value)
@@ -396,6 +426,7 @@ namespace Updater
 			}
 
 			const unsigned short method = ReadU16(data + pos + 10);
+			const unsigned int entryCrc = ReadU32(data + pos + 16);
 			const unsigned int compressedSize = ReadU32(data + pos + 20);
 			const unsigned int uncompressedSize = ReadU32(data + pos + 24);
 			const unsigned short nameLen = ReadU16(data + pos + 28);
@@ -421,6 +452,16 @@ namespace Updater
 			if (method != 0 && method != 8)
 			{
 				result.error = "Zip entry uses unsupported compression method.";
+				return result;
+			}
+
+			// Zip64 puts the real sizes in an extra field and leaves these saturated.
+			// The package is capped far below 4 GB, so treat it as malformed rather
+			// than growing a second size path that would never be exercised.
+			if (compressedSize == 0xFFFFFFFFu || uncompressedSize == 0xFFFFFFFFu ||
+				localOffset == 0xFFFFFFFFu)
+			{
+				result.error = "Zip64 entries are not supported.";
 				return result;
 			}
 
@@ -450,6 +491,16 @@ namespace Updater
 				}
 			}
 
+			ZipEntryRecord record;
+			record.name = name;
+			record.isDirectory = isDirectory;
+			record.method = method;
+			record.compressedSize = compressedSize;
+			record.uncompressedSize = uncompressedSize;
+			record.crc32 = entryCrc;
+			record.localHeaderOffset = localOffset;
+			result.records.push_back(record);
+
 			result.entries.push_back(name);
 			pos += 46 + nameLen + extraLen + commentLen;
 		}
@@ -458,81 +509,171 @@ namespace Updater
 		return result;
 	}
 
-	bool ExtractZipWithShell(const std::wstring& zipPath, const std::wstring& destination, std::string& error)
+	namespace
+	{
+		// Turns "a/b/c.dll" into an absolute path under `destination`, creating the
+		// directories on the way. The name has already passed IsAllowedEntryPath, so it
+		// cannot climb out with ".." or an absolute prefix.
+		std::wstring ResolveEntryPath(const std::wstring& destination, const std::string& name)
+		{
+			std::wstring relative = Utf8ToWide(name);
+			std::replace(relative.begin(), relative.end(), L'/', L'\\');
+			return CombinePath(destination, relative);
+		}
+
+		bool WriteEntryFile(const std::wstring& path, const unsigned char* data, size_t length, std::string& error)
+		{
+			const std::wstring parent = GetParentDirectory(path);
+			if (!parent.empty())
+				EnsureDirectoryRecursive(parent);
+
+			const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
+				CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+			if (file == INVALID_HANDLE_VALUE)
+			{
+				error = FormatWindowsError("Could not create staged file.", GetLastError());
+				AppendSecuritySoftwareHint(error);
+				return false;
+			}
+
+			size_t written = 0;
+			while (written < length)
+			{
+				const DWORD chunk = static_cast<DWORD>(
+					(length - written) > 0x100000u ? 0x100000u : (length - written));
+				DWORD wroteNow = 0;
+				if (!WriteFile(file, data + written, chunk, &wroteNow, nullptr) || wroteNow == 0)
+				{
+					const DWORD errorCode = GetLastError();
+					CloseHandle(file);
+					error = FormatWindowsError("Could not write staged file.", errorCode);
+					AppendSecuritySoftwareHint(error);
+					return false;
+				}
+				written += wroteNow;
+			}
+
+			CloseHandle(file);
+			return true;
+		}
+	}
+
+	bool ExtractUpdateZip(
+		const std::wstring& zipPath,
+		const ZipValidationResult& validated,
+		const std::wstring& destination,
+		std::string& error)
 	{
 		error.clear();
-		EnsureDirectoryRecursive(destination);
 
-		const HRESULT coInit = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-		const bool shouldUninit = SUCCEEDED(coInit);
-		IShellDispatch* shell = nullptr;
-		HRESULT hr = CoCreateInstance(CLSID_Shell, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shell));
-		if (FAILED(hr) || !shell)
+		// Extracting an archive nobody vetted would hand an attacker the path checks for
+		// free, so refuse rather than fall back to parsing it here.
+		if (!validated.valid)
 		{
-			if (shouldUninit)
-				CoUninitialize();
-			error = "Could not create Shell.Application.";
+			error = "Refusing to extract a zip that failed validation.";
 			return false;
 		}
 
-		Folder* zipFolder = nullptr;
-		Folder* destFolder = nullptr;
-		VARIANT zipVariant;
-		VARIANT destVariant;
-		VariantInit(&zipVariant);
-		VariantInit(&destVariant);
-		zipVariant.vt = VT_BSTR;
-		zipVariant.bstrVal = SysAllocString(zipPath.c_str());
-		destVariant.vt = VT_BSTR;
-		destVariant.bstrVal = SysAllocString(destination.c_str());
-
-		hr = shell->NameSpace(zipVariant, &zipFolder);
-		if (SUCCEEDED(hr))
-			hr = shell->NameSpace(destVariant, &destFolder);
-		if (FAILED(hr) || !zipFolder || !destFolder)
+		std::string bytes;
+		if (!ReadBinaryFile(zipPath, bytes))
 		{
-			if (zipFolder) zipFolder->Release();
-			if (destFolder) destFolder->Release();
-			VariantClear(&zipVariant);
-			VariantClear(&destVariant);
-			shell->Release();
-			if (shouldUninit)
-				CoUninitialize();
-			error = "Could not open zip or destination folder.";
+			error = "Could not read the downloaded package.";
 			return false;
 		}
 
-		FolderItems* items = nullptr;
-		hr = zipFolder->Items(&items);
-		if (SUCCEEDED(hr) && items)
+		if (!EnsureDirectoryRecursive(destination))
 		{
-			VARIANT itemVariant;
-			VARIANT options;
-			VariantInit(&itemVariant);
-			VariantInit(&options);
-			itemVariant.vt = VT_DISPATCH;
-			itemVariant.pdispVal = items;
-			options.vt = VT_I4;
-			options.lVal = 0x10 | 0x400 | 0x4;
-			hr = destFolder->CopyHere(itemVariant, options);
-			items->Release();
-		}
-
-		zipFolder->Release();
-		destFolder->Release();
-		VariantClear(&zipVariant);
-		VariantClear(&destVariant);
-		shell->Release();
-		if (shouldUninit)
-			CoUninitialize();
-
-		if (FAILED(hr))
-		{
-			error = "Shell zip extraction failed.";
+			error = FormatWindowsError("Could not create the staging folder.", GetLastError());
+			AppendSecuritySoftwareHint(error);
 			return false;
 		}
 
-		Sleep(1500);
+		const unsigned char* data = reinterpret_cast<const unsigned char*>(bytes.data());
+		const size_t total = bytes.size();
+		std::vector<unsigned char> output;
+		unsigned int filesWritten = 0;
+
+		for (size_t i = 0; i < validated.records.size(); ++i)
+		{
+			const ZipEntryRecord& entry = validated.records[i];
+			const std::wstring outPath = ResolveEntryPath(destination, entry.name);
+
+			if (entry.isDirectory)
+			{
+				EnsureDirectoryRecursive(outPath);
+				continue;
+			}
+
+			// The local header repeats the name and extra fields, and its lengths are
+			// allowed to differ from the central directory's. The payload starts after
+			// whatever the LOCAL header says, so it has to be read here rather than
+			// assumed from the entry we already parsed.
+			const size_t local = entry.localHeaderOffset;
+			if (local + 30 > total || ReadU32(data + local) != 0x04034b50)
+			{
+				error = "Zip local header is invalid for entry: " + entry.name;
+				return false;
+			}
+
+			const unsigned short localNameLen = ReadU16(data + local + 26);
+			const unsigned short localExtraLen = ReadU16(data + local + 28);
+			const size_t payload = local + 30 + localNameLen + localExtraLen;
+			if (payload + entry.compressedSize > total)
+			{
+				error = "Zip entry data runs past the end of the file: " + entry.name;
+				return false;
+			}
+
+			const unsigned char* compressed = data + payload;
+
+			if (entry.method == 0)
+			{
+				if (entry.compressedSize != entry.uncompressedSize)
+				{
+					error = "Stored zip entry has mismatched sizes: " + entry.name;
+					return false;
+				}
+				output.assign(compressed, compressed + entry.uncompressedSize);
+			}
+			else
+			{
+				// Zip stores raw deflate with no zlib header, so the header flag is off.
+				output.assign(entry.uncompressedSize, 0);
+				const size_t produced = tinfl_decompress_mem_to_mem(
+					output.empty() ? nullptr : &output[0],
+					entry.uncompressedSize,
+					compressed,
+					entry.compressedSize,
+					0);
+				if (produced == TINFL_DECOMPRESS_MEM_TO_MEM_FAILED ||
+					produced != entry.uncompressedSize)
+				{
+					error = "Could not decompress zip entry: " + entry.name;
+					return false;
+				}
+			}
+
+			// The shell verified entry CRCs on our behalf. Now that we inflate the bytes
+			// ourselves, dropping this would let a corrupt download install silently.
+			const unsigned int actual = Crc32(output.empty() ? nullptr : &output[0], output.size());
+			if (actual != entry.crc32)
+			{
+				error = "Zip entry failed its checksum: " + entry.name;
+				return false;
+			}
+
+			if (!WriteEntryFile(outPath, output.empty() ? nullptr : &output[0], output.size(), error))
+				return false;
+
+			++filesWritten;
+		}
+
+		if (filesWritten == 0)
+		{
+			error = "The update package contained no files to install.";
+			return false;
+		}
+
 		return true;
 	}
 

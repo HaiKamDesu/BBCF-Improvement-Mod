@@ -150,16 +150,33 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	const bool controllerForceEnabled = Settings::settingsIni.ForceEnableControllerSettingHooks;
 	const bool controllerPlatformSafe = IsSafeToUseControllerHooks();
 	const bool controllerRuntimeAllowed = IsControllerHooksRuntimeAllowed();
-	const char* controllerGateReason = !controllerPlatformSafe
-		? "blocked: Wine/Proton detected"
-		: (controllerRuntimeAllowed ? "allowed: Windows/native platform and setting enabled" : "blocked: controller setting disabled");
+	// The reason has to agree with `allowed`. It previously reported "blocked: Wine/Proton
+	// detected" purely because the platform was Wine, even when the force flag had allowed
+	// the hooks through - so the one line a Linux bug report is read for contradicted
+	// itself, saying blocked and allowed=1 side by side.
+	const char* controllerGateReason;
+	if (controllerForceEnabled)
+		controllerGateReason = controllerPlatformSafe
+			? "allowed: forced on (already a supported platform)"
+			: "allowed: FORCED ON over the Wine/Proton block - unsupported, expect problems";
+	else if (!controllerPlatformSafe)
+		controllerGateReason = "blocked: Wine/Proton detected (set ForceEnableControllerSettingHooks=1 to override)";
+	else if (controllerRuntimeAllowed)
+		controllerGateReason = "allowed: native platform and setting enabled";
+	else
+		controllerGateReason = "blocked: EnableControllerHooks is 0";
 	ForceLog("[Init] Controller gate: wineOrProton=%d EnableControllerHooks=%d ForceEnableControllerSettingHooks=%d allowed=%d reason=%s\n",
 		wineLikely ? 1 : 0,
 		controllerSettingEnabled ? 1 : 0,
 		controllerForceEnabled ? 1 : 0,
 		controllerRuntimeAllowed ? 1 : 0,
 		controllerGateReason);
-	if (!IsSafeToUseControllerHooks() && Settings::settingsIni.EnableControllerHooks)
+	// Honour the force flag here too. Without it this rewrote EnableControllerHooks to 0
+	// in settings.ini on every single launch under Wine, so a user who set the force flag
+	// watched their setting revert each time they started the game.
+	if (!IsSafeToUseControllerHooks() &&
+		!Settings::settingsIni.ForceEnableControllerSettingHooks &&
+		Settings::settingsIni.EnableControllerHooks)
 	{
 	LOG(1, "Wine/Proton detected; disabling controller hooks before initialization.\n");
 	Settings::changeSetting("EnableControllerHooks", "0");

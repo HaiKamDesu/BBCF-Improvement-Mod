@@ -1,0 +1,133 @@
+BBCF Improvement Mod - Wine/Proton capability probe
+Built Sep  1 2026 19:24:08
+
+========================================================
+  1. PLATFORM
+========================================================
+  Running under Wine                     YES  (version 11.16)
+  Host OS                                Linux 6.18.33.2-microsoft-standard-WSL2
+  WINEPREFIX                             /home/usuario/winetest/pfx
+  ANSI code page (CP_ACP)                1252
+  Probe path                             Z:\home\usuario\winetest\WineProbe.exe
+  Probe bitness                          32-bit
+
+========================================================
+  2. MODULE AVAILABILITY
+========================================================
+      The mod statically imports mfplat/mfreadwrite/mf. If any of those
+      is missing the DLL cannot load at all, with no error the user sees.
+
+  mfplat.dll                             OK    (C:\windows\system32\mfplat.dll)
+  mfreadwrite.dll                        OK    (C:\windows\system32\mfreadwrite.dll)
+  mf.dll                                 OK    (C:\windows\system32\mf.dll)
+  dbghelp.dll                            OK    (C:\windows\system32\dbghelp.dll)
+  dinput8.dll                            OK    (C:\windows\system32\dinput8.dll)
+  hid.dll                                OK    (C:\windows\system32\hid.dll)
+  setupapi.dll                           OK    (C:\windows\system32\setupapi.dll)
+  cfgmgr32.dll                           OK    (C:\windows\system32\cfgmgr32.dll)
+  d3dx9_43.dll                           OK    (C:\windows\system32\d3dx9_43.dll)
+  xinput1_4.dll                          OK    (C:\windows\system32\xinput1_4.dll)
+  xinput1_3.dll                          OK    (C:\windows\system32\xinput1_3.dll)
+  xinput9_1_0.dll                        OK    (C:\windows\system32\xinput9_1_0.dll)
+  winmm.dll                              OK    (C:\windows\system32\winmm.dll)
+  wininet.dll                            OK    (C:\windows\system32\wininet.dll)
+  shell32.dll                            OK    (C:\windows\system32\shell32.dll)
+  comdlg32.dll                           OK    (C:\windows\system32\comdlg32.dll)
+
+========================================================
+  3. MEDIA FOUNDATION  <-- the custom-music blocker
+========================================================
+  MFStartup exported                     YES
+  MFTEnumEx exported                     YES
+  MFStartup                              hr=0x00000000 (ok)
+
+  -- The exact call CustomMusicConverter.cpp:167 makes --
+  PCM -> WMAudioV8 (what the mod needs)  0 encoder(s)
+
+  -- Nearby alternatives --
+  PCM -> WMAudioV9                       0 encoder(s)
+  PCM -> AAC                             0 encoder(s)
+
+  -- Every audio ENCODER this runtime has --
+  Total audio encoders                   0
+
+  -- Every audio DECODER this runtime has --
+  Total audio decoders                   3
+      - (unnamed MFT)
+      - (unnamed MFT)
+      - (unnamed MFT)
+
+  -- Opus decoder (AudioDecode.cpp:481) --
+  CoCreateInstance(MSOpusDecoder)        hr=0x80040154 NOT AVAILABLE
+
+  VERDICT: custom music / BGM replacement is DEAD (no WMA encoder) on this runtime.
+
+========================================================
+  4. SHELL ZIP EXTRACTION  <-- the updater blocker
+========================================================
+      PackageStager.cpp:469 uses Shell.Application to unpack the update.
+
+  Test zip written                       118 bytes -> C:\users\usuario\AppData\Local\Temp\bbcf_probe.zip
+  CoCreateInstance(Shell.Application)    hr=0x00000000 created
+  IDispatch::GetIDsOfNames(NameSpace)    hr=0x00000000
+  NameSpace(<zip>) returns a Folder      hr=0x00000000  NO
+      This is the exact failure: Wine's shell32 has no zip folder handler.
+
+  VERDICT: updater is DEAD. Replace with in-process inflate (zlib already vendored).
+
+========================================================
+  5. CRASH DUMPS
+========================================================
+  dbghelp.dll                            loaded
+  MiniDumpWriteDump exported             YES
+  MiniDumpWriteDump                      returned TRUE  err=18
+  Dump size                              132021633 bytes
+  Header is 'MDMP'                       YES
+      A large, well-formed dump here means Linux crash reports are usable.
+      A tiny or malformed one means we should write a text report instead.
+
+========================================================
+  6. CONTROLLER STACK  <-- why the hooks were disabled
+========================================================
+      Every call the mod makes during enumeration, in order, with results.
+      Plug a pad in before running this or most sections will be empty.
+
+  setupapi.dll                           loaded
+  hid.dll                                loaded
+  SetupDiGetDevicePropertyW exported     YES
+
+      [device 1] \\?\hid#vid_845e&pid_0001#0&0000&0&0&0#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_845E&PID_0001\0&0000&0&0&0
+        ContainerID   : {0001845E-0000-FFFF-...}  <-- present
+        product       : Wine HID mouse
+
+      [device 2] \\?\hid#vid_845e&pid_0002#0&0000ffffffff0002845e&0&0&0#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_845E&PID_0002\0&0000FFFFFFFF0002845E&0&0&0
+        ContainerID   : {0002845E-0000-FFFF-...}  <-- present
+        product       : Wine HID keyboard
+
+  HID interfaces enumerated              2
+  ...of those with a ContainerID         2
+
+  GetRawInputDeviceList                  2 device(s)
+      keyboards=1  mice=1  other HID=0
+  joyGetNumDevs                          16 slot(s)
+  ...with a device attached              0
+  xinput1_4.dll                          loaded, 0 pad(s) connected
+  DirectInput8Create exported            YES
+
+========================================================
+  SUMMARY
+========================================================
+  Runtime                : Wine/Proton
+
+  [PASS] Mod DLL can load          - mfplat/mfreadwrite/mf all present
+  [FAIL] Custom music / BGM swap   - 0 PCM->WMAudioV8 encoder(s)
+  [FAIL] Auto-updater              - Shell.Application zip extraction
+  [FAIL] Opus decoding             - MSOpusDecoder MFT
+  [PASS] Crash minidumps           - well-formed dump written
+  [PASS] Controller correlation    - 2/2 HID devices carry a ContainerID
+
+========================================================
+  END OF REPORT
+========================================================

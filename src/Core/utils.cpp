@@ -33,27 +33,53 @@ std::string FormatWindowsError(const char* prefix, DWORD errorCode)
 	return result;
 }
 
+// Both forms come from one wide query of the module path.
+//
+// The wide one is the real path, losslessly. The narrow one is deliberately still the ANSI
+// code page, because GamePath() feeds narrow APIs - std::ofstream, CreateFileA - and those
+// interpret their bytes as ANSI. Handing them UTF-8 would corrupt exactly the non-ASCII
+// paths that used to work. So the narrow string keeps the old behaviour byte for byte, and
+// the win is that GetGameDirectoryW no longer inherits its losses: it used to be widened
+// back out of the narrow string, which meant anything the code page could not represent was
+// already gone. That matters under Proton, where the path runs through the Linux home
+// directory (Z:\home\<user>\...).
+static void ResolveGameDirectory(std::wstring& outWide, std::string& outNarrow)
+{
+	wchar_t widePath[MAX_PATH + 1] = {};
+	const DWORD length = GetModuleFileNameW(NULL, widePath, MAX_PATH);
+	if (length == 0 || length > MAX_PATH)
+	{
+		outWide = L".";
+		outNarrow = ".";
+		return;
+	}
+
+	std::wstring full(widePath, length);
+	const size_t slash = full.find_last_of(L"\\/");
+	outWide = (slash == std::wstring::npos) ? std::wstring(L".") : full.substr(0, slash);
+
+	const int needed = WideCharToMultiByte(CP_ACP, 0, outWide.c_str(), (int)outWide.size(),
+		NULL, 0, NULL, NULL);
+	if (needed > 0)
+	{
+		outNarrow.resize(needed);
+		WideCharToMultiByte(CP_ACP, 0, outWide.c_str(), (int)outWide.size(),
+			&outNarrow[0], needed, NULL, NULL);
+	}
+	if (outNarrow.empty())
+		outNarrow = ".";
+}
+
 const std::string& GetGameDirectory()
 {
 	// Resolved once from the executable's own path, so it cannot drift with the working
 	// directory. Falls back to "." only if the module path is unreadable, which would
 	// mean something far more broken than a music file in the wrong place.
-	static std::string cached;
-	if (!cached.empty())
-		return cached;
-
-	char path[MAX_PATH + 1] = {};
-	const DWORD length = GetModuleFileNameA(NULL, path, MAX_PATH);
-	if (length == 0 || length > MAX_PATH)
-	{
-		cached = ".";
-		return cached;
-	}
-
-	std::string full(path, length);
-	const size_t slash = full.find_last_of("\\/");
-	cached = (slash == std::string::npos) ? std::string(".") : full.substr(0, slash);
-	return cached;
+	static std::string cachedNarrow;
+	static std::wstring cachedWide;
+	if (cachedNarrow.empty())
+		ResolveGameDirectory(cachedWide, cachedNarrow);
+	return cachedNarrow;
 }
 
 std::string GamePath(const std::string& relativePath)
@@ -63,20 +89,11 @@ std::string GamePath(const std::string& relativePath)
 
 const std::wstring& GetGameDirectoryW()
 {
-	static std::wstring cached;
-	if (!cached.empty())
-		return cached;
-
-	const std::string& dir = GetGameDirectory();
-	const int needed = MultiByteToWideChar(CP_ACP, 0, dir.c_str(), (int)dir.size(), NULL, 0);
-	if (needed > 0)
-	{
-		cached.resize(needed);
-		MultiByteToWideChar(CP_ACP, 0, dir.c_str(), (int)dir.size(), &cached[0], needed);
-	}
-	if (cached.empty())
-		cached = L".";
-	return cached;
+	static std::wstring cachedWide;
+	static std::string cachedNarrow;
+	if (cachedWide.empty())
+		ResolveGameDirectory(cachedWide, cachedNarrow);
+	return cachedWide;
 }
 
 std::wstring GamePathW(const std::wstring& relativePath)

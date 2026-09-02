@@ -25,3 +25,6 @@ tools/urt_automation/runtime/
 
 # Regenerated on every build (BeforeBuild target); never stable enough to check in.
 src/Core/BuildInfo.autogen.h
+
+# Local deploy paths (machine-specific; template committed as DeploySettings.props.example)
+deploy/DeploySettings.props

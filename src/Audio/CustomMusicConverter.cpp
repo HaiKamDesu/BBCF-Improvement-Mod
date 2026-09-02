@@ -3,6 +3,7 @@
 #include "ReplayGain.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
+#include "Core/Settings.h"
 
 #include <windows.h>
 #include <mfapi.h>
@@ -65,7 +66,70 @@ static const unsigned int MAX_BANK_NAME_LEN = 63;
 // Bumped whenever the generated .pac layout OR the audio written into it changes, so
 // cached files from an older converter are rebuilt rather than reused. v4 added
 // auto-normalized gain, so every v3 cache holds un-normalized audio.
-static const unsigned int CONVERTER_VERSION = 4;
+// v5 added the PCM wave-bank format, so the stamp now records which format produced
+// the cache; a track built as WMA is not reusable once the format switches, and vice
+// versa. See ChooseBankFormat().
+static const unsigned int CONVERTER_VERSION = 5;
+
+// ============================================================================
+// Wave-bank format selection
+// ============================================================================
+// The converter can write either format. WMA is ~10x smaller and is what every
+// shipped BGM track uses, but producing it needs a PCM->WMAudioV8 encoder MFT,
+// and Wine/Proton registers no audio encoder of any kind - so on Linux the WMA
+// path cannot run at all.
+//
+// PCM is the fallback, and it is a real one rather than a guess: the game ships
+// 1989 PCM wave-bank entries (every character voice line) and plays them every
+// match, so xactengine2_10 handles wFormatTag 0 natively. Voice banks even mix
+// PCM and WMA entries, so the runtime dispatches per entry.
+// See docs/Research/LinuxWineCompatibility.md.
+enum class BankFormat { Wma, Pcm };
+
+static bool HasWmaEncoderMft() {
+    // Function-local static, so the probe runs exactly once even though conversions
+    // happen on a worker thread.
+    static const bool available = []() -> bool {
+        // Own MFStartup/MFShutdown pair: this can be asked before any conversion has
+        // started. Both are refcounted, so nesting inside a caller's pair is fine.
+        if (FAILED(MFStartup(MF_VERSION)))
+            return false;
+
+        MFT_REGISTER_TYPE_INFO inType  = { MFMediaType_Audio, MFAudioFormat_PCM };
+        MFT_REGISTER_TYPE_INFO outType = { MFMediaType_Audio, MFAudioFormat_WMAudioV8 };
+        IMFActivate** activates = NULL;
+        UINT32 count = 0;
+        const HRESULT hr = MFTEnumEx(MFT_CATEGORY_AUDIO_ENCODER, MFT_ENUM_FLAG_ALL,
+                                     &inType, &outType, &activates, &count);
+        if (SUCCEEDED(hr)) {
+            for (UINT32 i = 0; i < count; ++i)
+                if (activates[i]) activates[i]->Release();
+            if (activates) CoTaskMemFree(activates);
+        }
+        MFShutdown();
+
+        const bool found = SUCCEEDED(hr) && count > 0;
+        LogCustom("WMA encoder MFT: %s (hr=0x%08lX, %u found)\n",
+                  found ? "available" : "NOT available", (unsigned long)hr, count);
+        return found;
+    }();
+    return available;
+}
+
+
+// enum: 0 = Auto, 1 = WMA, 2 = PCM - matches MusicWaveBankFormat in settings.def
+// and kMusicWaveBankFormatOptions in SettingsIniWindow.cpp. Keep all three in step.
+static BankFormat ChooseBankFormat() {
+    switch (Settings::settingsIni.musicWaveBankFormat) {
+    case 1:  return BankFormat::Wma;
+    case 2:  return BankFormat::Pcm;
+    default: return HasWmaEncoderMft() ? BankFormat::Wma : BankFormat::Pcm;
+    }
+}
+
+static const char* BankFormatName(BankFormat f) {
+    return f == BankFormat::Wma ? "WMA" : "PCM";
+}
 
 // Sanitize an MP3 basename to lowercase [a-z0-9_] for use inside a cue name.
 static std::string SanitizeCueName(const std::string& base) {
@@ -361,6 +425,114 @@ static bool TranscodeToWma(const std::string& srcPath,
 }
 
 // ============================================================================
+// PCM path - no encoder, so nothing here can fail the way the WMA path does
+// ============================================================================
+// Same front half as TranscodeToWma (decode, then bake the gain into the samples,
+// because the game plays the finished .pac through XACT where the mod has no volume
+// control) and then simply stops, since the wave bank stores these samples directly.
+static bool TranscodeToPcm(const std::string& srcPath,
+                           float gainDb,
+                           float* headroomOut,
+                           float* tagGainOut,
+                           std::vector<unsigned char>& pcmData,
+                           unsigned long long* outTotalSamples) {
+    pcmData.clear();
+    *outTotalSamples = 0;
+
+    std::string decodeError;
+    if (!AudioDecode::DecodeFile(srcPath, TARGET_RATE, TARGET_CHANNELS, pcmData, &decodeError)) {
+        LogCustom("Decode failed for '%s': %s\n", srcPath.c_str(), decodeError.c_str());
+        return false;
+    }
+
+    // Identical to the WMA path, deliberately: same headroom sign convention, same
+    // tag-plus-offset gain, so a track sounds the same whichever format it is built as.
+    if (headroomOut)
+        *headroomOut = -AudioDecode::HeadroomDb(pcmData); // peak -6 dBFS -> +6 dB to spare
+
+    const ReplayGain::Tag tag = ReplayGain::Read(srcPath);
+    if (tagGainOut)
+        *tagGainOut = tag.found ? tag.trackGainDb : 0.0f;
+
+    const float effectiveGain = (tag.found ? tag.trackGainDb : 0.0f) + gainDb;
+    AudioDecode::ApplyGainDb(pcmData, effectiveGain, TARGET_CHANNELS, TARGET_RATE);
+
+    const size_t frameBytes = TARGET_CHANNELS * 2; // 16-bit
+    pcmData.resize((pcmData.size() / frameBytes) * frameBytes); // whole frames only
+    *outTotalSamples = pcmData.size() / frameBytes;
+
+    const double seconds = (double)pcmData.size() / (TARGET_RATE * TARGET_CHANNELS * 2);
+    LogCustom("PCM: %.1f s from '%s' at %+.1f dB (tag %+.1f, offset %+.1f) - %zu bytes\n",
+        seconds, srcPath.c_str(), effectiveGain,
+        tag.found ? tag.trackGainDb : 0.0f, gainDb, pcmData.size());
+    return *outTotalSamples > 0;
+}
+
+// ============================================================================
+// PCM wave bank
+// ============================================================================
+// Same container as the WMA bank; the differences are all in one entry's format
+// word plus the absence of a seek table. Verified against the game's own PCM banks
+// (docs/Research/LinuxWineCompatibility.md):
+//   - wFormatTag = 0, bit 31 = 1 for 16-bit, wBlockAlign = channels * 2
+//   - duration * channels * bytesPerSample == PlayRegion.length, without exception
+//   - no SeekTables segment: 1985 of the 1989 shipped PCM entries sit in banks that
+//     have none, and the other four mark their entry 0xFFFFFFFF. dwFlags still
+//     carries 0x00080000, which every shipped bank sets either way.
+static std::vector<unsigned char> BuildWaveBankPcm(const std::string& bankName,
+                                                   const std::vector<unsigned char>& pcmData,
+                                                   unsigned long long durationSamples) {
+    const unsigned int blockAlign = TARGET_CHANNELS * 2;
+    const unsigned int miniFormat = (0u & 0x3)                                  // PCM
+                                  | ((TARGET_CHANNELS & 0x7) << 2)
+                                  | ((TARGET_RATE & 0x3FFFF) << 5)
+                                  | ((blockAlign & 0xFF) << 23)
+                                  | (1u << 31);                                 // 16-bit
+
+    std::vector<unsigned char> bankData(96, 0);
+    *(unsigned int*)&bankData[0] = 0x00080000;
+    *(unsigned int*)&bankData[4] = 1;
+    size_t nameLen = bankName.size();
+    if (nameLen > MAX_BANK_NAME_LEN) nameLen = MAX_BANK_NAME_LEN;
+    memcpy(&bankData[8], bankName.c_str(), nameLen);
+    *(unsigned int*)&bankData[72] = 24; // md_elem_size
+    *(unsigned int*)&bankData[76] = 64; // nm_elem_size
+    *(unsigned int*)&bankData[80] = 4;  // alignment
+    *(unsigned int*)&bankData[84] = 0;  // bank-level miniFormat
+
+    std::vector<unsigned char> entryMeta(24, 0);
+    *(unsigned int*)&entryMeta[0]  = (unsigned int)((durationSamples & 0x0FFFFFFFull) << 4);
+    *(unsigned int*)&entryMeta[4]  = miniFormat;
+    *(unsigned int*)&entryMeta[8]  = 0;                                // PlayRegion offset
+    *(unsigned int*)&entryMeta[12] = (unsigned int)pcmData.size();     // PlayRegion length
+    *(unsigned int*)&entryMeta[16] = 0;                                // LoopRegion start
+    *(unsigned int*)&entryMeta[20] = 0;                                // LoopRegion total
+
+    const unsigned int headerSize = 52;
+    const unsigned int seg0_off = headerSize, seg0_len = (unsigned int)bankData.size();
+    const unsigned int seg1_off = seg0_off + seg0_len, seg1_len = (unsigned int)entryMeta.size();
+    const unsigned int seg2_off = 0, seg2_len = 0; // SeekTables: absent
+    const unsigned int seg3_off = 0, seg3_len = 0; // EntryNames: absent
+    const unsigned int seg4_off = (seg1_off + seg1_len + 3) & ~3u;
+    const unsigned int seg4_len = ((unsigned int)pcmData.size() + 3) & ~3u;
+
+    std::vector<unsigned char> xwb(seg4_off + seg4_len, 0);
+    memcpy(&xwb[0], "WBND", 4);
+    *(unsigned int*)&xwb[4] = 46;
+    *(unsigned int*)&xwb[8] = 44;
+    *(unsigned int*)&xwb[12] = seg0_off; *(unsigned int*)&xwb[16] = seg0_len;
+    *(unsigned int*)&xwb[20] = seg1_off; *(unsigned int*)&xwb[24] = seg1_len;
+    *(unsigned int*)&xwb[28] = seg2_off; *(unsigned int*)&xwb[32] = seg2_len;
+    *(unsigned int*)&xwb[36] = seg3_off; *(unsigned int*)&xwb[40] = seg3_len;
+    *(unsigned int*)&xwb[44] = seg4_off; *(unsigned int*)&xwb[48] = seg4_len;
+    memcpy(&xwb[seg0_off], bankData.data(), bankData.size());
+    memcpy(&xwb[seg1_off], entryMeta.data(), entryMeta.size());
+    if (!pcmData.empty())
+        memcpy(&xwb[seg4_off], pcmData.data(), pcmData.size());
+    return xwb;
+}
+
+// ============================================================================
 // XACT Wave Bank ("WBND") generation — byte-for-byte the native layout
 // ============================================================================
 // Verified layout (from the game's own files; see tools/analyze_pac_deep.py):
@@ -647,15 +819,23 @@ static bool ConvertOneTrack(const std::string& srcPath,
         return false;
     };
 
-    std::vector<unsigned char> wmaData;
+    const BankFormat format = ChooseBankFormat();
+    std::vector<unsigned char> audioData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    if (!TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, wmaData, pktSamples, &durationSamples))
-        return fail("Could not decode '" + srcPath + "'");
+    if (format == BankFormat::Wma) {
+        if (!TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, audioData, pktSamples, &durationSamples))
+            return fail("Could not decode '" + srcPath + "'");
+    } else {
+        if (!TranscodeToPcm(srcPath, gainDb, headroomOut, tagGainOut, audioData, &durationSamples))
+            return fail("Could not decode '" + srcPath + "'");
+    }
     if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)
         return fail("Implausible duration for '" + srcPath + "'");
 
-    std::vector<unsigned char> xwb = BuildWaveBank(cueName, wmaData, pktSamples, durationSamples);
+    std::vector<unsigned char> xwb = (format == BankFormat::Wma)
+        ? BuildWaveBank(cueName, audioData, pktSamples, durationSamples)
+        : BuildWaveBankPcm(cueName, audioData, durationSamples);
     std::vector<unsigned char> xsb = BuildSoundBank(cueName);
     std::vector<unsigned char> pac = BuildFpacContainer(cueName, xsb, xwb);
 
@@ -779,23 +959,35 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
     LogCustom("Replacement for \"%s\": reusing its %zu-byte sound bank verbatim\n",
         baseName.c_str(), originalXsb.size());
 
+    const BankFormat format = ChooseBankFormat();
+
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     bool coInitialized = SUCCEEDED(hrCo);
-    if (FAILED(MFStartup(MF_VERSION))) {
-        if (coInitialized) CoUninitialize();
-        return fail("Media Foundation is unavailable on this system");
+    // Only the WMA path needs Media Foundation. Requiring it for PCM too would fail the
+    // conversion on exactly the systems PCM exists to serve.
+    bool mfStarted = false;
+    if (format == BankFormat::Wma) {
+        if (FAILED(MFStartup(MF_VERSION))) {
+            if (coInitialized) CoUninitialize();
+            return fail("Media Foundation is unavailable on this system");
+        }
+        mfStarted = true;
     }
 
-    std::vector<unsigned char> wmaData;
+    std::vector<unsigned char> audioData;
     std::vector<unsigned int> pktSamples;
     unsigned long long durationSamples = 0;
-    bool ok = TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, wmaData, pktSamples, &durationSamples);
+    bool ok = (format == BankFormat::Wma)
+        ? TranscodeToWma(srcPath, gainDb, headroomOut, tagGainOut, audioData, pktSamples, &durationSamples)
+        : TranscodeToPcm(srcPath, gainDb, headroomOut, tagGainOut, audioData, &durationSamples);
     if (ok && (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)) ok = false;
 
     if (ok) {
         // The wave bank must carry the SAME name, because the reused sound bank refers
         // to it by that name.
-        std::vector<unsigned char> xwb = BuildWaveBank(baseName, wmaData, pktSamples, durationSamples);
+        std::vector<unsigned char> xwb = (format == BankFormat::Wma)
+            ? BuildWaveBank(baseName, audioData, pktSamples, durationSamples)
+            : BuildWaveBankPcm(baseName, audioData, durationSamples);
         std::vector<unsigned char> pac = BuildFpacContainer(baseName, originalXsb, xwb);
 
         const std::string tmpPath = outPacPath + ".tmp";
@@ -828,7 +1020,7 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
         *errorOut = "Could not decode '" + srcPath + "'";
     }
 
-    MFShutdown();
+    if (mfStarted) MFShutdown();
     if (coInitialized) CoUninitialize();
     return ok;
 }
@@ -921,13 +1113,26 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         HANDLE hStamp = CreateFileA(stampPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hStamp != INVALID_HANDLE_VALUE) {
+            // "<version> <format>". A cache built as WMA is unusable once the format
+            // switches to PCM and vice versa, so the format is part of the stamp rather
+            // than only the version. An older stamp has no format field and reads as
+            // empty, which never matches and so rebuilds - which is what we want.
             char stampBuf[32] = {};
             DWORD got = 0;
-            if (ReadFile(hStamp, stampBuf, sizeof(stampBuf) - 1, &got, NULL))
-                forceRebuild = ((unsigned int)atoi(stampBuf) != CONVERTER_VERSION);
+            if (ReadFile(hStamp, stampBuf, sizeof(stampBuf) - 1, &got, NULL)) {
+                unsigned int stampedVersion = 0;
+                char stampedFormat[8] = {};
+                sscanf_s(stampBuf, "%u %7s", &stampedVersion,
+                         stampedFormat, (unsigned)_countof(stampedFormat));
+                forceRebuild = (stampedVersion != CONVERTER_VERSION) ||
+                               (strcmp(stampedFormat, BankFormatName(ChooseBankFormat())) != 0);
+            }
             CloseHandle(hStamp);
         }
     }
+    LogCustom("Converter v%u, wave-bank format %s%s\n", CONVERTER_VERSION,
+              BankFormatName(ChooseBankFormat()),
+              Settings::settingsIni.musicWaveBankFormat == 0 ? " (auto)" : " (forced by setting)");
     if (forceRebuild)
         LogCustom("Converter version %u - rebuilding every cached .pac\n", CONVERTER_VERSION);
 
@@ -1044,7 +1249,8 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hStamp != INVALID_HANDLE_VALUE) {
             char stampBuf[32];
-            int n = sprintf_s(stampBuf, "%u", CONVERTER_VERSION);
+            int n = sprintf_s(stampBuf, "%u %s", CONVERTER_VERSION,
+                              BankFormatName(ChooseBankFormat()));
             DWORD written = 0;
             WriteFile(hStamp, stampBuf, (DWORD)n, &written, NULL);
             CloseHandle(hStamp);

@@ -1,0 +1,274 @@
+BBCF Improvement Mod - Wine/Proton capability probe
+Built Sep  1 2026 19:24:08
+
+========================================================
+  1. PLATFORM
+========================================================
+  Running under Wine                     NO  (native Windows - baseline run)
+  ANSI code page (CP_ACP)                1252
+  Probe path                             C:\Users\Usuario\AppData\Local\Temp\bbcfprobe\WineProbe.exe
+  Probe bitness                          32-bit
+
+========================================================
+  2. MODULE AVAILABILITY
+========================================================
+      The mod statically imports mfplat/mfreadwrite/mf. If any of those
+      is missing the DLL cannot load at all, with no error the user sees.
+
+  mfplat.dll                             OK    (C:\Windows\SYSTEM32\mfplat.dll)
+  mfreadwrite.dll                        OK    (C:\Windows\SYSTEM32\mfreadwrite.dll)
+  mf.dll                                 OK    (C:\Windows\SYSTEM32\mf.dll)
+  dbghelp.dll                            OK    (C:\Windows\SYSTEM32\dbghelp.dll)
+  dinput8.dll                            OK    (C:\Windows\SYSTEM32\dinput8.dll)
+  hid.dll                                OK    (C:\Windows\SYSTEM32\hid.dll)
+  setupapi.dll                           OK    (C:\Windows\System32\setupapi.dll)
+  cfgmgr32.dll                           OK    (C:\Windows\System32\cfgmgr32.dll)
+  d3dx9_43.dll                           OK    (C:\Windows\SYSTEM32\d3dx9_43.dll)
+  xinput1_4.dll                          OK    (C:\Windows\SYSTEM32\xinput1_4.dll)
+  xinput1_3.dll                          OK    (C:\Windows\SYSTEM32\xinput1_3.dll)
+  xinput9_1_0.dll                        OK    (C:\Windows\SYSTEM32\xinput9_1_0.dll)
+  winmm.dll                              OK    (C:\Windows\SYSTEM32\winmm.dll)
+  wininet.dll                            OK    (C:\Windows\SYSTEM32\wininet.dll)
+  shell32.dll                            OK    (C:\Windows\System32\shell32.dll)
+  comdlg32.dll                           OK    (C:\Windows\System32\comdlg32.dll)
+
+========================================================
+  3. MEDIA FOUNDATION  <-- the custom-music blocker
+========================================================
+  MFStartup exported                     YES
+  MFTEnumEx exported                     YES
+  MFStartup                              hr=0x00000000 (ok)
+
+  -- The exact call CustomMusicConverter.cpp:167 makes --
+  PCM -> WMAudioV8 (what the mod needs)  1 encoder(s)
+      - WMAudio Encoder MFT
+
+  -- Nearby alternatives --
+  PCM -> WMAudioV9                       1 encoder(s)
+      - WMAudio Encoder MFT
+  PCM -> AAC                             1 encoder(s)
+      - Microsoft AAC Audio Encoder MFT
+
+  -- Every audio ENCODER this runtime has --
+  Total audio encoders                   10
+      - LPCM DVD-Audio MFT
+      - MP3 Encoder ACM Wrapper MFT
+      - Microsoft FLAC Audio Encoder MFT
+      - WM Speech Encoder DMO
+      - MS AMRNB Encoder MFT
+      - Microsoft MPEG-2 Audio Encoder MFT
+      - WMAudio Encoder MFT
+      - Microsoft AAC Audio Encoder MFT
+      - Microsoft ALAC Audio Encoder MFT
+      - Microsoft Dolby Digital Encoder MFT
+
+  -- Every audio DECODER this runtime has --
+  Total audio decoders                   18
+      - Microsoft Dolby Digital Plus Decoder MFT
+      - MS AMRNB Decoder MFT
+      - WMAudio Decoder MFT
+      - Microsoft AAC Audio Decoder MFT
+      - A-law Wrapper MFT
+      - GSM ACM Wrapper MFT
+      - WMAPro over S/PDIF MFT
+      - Microsoft Opus Audio Decoder MFT
+      - Microsoft FLAC Audio Decoder MFT
+      - Microsoft MPEG Audio Decoder MFT
+      - WMSpeech Decoder DMO
+      - G711 Wrapper MFT
+      - IMA ADPCM ACM Wrapper MFT
+      - MP3 Decoder MFT
+      - Microsoft ALAC Audio Decoder MFT
+      - ADPCM ACM Wrapper MFT
+      - Dolby TrueHD IEC-61937 converter MFT
+      - DTS IEC-61937 converter MFT
+
+  -- Opus decoder (AudioDecode.cpp:481) --
+  CoCreateInstance(MSOpusDecoder)        hr=0x00000000 AVAILABLE
+
+  VERDICT: custom music / BGM replacement is POSSIBLE (a WMA encoder exists) on this runtime.
+
+========================================================
+  4. SHELL ZIP EXTRACTION  <-- the updater blocker
+========================================================
+      PackageStager.cpp:469 uses Shell.Application to unpack the update.
+
+  Test zip written                       118 bytes -> C:\Users\Usuario\AppData\Local\Temp\bbcf_probe.zip
+  CoCreateInstance(Shell.Application)    hr=0x00000000 created
+  IDispatch::GetIDsOfNames(NameSpace)    hr=0x00000000
+  NameSpace(<zip>) returns a Folder      hr=0x00000000  YES
+
+  VERDICT: shell extraction works here; the updater is fine on this runtime.
+
+========================================================
+  5. CRASH DUMPS
+========================================================
+  dbghelp.dll                            loaded
+  MiniDumpWriteDump exported             YES
+  MiniDumpWriteDump                      returned TRUE  err=87
+  Dump size                              86415829 bytes
+  Header is 'MDMP'                       YES
+      A large, well-formed dump here means Linux crash reports are usable.
+      A tiny or malformed one means we should write a text report instead.
+
+========================================================
+  6. CONTROLLER STACK  <-- why the hooks were disabled
+========================================================
+      Every call the mod makes during enumeration, in order, with results.
+      Plug a pad in before running this or most sections will be empty.
+
+  setupapi.dll                           loaded
+  hid.dll                                loaded
+  SetupDiGetDevicePropertyW exported     YES
+
+      [device 1] \\?\hid#vid_046d&pid_c547&mi_00#7&1ebf4b72&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_046D&PID_C547&MI_00\7&1EBF4B72&0&0000
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 2] \\?\hid#hidclass#1&2d595ca7&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\HIDCLASS\1&2D595CA7&0&0000
+        ContainerID   : {00000000-0000-0000-...}  <-- present
+        product       : vJoy - Virtual Joystick
+
+      [device 3] \\?\hid#vid_0b05&pid_19af&mi_02#7&382c88b3&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_0B05&PID_19AF&MI_02\7&382C88B3&0&0000
+        ContainerID   : {00000000-0000-0000-...}  <-- present
+        product       : AURA LED Controller
+
+      [device 4] \\?\hid#vid_31e3&pid_1402&mi_04#8&1ec8de5a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_04\8&1EC8DE5A&0&0000
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 5] \\?\hid#vid_25b1&pid_0003&col02#2&24d1a99c&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_25B1&PID_0003&COL02\2&24D1A99C&0&0001
+        ContainerID   : {BB882BBB-9212-5950-...}  <-- present
+        product       : Virtual Input Device for reWASD
+
+      [device 6] \\?\hid#vid_046d&pid_c547&mi_01&col02#7&6fbbf2d&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_046D&PID_C547&MI_01&COL02\7&6FBBF2D&0&0001
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 7] \\?\hid#vid_046d&pid_c547&mi_01&col01#7&6fbbf2d&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}\kbd
+        instance id   : HID\VID_046D&PID_C547&MI_01&COL01\7&6FBBF2D&0&0000
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 8] \\?\hid#vid_31e3&pid_1402&mi_03&col01#8&b98c21c&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_03&COL01\8&B98C21C&0&0000
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 9] \\?\hid#vid_31e3&pid_1402&mi_00#8&2df7929e&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_00\8&2DF7929E&0&0000
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 10] \\?\hid#vid_25b1&pid_0003&col03#2&24d1a99c&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_25B1&PID_0003&COL03\2&24D1A99C&0&0002
+        ContainerID   : {BB882BBB-9212-5950-...}  <-- present
+        product       : Virtual Input Device for reWASD
+
+      [device 11] \\?\hid#vid_beef&pid_0001&mi_02&col01#4&2adced6a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_BEEF&PID_0001&MI_02&COL01\4&2ADCED6A&0&0000
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 12] \\?\hid#vid_beef&pid_0001&mi_02&col02#4&2adced6a&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_BEEF&PID_0001&MI_02&COL02\4&2ADCED6A&0&0001
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 13] \\?\hid#vid_046d&pid_c547&mi_02&col01#7&2ad2fcef&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_046D&PID_C547&MI_02&COL01\7&2AD2FCEF&0&0000
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 14] \\?\hid#vid_beef&pid_0001&mi_01&col01#4&13196125&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}\kbd
+        instance id   : HID\VID_BEEF&PID_0001&MI_01&COL01\4&13196125&0&0000
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 15] \\?\hid#vid_046d&pid_c547&mi_01&col03#7&6fbbf2d&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_046D&PID_C547&MI_01&COL03\7&6FBBF2D&0&0002
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 16] \\?\hid#vid_046d&pid_c547&mi_02&col02#7&2ad2fcef&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_046D&PID_C547&MI_02&COL02\7&2AD2FCEF&0&0001
+        ContainerID   : {61682FE3-5C3A-11F1-...}  <-- present
+        product       : USB Receiver
+
+      [device 17] \\?\hid#vid_31e3&pid_1402&mi_03&col02#8&b98c21c&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_03&COL02\8&B98C21C&0&0001
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 18] \\?\hid#vid_046d&pid_c232#2&1a87f3a8&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}\kbd
+        instance id   : HID\VID_046D&PID_C232\2&1A87F3A8&0&0000
+        ContainerID   : {E149BA9F-3633-11F1-...}  <-- present
+        product       : FAILED err=1784
+
+      [device 19] \\?\hid#vid_31e3&pid_1402&mi_03&col03#8&b98c21c&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_03&COL03\8&B98C21C&0&0002
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 20] \\?\hid#vid_31e3&pid_1402&mi_02#8&7975a22&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_31E3&PID_1402&MI_02\8&7975A22&0&0000
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+      [device 21] \\?\hid#vid_beef&pid_0001&mi_01&col02#4&13196125&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_BEEF&PID_0001&MI_01&COL02\4&13196125&0&0001
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 22] \\?\hid#vid_25b1&pid_0003&col01#2&24d1a99c&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}\kbd
+        instance id   : HID\VID_25B1&PID_0003&COL01\2&24D1A99C&0&0000
+        ContainerID   : {BB882BBB-9212-5950-...}  <-- present
+        product       : Virtual Input Device for reWASD
+
+      [device 23] \\?\hid#vid_beef&pid_0001&mi_01&col03#4&13196125&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_BEEF&PID_0001&MI_01&COL03\4&13196125&0&0002
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 24] \\?\hid#vid_beef&pid_0001&mi_00#4&36f09ee7&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+        instance id   : HID\VID_BEEF&PID_0001&MI_00\4&36F09EE7&0&0000
+        ContainerID   : {E58FFD69-0AB2-11F1-...}  <-- present
+        product       : Parsec Virtual Mouse
+
+      [device 25] \\?\hid#vid_31e3&pid_1402&mi_01#8&1ac77660&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}\kbd
+        instance id   : HID\VID_31E3&PID_1402&MI_01\8&1AC77660&0&0000
+        ContainerID   : {1C8A479F-A78F-517E-...}  <-- present
+        product       : Wooting 80HE
+
+  HID interfaces enumerated              25
+  ...of those with a ContainerID         25
+
+  GetRawInputDeviceList                  23 device(s)
+      keyboards=5  mice=4  other HID=14
+  joyGetNumDevs                          16 slot(s)
+      slot 3: Microsoft PC-joystick driver
+  ...with a device attached              1
+  xinput1_4.dll                          loaded, 0 pad(s) connected
+  DirectInput8Create exported            YES
+
+========================================================
+  SUMMARY
+========================================================
+  Runtime                : native Windows (baseline)
+
+  [PASS] Mod DLL can load          - mfplat/mfreadwrite/mf all present
+  [PASS] Custom music / BGM swap   - 1 PCM->WMAudioV8 encoder(s)
+  [PASS] Auto-updater              - Shell.Application zip extraction
+  [PASS] Opus decoding             - MSOpusDecoder MFT
+  [PASS] Crash minidumps           - well-formed dump written
+  [PASS] Controller correlation    - 25/25 HID devices carry a ContainerID
+
+========================================================
+  END OF REPORT
+========================================================

@@ -63,7 +63,62 @@ namespace
 		return 0;
 	}
 
-	void LogOsVersion()
+	// Wine and Proton announce themselves through an ntdll export, not through anything
+	// in the registry - so the HKLM values LogOsVersion reads are synthetic there, and a
+	// Steam Deck bug report otherwise arrives claiming "Windows 10". Returns true when
+	// running under Wine, so the OS line can say where its numbers came from.
+	bool LogPlatform()
+	{
+		const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+		if (!ntdll)
+			return false;
+
+		typedef const char* (CDECL *wine_get_version_t)(void);
+		typedef void (CDECL *wine_get_host_version_t)(const char**, const char**);
+
+		const wine_get_version_t getVersion =
+			reinterpret_cast<wine_get_version_t>(GetProcAddress(ntdll, "wine_get_version"));
+		if (!getVersion)
+		{
+			LOG(1, "[SystemSpecs] Platform: native Windows\n");
+			return false;
+		}
+
+		const char* sysname = nullptr;
+		const char* release = nullptr;
+		const wine_get_host_version_t getHost =
+			reinterpret_cast<wine_get_host_version_t>(GetProcAddress(ntdll, "wine_get_host_version"));
+		if (getHost)
+			getHost(&sysname, &release);
+
+		LOG(1, "[SystemSpecs] Platform: Wine %s on %s %s\n",
+			getVersion(),
+			sysname ? sysname : "unknown",
+			release ? release : "");
+
+		// What actually distinguishes a Deck, a Proton session and a bare Wine prefix.
+		// Only the variables that are set get a line, so the log stays readable.
+		static const wchar_t* const kEnv[] = {
+			L"SteamDeck", L"SteamOS", L"SteamGameId",
+			L"STEAM_COMPAT_DATA_PATH", L"STEAM_COMPAT_CLIENT_INSTALL_PATH",
+			L"PROTON_USE_WINED3D", L"PROTON_NO_ESYNC", L"PROTON_NO_FSYNC",
+			L"XDG_SESSION_TYPE", L"GAMESCOPE_WAYLAND_DISPLAY", L"XDG_CURRENT_DESKTOP",
+			nullptr
+		};
+		for (int i = 0; kEnv[i]; ++i)
+		{
+			wchar_t value[1024] = {};
+			const DWORD length = GetEnvironmentVariableW(kEnv[i], value, ARRAYSIZE(value));
+			if (length > 0 && length < ARRAYSIZE(value))
+			{
+				LOG(1, "[SystemSpecs]   %s=%s\n",
+					NarrowFromWide(kEnv[i]).c_str(), NarrowFromWide(value).c_str());
+			}
+		}
+		return true;
+	}
+
+	void LogOsVersion(bool onWine)
 	{
 		HKEY hKey;
 		if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0,
@@ -79,11 +134,12 @@ namespace
 		const DWORD ubr = ReadRegistryDword(hKey, L"UBR");
 		RegCloseKey(hKey);
 
-		LOG(1, "[SystemSpecs] OS: %s %s (build %s.%u)\n",
+		LOG(1, "[SystemSpecs] OS: %s %s (build %s.%u)%s\n",
 			NarrowFromWide(productName.empty() ? L"Windows" : productName).c_str(),
 			NarrowFromWide(displayVersion).c_str(),
 			NarrowFromWide(buildNumber).c_str(),
-			ubr);
+			ubr,
+			onWine ? "  <- reported by Wine, not a real Windows install" : "");
 	}
 
 	void LogCpuAndRam()
@@ -259,7 +315,8 @@ namespace
 
 void LogSystemSpecs(IDirect3DDevice9* device)
 {
-	LogOsVersion();
+	const bool onWine = LogPlatform();
+	LogOsVersion(onWine);
 	LogCpuAndRam();
 	LogGpu(device);
 	LogDisk();
