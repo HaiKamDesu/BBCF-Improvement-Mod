@@ -11,6 +11,7 @@
 #include <Windows.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -191,6 +192,177 @@ namespace
 	// to bound log spam/repeated virtual-call cost, not a real limit on the
 	// game's own row count.
 	constexpr int kMaxDiagnosticRows = 32;
+
+	// A diagnostic that logs when its text CHANGES, and never merely because
+	// time passed.
+	//
+	// The three ranked-list diagnostics used to re-log on a timer as well as on
+	// change ("|| now - last > 1000"), which meant an idle main menu or a
+	// training match produced one identical line per second forever - 95% of a
+	// reporter's DEBUG.txt by volume, and none of it information. A repeated
+	// value carries nothing that the previous line did not already say.
+	//
+	// This keeps every distinct observation, drops only the duplicates, and
+	// reports how long a value held plus how many samples were collapsed into
+	// it - so a quiet stretch reads as one line that states its own duration,
+	// which is strictly more than a wall of identical lines said.
+	class SteadyStateDiagnostic
+	{
+	public:
+		// minIntervalMs bounds how fast a genuinely changing value may log, for
+		// fields that move every frame (measured RTT). The newest value is held
+		// rather than dropped, and emitted as soon as the floor passes.
+		explicit SteadyStateDiagnostic(const char* label, unsigned long long minIntervalMs = 0)
+			: m_label(label)
+			, m_minIntervalMs(minIntervalMs)
+		{
+		}
+
+		void Report(const std::string& text)
+		{
+			const unsigned long long now = GetTickCount64();
+
+			if (m_haveValue && text == m_currentText)
+			{
+				++m_collapsedSamples;
+				return;
+			}
+
+			if (m_haveValue && m_minIntervalMs != 0 && now - m_lastLogMs < m_minIntervalMs)
+			{
+				m_pendingText = text;
+				m_havePending = true;
+				++m_collapsedSamples;
+				return;
+			}
+
+			Emit(text, now);
+		}
+
+		// Emits a still-pending value once its rate limit has expired, so the
+		// last change before a quiet period is never lost. Safe to call every
+		// tick; does nothing when there is nothing pending.
+		void Tick()
+		{
+			if (!m_havePending)
+			{
+				return;
+			}
+
+			const unsigned long long now = GetTickCount64();
+			if (now - m_lastLogMs < m_minIntervalMs)
+			{
+				return;
+			}
+
+			const std::string text = m_pendingText;
+			m_havePending = false;
+			Emit(text, now);
+		}
+
+		// Closes out the current run when the diagnostic stops being sampled
+		// (leaving the screen it belongs to), so a held value ends with an
+		// explicit line instead of just going silent mid-log.
+		void Close(const char* why)
+		{
+			Tick();
+
+			if (!m_haveValue)
+			{
+				return;
+			}
+
+			const unsigned long long now = GetTickCount64();
+			LOG(1, "[RankedListFilter] %s: %s after %llums (%u samples collapsed), last was: %s\n",
+				m_label,
+				why,
+				now - m_firstSeenMs,
+				m_collapsedSamples,
+				m_currentText.c_str());
+
+			m_haveValue = false;
+			m_havePending = false;
+			m_collapsedSamples = 0;
+			m_currentText.clear();
+		}
+
+	private:
+		void Emit(const std::string& text, unsigned long long now)
+		{
+			// One line per change. The tail says what the value it replaced was
+			// doing, which is the part the old timer-driven repeats were an
+			// expensive way of not quite telling you.
+			if (m_haveValue)
+			{
+				// "spanned" rather than "held": for a de-duplicated value the
+				// samples were identical, but for a rate-limited one they were
+				// merely not worth a line each, and this wording is true of both.
+				LOG(1, "[RankedListFilter] %s: %s (previous line spanned %llums, %u samples)\n",
+					m_label, text.c_str(), now - m_firstSeenMs, m_collapsedSamples);
+			}
+			else
+			{
+				LOG(1, "[RankedListFilter] %s: %s\n", m_label, text.c_str());
+			}
+
+			m_currentText = text;
+			m_haveValue = true;
+			m_collapsedSamples = 0;
+			m_firstSeenMs = now;
+			m_lastLogMs = now;
+		}
+
+		const char* m_label;
+		unsigned long long m_minIntervalMs;
+		std::string m_currentText;
+		std::string m_pendingText;
+		bool m_haveValue = false;
+		bool m_havePending = false;
+		unsigned int m_collapsedSamples = 0;
+		unsigned long long m_firstSeenMs = 0;
+		unsigned long long m_lastLogMs = 0;
+	};
+
+	std::string FormatDiagnostic(const char* format, ...)
+	{
+		char buffer[1024];
+		va_list args;
+		va_start(args, format);
+		const int written = vsnprintf(buffer, sizeof(buffer), format, args);
+		va_end(args);
+		return written > 0 ? std::string(buffer) : std::string();
+	}
+
+	SteadyStateDiagnostic& RowDiagnostic()
+	{
+		static SteadyStateDiagnostic diagnostic("rowDiag");
+		return diagnostic;
+	}
+
+	// The manager line carries measured RTT, which moves every frame while a
+	// list is on screen, so this one keeps a rate floor. The others describe
+	// discrete states and change only when something really happened.
+	SteadyStateDiagnostic& RankedListMgrDiagnostic()
+	{
+		static SteadyStateDiagnostic diagnostic("rankedListMgrDiag", 1000);
+		return diagnostic;
+	}
+
+	SteadyStateDiagnostic& VisibilityDiagnostic()
+	{
+		static SteadyStateDiagnostic diagnostic("visibility check");
+		return diagnostic;
+	}
+
+	// The deep diagnostics below reach into the game's ranked-list manager and
+	// call through its vtable. That is only meaningful on the screens where a
+	// ranked list can exist, and doing it anywhere else was both pointless and
+	// the mod's only per-frame indirect call into game code while sitting in a
+	// training match. gstate/state are plain memory reads, so this gate is free.
+	bool RankedDiagnosticsAreRelevant(int gstate, int state)
+	{
+		return gstate == GameState_MainMenu && state == 4;
+	}
 
 	// Matchmaking-layer liveness polling (RequestLobbyData round-robin).
 	// Spacing bounds the request rate at ~4/s (Steam's limits are
@@ -2786,16 +2958,9 @@ int RankedListConnectionFilter::CountPopulatedGameRows() const
 		}
 	}
 
-	static unsigned long long s_lastRowDiagLogTickMs = 0;
-	static int s_lastRowDiagCount = -1;
-	const unsigned long long now = GetTickCount64();
-	if (count != s_lastRowDiagCount || now - s_lastRowDiagLogTickMs > 2000)
-	{
-		LOG(1, "[RankedListFilter] rowDiag: initGuardReadable=%d initDone=%d populatedRows=%d firstNonZeroRow=%d\n",
-			initGuardReadable ? 1 : 0, initDone ? 1 : 0, count, firstNonZeroRawByte);
-		s_lastRowDiagLogTickMs = now;
-		s_lastRowDiagCount = count;
-	}
+	RowDiagnostic().Report(FormatDiagnostic(
+		"initGuardReadable=%d initDone=%d populatedRows=%d firstNonZeroRow=%d",
+		initGuardReadable ? 1 : 0, initDone ? 1 : 0, count, firstNonZeroRawByte));
 
 	return count;
 }
@@ -2808,26 +2973,32 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 		return;
 	}
 
-	static unsigned long long s_lastLogTickMs = 0;
+	// Rate limiting and de-duplication both live in the diagnostic object now,
+	// so the vtable walk below still runs at most once per second but a steady
+	// manager state costs one log line instead of one per second. Tick() flushes
+	// a value that was held back by the rate floor and then stopped changing.
+	RankedListMgrDiagnostic().Tick();
+
+	static unsigned long long s_lastSampleTickMs = 0;
 	const unsigned long long now = GetTickCount64();
-	if (now - s_lastLogTickMs < 1000)
+	if (now - s_lastSampleTickMs < 1000)
 	{
 		return;
 	}
-	s_lastLogTickMs = now;
+	s_lastSampleTickMs = now;
 
 	const void* const* const slot =
 		reinterpret_cast<const void* const*>(moduleBase + kRankedListMgrSlotRva);
 	if (IsBadReadPtr(slot, sizeof(void*)))
 	{
-		LOG(1, "[RankedListFilter] rankedListMgrDiag: slot unreadable\n");
+		RankedListMgrDiagnostic().Report("slot unreadable");
 		return;
 	}
 
 	const void* const mgr = *slot;
 	if (mgr == nullptr)
 	{
-		LOG(1, "[RankedListFilter] rankedListMgrDiag: mgr=null\n");
+		RankedListMgrDiagnostic().Report("mgr=null");
 		return;
 	}
 
@@ -3013,23 +3184,14 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 		}
 	}
 
-	LOG(1, "[RankedListFilter] rankedListMgrDiag: mgr=0x%p vtable=0x%p rowCount=%d shownCount=%zu tiers:%s\n",
-		mgr, vtable, rowCount, m_lastShownCount, tierDump.c_str());
+	RankedListMgrDiagnostic().Report(FormatDiagnostic(
+		"mgr=0x%p vtable=0x%p rowCount=%d shownCount=%zu tiers:%s",
+		mgr, vtable, rowCount, m_lastShownCount, tierDump.c_str()));
 }
 
 bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 {
 	const unsigned long long now = GetTickCount64();
-
-	// DIAGNOSTIC ONLY (does not affect onList below): cross-checks the
-	// row-array signal (currently unused for the real decision) against the
-	// gstate/state1 signal that IS driving visibility right now.
-	CountPopulatedGameRows();
-	// DIAGNOSTIC ONLY: logs the candidate ranked-list-manager singleton slot
-	// found by tracing the delay-dot render code backward (see progress doc).
-	// A non-null read here while a populated list is on screen would confirm
-	// the whole chain is live; a persistent null kills this candidate.
-	DiagnosticLogRankedListMgrSlot();
 
 	bool onList = false;
 	int gstate = -1;
@@ -3046,6 +3208,33 @@ bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 		{
 			state = *reinterpret_cast<const int32_t*>(network + 0x00);
 			state1 = *reinterpret_cast<const int32_t*>(network + 0x04);
+
+			// DIAGNOSTIC ONLY (neither affects onList below). Both used to run
+			// unconditionally at the top of this function, which meant they
+			// reached into the game's ranked-list manager and called through its
+			// vtable every frame of every screen - including a training match,
+			// where there is no ranked list and never will be. gstate/state are
+			// plain reads, so gating on them is free and confines the vtable work
+			// to the screens the diagnostics were written to describe.
+			//
+			// - CountPopulatedGameRows cross-checks the row-array signal against
+			//   the gstate/state1 signal that IS driving visibility right now.
+			// - DiagnosticLogRankedListMgrSlot confirms the manager singleton
+			//   chain is live: non-null while a populated list is on screen
+			//   confirms it, a persistent null kills the candidate.
+			if (RankedDiagnosticsAreRelevant(gstate, state))
+			{
+				CountPopulatedGameRows();
+				DiagnosticLogRankedListMgrSlot();
+			}
+			else
+			{
+				// Off the ranked screens entirely: close out whatever the last
+				// observed values were, so the log states when and why sampling
+				// stopped rather than the lines simply ceasing.
+				RowDiagnostic().Close("stopped sampling (left the ranked screens)");
+				RankedListMgrDiagnostic().Close("stopped sampling (left the ranked screens)");
+			}
 
 			// state==4's full non-confirmation range also covers screens that
 			// are NOT the results list - state1==30 is the pre-search "press
@@ -3109,23 +3298,15 @@ bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 		}
 	}
 
-	// DIAGNOSTIC (throttled ~once/sec, or on any change): confirms the state
-	// values seen while testing visibility - this let us pin down the
-	// confirmation-vs-list discriminator in the first place.
-	static unsigned long long s_lastDiagLogTickMs = 0;
-	static int s_lastGstate = -2;
-	static int s_lastState = -2;
-	static int s_lastState1 = -2;
-	if (gstate != s_lastGstate || state != s_lastState || state1 != s_lastState1 ||
-		now - s_lastDiagLogTickMs > 1000)
-	{
-		LOG(1, "[RankedListFilter] visibility check: gstate=%d state=%d state1=%d onList=%d\n",
-			gstate, state, state1, onList ? 1 : 0);
-		s_lastDiagLogTickMs = now;
-		s_lastGstate = gstate;
-		s_lastState = state;
-		s_lastState1 = state1;
-	}
+	// DIAGNOSTIC (on change only): confirms the state values seen while testing
+	// visibility - this let us pin down the confirmation-vs-list discriminator
+	// in the first place. Previously it also re-logged once a second regardless,
+	// which on a menu the user was not touching produced an identical line per
+	// second indefinitely. onList joins the tracked tuple now, so a decision
+	// flip is logged even when the raw states behind it did not move.
+	VisibilityDiagnostic().Report(FormatDiagnostic(
+		"gstate=%d state=%d state1=%d onList=%d",
+		gstate, state, state1, onList ? 1 : 0));
 
 	if (onList)
 	{
