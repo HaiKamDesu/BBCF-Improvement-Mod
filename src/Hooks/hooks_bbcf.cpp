@@ -8564,10 +8564,20 @@ void __declspec(naked)PassMsgToImGui()
 			jmp[WindowMsgHandlerJmpBackAddr]
 	}
 EXIT:
+	// Returning "handled" means returning from the GAME's function, and its prologue at
+	// 0x0044F350 already pushed ebp/ebx/esi/edi before this hook's site at 0x0044F359.
+	// Those four have to come off before the ret, exactly as the game's own epilogues do
+	// (0x0044F38D, 0x0044F39F, 0x0044F3F1). Without them the ret pops the saved edi as its
+	// return address and jumps to it - and the saved edi is the outer WndProc's edi, which
+	// holds wParam. See docs/HookEpilogueContract.md.
 	__asm
 	{
 		popad
 		mov eax, 1
+		pop edi
+		pop esi
+		pop ebx
+		pop ebp
 		retn 0Ch
 	}
 }

@@ -37,7 +37,7 @@ Keep this file small. It is always loaded; deeper context is opt-in.
 - Hotkeys: action list in `src/Core/hotkeys.def`, polling/parsing in `src/Core/HotkeyManager.*`, controller input in `src/Core/InputDevices.*`, rebind UI in `src/Overlay/Widget/HotkeyBindWidget.*`.
 - Localization/UI copy: `resource/localization/Localization.csv`, generated `src/Core/LocalizationKeys.autogen.h`, `docs/localization.md`.
 - Overlay UI: `src/Overlay/Window*`, `src/Overlay/Widget*`, `src/Overlay/WindowManager.*`.
-- Hooks: `src/Hooks/*`, `notes.h`, `src/Game/GhidraDefs.h`.
+- Hooks: `src/Hooks/*`, `notes.h`, `src/Game/GhidraDefs.h`, and `docs/HookEpilogueContract.md` (read before touching any JMP patch).
 - Replay/URT: `src/Game/ReplayTakeover`, `src/Game/ReplayRewind`, `src/Game/ReplayStates`, `docs/replay_takeover`.
 - Networking/Steam: `src/Network`, `src/SteamApiWrapper`.
 - Palettes: `src/Palette`, `resource/palettes.ini`.
