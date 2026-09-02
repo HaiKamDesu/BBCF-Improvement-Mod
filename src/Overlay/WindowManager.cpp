@@ -133,62 +133,190 @@ extern unsigned int g_overlayKeyMsgs;
 // written down: opening the mod menu logs nothing, so a reporter's DEBUG.txt looks identical
 // whether the overlay worked perfectly or swallowed every click.
 //
-// Change-driven, and deliberately does NOT key on the cursor position - that changes every
-// frame and would flood the log. Positions are reported, the classification is what decides
-// whether to log.
+// Cost discipline, because this runs inside the render loop of a fighting game:
+//
+//  - Per frame it touches ONLY values already in memory (io, the draw data ImGui just
+//    produced, the modal window's own rect). No Win32 calls, no allocation - the key is
+//    built into a fixed buffer and compared with strcmp.
+//  - The Win32 calls that locate the real cursor (GetCursorPos / ScreenToClient /
+//    GetClientRect) happen only when that cheap key has changed, or once a second for the
+//    alignment probe. In a steady state - overlay closed, nothing moving - this function
+//    makes no system calls at all and writes no lines.
+//  - It is change-driven, and deliberately does NOT key on the cursor position or the
+//    vertex count. Both change every frame and would flood the log; they are reported in
+//    the line, they just never decide whether to write one.
 static void LogOverlayInputState(int openWindows)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	// Where the OS says the cursor is, in the same client space the backend reports.
-	POINT osPos = {};
-	bool osPosKnown = false;
-	if (GetCursorPos(&osPos) && ScreenToClient(g_gameProc.hWndGameWindow, &osPos))
+	// Valid because this is called after ImGui::Render(). "Did the overlay actually draw
+	// anything" is the question that separates "a window is blocking clicks" from "a window
+	// is blocking clicks and you cannot even see it", which is the case a reporter cannot
+	// describe and we could not otherwise tell apart.
+	const ImDrawData* const drawData = ImGui::GetDrawData();
+	const int totalVtx = (drawData != nullptr) ? drawData->TotalVtxCount : -1;
+
+	// A modal blocks every click outside itself, by design. An unanswered first-launch
+	// prompt therefore makes the whole overlay unclickable, which is indistinguishable from
+	// broken mouse input unless the log says so. Its rect is carried too: a modal that is
+	// open but positioned outside the display is blocking input while invisible, and that
+	// is the only way a user can be stuck without ever seeing what is asking them.
+	ImGuiWindow* const modal = ImGui::GetTopMostPopupModal();
+	const char* const modalName = (modal != nullptr) ? modal->Name : "";
+	ImVec2 modalPos(0.0f, 0.0f), modalSize(0.0f, 0.0f);
+	bool modalOnScreen = true;
+	if (modal != nullptr)
 	{
-		osPosKnown = true;
+		modalPos = modal->Pos;
+		modalSize = modal->Size;
+		// Any overlap with the display counts as visible; a fully off-display rect does not.
+		modalOnScreen =
+			(modalPos.x + modalSize.x) > 0.0f && modalPos.x < io.DisplaySize.x &&
+			(modalPos.y + modalSize.y) > 0.0f && modalPos.y < io.DisplaySize.y &&
+			modalSize.x > 0.0f && modalSize.y > 0.0f;
 	}
 
-	RECT client = {};
-	GetClientRect(g_gameProc.hWndGameWindow, &client);
+	// Note what is NOT in this key. The mouse button state is reported but not keyed on:
+	// it flips twice per click, which measured at 1200 lines for ten minutes of ordinary
+	// clicking while telling us nothing the clicksSeen bit does not already say. Same for
+	// the cursor position and the vertex count.
+	char key[384];
+	snprintf(key, sizeof(key),
+		"display=%.0fx%.0f openWindows=%d capture=%d drew=%d modal='%s' modalOnScreen=%d clicksSeen=%d",
+		io.DisplaySize.x, io.DisplaySize.y, openWindows,
+		io.WantCaptureMouse ? 1 : 0,
+		totalVtx > 0 ? 1 : 0, modalName, modalOnScreen ? 1 : 0,
+		g_overlayMouseButtonMsgs != 0 ? 1 : 0);
 
-	// The single most useful number: how far ImGui's idea of the cursor is from the OS's.
-	// Anything but ~0 while the cursor is over the window means hit-testing and rendering are
-	// in different coordinate spaces, which is what makes a visible button unclickable.
+	static char s_lastKey[sizeof(key)] = { 0 };
+	const bool keyChanged = strcmp(key, s_lastKey) != 0;
+
+	static unsigned long long s_lastProbeMs = 0;
+	static int s_lastDeltaClass = -2;
+	static unsigned long long s_lastEmitMs = 0;
+	static unsigned int s_suppressed = 0;
+	static unsigned int s_linesWritten = 0;
+	const unsigned long long nowMs = GetTickCount64();
+
+	// Absolute guarantee, independent of what the user does with the mouse: this is a
+	// diagnostic, and a couple of hundred lines is far more than enough to diagnose
+	// anything. After that it says so once and goes quiet for the rest of the session.
+	static const unsigned int kMaxLines = 200;
+	if (s_linesWritten > kMaxLines)
+	{
+		return;
+	}
+
+	// Rate ceiling comes BEFORE the Win32 calls, not after. Measured the other way round it
+	// still made 81k system calls in ten minutes of a cursor waved across a window edge,
+	// because change-detection let every flap through to the syscalls and only the logging
+	// was capped.
+	const bool probeDue = (nowMs - s_lastProbeMs) >= 1000;
+	const bool ceilingOpen = (nowMs - s_lastEmitMs) >= 1000;
+
+	if (!keyChanged && !probeDue)
+	{
+		return; // steady state: no system calls, no line
+	}
+	if (keyChanged && !ceilingOpen && !probeDue)
+	{
+		// Hold the newest state rather than dropping it: s_lastKey is only committed once a
+		// line is actually written, so this change is still pending and gets reported as
+		// soon as the ceiling opens.
+		++s_suppressed;
+		return;
+	}
+
+	// Cursor alignment is the one thing here that needs Win32, so it is reached at most
+	// about twice a second. A non-zero delta while the cursor is over the window means
+	// hit-testing and rendering are in different coordinate spaces, which is what makes a
+	// visible button unclickable.
 	int delta = -1;
+	int deltaClass = -1;
+	POINT osPos = {};
+	RECT client = {};
+	const bool osPosKnown =
+		GetCursorPos(&osPos) && ScreenToClient(g_gameProc.hWndGameWindow, &osPos) != FALSE;
+	GetClientRect(g_gameProc.hWndGameWindow, &client);
 	if (osPosKnown)
 	{
 		const int dx = (int)io.MousePos.x - osPos.x;
 		const int dy = (int)io.MousePos.y - osPos.y;
 		delta = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+		deltaClass = (delta <= 2) ? 0 : ((delta <= 40) ? 1 : 2);
 	}
 
-	// A modal blocks every click outside itself, by design. An unanswered first-launch
-	// prompt therefore makes the whole overlay unclickable, which looks exactly like broken
-	// mouse input, so name it explicitly.
-	ImGuiWindow* const modal = ImGui::GetTopMostPopupModal();
-	const char* modalName = modal ? modal->Name : "";
+	if (probeDue)
+	{
+		s_lastProbeMs = nowMs;
+	}
 
-	char key[512];
-	snprintf(key, sizeof(key),
-		"display=%.0fx%.0f client=%ldx%ld openWindows=%d capture=%d down=%d modal='%s' deltaClass=%s msgs=%s",
-		io.DisplaySize.x, io.DisplaySize.y,
-		client.right - client.left, client.bottom - client.top,
-		openWindows, io.WantCaptureMouse ? 1 : 0, io.MouseDown[0] ? 1 : 0, modalName,
-		delta < 0 ? "unknown" : (delta <= 2 ? "aligned" : (delta <= 40 ? "small" : "LARGE")),
-		g_overlayMouseButtonMsgs == 0 ? "no-clicks-seen" : "clicks-seen");
-
-	static std::string s_lastKey;
-	if (s_lastKey == key)
+	// A probe that found nothing new stays silent.
+	if (!keyChanged && deltaClass == s_lastDeltaClass)
 	{
 		return;
 	}
-	s_lastKey = key;
+	if (!ceilingOpen)
+	{
+		++s_suppressed;
+		return;
+	}
 
-	LOG(1, "[OverlayInput] %s imguiPos=(%.0f,%.0f) osPos=(%ld,%ld) delta=%d "
-	       "msgCounts move=%u button=%u key=%u\n",
-		key, io.MousePos.x, io.MousePos.y,
-		osPosKnown ? osPos.x : -1, osPosKnown ? osPos.y : -1, delta,
-		g_overlayMouseMoveMsgs, g_overlayMouseButtonMsgs, g_overlayKeyMsgs);
+	const unsigned int suppressed = s_suppressed;
+	s_suppressed = 0;
+	s_lastEmitMs = nowMs;
+	s_lastDeltaClass = deltaClass;
+	memcpy(s_lastKey, key, sizeof(key));
+
+	if (++s_linesWritten > kMaxLines)
+	{
+		LOG(1, "[OverlayInput] %u lines written; going quiet for the rest of the session. "
+		       "The state above is the last one recorded.\n", kMaxLines);
+		return;
+	}
+
+	static const char* const kDeltaNames[] = { "aligned", "small", "LARGE" };
+	LOG(1, "[OverlayInput] %s down=%d client=%ldx%ld cursorDelta=%s(%d) imguiPos=(%.0f,%.0f) "
+	       "osPos=(%ld,%ld) vtx=%d modalRect=(%.0f,%.0f)+(%.0fx%.0f) msgs move=%u button=%u key=%u suppressed=%u\n",
+		key, io.MouseDown[0] ? 1 : 0,
+		client.right - client.left, client.bottom - client.top,
+		deltaClass < 0 ? "unknown" : kDeltaNames[deltaClass], delta,
+		io.MousePos.x, io.MousePos.y,
+		osPosKnown ? osPos.x : -1, osPosKnown ? osPos.y : -1,
+		totalVtx,
+		modalPos.x, modalPos.y, modalSize.x, modalSize.y,
+		g_overlayMouseMoveMsgs, g_overlayMouseButtonMsgs, g_overlayKeyMsgs, suppressed);
+
+	// One-shot, loud, and the line that would have answered this report on its own: a modal
+	// that has been swallowing every overlay click for ten seconds is not a transient
+	// prompt, it is a user who is stuck and probably cannot tell why.
+	static unsigned long long s_modalSinceMs = 0;
+	static bool s_modalWarned = false;
+	static char s_warnedModal[128] = { 0 };
+	if (modal == nullptr)
+	{
+		s_modalSinceMs = 0;
+		s_modalWarned = false;
+	}
+	else
+	{
+		if (s_modalSinceMs == 0 || strncmp(s_warnedModal, modalName, sizeof(s_warnedModal) - 1) != 0)
+		{
+			s_modalSinceMs = nowMs;
+			s_modalWarned = false;
+			strncpy_s(s_warnedModal, modalName, sizeof(s_warnedModal) - 1);
+		}
+		if (!s_modalWarned && (nowMs - s_modalSinceMs) >= 10000)
+		{
+			s_modalWarned = true;
+			LOG(0, "[OverlayInput] Modal '%s' has blocked every overlay click for %llus "
+			       "(onScreen=%d rect=(%.0f,%.0f)+(%.0fx%.0f)). Nothing else in the overlay can "
+			       "be clicked until it is answered; if onScreen=0 the user cannot even see "
+			       "what is asking.\n",
+				modalName, (nowMs - s_modalSinceMs) / 1000, modalOnScreen ? 1 : 0,
+				modalPos.x, modalPos.y, modalSize.x, modalSize.y);
+		}
+	}
 }
 
 WindowManager* WindowManager::m_instance = nullptr;
@@ -525,8 +653,6 @@ void WindowManager::Render()
 	}
 
 
-	LogOverlayInputState(openWindowCount);
-
 	DrawAllWindows();
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
@@ -539,6 +665,7 @@ void WindowManager::Render()
 	g_notificationBar->DrawNotifications();
 
 	ImGui::Render();
+	LogOverlayInputState(openWindowCount);
 	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 }
 

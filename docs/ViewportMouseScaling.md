@@ -96,6 +96,12 @@ Two rules follow, and they generalise past this file:
   because it depended on ImGui internals (queue ordering) that the vendored file does not
   promise. If the correct place for a fix is inside `depends/`, put it there and label it.
 
+## Not the only cause of this symptom
+
+An unanswered first-launch modal produces an identical report and is more common, since it
+needs no unusual settings at all. `docs/OverlayInputTriage.md` covers all three known causes
+and how `[OverlayInput]` tells them apart; check that first.
+
 ## Checking a report
 
 Ask for the reporter's `Viewport` line from `settings.ini`, and their game resolution.
