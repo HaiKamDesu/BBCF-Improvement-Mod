@@ -26,9 +26,11 @@ namespace
 	const size_t kHeaderSize = 4 + 4 * 2;
 	const wchar_t* const kResourceName = L"palette_thumbnails";
 
-	// A grid shows roughly two dozen at once; this leaves room to scroll a screenful
-	// either way without rebuilding, and caps the cache at about 6 MB.
-	const size_t kMaxCachedTextures = 48;
+	// A grid shows a few dozen at once; this leaves room to scroll a screenful either way
+	// without rebuilding, and caps the cache at about 12 MB. It is a soft cap: see the
+	// eviction loop in Get(), which will not release a texture the current frame is still
+	// going to draw.
+	const size_t kMaxCachedTextures = 96;
 
 	unsigned int ReadU32(const unsigned char* p)
 	{
@@ -140,6 +142,7 @@ namespace
 	{
 		IDirect3DTexture9* texture;
 		std::list<CacheKey>::iterator recency; // position in g_recency, most recent at front
+		int lastUsedFrame;                     // ImGui frame this was last handed out in
 	};
 
 	std::map<CacheKey, Entry> g_cache;
@@ -327,6 +330,7 @@ namespace PaletteThumbnails
 			// Touch: move to the front so the least recently drawn is what gets evicted.
 			g_recency.splice(g_recency.begin(), g_recency, hit->second.recency);
 			hit->second.recency = g_recency.begin();
+			hit->second.lastUsedFrame = ImGui::GetFrameCount();
 			return (ImTextureID)(uintptr_t)hit->second.texture;
 		}
 
@@ -334,6 +338,14 @@ namespace PaletteThumbnails
 		if (!texture)
 			return NULL;
 
+		// Evicting Release()es the texture, but a thumbnail drawn earlier in this same
+		// frame is only recorded in ImGui's draw list so far - it is not bound until the
+		// frame is rendered. Releasing it here would leave a dangling pointer in that
+		// draw list and fault in the DX9 backend at render time. So the cap only applies
+		// to entries from earlier frames: if a frame asks for more than
+		// kMaxCachedTextures the cache overshoots for that frame and is trimmed on the
+		// next one.
+		const int frame = ImGui::GetFrameCount();
 		while (g_cache.size() >= kMaxCachedTextures && !g_recency.empty())
 		{
 			std::map<CacheKey, Entry>::iterator oldest = g_cache.find(g_recency.back());
@@ -342,6 +354,8 @@ namespace PaletteThumbnails
 				g_recency.pop_back();
 				continue;
 			}
+			if (oldest->second.lastUsedFrame == frame)
+				break; // everything left is in this frame's draw list
 			Evict(oldest);
 		}
 
@@ -349,6 +363,7 @@ namespace PaletteThumbnails
 		Entry entry;
 		entry.texture = texture;
 		entry.recency = g_recency.begin();
+		entry.lastUsedFrame = frame;
 		g_cache[cacheKey] = entry;
 
 		return (ImTextureID)(uintptr_t)texture;

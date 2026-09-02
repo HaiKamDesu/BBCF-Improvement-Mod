@@ -940,6 +940,22 @@ void PalettesConfigWindow::DrawPaletteCells(int groupIndex, const std::vector<in
 		}
 		const bool hovered = ImGui::IsItemHovered();
 
+		// A character can easily have several hundred palettes and every group starts
+		// expanded, so drawing every cell would ask PaletteThumbnails for a texture per
+		// palette per frame - thousands of them, when the cache is sized for a screenful.
+		// Cells scrolled out of view are clipped by ImGui anyway; skipping their contents
+		// keeps the per-frame texture count down to what is actually on screen. The
+		// InvisibleButton above still runs, so layout, scroll extent and clicks are
+		// unchanged.
+		const bool visible = ImGui::IsRectVisible(
+			cursor, ImVec2(cursor.x + cellSize.x, cursor.y + cellSize.y));
+		if (!visible)
+		{
+			ImGui::EndGroup();
+			ImGui::PopID();
+			continue;
+		}
+
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		if (selected || hovered)
 		{
