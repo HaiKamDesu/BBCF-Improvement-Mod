@@ -45,6 +45,7 @@
 #include <imgui.h>
 #include <imgui_impl_dx9.h>
 #include <imgui_impl_win32.h>
+#include <imgui_internal.h>
 #include <cstdio>
 #include <ctime>
 
@@ -120,6 +121,74 @@ static void ApplyViewportOverride()
 			io.AddMousePosEvent((float)pos.x * scaleX, (float)pos.y * scaleY);
 		}
 	}
+}
+
+// Counted in hooks_bbcf.cpp by the wrapper around ImGui_ImplWin32_WndProcHandler.
+extern unsigned int g_overlayMouseMoveMsgs;
+extern unsigned int g_overlayMouseButtonMsgs;
+extern unsigned int g_overlayKeyMsgs;
+
+// Answers "mouse clicks don't register" from a log instead of from guesses. Two reports in
+// a row could not be diagnosed because nothing about the overlay's input state was ever
+// written down: opening the mod menu logs nothing, so a reporter's DEBUG.txt looks identical
+// whether the overlay worked perfectly or swallowed every click.
+//
+// Change-driven, and deliberately does NOT key on the cursor position - that changes every
+// frame and would flood the log. Positions are reported, the classification is what decides
+// whether to log.
+static void LogOverlayInputState(int openWindows)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	// Where the OS says the cursor is, in the same client space the backend reports.
+	POINT osPos = {};
+	bool osPosKnown = false;
+	if (GetCursorPos(&osPos) && ScreenToClient(g_gameProc.hWndGameWindow, &osPos))
+	{
+		osPosKnown = true;
+	}
+
+	RECT client = {};
+	GetClientRect(g_gameProc.hWndGameWindow, &client);
+
+	// The single most useful number: how far ImGui's idea of the cursor is from the OS's.
+	// Anything but ~0 while the cursor is over the window means hit-testing and rendering are
+	// in different coordinate spaces, which is what makes a visible button unclickable.
+	int delta = -1;
+	if (osPosKnown)
+	{
+		const int dx = (int)io.MousePos.x - osPos.x;
+		const int dy = (int)io.MousePos.y - osPos.y;
+		delta = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+	}
+
+	// A modal blocks every click outside itself, by design. An unanswered first-launch
+	// prompt therefore makes the whole overlay unclickable, which looks exactly like broken
+	// mouse input, so name it explicitly.
+	ImGuiWindow* const modal = ImGui::GetTopMostPopupModal();
+	const char* modalName = modal ? modal->Name : "";
+
+	char key[512];
+	snprintf(key, sizeof(key),
+		"display=%.0fx%.0f client=%ldx%ld openWindows=%d capture=%d down=%d modal='%s' deltaClass=%s msgs=%s",
+		io.DisplaySize.x, io.DisplaySize.y,
+		client.right - client.left, client.bottom - client.top,
+		openWindows, io.WantCaptureMouse ? 1 : 0, io.MouseDown[0] ? 1 : 0, modalName,
+		delta < 0 ? "unknown" : (delta <= 2 ? "aligned" : (delta <= 40 ? "small" : "LARGE")),
+		g_overlayMouseButtonMsgs == 0 ? "no-clicks-seen" : "clicks-seen");
+
+	static std::string s_lastKey;
+	if (s_lastKey == key)
+	{
+		return;
+	}
+	s_lastKey = key;
+
+	LOG(1, "[OverlayInput] %s imguiPos=(%.0f,%.0f) osPos=(%ld,%ld) delta=%d "
+	       "msgCounts move=%u button=%u key=%u\n",
+		key, io.MousePos.x, io.MousePos.y,
+		osPosKnown ? osPos.x : -1, osPosKnown ? osPos.y : -1, delta,
+		g_overlayMouseMoveMsgs, g_overlayMouseButtonMsgs, g_overlayKeyMsgs);
 }
 
 WindowManager* WindowManager::m_instance = nullptr;
@@ -445,15 +514,18 @@ void WindowManager::Render()
 	ImGui::NewFrame();
 
 	ImGui::GetIO().MouseDrawCursor = false;
+	int openWindowCount = 0;
 	for (auto p : m_windowContainer->GetWindows()) {
 		if (p.first == WindowType_HitboxOverlay) continue; // ignore windows that don't need a mouse
 		if (!p.second) continue;
 		if (p.second->IsOpen()) {
 			ImGui::GetIO().MouseDrawCursor = true;
-			break;
+			++openWindowCount;
 		}
 	}
 
+
+	LogOverlayInputState(openWindowCount);
 
 	DrawAllWindows();
 	DrawRankedProgressOverlayStandalone();

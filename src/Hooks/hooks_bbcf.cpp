@@ -8518,6 +8518,36 @@ void __declspec(naked)GetGameStateReplayMenuScreen()
 
 DWORD WindowMsgHandlerJmpBackAddr = 0;
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+// Counts what actually reaches ImGui, so a report of "mouse clicks don't register" can be
+// split into "the messages never arrive" and "they arrive and land in the wrong place"
+// without guessing. Drop-in for ImGui_ImplWin32_WndProcHandler: same cdecl signature and
+// argument order, so the naked hook's push sequence is unchanged.
+unsigned int g_overlayMouseMoveMsgs = 0;
+unsigned int g_overlayMouseButtonMsgs = 0;
+unsigned int g_overlayKeyMsgs = 0;
+
+LRESULT ImGuiWndProcCounted(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch (msg)
+	{
+	case WM_MOUSEMOVE: case WM_NCMOUSEMOVE:
+		++g_overlayMouseMoveMsgs;
+		break;
+	case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP:
+	case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP:
+	case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP:
+		++g_overlayMouseButtonMsgs;
+		break;
+	case WM_KEYDOWN: case WM_SYSKEYDOWN:
+		++g_overlayKeyMsgs;
+		break;
+	default:
+		break;
+	}
+
+	return ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+}
+
 void __declspec(naked)PassMsgToImGui()
 {
 	static bool isWindowManagerInitialized = false;
@@ -8553,7 +8583,7 @@ void __declspec(naked)PassMsgToImGui()
 		push edi //wParam
 		push esi //msg
 		push dword ptr[ebx + 1Ch] //hwnd
-		call ImGui_ImplWin32_WndProcHandler
+		call ImGuiWndProcCounted
 		pop ebx //manually clearing stack...
 		pop ebx
 		pop ebx
