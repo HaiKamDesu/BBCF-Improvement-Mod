@@ -3,6 +3,7 @@
 #include "HookManager.h"
 
 #include "Core/interfaces.h"
+#include "Core/crashdump.h"
 #include "Core/logger.h"
 #include "D3D9EXWrapper/ID3D9Wrapper_Sprite.h"
 #include "D3D9EXWrapper/ID3DXWrapper_Effect.h"
@@ -830,6 +831,32 @@ namespace
 	// pointer plus a before/after prologue comparison. If the prologue is
 	// unchanged after the call, the hook is not live no matter what
 	// DetourFunction returned.
+	using SetUnhandledExceptionFilter_t = LPTOP_LEVEL_EXCEPTION_FILTER(WINAPI*)(LPTOP_LEVEL_EXCEPTION_FILTER);
+	SetUnhandledExceptionFilter_t orig_SetUnhandledExceptionFilter = nullptr;
+
+	// The filter another module asked for. Recorded rather than honoured: we stay
+	// installed, and this is kept so the displaced filter is visible in the log and can be
+	// chained to later if that ever turns out to be wanted.
+	LPTOP_LEVEL_EXCEPTION_FILTER g_displacedTopLevelFilter = nullptr;
+	bool g_loggedFilterDisplacement = false;
+
+	LPTOP_LEVEL_EXCEPTION_FILTER WINAPI hook_SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER filter)
+	{
+		const LPTOP_LEVEL_EXCEPTION_FILTER previous = g_displacedTopLevelFilter;
+		g_displacedTopLevelFilter = filter;
+
+		// One line per process, not per call: the CRT can come through here repeatedly and
+		// this must not become the next thing that floods DEBUG.txt.
+		if (!g_loggedFilterDisplacement)
+		{
+			g_loggedFilterDisplacement = true;
+			LOG(1, "[Crash] Another module tried to install top-level filter %p; keeping ours.\n", filter);
+		}
+
+		ReassertUnhandledExceptionFilter();
+		return previous;
+	}
+
 	PBYTE InstallDetour(PBYTE target, PBYTE hook, const char* funcName)
 	{
 		if (!target)
@@ -1390,6 +1417,18 @@ bool placeHooks_detours()
 	// if (!HookOptionalDetour((PBYTE)pSteamAPI_ISteamUserStats_FindLeaderboard, "SteamAPI_ISteamUserStats_FindLeaderboard")) return false;
 	HookOptionalDetour((PBYTE)pSteamAPI_ISteamUserStats_UploadLeaderboardScore, "SteamAPI_ISteamUserStats_UploadLeaderboardScore");
 	HookOptionalDetour((PBYTE)pCreateWindowExW, "CreateWindowExW");
+
+	// Keep our top-level filter installed no matter who tries to replace it.
+	//
+	// BBCF's CRT contains, at static 0x007B2533, the sequence
+	//   SetUnhandledExceptionFilter(NULL); UnhandledExceptionFilter(record);
+	// which exists precisely to stop the application's filter from running before WER
+	// gets the fault. Since dinput8 is a static import of BBCF.exe our DllMain always
+	// registers first, so we are always the filter that gets deleted. That is why 141 of
+	// 147 recorded access violations produced no crash bundle. See docs/CrashCapture.md.
+	orig_SetUnhandledExceptionFilter = (SetUnhandledExceptionFilter_t)InstallDetour(
+		(PBYTE)&SetUnhandledExceptionFilter, (LPBYTE)hook_SetUnhandledExceptionFilter,
+		"SetUnhandledExceptionFilter");
 
 	// Sampled before our own detour lands, or the answer is always "us".
 	const bool foreignOwnerAtStartup = IsExportForeignOwned(pDirect3DCreate9Ex, hM_d3d9);

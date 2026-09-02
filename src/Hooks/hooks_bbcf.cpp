@@ -1,5 +1,6 @@
 #include "hooks_bbcf.h"
 
+#include "Core/crashdump.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/Settings.h"
@@ -9261,12 +9262,142 @@ void __declspec(naked)GetFFAMatchThisPlayerIndex()
 }
 
 DWORD SetDumpfileCommentStringJmpBackAddr = 0;
+
+// This hook site (static 0x0044E782) is not a menu transition, despite the name and the
+// [MenuExit] label it used to log under. It sits inside BBCF's own __except FILTER at
+// 0x0044E740 - the function referenced from an SEH scope table that formats a comment,
+// calls SteamAPI_SetMiniDumpComment, then SteamAPI_WriteMiniDump, after which the game
+// unwinds and exits through a normal path. Because it exits rather than dying, our
+// DLL_PROCESS_DETACH runs and the log records a game crash as "BBCF_IM_Shutdown", which is
+// the entire reason most crashes were reported as "CF crashed, no IM message".
+//
+// A full normal session's DEBUG.txt contains zero occurrences of this hook, so it really
+// is crash-only. See docs/CrashCapture.md for the measurement and the disassembly.
+//
+// The filter's own arguments are still live here: [ebp+8] is the exception code and
+// [ebp+0Ch] is the PEXCEPTION_POINTERS, captured before any C++ runs because that would
+// clobber ebp.
+namespace
+{
+	DWORD g_bbcfFilterExceptionCode = 0;
+	PEXCEPTION_POINTERS g_bbcfFilterExceptionPointers = nullptr;
+
+	void HandleBbcfOwnExceptionFilter()
+	{
+		LOG(0, "[Crash] BBCF's own exception filter ran: code=0x%08X pointers=%p. The game "
+		       "caught this itself and will write a Steam minidump and exit, which is why a "
+		       "crash like this used to leave nothing but a clean-shutdown log.\n",
+			g_bbcfFilterExceptionCode, g_bbcfFilterExceptionPointers);
+		LogMenuExitState("BBCF exception filter");
+
+		// Only trust the pointer if it really looks like a filter argument; this hook is a
+		// 5-byte patch inside game code and a bad read here would replace a reportable
+		// crash with an unreportable one.
+		if (g_bbcfFilterExceptionPointers != nullptr &&
+			!IsBadReadPtr(g_bbcfFilterExceptionPointers, sizeof(EXCEPTION_POINTERS)) &&
+			g_bbcfFilterExceptionPointers->ExceptionRecord != nullptr &&
+			!IsBadReadPtr(g_bbcfFilterExceptionPointers->ExceptionRecord, sizeof(EXCEPTION_RECORD)) &&
+			g_bbcfFilterExceptionPointers->ContextRecord != nullptr &&
+			!IsBadReadPtr(g_bbcfFilterExceptionPointers->ContextRecord, sizeof(CONTEXT)))
+		{
+			WriteCrashBundle("Game's own exception filter (BBCF caught this crash itself)",
+				g_bbcfFilterExceptionPointers, false);
+			return;
+		}
+
+		LOG(0, "[Crash] Filter arguments were not readable; falling back to the captured "
+		       "register state.\n");
+		WriteCrashBundleForCurrentContext(
+			"Game's own exception filter (arguments unreadable)",
+			g_bbcfFilterExceptionCode != 0 ? g_bbcfFilterExceptionCode : 0x40000015 /* STATUS_FATAL_APP_EXIT */,
+			false);
+	}
+}
+
+// ---------------------------------------------------------------------------------------
+// CRT fastfail interception.
+//
+// `int 29h` traps straight into the kernel, which terminates the process without
+// dispatching an exception: no vectored handler, no SEH, no unhandled filter. 130 of 286
+// recorded BBCF crashes on the dev machine were 0xC0000409 and not one produced a bundle,
+// because no in-process API can see them. The only way to get anything is to be standing
+// at the instruction before the trap.
+//
+// Both sites are `push N; pop ecx; int 29h` - exactly 5 bytes - and the `je` above each one
+// targets the byte immediately after, so neither patch has an interior entry point
+// (verified against the disassembly; see docs/HookEpilogueContract.md for why that check is
+// mandatory). The hook writes a bundle and then performs the original three instructions,
+// so the process still dies the way the CRT intended, with ecx carrying the fastfail code.
+//
+// Caveat worth knowing: abort() is sometimes reached *because* the heap is corrupt, and
+// MiniDumpWriteDump can hang on a corrupt heap. The one-shot guard in WriteCrashBundle
+// stops a loop, and a hang that produces a dump is still better than a silent exit that
+// produces nothing - but this is the reason these two hooks are the layer most likely to
+// need a timeout later.
+namespace
+{
+	void ReportCrtFastFail(const char* what)
+	{
+		LOG(0, "[Crash] Intercepted CRT fastfail (%s). This path never reaches an exception "
+		       "handler, so without this hook the process would have vanished silently.\n", what);
+
+		// 0xC0000409 is the code the kernel would have raised. eip in the report points at
+		// the interception point rather than the trap; the walked stack above it is what
+		// identifies who decided to abort.
+		WriteCrashBundleForCurrentContext(what, 0xC0000409, false);
+	}
+}
+
+DWORD CrtFastFailAbortJmpBackAddr = 0;
+void __declspec(naked) CrtFastFailAbortHook()
+{
+	__asm pushad
+	ReportCrtFastFail("CRT fastfail: abort() / FAST_FAIL_FATAL_APP_EXIT (int 29h)");
+	__asm popad
+
+	// ORIGINAL instructions: push 7; pop ecx; int 29h
+	__asm
+	{
+		push 7
+		pop ecx
+		int 29h
+	}
+}
+
+DWORD CrtFastFailCookieJmpBackAddr = 0;
+void __declspec(naked) CrtFastFailCookieHook()
+{
+	__asm pushad
+	ReportCrtFastFail("CRT fastfail: FAST_FAIL_STACK_COOKIE_CHECK_FAILURE (int 29h)");
+	__asm popad
+
+	// ORIGINAL instructions: push 2; pop ecx; int 29h
+	__asm
+	{
+		push 2
+		pop ecx
+		int 29h
+	}
+}
+
 void __declspec(naked)SetDumpfileCommentString()
 {
-	static int* addr = nullptr;
+	__asm
+	{
+		pushad
+		mov eax, [ebp + 8]
+		mov g_bbcfFilterExceptionCode, eax
+		mov eax, [ebp + 0Ch]
+		mov g_bbcfFilterExceptionPointers, eax
+		popad
+	}
 
 	LOG_ASM(2, "SetDumpfileCommentString\n");
-	LogMenuExitState("SetDumpfileCommentString");
+
+	__asm pushad
+	HandleBbcfOwnExceptionFilter();
+	__asm popad
+
 	static char* format_string = "\n GameMode: %d, GameScene: %d, GameSceneStatus: %d \n Improvement Mod loaded \n Version: "  MOD_VERSION_NUM;
 	_asm
 	{
@@ -9516,6 +9647,40 @@ bool placeHooks_bbcf()
 	g_gameVals.pGameMoney = (int*)HookManager::GetBytesFromAddr("GetMoneyAddr", 2, 4);
 
 	SetDumpfileCommentStringJmpBackAddr = HookManager::SetHook("SetDumpfileCommentString", "\x68\x04\x8f\xe6\x00", "xxx??", 5, SetDumpfileCommentString);
+
+	// The two CRT `int 29h` sites. Signatures start 11 bytes before the patch so they are
+	// distinctive (the 5 bytes we take over, `6A 0N 59 CD 29`, would match almost anything on
+	// their own); RegisterHook resolves the pattern, then the hook lands at +11. The absolute
+	// operands after the second site are rebased by ASLR and so are wildcarded.
+	const DWORD crtFastFailAbortSite = HookManager::RegisterHook(
+		"CrtFastFailAbortSite",
+		"\x6A\x17\xE8\x00\x00\x00\x00\x85\xC0\x74\x05\x6A\x07\x59\xCD\x29\x6A\x01\x68\x15\x00\x00\x40",
+		"xx????xxxxxxxxxxxxxxxxx",
+		5);
+	if (crtFastFailAbortSite != 0)
+	{
+		CrtFastFailAbortJmpBackAddr = HookManager::SetHook(
+			"CrtFastFailAbort", crtFastFailAbortSite + 11, 5, CrtFastFailAbortHook);
+	}
+	else
+	{
+		LOG(1, "[Crash] CRT abort fastfail site not found; those crashes stay invisible.\n");
+	}
+
+	const DWORD crtFastFailCookieSite = HookManager::RegisterHook(
+		"CrtFastFailCookieSite",
+		"\x6A\x17\xE8\x00\x00\x00\x00\x85\xC0\x74\x05\x6A\x02\x59\xCD\x29\xA3\x00\x00\x00\x00\x89\x0D",
+		"xx????xxxxxxxxxxx????xx",
+		5);
+	if (crtFastFailCookieSite != 0)
+	{
+		CrtFastFailCookieJmpBackAddr = HookManager::SetHook(
+			"CrtFastFailCookie", crtFastFailCookieSite + 11, 5, CrtFastFailCookieHook);
+	}
+	else
+	{
+		LOG(1, "[Crash] CRT stack-cookie fastfail site not found; those crashes stay invisible.\n");
+	}
 
 	//HookManager::RegisterHook
 	//UploadReplayToEndpointJmpBackAddr = HookManager::SetHook("UploadReplayToEndpoint", "\xA1\x40\x0C\x44\x01", "xxxxx", 5, UploadReplayToEndpoint);

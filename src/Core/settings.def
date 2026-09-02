@@ -34,6 +34,16 @@ SETTING(int, menusize, "MenuSize", "2");
 SETTING(bool, notifications, "Notifications", "1");
 SETTING(bool, checkupdates, "CheckUpdates", "1");
 SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
+// How much memory a crash dump captures. Full memory was the old behaviour and made every
+// dump ~500 MB, which is why CrashReports folders reached 14 GB and reporter bundles had to
+// be split across several archives to be sent at all. Medium keeps everything the crash
+// context and a stack walk need and drops the bulk texture/audio memory.
+// enum: 0 = small, 1 = medium, 2 = full. Keep in the same order as
+// kCrashDumpDetailOptions in SettingsIniWindow.cpp.
+SETTING(int, crashDumpDetail, "CrashDumpDetail", "1");
+// Oldest-first prune of BBCF_IM\CrashReports before each new bundle is written. 0 keeps
+// every bundle forever, which is the behaviour that let the folder grow unbounded.
+SETTING(int, crashReportsToKeep, "CrashReportsToKeep", "5");
 SETTING(bool, showRankedProgress, "ShowRankedProgress", "0");
 SETTING(bool, showSquareColorProgress, "ShowSquareColorProgress", "0");
 SETTING(bool, showRankedPrediction, "ShowRankedPrediction", "1");

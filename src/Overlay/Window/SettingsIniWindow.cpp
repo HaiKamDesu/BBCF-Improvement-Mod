@@ -33,6 +33,8 @@ namespace {
 		{ "Notifications", "Notifications", "Interface", "The small messages the mod pops up in the corner (palette loaded, update available, room link copied). Turn off if you find them distracting." },
 		{ "CheckUpdates", "Check for updates", "Interface", "Checks once at startup whether a newer version of the mod has been released, and tells you if so. It never installs anything without asking." },
 		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes a detailed DEBUG.txt log next to the game. Leave this on: if anything ever goes wrong, that file is what lets the mod's developers work out why. It costs almost nothing." },
+		{ "CrashDumpDetail", "Crash dump detail", "Debug", "How much of the game's memory a crash dump captures. Medium is the right answer almost always - it keeps the registers, the stack and the objects the crash touched, and produces a file small enough to actually send. Full captures all of the game's memory, which is hundreds of megabytes of textures nobody will read; only pick it if a developer asks you to." },
+		{ "CrashReportsToKeep", "Crash reports to keep", "Debug", "Deletes the oldest crash reports so BBCF_IM\\CrashReports cannot grow forever. Set to 0 to keep every report, which is how that folder has previously reached several gigabytes." },
 		{ "DCodeAutoRecover", "Fix stuck player profiles", "Debug", "Sometimes the game gets permanently stuck fetching another player's profile, and their D-Code and stats never appear for the rest of the session. This notices that and nudges the game into trying again. Leave it on." },
 		{ "SpectatorSyncHooksEnabled", "Spectator desync fix", "Debug", "While spectating, briefly repeats the players' last known inputs when new ones have not arrived yet, instead of letting the game guess with empty ones - guessing permanently desyncs the match you are watching. Only affects spectating. Requires a restart." },
 		{ "DCodeForceFailureOnce", "Break profile fetch (testing)", "Debug", "TESTING ONLY. Deliberately breaks the first profile fetch after launch so the fix above can be verified. There is no reason to turn this on unless a developer asked you to." },
@@ -217,7 +219,15 @@ namespace {
 		{ 1, "Yes" },
 	};
 
+	// Order must match the enum comment in settings.def and DumpFlagsForDetail().
+	static const SettingEnumOption kCrashDumpDetailOptions[] = {
+		{ 0, "Small (stacks only)" },
+		{ 1, "Medium (recommended)" },
+		{ 2, "Full memory (very large)" },
+	};
+
 	static const SettingEnumMetadata kSettingEnumMetadata[] = {
+		{ "CrashDumpDetail", kCrashDumpDetailOptions, _countof(kCrashDumpDetailOptions) },
 		{ "AllowPaletteDownloads", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },
 		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },

@@ -18,6 +18,7 @@
 #include <shlobj.h>
 #include <sstream>
 #include <string>
+#include <vector>
 #include <tchar.h>
 #include <windows.h>
 
@@ -626,14 +627,120 @@ namespace
                 return oss.str();
         }
 
-        MINIDUMP_TYPE GetCrashDumpFlags()
+        // enum: 0 = small, 1 = medium, 2 = full. Same order as CrashDumpDetail in
+        // settings.def and kCrashDumpDetailOptions in SettingsIniWindow.cpp.
+        MINIDUMP_TYPE DumpFlagsForDetail(int detail)
         {
-                return static_cast<MINIDUMP_TYPE>(MiniDumpWithFullMemory |
-                                                   MiniDumpWithFullMemoryInfo |
-                                                   MiniDumpWithHandleData |
-                                                   MiniDumpWithThreadInfo |
-                                                   MiniDumpWithUnloadedModules |
-                                                   MiniDumpWithDataSegs);
+                switch (detail)
+                {
+                case 0:
+                        // Thread stacks and the module list. Enough to identify a crash
+                        // site and read a call stack; not enough to inspect an object.
+                        return static_cast<MINIDUMP_TYPE>(MiniDumpWithThreadInfo |
+                                                          MiniDumpWithUnloadedModules |
+                                                          MiniDumpScanMemory);
+
+                case 2:
+                        // The old unconditional behaviour: the entire committed address
+                        // space. ~500 MB per dump for this game, which is how
+                        // CrashReports reached 14 GB. Kept for the rare case that needs
+                        // the whole heap.
+                        return static_cast<MINIDUMP_TYPE>(MiniDumpWithFullMemory |
+                                                          MiniDumpWithFullMemoryInfo |
+                                                          MiniDumpWithHandleData |
+                                                          MiniDumpWithThreadInfo |
+                                                          MiniDumpWithUnloadedModules |
+                                                          MiniDumpWithDataSegs);
+
+                case 1:
+                default:
+                        // Measured on a process holding 300 MB of committed private
+                        // memory: this set produced a 29 MB dump and full memory produced
+                        // 362 MB, i.e. the game's own bulk allocations are excluded
+                        // entirely, which is what made dumps ~500 MB. The ~29 MB that
+                        // remains is the code sections of loaded system modules; if that
+                        // still needs to come down, the lever is a
+                        // MINIDUMP_CALLBACK_INFORMATION that clears ModuleWriteModule for
+                        // third-party modules, not a different flag - flag combinations
+                        // were measured and none of them move it.
+                        //
+                        // Everything the crash context and a stack walk actually consume:
+                        // stacks, the memory those stacks point at (so the faulting
+                        // object is inspectable), module data segments, handles and thread
+                        // state. Excludes the bulk texture and audio memory that made up
+                        // almost all of a full dump.
+                        return static_cast<MINIDUMP_TYPE>(MiniDumpWithIndirectlyReferencedMemory |
+                                                          MiniDumpWithDataSegs |
+                                                          MiniDumpWithHandleData |
+                                                          MiniDumpWithThreadInfo |
+                                                          MiniDumpWithProcessThreadData |
+                                                          MiniDumpWithUnloadedModules |
+                                                          MiniDumpScanMemory);
+                }
+        }
+
+        // Oldest-first prune of previous bundles. Nothing capped this before, and with
+        // every dump being full-memory that is how the folder reached 14 GB.
+        void PruneOldCrashBundles(const std::wstring& crashRoot, int keep)
+        {
+                if (keep <= 0)
+                {
+                        return;
+                }
+
+                std::vector<std::wstring> bundles;
+
+                WIN32_FIND_DATAW find{};
+                const std::wstring pattern = JoinPath(crashRoot, L"Crash_*");
+                HANDLE handle = FindFirstFileW(pattern.c_str(), &find);
+                if (handle == INVALID_HANDLE_VALUE)
+                {
+                        return;
+                }
+
+                do
+                {
+                        if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+                        {
+                                bundles.push_back(find.cFileName);
+                        }
+                } while (FindNextFileW(handle, &find));
+                FindClose(handle);
+
+                // Names are Crash_YYYYMMDD_HHMMSS, so lexicographic order is chronological.
+                std::sort(bundles.begin(), bundles.end());
+
+                // keep - 1, because the caller is about to add one more.
+                const size_t target = static_cast<size_t>(keep > 1 ? keep - 1 : 0);
+                if (bundles.size() <= target)
+                {
+                        return;
+                }
+
+                const size_t toDelete = bundles.size() - target;
+                for (size_t i = 0; i < toDelete; ++i)
+                {
+                        const std::wstring dir = JoinPath(crashRoot, bundles[i]);
+
+                        // Only ever the files this bundle writes, never a recursive wipe:
+                        // this runs unattended against a directory under the user's game
+                        // install, so it deletes exactly what WriteCrashBundle created and
+                        // leaves anything else (and the directory) alone if it cannot.
+                        static const wchar_t* const kBundleFiles[] = { L"crash.dmp", L"logs.txt", L"crash_context.txt" };
+                        for (const wchar_t* name : kBundleFiles)
+                        {
+                                DeleteFileW(JoinPath(dir, name).c_str());
+                        }
+
+                        if (!RemoveDirectoryW(dir.c_str()))
+                        {
+                                ForceLog("[Crash] Kept %s (not empty or in use, err=%lu)\n",
+                                         ToUtf8(dir).c_str(), GetLastError());
+                                continue;
+                        }
+
+                        ForceLog("[Crash] Pruned old crash bundle %s\n", ToUtf8(dir).c_str());
+                }
         }
 }
 
@@ -672,6 +779,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                  ToUtf8(dumpPath).c_str());
 
         EnsureDirectory(crashRoot);
+        PruneOldCrashBundles(crashRoot, Settings::settingsIni.crashReportsToKeep);
         EnsureDirectory(crashDir);
 
         const std::string recentLogs = GetRecentLogs();
@@ -682,6 +790,18 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         LoadSymbolApi(hLib, symbolApi);
 
         std::string context = BuildContextText(ExPtr, dumpPath, symbolApi);
+
+        // Release symbols BEFORE writing the dump, not after. Walking the stack and
+        // resolving names makes dbghelp map the images it needed to read, and those
+        // mappings are then committed memory that MiniDumpWriteDump faithfully captures -
+        // measured at 28 MB of loaded system-module code in a hello-world process, none of
+        // which is worth a single byte since those images exist on every machine. Nothing
+        // below this point needs symbols.
+        if (symbolApi.initialized && symbolApi.Cleanup != nullptr)
+        {
+                symbolApi.Cleanup(GetCurrentProcess());
+                symbolApi.initialized = false;
+        }
         if (reason)
         {
                 context.append("Reason: ");
@@ -713,7 +833,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                         md.ThreadId = GetCurrentThreadId();
                         md.ExceptionPointers = ExPtr;
                         md.ClientPointers = FALSE;
-                        const BOOL win = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, GetCrashDumpFlags(), &md, &userStreams, nullptr);
+                        const BOOL win = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, DumpFlagsForDetail(Settings::settingsIni.crashDumpDetail), &md, &userStreams, nullptr);
 
                         if (!win)
                         {
@@ -737,12 +857,6 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         else
         {
                 wsprintf(messageBuffer, _T("Could not load dbghelp; crash context saved at:\n%ls"), crashDir.c_str());
-        }
-
-        if (symbolApi.initialized && symbolApi.Cleanup != nullptr)
-        {
-                symbolApi.Cleanup(GetCurrentProcess());
-                symbolApi.initialized = false;
         }
 
         ForceLog("[Crash] Bundle written to %s\n", ToUtf8(crashDir).c_str());
@@ -785,12 +899,49 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         return EXCEPTION_CONTINUE_SEARCH;
 }
 
+void WriteCrashBundleForCurrentContext(const char* reason, DWORD pseudoExceptionCode, bool showDialog)
+{
+        // No exception has been raised, so synthesize the record from the caller's own
+        // state. Eip points at the abort/fastfail site, which is what makes the walked
+        // stack show who decided to die rather than just "the CRT".
+        CONTEXT context{};
+        context.ContextFlags = CONTEXT_FULL;
+        RtlCaptureContext(&context);
+
+        EXCEPTION_RECORD record{};
+        record.ExceptionCode = pseudoExceptionCode;
+        record.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+#if defined(_M_IX86)
+        record.ExceptionAddress = reinterpret_cast<PVOID>(context.Eip);
+#endif
+
+        EXCEPTION_POINTERS pointers{};
+        pointers.ExceptionRecord = &record;
+        pointers.ContextRecord = &context;
+
+        WriteCrashBundle(reason, &pointers, showDialog);
+}
+
+void ReassertUnhandledExceptionFilter()
+{
+        SetUnhandledExceptionFilter(UnhandledExFilter);
+}
+
 void InstallCrashHandlers()
 {
         if (!g_vectoredHandler)
         {
                 g_vectoredHandler = AddVectoredExceptionHandler(1, VectoredCrashHandler);
                 ForceLog("[Crash] Vectored exception handler installed (%p).\n", g_vectoredHandler);
+        }
+
+        // A stack overflow leaves too little room for a filter to run and write a dump,
+        // which is why every 0xC00000FD on record produced nothing. Reserving a slice of
+        // the guard region gives the handler somewhere to stand.
+        ULONG_PTR guarantee = 64 * 1024;
+        if (!SetThreadStackGuarantee(&guarantee))
+        {
+                ForceLog("[Crash] SetThreadStackGuarantee failed err=%lu\n", GetLastError());
         }
 
         SetUnhandledExceptionFilter(UnhandledExFilter);
