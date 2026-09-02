@@ -13,6 +13,7 @@
 #include "Game/Menus/TrainingSetupMenu.h"
 #include "Game/ScenesManager/ScenesManager.h"
 #include "Game/TasManager.h"
+#include "Game/StandaloneTasRecorder.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
 #include "Overlay/WindowManager.h"
 #include "Overlay/Window/HitboxOverlay.h"
@@ -60,8 +61,11 @@ void ScrWindow::DrawTasComboToolButton() {
     // TasManager::Enter already explains itself when the match is not a training one, so
     // this stays a plain button rather than growing its own availability check.
     TasManager& tas = TasManager::Instance();
+const bool standaloneBusy = StandaloneTasRecorder::Instance().IsRecording() ||
+        StandaloneTasRecorder::Instance().IsPendingExport();
+    ImGui::BeginDisabled(standaloneBusy && !tas.IsActive());
     if (ImGui::Button(tas.IsActive() ? L("Exit TAS Combo tool").c_str()
-                                     : L("TAS Combo tool").c_str()))
+                                      : L("TAS Combo tool").c_str()))
     {
         if (tas.IsActive())
         {
@@ -77,7 +81,16 @@ void ScrWindow::DrawTasComboToolButton() {
             }
         }
     }
+    ImGui::EndDisabled();
     ImGui::ShowHelpMarkerSameLine(L("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.").c_str());
+
+    const std::string recordingLabel = L("TAS recording");
+    ImGui::SameLineOrWrap(ImGui::ButtonWidth(recordingLabel.c_str()));
+    if (ImGui::Button(recordingLabel.c_str()))
+    {
+        m_pWindowContainer->GetWindow(WindowType_TasRecording)->ToggleOpen();
+    }
+    ImGui::ShowHelpMarkerSameLine(L("Open the standalone P1 real-time TAS recording window.").c_str());
 
     if (!tas.IsActive() && !tas.GetError().empty())
     {
