@@ -124,8 +124,14 @@ case WM_IME_COMPOSITION:
 
 Upgrading a vendored dependency made eight-year-old dead code live. Anyone with an IME
 active now crashed on every committed composition; players with no IME never generated the
-message and saw nothing wrong. `WM_SETCURSOR` reaches the same exit and was a second live
-trigger on any machine.
+message and saw nothing wrong.
+
+`WM_SETCURSOR` is the handler's only other `return 1`, and reaches the same exit - but
+`WindowManager::Initialize` sets `ImGuiConfigFlags_NoMouseCursorChange`, and
+`ImGui_ImplWin32_UpdateMouseCursor` returns false immediately when that flag is set, so
+that path returns 0 and never armed the bug. The crash was IME-only in practice. Do not
+rely on that: it means one line in `Initialize` is all that stood between an IME-only
+report and a universal one.
 
 The dump matched exactly: `eip=0x77`, `edi=0x77` (wParam `'w'`), `esi=0x10f`
 (`WM_IME_COMPOSITION`), `esp=0x01f3eec4` holding the untouched real return address

@@ -26,6 +26,17 @@ IMGUI_IMPL_API bool     ImGui_ImplWin32_InitForOpenGL(void* hwnd);
 IMGUI_IMPL_API void     ImGui_ImplWin32_Shutdown();
 IMGUI_IMPL_API void     ImGui_ImplWin32_NewFrame();
 
+// ---------------------------------------------------------------------------------------
+// BBCF Improvement Mod local modification - DO NOT DROP WHEN UPGRADING DEAR IMGUI.
+// This has now been lost once already: the 1.53 -> 1.92 upgrade replaced the patched
+// backend with the stock file and the scaling was reimplemented as a post-hoc re-emit in
+// WindowManager, which ImGui's input-queue trickling silently defeats on exactly the
+// frames that carry a click. See docs/ViewportMouseScaling.md.
+//
+// Scales every mouse position this backend reports, so a fixed ImGui coordinate space
+// (the mod's "Viewport" setting) hit-tests in the same space it renders in. 1,1 disables.
+IMGUI_IMPL_API void     ImGui_ImplWin32_SetMousePosScale(float scale_x, float scale_y);
+
 // Win32 message handler your application needs to call.
 // - Intentionally commented out in a '#if 0' block to avoid dragging dependencies on <windows.h> from this helper.
 // - You should COPY the line below into your .cpp code to forward declare the function and then you can call it.

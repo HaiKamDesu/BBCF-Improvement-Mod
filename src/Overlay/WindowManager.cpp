@@ -62,14 +62,23 @@ static void SetDisplaySizeOverride(float width, float height)
 
 // Renders ImGui in a fixed coordinate space instead of the window client size, and rescales
 // mouse input to match. Mouse events arrive from the Win32 backend in client pixels; without
-// the matching rescale, hitboxes drift away from the rendered widgets (worse further from the
-// top-left). Must run after ImGui_ImplWin32_NewFrame() (so our position event is the last one
-// queued and therefore wins) and before ImGui::NewFrame() (which consumes the queue and
-// validates DisplaySize).
+// the matching rescale, hit-testing happens in a different space than rendering.
+//
+// The scale is applied AT THE SOURCE, inside the Win32 backend, and must be. Re-emitting a
+// corrected position here instead - which is what this function used to do, on the stated
+// assumption that "our position event is the last one queued and therefore wins" - does not
+// work: ImGui's input-queue trickling stops applying queued MousePos events as soon as it has
+// applied a mouse button change (UpdateInputEvents, "Trickling Rule: Stop processing queued
+// events if we already handled a mouse button change"). The corrected position is queued
+// after the button, so on every frame that carries a click it is discarded and the click is
+// hit-tested at the raw client pixel instead. When the override is smaller than the window
+// that lands outside the ImGui space entirely, so hovering highlights correctly and no click
+// registers anywhere. See docs/ViewportMouseScaling.md.
 static void ApplyViewportOverride()
 {
 	if (g_displaySizeOverride.x <= 0.0f || g_displaySizeOverride.y <= 0.0f)
 	{
+		ImGui_ImplWin32_SetMousePosScale(1.0f, 1.0f);
 		return; // stock behaviour: backend-provided client size and unscaled mouse
 	}
 
@@ -85,6 +94,7 @@ static void ApplyViewportOverride()
 	const float clientHeight = (float)(rect.bottom - rect.top);
 	if (clientWidth <= 0.0f || clientHeight <= 0.0f)
 	{
+		ImGui_ImplWin32_SetMousePosScale(1.0f, 1.0f);
 		return;
 	}
 
@@ -93,9 +103,15 @@ static void ApplyViewportOverride()
 	const float scaleX = g_displaySizeOverride.x / clientWidth;
 	const float scaleY = g_displaySizeOverride.y / clientHeight;
 
-	// Re-emit the cursor position in the overridden space. Only while the cursor is actually
-	// over the client area, so the backend's own mouse-leave event stays authoritative when
-	// it isn't.
+	// Applies from the next message pumped, which is what makes every position event in the
+	// queue - not just the last one - already be in the overridden space.
+	ImGui_ImplWin32_SetMousePosScale(scaleX, scaleY);
+
+	// Seed the position for the first frame after the scale changes, and for the case where
+	// no WM_MOUSEMOVE has arrived yet. Already in overridden space, so it agrees with the
+	// events the backend queues rather than competing with them. Only while the cursor is
+	// actually over the client area, so the backend's own mouse-leave event stays
+	// authoritative when it isn't.
 	POINT pos;
 	if (GetCursorPos(&pos) && ScreenToClient(g_gameProc.hWndGameWindow, &pos))
 	{

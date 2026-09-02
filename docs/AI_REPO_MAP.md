@@ -27,6 +27,8 @@ No unit test suite is present; normal validation is build plus operator in-game 
   Read `docs/HookEpilogueContract.md` before placing or editing any JMP patch: interior branch
   targets and hook epilogues have shipped two silent process-killers.
 - Overlay/UI: `src/Overlay/Window*`, `Widget*`, `WindowManager.*`, `imgui_utils.*`.
+  Local modifications inside `depends/imgui` are labelled `DO NOT DROP WHEN UPGRADING`; see
+  `docs/ViewportMouseScaling.md` for what happened the two times one was silently lost.
 - Mod menu (F1): `src/Overlay/Window/MainWindow.*` is only the shell (page list + feature search).
   Pages and their sections live in `src/Overlay/Window/MainMenu/`; every section is declared once
   in `MainMenuNav.cpp`'s table, which is also what the search indexes.
