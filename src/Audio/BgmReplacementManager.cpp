@@ -812,6 +812,40 @@ int BgmReplacementManager::GetActiveCount() const
 	return n;
 }
 
+std::string BgmReplacementManager::GetActiveReplacementPlayPath(const std::string& baseName,
+	bool mustBeWhatTheGameLoaded) const
+{
+	if (!m_initialized || baseName.empty())
+		return std::string();
+
+	for (const auto& track : m_tracks)
+	{
+		if (_stricmp(track.baseName.c_str(), baseName.c_str()) != 0)
+			continue;
+
+		// The path returned here is relative to kBgmDir, so a track shipped in the other
+		// BGM folder cannot be described by it. Those are menu/ending tracks the jukebox
+		// does not play, and answering with a path into the wrong folder would be worse
+		// than answering with nothing.
+		if (track.originalDir != kBgmDir)
+			return std::string();
+
+		const auto it = m_assignments.find(track.tableIndex);
+		if (it == m_assignments.end() || it->second.state != BgmReplacementState::Active)
+			return std::string();
+		if (mustBeWhatTheGameLoaded && !IsLiveNow(track.tableIndex))
+			return std::string();
+
+		return std::string(kReplacementDir) + "/" + track.baseName;
+	}
+	return std::string();
+}
+
+bool BgmReplacementManager::HasActiveReplacement(const std::string& baseName) const
+{
+	return !GetActiveReplacementPlayPath(baseName, false).empty();
+}
+
 bool BgmReplacementManager::IsLiveNow(int tableIndex) const
 {
 	auto it = m_assignments.find(tableIndex);

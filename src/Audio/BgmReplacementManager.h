@@ -112,6 +112,26 @@ public:
 	std::string GetOriginalPreviewPath(int tableIndex) const;
 	std::string GetReplacementPreviewPath(int tableIndex) const;
 
+	// The active replacement for this track, as a path relative to data/Sound/BGM with no
+	// extension ("BBCFIM_Music/008_btl_bn") - the same shape MusicManager already takes for
+	// a preview, so it can be loaded and its length read with no new plumbing. Keyed by base
+	// filename because that is all MusicManager knows a track by. Empty when nothing stands
+	// in for the track, in which case the caller's path to the shipped file is still right.
+	//
+	// Note the cue name does NOT change with the path: a replacement .pac keeps the original
+	// base filename as its cue, which is what makes the pointer swap work at all, so callers
+	// keep playing the cue they already were.
+	//
+	//   mustBeWhatTheGameLoaded - answer only when the pointer was already in place when the
+	//   game read the entry, i.e. when the replacement is what the game itself is playing.
+	//   Pass false when the caller opens the file itself, where that history is irrelevant.
+	std::string GetActiveReplacementPlayPath(const std::string& baseName,
+		bool mustBeWhatTheGameLoaded) const;
+
+	// True when a replacement is standing in for this track. Callers use it to know that a
+	// precomputed length for the SHIPPED file no longer describes what is playing.
+	bool HasActiveReplacement(const std::string& baseName) const;
+
 	// True when this replacement's pointer was already in the table before the game loaded
 	// the track, so it is what you are hearing now. Only ever false for a GameRestart track
 	// that was swapped mid-session: those are read once during the game's boot, so the swap

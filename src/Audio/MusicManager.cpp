@@ -1,4 +1,5 @@
 #include "MusicManager.h"
+#include "BgmReplacementManager.h"
 #include "CustomMusicConverter.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
@@ -1100,26 +1101,50 @@ void MusicManager::UpdateMusicState() {
 }
 
 int MusicManager::GetRotationThresholdFrames() const {
-	// Advance at the END OF THE SONG. Prefer the live duration read from the
-	// loaded wave bank; otherwise use the precomputed table (generated from the
-	// game's audio data). The constant below is only a last-resort safety net for
-	// a track whose length is somehow unknown (all known tracks have a duration).
+	// Advance at the END OF THE SONG, using the live duration read from the wave bank of
+	// whichever file is actually playing. What to do when that is missing depends on
+	// whether the track has been replaced, which is what the two branches below decide.
 	constexpr int MIN_PLAUSIBLE = 60; // 1s guard against a corrupt/short parse
 	if (m_currentTrackDurationFrames > MIN_PLAUSIBLE) {
 		return m_currentTrackDurationFrames;
 	}
-	int precomputed = GetTrackDuration(m_currentTrackId);
-	if (precomputed > MIN_PLAUSIBLE) {
-		return precomputed;
+	// The precomputed table was generated from the game's own audio, so it describes the
+	// SHIPPED file. Once something else is standing in for the track it says nothing about
+	// what is playing, and using it would put the cut back where it was.
+	const char* bgmName = GetBgmFilename(m_currentTrackId);
+	const bool replaced = bgmName != nullptr &&
+		BgmReplacementManager::GetInstance().HasActiveReplacement(bgmName);
+	if (!replaced) {
+		// Shipped track: the table is generated from the game's own audio and covers every
+		// one of them, so the constant past it is only a safety net.
+		int precomputed = GetTrackDuration(m_currentTrackId);
+		if (precomputed > MIN_PLAUSIBLE) {
+			return precomputed;
+		}
+		return MIN_FRAMES_BETWEEN_CHANGES;
 	}
-	return MIN_FRAMES_BETWEEN_CHANGES;
+
+	// A replaced track whose length could not be read: both sources above describe a file
+	// that is not playing, and the short default would machine-gun through the playlist.
+	// 0 says "length unknown" - ChangeMusicIfNeeded holds the song on it, and the Jukebox's
+	// own "is there a total to show" check already treats it as no total.
+	// Warned once per track, because this runs every frame from ChangeMusicIfNeeded and
+	// again from the Jukebox window.
+	static int s_lastHeldTrackId = -1;
+	if (s_lastHeldTrackId != m_currentTrackId) {
+		s_lastHeldTrackId = m_currentTrackId;
+		LogMusic("MusicManager: WARNING - no duration for replaced track %d; rotation held\n",
+			m_currentTrackId);
+	}
+	return 0;
 }
 
 void MusicManager::ChangeMusicIfNeeded() {
-	// Advance at the end of the current song (its true duration).
-	int threshold = GetRotationThresholdFrames();
+	// Advance at the end of the current song (its true duration). A threshold of 0 means
+	// that length is unknown, in which case the song is held rather than advanced on a guess.
+	const int threshold = GetRotationThresholdFrames();
 
-	if (m_framesSinceLastChange < threshold) {
+	if (threshold <= 0 || m_framesSinceLastChange < threshold) {
 		return;
 	}
 
@@ -1401,12 +1426,32 @@ static bool ParseFpacTable(const char* buf, int bufSize,
 // rotation still advances at end-of-song. Only the FPAC header/table and the WBND
 // header are read (a few hundred bytes), not the whole audio file. Returns 0 on
 // any failure.
+// The path, relative to data/Sound/BGM and without the extension, that a track's audio
+// should be read from: the replacement when one is standing in for it, otherwise the shipped
+// file. Written into a caller-supplied buffer rather than returned as a std::string because
+// both callers use __try, which MSVC will not accept in a function holding an unwindable
+// local (C2712).
+static void ResolveBgmLoadName(const char* bgmName, bool mustBeWhatTheGameLoaded,
+	char* out, size_t outSize) {
+	const std::string replacement = BgmReplacementManager::GetInstance()
+		.GetActiveReplacementPlayPath(bgmName, mustBeWhatTheGameLoaded);
+	strcpy_s(out, outSize, replacement.empty() ? bgmName : replacement.c_str());
+}
+
 static int GetTrackDurationFramesFromPac(int trackId) {
 	const char* bgmName = MusicManager::GetBgmFilename(trackId);
 	if (!bgmName) return 0;
 
-	char path[260];
-	sprintf_s(path, "data/Sound/BGM/%s.pac", bgmName);
+	// Rotation advances at this number, so for a replaced track it has to come from the
+	// file the game actually opened. Reading the shipped .pac instead is what cut a longer
+	// replacement off at the original song's length.
+	char loadName[MAX_PATH];
+	ResolveBgmLoadName(bgmName, true, loadName, sizeof(loadName));
+
+	// Anchored to the game folder: CreateFileA resolves a relative path against the working
+	// directory, which is not reliably the install folder (see PlayTrackPhysically).
+	char path[MAX_PATH];
+	sprintf_s(path, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), loadName);
 
 	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -1515,11 +1560,27 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// Build the path strings
 	char physicalPath[260];
 	char logicalPath[260];
+	// A replaced track loads from the replacement file. Only the PATH changes: bgmName is
+	// also the cue this is played by below, and a replacement .pac deliberately keeps the
+	// original base filename as its cue - that is what makes the pointer swap work at all -
+	// so the cue must stay as it is. Previews already carry their own path and cue and are
+	// left alone.
+	char loadName[MAX_PATH];
+	if (trackId >= 0 && cueOverride == nullptr) {
+		ResolveBgmLoadName(bgmName, false, loadName, sizeof(loadName));
+	} else {
+		strcpy_s(loadName, sizeof(loadName), bgmName);
+	}
+	if (strcmp(loadName, bgmName) != 0) {
+		LogMusic("MusicManager: Track %d is replaced; loading \"%s\" and playing cue \"%s\"\n",
+			trackId, loadName, bgmName);
+	}
+
 	// Anchored to the game folder: this one is opened with CreateFileA, so a moved working
 	// directory would make it miss. The logical path below stays relative - that one is
 	// handed to the game, which resolves it its own way.
-	sprintf_s(physicalPath, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), bgmName);
-	sprintf_s(logicalPath, "data/sound/BGM/%s.pac", bgmName);
+	sprintf_s(physicalPath, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), loadName);
+	sprintf_s(logicalPath, "data/sound/BGM/%s.pac", loadName);
 	LogMusic("MusicManager: Loading BGM file: %s (logical: %s)\n", physicalPath, logicalPath);
 
 	// --- STEP 1: Stop the current BGM audio and clear playController references ---
