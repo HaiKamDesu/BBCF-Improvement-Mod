@@ -22,8 +22,6 @@ namespace
 {
 	const char* const kJukeboxDialogOwner = "jukebox_window";
 	const char* const kCustomDirRel = "data/Sound/BGM/custom";
-	// Matches MusicManager: custom tracks are numbered from here up.
-	const int kCustomTrackIdBase = 10000;
 
 	std::string FileNameOf(const std::string& path)
 	{
@@ -47,6 +45,9 @@ void JukeboxWindow::Draw() {
 	MusicManager& musicManager = GetMusicManager();
 	musicManager.StartCustomMusicDiscovery();
 	musicManager.PollCustomMusicDiscovery();
+	// Both of these can rewrite the track list, so they run before anything walks it:
+	// DrawTrackList holds pointers into it for the length of one frame.
+	musicManager.SyncReplacementTracks();
 	PollImportDialog();
 	PollRestartAfterVolume();
 
@@ -386,6 +387,7 @@ static const ImVec4 COLOR_OLD  = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);   // Gray - Leg
 static const ImVec4 COLOR_STORY = ImVec4(0.4f, 1.0f, 0.6f, 1.0f);  // Light Green - Story themes
 static const ImVec4 COLOR_ASTRAL = ImVec4(1.0f, 0.6f, 0.2f, 1.0f); // Orange - Astral Finish themes
 static const ImVec4 COLOR_CUSTOM = ImVec4(0.2f, 0.8f, 1.0f, 1.0f); // Cyan/Teal - Custom user tracks
+static const ImVec4 COLOR_REPLACEMENT = ImVec4(0.6f, 1.0f, 0.4f, 1.0f); // Green - BGM replacements
 
 static ImVec4 GetCategoryColor(const std::string& category) {
 	if (category == "btl") return COLOR_BTL;
@@ -396,6 +398,7 @@ static ImVec4 GetCategoryColor(const std::string& category) {
 	if (category == "story") return COLOR_STORY;
 	if (category == "astral") return COLOR_ASTRAL;
 	if (category == "custom") return COLOR_CUSTOM;
+	if (category == "replacements") return COLOR_REPLACEMENT;
 	return ImVec4(1, 1, 1, 1);
 }
 
@@ -469,8 +472,11 @@ void JukeboxWindow::DrawTrackList() {
 		ImGui::SameLine();
 
 		// Custom tracks get a volume of their own. Native ones are already balanced
-		// against each other by the game, so there is nothing to fix there.
-		const bool isCustom = track->id >= kCustomTrackIdBase;
+		// against each other by the game, so there is nothing to fix there - and a
+		// replacement's gain belongs to the replacement browser, which owns the
+		// reconversion that applying it needs, so it is deliberately not offered twice.
+		const bool isCustom = MusicManager::IsCustomTrackId(track->id);
+		const bool isReplacement = MusicManager::IsReplacementTrackId(track->id);
 
 		// A Selectable spans the rest of the line by default, which puts it underneath
 		// anything drawn after it on the same row - that is why the volume button could
@@ -482,6 +488,10 @@ void JukeboxWindow::DrawTrackList() {
 			isCurrent, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap,
 			ImVec2(selectableWidth, 0.0f)) && ImGui::IsMouseDoubleClicked(0)) {
 			musicManager.PlayTrack(track->id);
+		}
+
+		if (ImGui::IsItemHovered() && isReplacement) {
+			ImGui::SetTooltipWrapped(L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.").c_str());
 		}
 
 		if (isCurrent) {

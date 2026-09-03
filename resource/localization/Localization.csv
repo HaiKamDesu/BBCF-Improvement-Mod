@@ -1120,6 +1120,7 @@ Jukebox,Jukebox,Jukebox
 Music,Music,Música
 Loading custom music...,Loading custom music...,Cargando música personalizada...
 Enable Music Rotation,Enable Music Rotation,Activar rotación de música
+"Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.","Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.","Reproduce el reemplazo en sí. La pista a la que sustituye sigue apareciendo por separado y sigue reproduciendo la original. Ajusta su volumen en la ventana de reemplazo de música."
 Enable music rotation,Enable music rotation,Activar rotación de música
 Enable/disable automatic music rotation in-game,Enable/disable automatic music rotation in-game,Activa o desactiva la rotación automática de música durante la partida
 Rotation Mode:,Rotation Mode:,Modo de rotación:

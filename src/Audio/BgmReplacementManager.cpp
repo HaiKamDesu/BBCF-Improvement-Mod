@@ -841,9 +841,55 @@ std::string BgmReplacementManager::GetActiveReplacementPlayPath(const std::strin
 	return std::string();
 }
 
-bool BgmReplacementManager::HasActiveReplacement(const std::string& baseName) const
+bool BgmReplacementManager::HasActiveReplacement(const std::string& baseName,
+	bool mustBeWhatTheGameLoaded) const
 {
-	return !GetActiveReplacementPlayPath(baseName, false).empty();
+	return !GetActiveReplacementPlayPath(baseName, mustBeWhatTheGameLoaded).empty();
+}
+
+std::vector<BgmReplacementManager::ActiveReplacement>
+BgmReplacementManager::GetActiveReplacements() const
+{
+	std::vector<ActiveReplacement> result;
+	if (!m_initialized)
+		return result;
+
+	for (const auto& track : m_tracks)
+	{
+		// Same restriction as GetActiveReplacementPlayPath: the path is relative to kBgmDir,
+		// so a track shipped in the other folder cannot be described by one.
+		if (track.originalDir != kBgmDir)
+			continue;
+		const auto it = m_assignments.find(track.tableIndex);
+		if (it == m_assignments.end() || it->second.state != BgmReplacementState::Active)
+			continue;
+
+		ActiveReplacement entry;
+		entry.tableIndex = track.tableIndex;
+		entry.baseName = track.baseName;
+		entry.relPathNoExt = std::string(kReplacementDir) + "/" + track.baseName;
+		entry.trackName = track.displayName;
+		entry.sourceName = GetSourceName(track.tableIndex);
+		result.push_back(std::move(entry));
+	}
+	return result;
+}
+
+unsigned int BgmReplacementManager::GetActiveSignature() const
+{
+	if (!m_initialized)
+		return 0;
+
+	// Order-independent would be enough, but the walk is in table order anyway, so this
+	// also catches a swap that keeps the count the same.
+	unsigned int signature = 2166136261u;
+	for (const auto& entry : m_assignments)
+	{
+		if (entry.second.state != BgmReplacementState::Active)
+			continue;
+		signature = (signature ^ static_cast<unsigned int>(entry.first)) * 16777619u;
+	}
+	return signature;
 }
 
 bool BgmReplacementManager::IsLiveNow(int tableIndex) const

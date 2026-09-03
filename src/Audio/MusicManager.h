@@ -119,8 +119,35 @@ public:
     void LoadPreferences();
     void ResetPreferences();
 
+    // Dynamic track id ranges. Custom Jukebox songs and BGM replacements both appear in
+    // the track list, and both need ids that can never collide with a native one or be
+    // written into the game's own BGM-id fields. They are separate ranges because the two
+    // features own different per-track state (a custom song's volume lives here, a
+    // replacement's gain lives in BgmReplacementManager) and each must be able to rebuild
+    // its own rows without disturbing the other's.
+    static const int kCustomTrackIdBase = 10000;
+    static const int kReplacementTrackIdBase = 20000;
+
+    static bool IsCustomTrackId(int trackId) {
+        return trackId >= kCustomTrackIdBase && trackId < kReplacementTrackIdBase;
+    }
+    static bool IsReplacementTrackId(int trackId) { return trackId >= kReplacementTrackIdBase; }
+
     static const char* GetBgmFilename(int trackId);
+    // The XACT cue to play a track by, which is NOT always its filename:
+    //   - a replacement .pac keeps the ORIGINAL track's base filename as its cue, which is
+    //     the whole reason the pointer swap works, so its path and cue differ
+    //   - a custom Jukebox .pac is built from the 000_btl_rg template and keeps that cue
+    // nullptr for an id with no file.
+    static const char* GetBgmCueName(int trackId);
     static int GetTrackDuration(int trackId);
+
+    // Publishes the BGM replacements the user has assigned as tracks of their own, so they
+    // can be played from the Jukebox directly instead of only being heard when the game
+    // loads the track they stand in for. Cheap to call every frame: it only rebuilds when
+    // the set of active replacements has actually changed. Called from the game tick and
+    // from the Jukebox draw path, for the same reason PollCustomMusicDiscovery is.
+    void SyncReplacementTracks();
 
     // Custom track filename lookup (dynamic, parallels the static UNKNOWN_TRACK_FILES).
     // Populated once at startup by DiscoverCustomTracks(). Each entry:
@@ -128,6 +155,15 @@ public:
     // Custom track IDs are >= 10000 so they can never collide with a native ID
     // and can never be written into the game's own BGM-id fields.
     static std::vector<std::pair<int, std::string>> s_customTrackFiles;
+
+    // Replacement tracks need a cue that differs from their path, so they carry more than
+    // the id->filename pair a custom track does.
+    struct ReplacementTrackFile {
+        int id = -1;
+        std::string pacPath;   // "BBCFIM_Music/008_btl_bn", relative to data/Sound/BGM
+        std::string cueName;   // "008_btl_bn" - the original base filename
+    };
+    static std::vector<ReplacementTrackFile> s_replacementTrackFiles;
 
     int GetSongPlaybackFrames() const { return m_songPlaybackFrames; }
     std::string GetSongTimeString() const;
@@ -184,6 +220,11 @@ private:
     void BuildTrackList();
     void DiscoverCustomTracks();
     void RegisterCustomTracks(const std::vector<CustomTrackInfo>& customTracks);
+    // Re-appends the whole dynamic region (custom songs, then replacements) from the cached
+    // rows below. Both features live past kCustomTrackIdBase and the Jukebox groups the list
+    // by walking it in order, so a category has to stay contiguous - which means whichever
+    // of the two changed, the region is rebuilt as a whole rather than patched in place.
+    void RebuildDynamicTracks();
     void ChangeMusicIfNeeded();
     void UpdateMusicState();
     void ShufflePlaylist();
@@ -195,6 +236,12 @@ private:
     bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
 
     std::vector<MusicTrack> m_tracks;
+    // The dynamic rows, kept so RebuildDynamicTracks can re-append them without asking
+    // either feature to rediscover anything.
+    std::vector<MusicTrack> m_customTrackRows;
+    std::vector<MusicTrack> m_replacementTrackRows;
+    unsigned int m_replacementSignature = 0;
+    bool m_replacementsSynced = false;
     std::map<int, bool> m_trackEnabled;
     const MusicTrack* m_currentTrack = nullptr;
     int m_currentTrackId = -1;
@@ -203,7 +250,9 @@ private:
     int m_songPlaybackFrames = 0;
     int m_sequentialIndex = 0;
 
-    bool m_enabled = true;
+    // Off by default: rotation advancing at a song's end is a deliberate choice, and on by
+    // default it silently replaced whatever the user had put in a track's place.
+    bool m_enabled = false;
     bool m_initialized = false;
     bool m_customTracksDiscovered = false; // one-shot guard for DiscoverCustomTracks
     std::atomic<bool> m_customMusicStarted{ false };

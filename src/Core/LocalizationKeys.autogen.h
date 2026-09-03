@@ -2832,6 +2832,9 @@ struct LocalizationKeysAccessor
         // Enable Music Rotation
         inline const char* Enable_Music_Rotation() const { return Get("Enable Music Rotation"); }
 
+        // Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.
+        inline const char* Plays_the_replacement_itself_The_track_it_stands_in_for_is_still_listed_separately_and_still_plays_the_original_Set_its_volume_in_the_music_replacement_window() const { return Get("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window."); }
+
         // Enable music rotation
         inline const char* Enable_music_rotation_2() const { return Get("Enable music rotation"); }
 

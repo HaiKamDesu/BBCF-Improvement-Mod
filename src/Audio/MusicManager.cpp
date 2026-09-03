@@ -40,10 +40,11 @@ static void LogMusic(const char* fmt, ...) {
 int* MusicManager::s_musicSelectX = nullptr;
 int* MusicManager::s_musicSelectY = nullptr;
 std::vector<std::pair<int, std::string>> MusicManager::s_customTrackFiles;
+std::vector<MusicManager::ReplacementTrackFile> MusicManager::s_replacementTrackFiles;
 
 // Custom tracks are numbered from here up, so they can never collide with a native id -
 // and so they can be told apart from native ones when a rescan replaces them.
-static const int kCustomTrackIdBase = 10000;
+// Track id ranges live on MusicManager itself; see MusicManager.h.
 
 // Audio engine constants (from reverse engineering BBCF.exe)
 static constexpr uintptr_t AUDIO_MGR_RVA = 0x008903B0;
@@ -179,7 +180,44 @@ const char* MusicManager::GetBgmFilename(int trackId) {
 			return entry.second.c_str();
 		}
 	}
+	// BGM replacements published as tracks of their own. The path carries a subdirectory,
+	// which the loader already supports - that is how PreviewPac auditions one.
+	for (const auto& entry : s_replacementTrackFiles) {
+		if (entry.id == trackId) {
+			return entry.pacPath.c_str();
+		}
+	}
 	return nullptr;
+}
+
+const char* MusicManager::GetBgmCueName(int trackId) {
+	if (IsReplacementTrackId(trackId)) {
+		for (const auto& entry : s_replacementTrackFiles) {
+			if (entry.id == trackId) {
+				return entry.cueName.c_str();
+			}
+		}
+		return nullptr;
+	}
+	// Custom Jukebox tracks are built from the complete native 000_btl_rg bank and keep its
+	// cue; only their outer .pac filename is their own.
+	if (IsCustomTrackId(trackId)) {
+		return "000_btl_rg";
+	}
+	// Native track: the cue is the base filename.
+	return GetBgmFilename(trackId);
+}
+
+// True for an id the GAME itself can name: a shipped track. The Jukebox's dynamic ids
+// (custom songs from kCustomTrackIdBase, replacements from kReplacementTrackIdBase) are ours
+// alone and the game knows nothing about them, so a value read out of the game's own fields
+// that lands in one of those ranges can only be garbage. That distinction is load-bearing:
+// such a value can otherwise become m_anchorTrackId, and the anchor is written straight back
+// into musicSelect_X on scene exit - presenting a non-selectable id there is exactly what
+// errors Character Select into the red debug screen.
+static bool IsNativeGameTrackId(int trackId) {
+	return trackId >= 0 && trackId < MusicManager::kCustomTrackIdBase &&
+		MusicManager::GetBgmFilename(trackId) != nullptr;
 }
 
 // Precomputed EXACT track durations in seconds, generated offline from the
@@ -458,16 +496,18 @@ void MusicManager::RegisterCustomTracks(const std::vector<CustomTrackInfo>& cust
     // every custom track each time - not just the new one. Drop what a previous run
     // registered first, or the same track is added twice, which shows up as duplicate
     // ids and an ImGui "conflicting ID" complaint over the track list.
-    m_tracks.erase(std::remove_if(m_tracks.begin(), m_tracks.end(),
-        [](const MusicTrack& track) { return track.id >= kCustomTrackIdBase; }), m_tracks.end());
+    // Ranges, not ">= base": replacements live past kReplacementTrackIdBase and are owned by
+    // SyncReplacementTracks. Dropping them here would delete the other feature's rows every
+    // time a song was imported.
+    m_customTrackRows.clear();
     s_customTrackFiles.erase(std::remove_if(s_customTrackFiles.begin(), s_customTrackFiles.end(),
-        [](const std::pair<int, std::string>& entry) { return entry.first >= kCustomTrackIdBase; }),
+        [](const std::pair<int, std::string>& entry) { return IsCustomTrackId(entry.first); }),
         s_customTrackFiles.end());
-    m_currentTrack = nullptr;
 
     if (customTracks.empty()) {
         LogMusic("MusicManager: No custom tracks found\n");
         m_customTrackCount = 0;
+        RebuildDynamicTracks();
         return;
     }
 
@@ -478,7 +518,7 @@ void MusicManager::RegisterCustomTracks(const std::vector<CustomTrackInfo>& cust
 
     for (const auto& ct : customTracks) {
         // Add to the track list with "custom" category (appears below "astral")
-        m_tracks.push_back({ ct.id, ct.displayName, "custom" });
+        m_customTrackRows.push_back({ ct.id, ct.displayName, "custom" });
         m_customTrackSource[ct.id] = ct.sourceName;
         if (ct.hasTagGain)
             m_customTrackTagGain[ct.id] = ct.tagGainDb;
@@ -497,17 +537,80 @@ void MusicManager::RegisterCustomTracks(const std::vector<CustomTrackInfo>& cust
     }
 
     m_customTrackCount = (int)customTracks.size();
+    RebuildDynamicTracks();
+    LogMusic("MusicManager: Total tracks after custom: %d\n", (int)m_tracks.size());
+}
 
-    // m_currentTrack points INTO m_tracks, and the push_backs above can reallocate
-    // it - which leaves that pointer dangling for every reader (the Jukebox and the
-    // main menu both dereference it every frame). Re-resolve it from the id, which
-    // is the field that actually survives.
+void MusicManager::RebuildDynamicTracks() {
+    m_tracks.erase(std::remove_if(m_tracks.begin(), m_tracks.end(),
+        [](const MusicTrack& track) { return track.id >= kCustomTrackIdBase; }), m_tracks.end());
+
+    // Custom first, then replacements. The Jukebox groups the list by walking it and
+    // starting a new header whenever the category changes, so each has to arrive as one
+    // unbroken run.
+    for (const auto& row : m_customTrackRows) {
+        m_tracks.push_back(row);
+    }
+    for (const auto& row : m_replacementTrackRows) {
+        m_tracks.push_back(row);
+    }
+
+    // Enable a newly-seen dynamic track unless the user's saved preferences already have an
+    // opinion about it (LoadPreferences runs before any of this).
+    for (const auto& row : m_customTrackRows) {
+        if (m_trackEnabled.find(row.id) == m_trackEnabled.end()) m_trackEnabled[row.id] = true;
+    }
+    for (const auto& row : m_replacementTrackRows) {
+        if (m_trackEnabled.find(row.id) == m_trackEnabled.end()) m_trackEnabled[row.id] = true;
+    }
+
+    // m_currentTrack points INTO m_tracks, and the push_backs above can reallocate it -
+    // which leaves that pointer dangling for every reader (the Jukebox and the main menu
+    // both dereference it every frame). Re-resolve it from the id, which is the field that
+    // actually survives.
     m_currentTrack = nullptr;
     for (const auto& t : m_tracks) {
         if (t.id == m_currentTrackId) { m_currentTrack = &t; break; }
     }
+}
 
-    LogMusic("MusicManager: Total tracks after custom: %d\n", (int)m_tracks.size());
+void MusicManager::SyncReplacementTracks() {
+    auto& replacements = BgmReplacementManager::GetInstance();
+    if (!replacements.IsInitialized()) {
+        return;
+    }
+
+    // The signature allocates nothing, which is what makes this safe to call every frame.
+    const unsigned int signature = replacements.GetActiveSignature();
+    if (m_replacementsSynced && signature == m_replacementSignature) {
+        return;
+    }
+    m_replacementSignature = signature;
+    m_replacementsSynced = true;
+
+    m_replacementTrackRows.clear();
+    s_replacementTrackFiles.clear();
+
+    for (const auto& entry : replacements.GetActiveReplacements()) {
+        // Derived from the table index, so a track keeps the same id across launches and its
+        // enabled state in music_preferences.ini keeps applying to it.
+        const int id = kReplacementTrackIdBase + entry.tableIndex;
+
+        // Named after the song the user chose, because that is what they are looking for in
+        // the list; the shipped track it stands in for is what disambiguates two rows built
+        // from the same file.
+        std::string name = entry.sourceName.empty() ? entry.baseName : entry.sourceName;
+        if (!entry.trackName.empty()) {
+            name += " (replaces " + entry.trackName + ")";
+        }
+
+        m_replacementTrackRows.push_back({ id, name, "replacements" });
+        s_replacementTrackFiles.push_back({ id, entry.relPathNoExt, entry.baseName });
+    }
+
+    RebuildDynamicTracks();
+    LogMusic("MusicManager: Published %d BGM replacement(s) as Jukebox tracks\n",
+        (int)m_replacementTrackRows.size());
 }
 
 void MusicManager::StartCustomMusicDiscovery() {
@@ -613,7 +716,7 @@ void MusicManager::Initialize() {
     s_musicSelectX = g_gameVals.musicSelect_X;
     s_musicSelectY = g_gameVals.musicSelect_Y;
 
-    if (s_musicSelectX) {
+    if (s_musicSelectX && IsNativeGameTrackId(*s_musicSelectX)) {
         m_gameMusicId = *s_musicSelectX;
         m_currentTrackId = m_gameMusicId;
 
@@ -741,7 +844,7 @@ void MusicManager::Update() {
 
         if (s_musicSelectX) {
             int startupId = *s_musicSelectX;
-            if (GetBgmFilename(startupId)) { // ignore non-track garbage values
+            if (IsNativeGameTrackId(startupId)) { // ignore non-track garbage values
                 m_gameMusicId = startupId;
                 m_currentTrackId = startupId;
                 for (const auto& track : m_tracks) {
@@ -812,6 +915,7 @@ void MusicManager::Update() {
 
     UpdateMusicState();
 
+    SyncReplacementTracks();
     ApplyPendingRematchTrack();
 
     // Only auto-rotate when actively fighting and the confirm dialog isn't open.
@@ -1055,7 +1159,7 @@ void MusicManager::UpdateMusicState() {
 	// file, so a bogus read can't become the "anchor" we present to the game
 	// on scene exit (presenting a nonexistent BGM id to Character Select is
 	// exactly what makes its validation blow up).
-	bool validTrackId = (GetBgmFilename(gameMusicId) != nullptr);
+	bool validTrackId = IsNativeGameTrackId(gameMusicId);
 	if (!validTrackId && gameMusicId != m_currentTrackId) {
 		static int s_lastIgnoredBgmId = -1;
 		if (gameMusicId != s_lastIgnoredBgmId) {
@@ -1108,13 +1212,16 @@ int MusicManager::GetRotationThresholdFrames() const {
 	if (m_currentTrackDurationFrames > MIN_PLAUSIBLE) {
 		return m_currentTrackDurationFrames;
 	}
-	// The precomputed table was generated from the game's own audio, so it describes the
-	// SHIPPED file. Once something else is standing in for the track it says nothing about
-	// what is playing, and using it would put the cut back where it was.
+	// Nothing live to go on. The precomputed table was generated from the game's own audio,
+	// so it only answers for a shipped track whose shipped audio is what is playing. Two
+	// cases where it is not:
+	//   - a replacement the Jukebox is playing as its own track: not in the table at all
+	//   - a shipped track the GAME loaded while a replacement was live: the audio is the
+	//     replacement's, so the table's number would cut it short - the original bug
 	const char* bgmName = GetBgmFilename(m_currentTrackId);
-	const bool replaced = bgmName != nullptr &&
-		BgmReplacementManager::GetInstance().HasActiveReplacement(bgmName);
-	if (!replaced) {
+	const bool gameIsPlayingAReplacement = !m_modControllingBgm && bgmName != nullptr &&
+		BgmReplacementManager::GetInstance().HasActiveReplacement(bgmName, true);
+	if (!IsReplacementTrackId(m_currentTrackId) && !gameIsPlayingAReplacement) {
 		// Shipped track: the table is generated from the game's own audio and covers every
 		// one of them, so the constant past it is only a safety net.
 		int precomputed = GetTrackDuration(m_currentTrackId);
@@ -1124,7 +1231,7 @@ int MusicManager::GetRotationThresholdFrames() const {
 		return MIN_FRAMES_BETWEEN_CHANGES;
 	}
 
-	// A replaced track whose length could not be read: both sources above describe a file
+	// A replacement whose length could not be read: both sources above describe a file
 	// that is not playing, and the short default would machine-gun through the playlist.
 	// 0 says "length unknown" - ChangeMusicIfNeeded holds the song on it, and the Jukebox's
 	// own "is there a total to show" check already treats it as no total.
@@ -1426,11 +1533,12 @@ static bool ParseFpacTable(const char* buf, int bufSize,
 // rotation still advances at end-of-song. Only the FPAC header/table and the WBND
 // header are read (a few hundred bytes), not the whole audio file. Returns 0 on
 // any failure.
-// The path, relative to data/Sound/BGM and without the extension, that a track's audio
-// should be read from: the replacement when one is standing in for it, otherwise the shipped
-// file. Written into a caller-supplied buffer rather than returned as a std::string because
-// both callers use __try, which MSVC will not accept in a function holding an unwindable
-// local (C2712).
+// The path, relative to data/Sound/BGM and without the extension, of the file the GAME will
+// have opened for this track: the replacement when one is live, otherwise the shipped file.
+// This is a question about the game's own loads only - the Jukebox always plays what its
+// track id names. Written into a caller-supplied buffer rather than returned as a
+// std::string because the caller uses __try, which MSVC will not accept in a function
+// holding an unwindable local (C2712).
 static void ResolveBgmLoadName(const char* bgmName, bool mustBeWhatTheGameLoaded,
 	char* out, size_t outSize) {
 	const std::string replacement = BgmReplacementManager::GetInstance()
@@ -1560,27 +1668,17 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// Build the path strings
 	char physicalPath[260];
 	char logicalPath[260];
-	// A replaced track loads from the replacement file. Only the PATH changes: bgmName is
-	// also the cue this is played by below, and a replacement .pac deliberately keeps the
-	// original base filename as its cue - that is what makes the pointer swap work at all -
-	// so the cue must stay as it is. Previews already carry their own path and cue and are
-	// left alone.
-	char loadName[MAX_PATH];
-	if (trackId >= 0 && cueOverride == nullptr) {
-		ResolveBgmLoadName(bgmName, false, loadName, sizeof(loadName));
-	} else {
-		strcpy_s(loadName, sizeof(loadName), bgmName);
-	}
-	if (strcmp(loadName, bgmName) != 0) {
-		LogMusic("MusicManager: Track %d is replaced; loading \"%s\" and playing cue \"%s\"\n",
-			trackId, loadName, bgmName);
-	}
-
+	// bgmName is used verbatim: a native track id means the SHIPPED file, deliberately, so
+	// that selecting a replaced track in the Jukebox still plays the original. A replacement
+	// is reached by picking its own row in the list, whose id resolves to the replacement's
+	// path here. Either way the loader takes a subdirectory happily - that is how PreviewPac
+	// auditions one.
+	//
 	// Anchored to the game folder: this one is opened with CreateFileA, so a moved working
 	// directory would make it miss. The logical path below stays relative - that one is
 	// handed to the game, which resolves it its own way.
-	sprintf_s(physicalPath, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), loadName);
-	sprintf_s(logicalPath, "data/sound/BGM/%s.pac", loadName);
+	sprintf_s(physicalPath, "%s\\data\\Sound\\BGM\\%s.pac", GetGameDirectory().c_str(), bgmName);
+	sprintf_s(logicalPath, "data/sound/BGM/%s.pac", bgmName);
 	LogMusic("MusicManager: Loading BGM file: %s (logical: %s)\n", physicalPath, logicalPath);
 
 	// --- STEP 1: Stop the current BGM audio and clear playController references ---
@@ -1628,13 +1726,16 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 					memset((char*)cues_ptr + 4, 0, 0x98 - 4);
 				}
 
-				// CUSTOM TRACKS ONLY: belt-and-suspenders reset of the registered
+				// MOD-LOADED TRACKS ONLY: belt-and-suspenders reset of the registered
 				// sound/wave bank count fields and slot arrays so the registration
 				// below lands deterministically in slot 0. InitCues already zeroes
 				// these (see above), so for native tracks this is a no-op — it is
-				// deliberately gated to custom tracks (id >= 10000) to guarantee the
-				// native rotation path is byte-for-byte unchanged.
-				if (trackId >= 10000) {
+				// deliberately gated to the dynamic id ranges (custom Jukebox songs and
+				// published BGM replacements, both of which are a .pac of ours loaded
+				// out of a subdirectory) to guarantee the native rotation path is
+				// byte-for-byte unchanged. A preview passes id -1 and keeps the native
+				// path it has always taken.
+				if (trackId >= kCustomTrackIdBase) {
 					*(int*)((char*)bank13 + 0x48) = 0;   // sound bank count
 					*(int*)((char*)bank13 + 0x8C) = 0;   // wave bank count
 					memset((char*)bank13 + 0x08, 0, 16 * sizeof(void*)); // SB pointer array
@@ -1829,9 +1930,13 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 				// template; only their outer .pac filename is custom. Replacement
 				// previews supply their real cue explicitly, while native tracks use
 				// their normal filename.
+				// Previews supply their real cue explicitly. Otherwise the id decides:
+				// a replacement's cue is the original base filename, not its own path,
+				// and a custom track's is the native template's.
+				const char* resolvedCue = MusicManager::GetBgmCueName(trackId);
 				const char* playCueName = cueOverride
 					? cueOverride
-					: ((trackId >= 10000) ? "000_btl_rg" : bgmName);
+					: (resolvedCue ? resolvedCue : bgmName);
 				playCue(bank13, &playResult, playCueName, dummyParams);
 				LogMusic("MusicManager: Direct CSoundBank_XACT::Play(\"%s\") returned %d\n", playCueName, playResult);
 			}
@@ -2392,7 +2497,8 @@ void MusicManager::ResetPreferences() {
     for (auto& track : m_tracks) {
         m_trackEnabled[track.id] = true;
     }
-    m_enabled = true;
+    // Matches the shipped default; see m_enabled's declaration for why rotation is off.
+    m_enabled = false;
 	m_rotationMode = MusicRotationMode::Sequential;
 	m_repeatSingle = false;
 	m_rematchTrackMode = RematchTrackMode::CharacterSelect;

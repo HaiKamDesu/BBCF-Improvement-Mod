@@ -130,7 +130,25 @@ public:
 
 	// True when a replacement is standing in for this track. Callers use it to know that a
 	// precomputed length for the SHIPPED file no longer describes what is playing.
-	bool HasActiveReplacement(const std::string& baseName) const;
+	bool HasActiveReplacement(const std::string& baseName, bool mustBeWhatTheGameLoaded) const;
+
+	// One replacement, in the shape the Jukebox needs to offer it as a track of its own.
+	struct ActiveReplacement
+	{
+		int         tableIndex = -1;
+		std::string baseName;       // "008_btl_bn" - also the .pac's cue name
+		std::string relPathNoExt;   // "BBCFIM_Music/008_btl_bn", relative to data/Sound/BGM
+		std::string trackName;      // the shipped track it stands in for, e.g. "REPPUU II (Bang)"
+		std::string sourceName;     // the song the user picked, e.g. "flowerman.mp3"
+	};
+
+	// Every replacement that is converted and on disk, so it can be listed and played
+	// directly rather than only being heard when the game happens to load its track.
+	std::vector<ActiveReplacement> GetActiveReplacements() const;
+
+	// Cheap "has the set of active replacements changed" probe, so a per-frame caller can
+	// skip rebuilding its own list. Allocates nothing; only equality is meaningful.
+	unsigned int GetActiveSignature() const;
 
 	// True when this replacement's pointer was already in the table before the game loaded
 	// the track, so it is what you are hearing now. Only ever false for a GameRestart track
