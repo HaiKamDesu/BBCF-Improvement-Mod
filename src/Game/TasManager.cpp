@@ -243,6 +243,10 @@ void TasManager::Enter() {
 }
 
 void TasManager::Exit() {
+    m_liveRecording = false;
+    m_liveRecordingFrames.clear();
+    m_liveRecordingOpponentFrames.clear();
+    m_liveRecordingHasFrame = false;
     ClearInputOverride();
     if (m_p2KeyboardOverrideWasEnabled) {
         ControllerOverrideManager::GetInstance().SetMultipleKeyboardOverrideEnabled(true);
@@ -346,6 +350,13 @@ void TasManager::Update() {
     // GetFrameCounter invokes us immediately before incrementing the game's frame count.
     // The input hooks have therefore finished the current frame, and currentFrame + 1
     // is the exact movie position after this callback returns.
+    // Recording is mutually exclusive with playback (StartLiveRecording refuses while a
+    // run is going), so it gets the frame to itself and nothing below it can be reached.
+    if (m_liveRecording) {
+        SampleLiveRecordingFrame();
+        return;
+    }
+
     const unsigned int currentFrame = *g_gameVals.pFrameCount;
     if (m_runState == TasRunState::PresentationLeadIn ||
         m_runState == TasRunState::PresentationLeadOut) {
@@ -479,6 +490,10 @@ void TasManager::StopPlayback(bool completed) {
 }
 
 void TasManager::EditAndAdvanceFrames(int count) {
+    if (m_liveRecording) {
+        SetError(L("Stop the recording before committing input.").c_str());
+        return;
+    }
     if (IsPlaybackRunning()) {
         SetError(L("Cannot advance frames during playback.").c_str());
         return;
@@ -524,7 +539,7 @@ void TasManager::EditAndAdvanceFrames(int count) {
 }
 
 bool TasManager::CanEditMovie() const {
-    return m_active && !IsPlaybackRunning();
+    return m_active && !IsPlaybackRunning() && !m_liveRecording;
 }
 
 void TasManager::PushUndoState() {
@@ -733,6 +748,12 @@ bool TasManager::AdvanceFrames(int count) {
 }
 
 bool TasManager::SeekToFrame(size_t targetFrame) {
+    // StopLiveRecording clears the flag before it seeks the match back, so its own seek
+    // still gets through here.
+    if (m_liveRecording) {
+        SetError(L("Stop the recording before moving through the combo.").c_str());
+        return false;
+    }
     if (IsPlaying()) {
         SetError(L("Cannot seek during playback.").c_str());
         return false;
@@ -823,6 +844,131 @@ bool TasManager::AdvanceOrExtend(int count) {
     // frames in between are simply played out from here.
     m_status.clear();
     return BeginMovieRun(TasRunState::ReplayingMovie, target);
+}
+
+// A recorded frame comes straight off the game's packed input word, which carries bits the
+// notation cannot express (the SPECIAL macro button, and a direction nibble the game is free
+// to leave at 0). Anything the composer could not parse back is dropped here, so the text
+// this produces is always valid and always round-trips.
+static uint16_t SanitizeRecordedInput(uint16_t packed) {
+    const uint16_t direction = static_cast<uint16_t>(packed & 0x0F);
+    const uint16_t buttons = static_cast<uint16_t>(packed & 0x1F0); // A B C D + taunt
+    return static_cast<uint16_t>((direction >= 1 && direction <= 9 ? direction : 5) | buttons);
+}
+
+size_t TasManager::GetLiveRecordingFrameLimit() {
+    // 60 seconds. Long enough for any combo, and short enough that the notation it produces
+    // still fits the composer's text field even if every frame carries buttons.
+    return 3600;
+}
+
+bool TasManager::StartLiveRecording(int player, std::vector<uint16_t> opponentFrames) {
+    if (m_liveRecording || (player != 0 && player != 1)) {
+        return false;
+    }
+    if (!m_active) {
+        SetError(L("TAS mode is not active.").c_str());
+        return false;
+    }
+    if (IsPlaybackRunning()) {
+        SetError(L("Cannot record while playback is running.").c_str());
+        return false;
+    }
+    // Stopping seeks back to where the editor was, and committing the capture re-simulates
+    // from the base state. Both need one, so there is no point starting without it.
+    if (!HasBaseSnapshot()) {
+        SetError(L("Save a base state before recording live input.").c_str());
+        return false;
+    }
+    if (!IsInTrainingMatch()) {
+        SetError(L("TAS mode is available only during a training match.").c_str());
+        return false;
+    }
+    if (!IsBattleInputHookInstalled()) {
+        SetError(L("TAS mode needs the controller hooks. Enable EnableControllerHooks in settings.ini and restart the game.").c_str());
+        return false;
+    }
+
+    m_liveRecording = true;
+    m_liveRecordingPlayer = player;
+    m_liveRecordingReturnFrame = m_playhead;
+    m_liveRecordingHasFrame = false;
+    m_liveRecordingLastFrame = 0;
+    m_liveRecordingFrames.clear();
+    m_liveRecordingOpponentFrames = std::move(opponentFrames);
+
+    // Hand the pad back: the recorded player must be free of any override, and the match has
+    // to actually run, which it does not after a commit leaves it frozen on a frame.
+    ClearInputOverride();
+    g_gameVals.isFrameFrozen = false;
+    g_gameVals.framesToReach = 0;
+    m_error.clear();
+    m_status = L("Recording live input. Press Stop to put it in the text field.");
+    LOG(1, "[TAS] live recording started player=%d from movie frame %u\n",
+        player, static_cast<unsigned int>(m_liveRecordingReturnFrame));
+    return true;
+}
+
+void TasManager::StopLiveRecording() {
+    if (!m_liveRecording) {
+        return;
+    }
+    m_liveRecording = false;
+    ClearInputOverride();
+    LOG(1, "[TAS] live recording stopped player=%d frames=%u\n",
+        m_liveRecordingPlayer, static_cast<unsigned int>(m_liveRecordingFrames.size()));
+
+    // The frames the user just played were a capture, not a commit, so the match goes back
+    // to where the editor left it. The movie is untouched either way.
+    SeekToFrame(m_liveRecordingReturnFrame);
+}
+
+std::string TasManager::TakeLiveRecordingNotation(size_t maxChars) {
+    std::string notation;
+    size_t kept = 0;
+    for (uint16_t packed : m_liveRecordingFrames) {
+        const std::string token = FormatInput(packed);
+        // Cutting mid-token would leave notation the composer rejects, so a frame either
+        // fits whole or ends the string.
+        if (notation.size() + token.size() > maxChars) {
+            break;
+        }
+        notation += token;
+        ++kept;
+    }
+    if (kept < m_liveRecordingFrames.size()) {
+        m_status = L("The recording was longer than the text field holds and was cut short.");
+    }
+    m_liveRecordingFrames.clear();
+    m_liveRecordingHasFrame = false;
+    return notation;
+}
+
+void TasManager::SampleLiveRecordingFrame() {
+    const unsigned int frame = *g_gameVals.pFrameCount;
+    if (m_liveRecordingHasFrame && m_liveRecordingLastFrame == frame) {
+        return;
+    }
+    m_liveRecordingLastFrame = frame;
+    m_liveRecordingHasFrame = true;
+
+    if (m_liveRecordingFrames.size() >= GetLiveRecordingFrameLimit()) {
+        StopLiveRecording();
+        m_status = L("Recording stopped at the frame limit.");
+        return;
+    }
+
+    m_liveRecordingFrames.push_back(
+        SanitizeRecordedInput(GetLastObservedBattleInputPacked(static_cast<uint32_t>(m_liveRecordingPlayer))));
+
+    // Hold the other player to its own typed command, which is what a commit will give it.
+    // Past the end of that command it goes neutral, matching how EditAndAdvanceFrames pads.
+    const uint32_t other = m_liveRecordingPlayer == 0 ? 1u : 0u;
+    const size_t index = m_liveRecordingFrames.size() - 1;
+    const uint16_t otherPacked = index < m_liveRecordingOpponentFrames.size()
+        ? m_liveRecordingOpponentFrames[index]
+        : static_cast<uint16_t>(5);
+    OverrideBattleInputPacked(other, otherPacked, 1);
 }
 
 void TasManager::ResumeGame() {

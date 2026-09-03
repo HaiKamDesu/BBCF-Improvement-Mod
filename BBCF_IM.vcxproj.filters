@@ -206,7 +206,6 @@
     <ClCompile Include="src\Game\Scr\ScrStateReader.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\TasWindow.cpp" />
-    <ClCompile Include="src\Overlay\Window\TasRecordingWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\TasInputListWindow.cpp" />
     <ClCompile Include="src\Game\ReplayStates\FrameState.cpp" />
     <ClCompile Include="src\Game\ReplayFiles\ReplayFileManager.cpp" />
@@ -234,7 +233,6 @@
     <ClCompile Include="src\Overlay\Window\ReplayRewindWindow.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
     <ClCompile Include="src\Game\TasManager.cpp" />
-    <ClCompile Include="src\Game\StandaloneTasRecorder.cpp" />
     <ClCompile Include="src\Hooks\hooks_battle_input.cpp" />
     <ClCompile Include="src\Hooks\RankedAutomationHarness.cpp" />
     <ClCompile Include="src\Core\Localization.cpp" />
@@ -445,7 +443,6 @@
     <ClInclude Include="src\Game\EntityData.h" />
     <ClInclude Include="src\Overlay\Window\ScrWindow.h" />
     <ClInclude Include="src\Overlay\Window\TasWindow.h" />
-    <ClInclude Include="src\Overlay\Window\TasRecordingWindow.h" />
     <ClInclude Include="src\Overlay\Window\TasInputListWindow.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayFile.h" />
     <ClInclude Include="src\Game\ReplayFiles\ReplayFileManager.h" />
@@ -468,7 +465,6 @@
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotApparatus.h" />
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotSlotPool.h" />
     <ClInclude Include="src\Game\TasManager.h" />
-    <ClInclude Include="src\Game\StandaloneTasRecorder.h" />
     <ClInclude Include="src\Game\ReplayTakeover\ReplayTakeoverFeatureFlags.h" />
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
     <ClInclude Include="src\Overlay\Window\ReplayDBPopupWindow.h" />

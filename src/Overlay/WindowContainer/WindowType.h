@@ -23,7 +23,6 @@ enum WindowType_
         WindowType_NetworkSquareColor,
         WindowType_UnlimitedReplayTakeover,
         WindowType_Tas,
-        WindowType_TasRecording,
         WindowType_TasInputList,
         WindowType_ReleaseChecker,
         WindowType_RankedListFilter,

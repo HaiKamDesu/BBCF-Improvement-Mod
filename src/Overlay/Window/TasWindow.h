@@ -32,6 +32,10 @@ private:
     void DrawBaseStateSection(TasManager& manager);
     void DrawTimeline(TasManager& manager);
     void DrawComposer(TasManager& manager);
+    // One player's row: label, notation field, Record/Stop, frame-count badge. Returns the
+    // frame count the field currently parses to, or -1 if the notation is invalid.
+    int DrawComposerRow(TasManager& manager, int player, const char* label, const char* id,
+        const std::string& hint, char* buffer, size_t bufferSize, float badgeWidth);
     void DrawPlaybackSection(TasManager& manager);
     void DrawFooter(TasManager& manager);
 
@@ -49,9 +53,15 @@ private:
 
     WindowContainer* m_pWindowContainer = nullptr;
 
-    char m_p1Input[256] = "5";
-    char m_p2Input[256] = "5";
+    // Sized for a live capture rather than a typed command: one token per recorded frame,
+    // up to TasManager::GetLiveRecordingFrameLimit() of them.
+    char m_p1Input[16384] = "5";
+    char m_p2Input[16384] = "5";
     int m_frameCount = 1;
+    // Which row started the running capture, so the result is collected however the
+    // recording ended - Stop, the frame limit, or the match going away - rather than only
+    // when the user is the one who ended it.
+    int m_recordingPlayer = -1;
 
     bool m_includeInitialConditions = true;
 

@@ -27,6 +27,28 @@ public:
     bool IsActive() const { return m_active; }
     bool HasBaseSnapshot() const { return m_snapshotOwner != nullptr && m_snapshotOwner->snapshot_count > 0 && m_snapshotSize > 0; }
     bool IsInTrainingMatch() const;
+    // --- live recording ----------------------------------------------------------------
+    // Hands one player back to whoever is holding the controller and samples what they do,
+    // one packed input per game frame. Nothing is written to the movie: the capture comes
+    // back as notation for the composer's text field, so a played sequence becomes an
+    // ordinary typed command the user can edit and commit (or throw away) as usual.
+    // The other player is held to opponentFrames (its own text field, already parsed, and
+    // neutral once it runs out) because that is exactly what a commit will replay for it.
+    // Holding it to anything else - the movie's current contents included - would record
+    // the capture against an opponent it never plays back against.
+    bool StartLiveRecording(int player, std::vector<uint16_t> opponentFrames);
+    void StopLiveRecording();
+    bool IsLiveRecording() const { return m_liveRecording; }
+    // 0 or 1 while recording, -1 otherwise.
+    int GetLiveRecordingPlayer() const { return m_liveRecording ? m_liveRecordingPlayer : -1; }
+    size_t GetLiveRecordingFrameCount() const { return m_liveRecordingFrames.size(); }
+    // Capped so a recording left running cannot outgrow the composer's text field.
+    static size_t GetLiveRecordingFrameLimit();
+    // The finished capture as numpad notation, empty if nothing was recorded. Truncates on
+    // a frame boundary if it will not fit in maxChars (and says so in the status), so the
+    // caller always gets something the composer can parse. Clears the capture.
+    std::string TakeLiveRecordingNotation(size_t maxChars);
+
     bool IsRecording() const { return false; }
     bool HasRecording() const { return !m_movie.empty(); }
     bool IsPlaying() const {
@@ -160,7 +182,18 @@ private:
     void StartPresentationLeadOut();
     void ScheduleNeutralFrame();
 
+    void SampleLiveRecordingFrame();
+
     bool m_active = false;
+    bool m_liveRecording = false;
+    int m_liveRecordingPlayer = 0;
+    // Where the playhead sat when recording began: the match runs on while the user plays,
+    // so stopping seeks back here and leaves the editor exactly where they left it.
+    size_t m_liveRecordingReturnFrame = 0;
+    bool m_liveRecordingHasFrame = false;
+    unsigned int m_liveRecordingLastFrame = 0;
+    std::vector<uint16_t> m_liveRecordingFrames;
+    std::vector<uint16_t> m_liveRecordingOpponentFrames;
     bool m_p2KeyboardOverrideWasEnabled = false;
     bool m_frameHistoryOpenedByTas = false;
     SnapshotApparatus* m_snapshotOwner = nullptr;

@@ -205,21 +205,31 @@ void TasWindow::Draw() {
     }
 
     if (!manager.IsActive()) {
+        m_recordingPlayer = -1;
         DrawInactiveState(manager);
         return;
     }
 
     DrawStatusStrip(manager);
+    ImGui::BeginDisabled(manager.IsLiveRecording());
     DrawBaseStateSection(manager);
+    ImGui::EndDisabled();
 
     // Nothing downstream of the base state can do anything without one, so rather than
     // letting the user click buttons that only produce an error, the whole editor is
     // disabled until the situation has been captured.
     const bool ready = manager.HasBaseSnapshot();
+    const bool recording = manager.IsLiveRecording();
     ImGui::BeginDisabled(!ready);
+    // The composer stays live during a capture because it owns the Stop button; everything
+    // that would move the match or the movie underneath the capture does not.
+    ImGui::BeginDisabled(recording);
     DrawTimeline(manager);
+    ImGui::EndDisabled();
     DrawComposer(manager);
+    ImGui::BeginDisabled(recording);
     DrawPlaybackSection(manager);
+    ImGui::EndDisabled();
     ImGui::EndDisabled();
 
     DrawFooter(manager);
@@ -432,31 +442,10 @@ void TasWindow::DrawComposer(TasManager& manager) {
 
     ImGui::BeginDisabled(busy);
 
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("P1");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-badgeWidth);
-    ImGui::InputTextWithHint("##tas_p1", L("numpad notation, e.g. 623C").c_str(), m_p1Input, sizeof(m_p1Input));
-    const int p1Frames = ParsedFrameCount(m_p1Input);
-    ImGui::SameLine();
-    if (p1Frames < 0) {
-        ImGui::TextColored(kColError, "%s", L("invalid").c_str());
-    } else {
-        ImGui::TextColored(kColOk, "%s", FrameCountLabel(p1Frames).c_str());
-    }
-
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("P2");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-badgeWidth);
-    ImGui::InputTextWithHint("##tas_p2", L("leave empty for neutral").c_str(), m_p2Input, sizeof(m_p2Input));
-    const int p2Frames = ParsedFrameCount(m_p2Input);
-    ImGui::SameLine();
-    if (p2Frames < 0) {
-        ImGui::TextColored(kColError, "%s", L("invalid").c_str());
-    } else {
-        ImGui::TextColored(kColOk, "%s", FrameCountLabel(p2Frames).c_str());
-    }
+    const int p1Frames = DrawComposerRow(manager, 0, "P1", "##tas_p1",
+        L("numpad notation, e.g. 623C"), m_p1Input, sizeof(m_p1Input), badgeWidth);
+    const int p2Frames = DrawComposerRow(manager, 1, "P2", "##tas_p2",
+        L("leave empty for neutral"), m_p2Input, sizeof(m_p2Input), badgeWidth);
 
     TextDisabledWrapped(L("Numpad notation: 5 is neutral, 623C is three frames. One digit is one frame."));
     FlowHelpMarker(L("Directions use the numpad layout, 7 8 9 over 4 5 6 over 1 2 3, with 5 as neutral. Letters A B C D attach to the direction right before them, so 623C is 6, then 2, then 3 with C held. Press Help for the full reference."));
@@ -466,6 +455,7 @@ void TasWindow::DrawComposer(TasManager& manager) {
     const bool valid = p1Frames >= 0 && p2Frames >= 0;
     const int commitFrames = (std::max)(p1Frames, p2Frames);
 
+    ImGui::BeginDisabled(manager.IsLiveRecording());
     ImGui::BeginDisabled(!valid || commitFrames <= 0);
     char commitLabel[160];
     if (commitFrames == 1) {
@@ -502,6 +492,8 @@ void TasWindow::DrawComposer(TasManager& manager) {
     }
     FlowHelpMarker(L("Adds this many frames using whatever is left of the typed input, then neutral. Use it to wait between moves. To move around without changing anything, use the transport buttons above."));
 
+    ImGui::EndDisabled();
+
     const size_t queued = manager.GetQueuedFrameCount();
     const size_t consumed = manager.GetQueueCursor();
     if (queued > consumed) {
@@ -509,6 +501,83 @@ void TasWindow::DrawComposer(TasManager& manager) {
     }
 
     ImGui::EndDisabled();
+}
+
+int TasWindow::DrawComposerRow(TasManager& manager, int player, const char* label,
+    const char* id, const std::string& hint, char* buffer, size_t bufferSize,
+    float badgeWidth) {
+    const bool recording = manager.IsLiveRecording();
+    const bool recordingThis = recording && manager.GetLiveRecordingPlayer() == player;
+
+    // A recording can end without the user pressing Stop - the frame limit trips, or the
+    // training match ends - so the capture is collected here, on whichever frame it turns
+    // out to have stopped, instead of inside the button handler.
+    if (m_recordingPlayer == player && !recording) {
+        m_recordingPlayer = -1;
+        const std::string notation = manager.TakeLiveRecordingNotation(bufferSize - 1);
+        // An empty capture would blank a field the user may have typed into, so a
+        // recording that caught nothing leaves the row alone.
+        if (!notation.empty()) {
+            std::snprintf(buffer, bufferSize, "%s", notation.c_str());
+        }
+    }
+
+    const std::string recordLabel = recordingThis ? L("Stop") : L("Record");
+    // Reserve the wider of the two labels either way, so starting a recording does not
+    // resize the notation field next to it.
+    const float recordWidth = (std::max)(ButtonWidth(L("Record")), ButtonWidth(L("Stop")))
+        + ImGui::GetStyle().ItemSpacing.x;
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine();
+
+    // The field is what the capture lands in, so it is read-only for as long as one is
+    // running rather than letting the user type into a value about to be overwritten.
+    ImGui::SetNextItemWidth(-(badgeWidth + recordWidth));
+    ImGui::BeginDisabled(recording);
+    ImGui::InputTextWithHint(id, hint.c_str(), buffer, bufferSize);
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    // While one player is being recorded the other player's button is dead: only one
+    // capture at a time, and only the row that owns it can stop it.
+    ImGui::BeginDisabled(recording && !recordingThis);
+    if (ImGui::Button(recordLabel.c_str())) {
+        if (recordingThis) {
+            manager.StopLiveRecording();
+        } else {
+            // The opponent has to replay its own typed command while this one is being
+            // played live, or the capture would be recorded against something a commit
+            // never reproduces. Invalid notation there simply means neutral.
+            std::vector<uint16_t> opponentFrames;
+            const char* opponentText = player == 0 ? m_p2Input : m_p1Input;
+            if (!TasManager::TryParseCommand(TextOrNeutral(opponentText), &opponentFrames)) {
+                opponentFrames.clear();
+            }
+            if (manager.StartLiveRecording(player, std::move(opponentFrames))) {
+                m_recordingPlayer = player;
+            }
+        }
+    }
+    ImGui::EndDisabled();
+    ImGui::HoverTooltip(recordingThis
+        ? L("Stop recording and put what you played into the box as notation.").c_str()
+        : L("Play this player yourself and capture it as notation you can edit before committing. The other player replays its own typed command meanwhile.").c_str());
+
+    const int frames = ParsedFrameCount(buffer);
+    ImGui::SameLine();
+    if (recordingThis) {
+        char badge[64];
+        std::snprintf(badge, sizeof(badge), L("rec %u").c_str(),
+            static_cast<unsigned int>(manager.GetLiveRecordingFrameCount()));
+        ImGui::TextColored(kColLive, "%s", badge);
+    } else if (frames < 0) {
+        ImGui::TextColored(kColError, "%s", L("invalid").c_str());
+    } else {
+        ImGui::TextColored(kColOk, "%s", FrameCountLabel(frames).c_str());
+    }
+    return frames;
 }
 
 void TasWindow::DrawPlaybackSection(TasManager& manager) {
@@ -704,6 +773,11 @@ void TasWindow::DrawHelpPopup() const {
     ImGui::TextWrapped("%s", L("3. Repeat. Use Advance to wait a number of frames without pressing anything.").c_str());
     ImGui::TextWrapped("%s", L("4. If a frame was wrong, press Rewind or click that frame in the timeline, then commit the replacement.").c_str());
     ImGui::TextWrapped("%s", L("Rewinding deletes every frame after the point you go back to. That is what makes it a re-record rather than an undo.").c_str());
+
+    ImGui::VerticalSpacing(4);
+    ImGui::TextDisabled("%s", L("Recording instead of typing").c_str());
+    ImGui::TextWrapped("%s", L("Press Record on the P1 or P2 row to play that player yourself. The match runs while you do, and Stop turns what you played into notation in that row's box - it is not committed, so you can fix a frame or two first and then press Commit like anything else you typed.").c_str());
+    ImGui::TextWrapped("%s", L("Stopping puts the match back where the editor was, and the other player holds whatever its own box says while you record, so a capture plays back the way it was made.").c_str());
 
     ImGui::VerticalSpacing(4);
     ImGui::TextDisabled("%s", L("Hotkeys").c_str());

@@ -2640,32 +2640,47 @@ struct LocalizationKeysAccessor
         // TAS input list
         inline const char* TAS_input_list() const { return Get("TAS input list"); }
 
-        // TAS recording
-        inline const char* TAS_recording() const { return Get("TAS recording"); }
+        // Record
+        inline const char* Record() const { return Get("Record"); }
 
-        // Record P1
-        inline const char* Record_P1() const { return Get("Record P1"); }
+        // rec %u
+        inline const char* rec_u() const { return Get("rec %u"); }
 
-        // End recording and export .txt
-        inline const char* End_recording_and_export_txt() const { return Get("End recording and export .txt"); }
+        // Stop recording and put what you played into the box as notation.
+        inline const char* Stop_recording_and_put_what_you_played_into_the_box_as_notation() const { return Get("Stop recording and put what you played into the box as notation."); }
 
-        // Export TAS recording
-        inline const char* Export_TAS_recording() const { return Get("Export TAS recording"); }
+        // Play this player yourself and capture it as notation you can edit before committing. The other player replays its own typed command meanwhile.
+        inline const char* Play_this_player_yourself_and_capture_it_as_notation_you_can_edit_before_committing_The_other_player_replays_its_own_typed_command_meanwhile() const { return Get("Play this player yourself and capture it as notation you can edit before committing. The other player replays its own typed command meanwhile."); }
 
-        // Recording: %u frames
-        inline const char* Recording_u_frames() const { return Get("Recording: %u frames"); }
+        // Cannot record while playback is running.
+        inline const char* Cannot_record_while_playback_is_running() const { return Get("Cannot record while playback is running."); }
 
-        // Open the standalone P1 real-time TAS recording window.
-        inline const char* Open_the_standalone_P1_real_time_TAS_recording_window() const { return Get("Open the standalone P1 real-time TAS recording window."); }
+        // Save a base state before recording live input.
+        inline const char* Save_a_base_state_before_recording_live_input() const { return Get("Save a base state before recording live input."); }
 
-        // Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open.
-        inline const char* Records_P1_s_inputs_frame_by_frame_during_a_training_match_then_saves_them_as_a_TAS_movie_the_combo_editor_can_open() const { return Get("Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open."); }
+        // Recording live input. Press Stop to put it in the text field.
+        inline const char* Recording_live_input_Press_Stop_to_put_it_in_the_text_field() const { return Get("Recording live input. Press Stop to put it in the text field."); }
 
-        // Leave the TAS combo editor before recording.
-        inline const char* Leave_the_TAS_combo_editor_before_recording() const { return Get("Leave the TAS combo editor before recording."); }
+        // Recording stopped at the frame limit.
+        inline const char* Recording_stopped_at_the_frame_limit() const { return Get("Recording stopped at the frame limit."); }
 
-        // The recording was discarded because the training match ended.
-        inline const char* The_recording_was_discarded_because_the_training_match_ended() const { return Get("The recording was discarded because the training match ended."); }
+        // The recording was longer than the text field holds and was cut short.
+        inline const char* The_recording_was_longer_than_the_text_field_holds_and_was_cut_short() const { return Get("The recording was longer than the text field holds and was cut short."); }
+
+        // Stop the recording before moving through the combo.
+        inline const char* Stop_the_recording_before_moving_through_the_combo() const { return Get("Stop the recording before moving through the combo."); }
+
+        // Stop the recording before committing input.
+        inline const char* Stop_the_recording_before_committing_input() const { return Get("Stop the recording before committing input."); }
+
+        // Recording instead of typing
+        inline const char* Recording_instead_of_typing() const { return Get("Recording instead of typing"); }
+
+        // Press Record on the P1 or P2 row to play that player yourself. The match runs while you do, and Stop turns what you played into notation in that row's box - it is not committed, so you can fix a frame or two first and then press Commit like anything else you typed.
+        inline const char* Press_Record_on_the_P1_or_P2_row_to_play_that_player_yourself_The_match_runs_while_you_do_and_Stop_turns_what_you_played_into_notation_in_that_row_s_box_it_is_not_committed_so_you_can_fix_a_frame_or_two_first_and_then_press_Commit_like_anything_else_you_typed() const { return Get("Press Record on the P1 or P2 row to play that player yourself. The match runs while you do, and Stop turns what you played into notation in that row's box - it is not committed, so you can fix a frame or two first and then press Commit like anything else you typed."); }
+
+        // Stopping puts the match back where the editor was, and the other player holds whatever its own box says while you record, so a capture plays back the way it was made.
+        inline const char* Stopping_puts_the_match_back_where_the_editor_was_and_the_other_player_holds_whatever_its_own_box_says_while_you_record_so_a_capture_plays_back_the_way_it_was_made() const { return Get("Stopping puts the match back where the editor was, and the other player holds whatever its own box says while you record, so a capture plays back the way it was made."); }
 
         // Follow playhead
         inline const char* Follow_playhead() const { return Get("Follow playhead"); }

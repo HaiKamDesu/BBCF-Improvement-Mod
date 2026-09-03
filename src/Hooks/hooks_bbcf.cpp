@@ -25,7 +25,6 @@
 #include "Audio/MusicManager.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/TasManager.h"
-#include "Game/StandaloneTasRecorder.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 #include <array>
 #include <cstring>
@@ -9158,7 +9157,6 @@ void __declspec(naked)GetFrameCounter()
 	}
 	UnlimitedPlaybackManager::Instance().Tick();
 	TasManager::Instance().Update();
-	StandaloneTasRecorder::Instance().Update();
 	RankedProbeTickFrameState();
 	RankedAutomationHarness::Tick();
 	GetMusicManager().Update();
