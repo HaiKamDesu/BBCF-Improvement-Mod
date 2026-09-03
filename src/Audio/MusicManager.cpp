@@ -2399,6 +2399,63 @@ void MusicManager::ClearBgmForSceneExit() {
         m_anchorTrackId);
 }
 
+bool MusicManager::DeleteCustomTrack(int trackId) {
+    if (!IsCustomTrackId(trackId)) {
+        return false;
+    }
+
+    // Wide deletes throughout: an imported song keeps the name it arrived with, which the
+    // import path already goes out of its way not to mangle.
+    bool pacGone = true;
+    if (const char* pac = GetBgmFilename(trackId)) {
+        const std::string pacPath = GamePath(std::string("data/Sound/BGM/") + pac + ".pac");
+        pacGone = DeleteFileW(utf8_to_utf16(pacPath).c_str()) != 0 ||
+            GetLastError() == ERROR_FILE_NOT_FOUND;
+        if (!pacGone) {
+            LogMusic("MusicManager: Could not delete \"%s\" (error %lu)\n",
+                pacPath.c_str(), GetLastError());
+        }
+    }
+
+    const std::string sourceName = GetCustomTrackSourceName(trackId);
+    if (!sourceName.empty()) {
+        // The source has to go as well. Discovery scans the custom folder, so leaving it
+        // there would convert the track straight back on the rescan below.
+        const std::string sourcePath = GamePath("data/Sound/BGM/custom/" + sourceName);
+        if (DeleteFileW(utf8_to_utf16(sourcePath).c_str()) == 0 &&
+            GetLastError() != ERROR_FILE_NOT_FOUND) {
+            LogMusic("MusicManager: Could not delete \"%s\" (error %lu)\n",
+                sourcePath.c_str(), GetLastError());
+        }
+        // Volume is keyed by file name, so a different song imported under the same name
+        // later would otherwise inherit this one's level.
+        m_customTrackVolume.erase(sourceName);
+    }
+
+    m_trackEnabled.erase(trackId);
+    SavePreferences();
+    LogMusic("MusicManager: Deleted custom track %d (source \"%s\")\n",
+        trackId, sourceName.c_str());
+
+    // Rediscovery is what actually drops the row. Ids are derived from the file name, so
+    // nothing else is renumbered by this.
+    RescanCustomMusic();
+    return pacGone;
+}
+
+bool MusicManager::IsCategoryExpanded(const std::string& category) const {
+    auto it = m_categoryExpanded.find(category);
+    return it == m_categoryExpanded.end() ? true : it->second;
+}
+
+void MusicManager::SetCategoryExpanded(const std::string& category, bool expanded) {
+    if (IsCategoryExpanded(category) == expanded) {
+        return;
+    }
+    m_categoryExpanded[category] = expanded;
+    SavePreferences();
+}
+
 void MusicManager::SavePreferences() {
     // BBCF_IM/ only exists once some other feature has written into it, and on a
     // fresh install nothing has yet - without this the ofstream below silently
@@ -2423,6 +2480,13 @@ void MusicManager::SavePreferences() {
     for (const auto& entry : m_customTrackVolume) {
         if (entry.second != 0.0f)
             file << entry.first << "=" << entry.second << "\n";
+    }
+
+    file << "\n[CategoryExpanded]\n";
+    file << "; Jukebox categories the user has collapsed. Anything not listed is open.\n";
+    for (const auto& entry : m_categoryExpanded) {
+        if (!entry.second)
+            file << entry.first << "=0\n";
     }
 
     file << "\n[Settings]\n";
@@ -2462,7 +2526,10 @@ void MusicManager::LoadPreferences() {
         std::string key = line.substr(0, eqPos);
         std::string value = line.substr(eqPos + 1);
 
-        if (section == "CustomTrackVolume") {
+        if (section == "CategoryExpanded") {
+            if (!key.empty() && key[0] != ';')
+                m_categoryExpanded[key] = (value == "1");
+        } else if (section == "CustomTrackVolume") {
             if (!key.empty() && key[0] != ';')
                 m_customTrackVolume[key] = (float)atof(value.c_str());
         } else if (section == "MusicTracks") {
@@ -2494,6 +2561,7 @@ void MusicManager::LoadPreferences() {
 
 void MusicManager::ResetPreferences() {
     m_trackEnabled.clear();
+    m_categoryExpanded.clear();
     for (auto& track : m_tracks) {
         m_trackEnabled[track.id] = true;
     }

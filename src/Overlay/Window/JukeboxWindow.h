@@ -35,6 +35,19 @@ private:
 	void DrawTrackVolume(int trackId);
 	void PollRestartAfterVolume();
 	void DrawCurrentTrackInfo();
+	// Right-click menu on a row the user owns. Native tracks are the game's files and have
+	// nothing to delete.
+	void DrawTrackContextMenu(const MusicTrack& track);
+	// Lives at the top level of Draw, not inside the scrolling child: a modal opened from
+	// inside the list would be parented to it, and the row it came from can stop being
+	// drawn the moment the deletion lands.
+	void DrawDeleteTrackModal();
+
+	// Deletion awaiting confirmation. The name is kept by value because the row it came
+	// from is a pointer into a list the rescan rebuilds.
+	int         m_deleteRequestTrackId = -1;
+	std::string m_deleteRequestName;
+	bool        m_deleteModalQueued = false;
 
 	// Search/filter
 	char m_searchBuffer[256] = {};

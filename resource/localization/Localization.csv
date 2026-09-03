@@ -1330,6 +1330,11 @@ You must be in a mode where state can be saved.,You must be in a mode where stat
 You cannot use this feature while searching for a ranked match.,You cannot use this feature while searching for a ranked match.,No puedes usar esta función mientras buscas una partida clasificatoria.
 not applied yet,not applied yet,sin aplicar todavía
 converting...,converting...,convirtiendo...
+Delete track,Delete track,Eliminar pista
+"This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.","This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.","Esto elimina el reemplazo en sí, así que la pista a la que sustituye vuelve a la canción original en todas partes, incluida la ventana de reemplazo de música. La canción que elegiste no se toca; solo se borra la copia convertida."
+"The imported song and its converted copy are both deleted from the Jukebox's custom folder. This cannot be undone.","The imported song and its converted copy are both deleted from the Jukebox's custom folder. This cannot be undone.","La canción importada y su copia convertida se borran de la carpeta personalizada del Jukebox. Esto no se puede deshacer."
+Mixed: click to enable ALL tracks in this category,Mixed: click to enable ALL tracks in this category,Mixto: pulsa para activar TODAS las pistas de esta categoría
+Enable/disable ALL tracks in this category,Enable/disable ALL tracks in this category,Activar/desactivar TODAS las pistas de esta categoría
 Untouched up to,Untouched up to,Sin alterar hasta
 Above,Above,Por encima de
 this song gets squashed to fit.,this song gets squashed to fit.,esta canción se comprime para caber.

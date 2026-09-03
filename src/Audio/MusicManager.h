@@ -115,6 +115,17 @@ public:
     void SetRematchTrackMode(RematchTrackMode mode) { m_rematchTrackMode = mode; }
     RematchTrackMode GetRematchTrackMode() const { return m_rematchTrackMode; }
 
+    // Removes a custom Jukebox song for good: the converted .pac and the source file the
+    // scan would otherwise find again, then rescans so the row goes away. Only valid for a
+    // custom id - a replacement is removed through BgmReplacementManager::Unassign, which
+    // also has a pointer to put back. False if the converted file could not be deleted.
+    bool DeleteCustomTrack(int trackId);
+
+    // Whether a Jukebox category is expanded. Categories start open; only a category the
+    // user has collapsed is remembered, so a new one added later still shows up open.
+    bool IsCategoryExpanded(const std::string& category) const;
+    void SetCategoryExpanded(const std::string& category, bool expanded);
+
     void SavePreferences();
     void LoadPreferences();
     void ResetPreferences();
@@ -125,11 +136,18 @@ public:
     // features own different per-track state (a custom song's volume lives here, a
     // replacement's gain lives in BgmReplacementManager) and each must be able to rebuild
     // its own rows without disturbing the other's.
+    //
+    // A custom song's id is NOT sequential from the base: DiscoverCustomTracks derives it
+    // as 10000 + (FNV-1a of the file name % 90000) so a song keeps the same id across
+    // launches, which means the custom range really is the whole of 10000..99999. The
+    // replacement base has to clear all of it - anything lower and most custom songs would
+    // be misread as replacements, since the hash spreads them across the entire span.
     static const int kCustomTrackIdBase = 10000;
-    static const int kReplacementTrackIdBase = 20000;
+    static const int kCustomTrackIdEnd = 100000;   // one past the last id the hash can give
+    static const int kReplacementTrackIdBase = kCustomTrackIdEnd;
 
     static bool IsCustomTrackId(int trackId) {
-        return trackId >= kCustomTrackIdBase && trackId < kReplacementTrackIdBase;
+        return trackId >= kCustomTrackIdBase && trackId < kCustomTrackIdEnd;
     }
     static bool IsReplacementTrackId(int trackId) { return trackId >= kReplacementTrackIdBase; }
     // The BgmReplacementManager table index a published replacement row came from, or -1 for
@@ -267,6 +285,7 @@ private:
     std::atomic<int> m_customMusicTotal{ 0 };
     std::atomic<int> m_customTrackCount{ 0 };
     std::map<std::string, float> m_customTrackVolume;   // source file name -> dB
+    std::map<std::string, bool> m_categoryExpanded;     // category -> shown open
     std::map<int, std::string> m_customTrackSource;     // track id -> source file name
     std::map<int, float> m_customTrackTagGain;          // track id -> its own ReplayGain
     std::mutex m_customMusicPollMutex;

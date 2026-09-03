@@ -3462,6 +3462,21 @@ struct LocalizationKeysAccessor
         // converting...
         inline const char* converting_2() const { return Get("converting..."); }
 
+        // Delete track
+        inline const char* Delete_track() const { return Get("Delete track"); }
+
+        // This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.
+        inline const char* This_removes_the_replacement_itself_so_the_track_it_stands_in_for_goes_back_to_the_original_song_everywhere_the_music_replacement_window_included_The_song_you_picked_is_not_touched_only_the_converted_copy_is_deleted() const { return Get("This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted."); }
+
+        // The imported song and its converted copy are both deleted from the Jukebox's custom folder. This cannot be undone.
+        inline const char* The_imported_song_and_its_converted_copy_are_both_deleted_from_the_Jukebox_s_custom_folder_This_cannot_be_undone() const { return Get("The imported song and its converted copy are both deleted from the Jukebox's custom folder. This cannot be undone."); }
+
+        // Mixed: click to enable ALL tracks in this category
+        inline const char* Mixed_click_to_enable_ALL_tracks_in_this_category() const { return Get("Mixed: click to enable ALL tracks in this category"); }
+
+        // Enable/disable ALL tracks in this category
+        inline const char* Enable_disable_ALL_tracks_in_this_category() const { return Get("Enable/disable ALL tracks in this category"); }
+
         // Untouched up to
         inline const char* Untouched_up_to() const { return Get("Untouched up to"); }
 

@@ -66,6 +66,7 @@ void JukeboxWindow::Draw() {
 	DrawCurrentTrackInfo();
 	ImGui::Separator();
 	DrawTrackList();
+	DrawDeleteTrackModal();
 }
 
 void JukeboxWindow::DrawControls() {
@@ -459,6 +460,92 @@ static ImVec4 GetCategoryColor(const std::string& category) {
 	return ImVec4(1, 1, 1, 1);
 }
 
+// Only a row the user put there can be deleted: a native track is one of the game's own
+// files. A replacement is removed through Unassign, which puts the table pointer back as
+// well as deleting the converted file - which is why the confirmation says so.
+void JukeboxWindow::DrawTrackContextMenu(const MusicTrack& track) {
+	const bool ownedByUser = MusicManager::IsCustomTrackId(track.id) ||
+		MusicManager::IsReplacementTrackId(track.id);
+	if (!ownedByUser) {
+		return;
+	}
+
+	const std::string contextId = "##ctx" + std::to_string(track.id);
+	if (ImGui::BeginPopupContextItem(contextId.c_str())) {
+		if (ImGui::MenuItem(L("Delete track").c_str())) {
+			m_deleteRequestTrackId = track.id;
+			m_deleteRequestName = track.name;
+			m_deleteModalQueued = true;
+		}
+		ImGui::EndPopup();
+	}
+}
+
+void JukeboxWindow::DrawDeleteTrackModal() {
+	const char* modalId = "##jukebox_delete_track";
+	if (m_deleteModalQueued) {
+		m_deleteModalQueued = false;
+		ImGui::OpenPopup(modalId);
+	}
+	if (m_deleteRequestTrackId < 0) {
+		return;
+	}
+	// Escape dismisses a modal without going through either button, so the request is
+	// dropped once the popup is gone rather than left pointing at a track that may not
+	// even be in the list any more.
+	if (!ImGui::IsPopupOpen(modalId)) {
+		m_deleteRequestTrackId = -1;
+		m_deleteRequestName.clear();
+		return;
+	}
+
+	if (!ImGui::BeginPopupModal(modalId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		return;
+	}
+
+	const int trackId = m_deleteRequestTrackId;
+	const int tableIndex = MusicManager::GetReplacementTableIndex(trackId);
+	const bool isReplacement = tableIndex >= 0;
+
+	ImGui::TextWrapped("%s", (L("Delete") + " \"" + m_deleteRequestName + "\"?").c_str());
+	ImGui::Spacing();
+
+	if (isReplacement) {
+		ImGui::TextWrapped("%s", L("This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.").c_str());
+	} else {
+		ImGui::TextWrapped("%s", L("The imported song and its converted copy are both deleted from the Jukebox's custom folder. This cannot be undone.").c_str());
+	}
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (ImGui::Button(L("Delete track").c_str(), ImVec2(120.0f, 0.0f))) {
+		bool ok = true;
+		if (isReplacement) {
+			GetBgmReplacements().Unassign(tableIndex);
+		} else {
+			ok = GetMusicManager().DeleteCustomTrack(trackId);
+		}
+		if (g_notificationBar) {
+			g_notificationBar->AddNotification(ok
+				? ("Deleted " + m_deleteRequestName).c_str()
+				: ("Could not delete " + m_deleteRequestName).c_str());
+		}
+		m_deleteRequestTrackId = -1;
+		m_deleteRequestName.clear();
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button(L("Cancel").c_str(), ImVec2(120.0f, 0.0f))) {
+		m_deleteRequestTrackId = -1;
+		m_deleteRequestName.clear();
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
+}
+
 void JukeboxWindow::DrawTrackList() {
 	MusicManager& musicManager = GetMusicManager();
 
@@ -491,6 +578,7 @@ void JukeboxWindow::DrawTrackList() {
 
 	// Render tracks grouped by category
 	std::string lastCategory;
+	bool categoryOpen = true;
 	for (const MusicTrack* track : filteredTracks) {
 	// Draw category header with a "check all" toggle for the whole category
 		if (track->category != lastCategory) {
@@ -504,11 +592,34 @@ void JukeboxWindow::DrawTrackList() {
 			}
 			if (ImGui::IsItemHovered()) {
 				ImGui::SetTooltipWrapped(catState == -1
-					? "Mixed: click to enable ALL tracks in this category"
-					: "Enable/disable ALL tracks in this category");
+					? L("Mixed: click to enable ALL tracks in this category").c_str()
+					: L("Enable/disable ALL tracks in this category").c_str());
 			}
 			ImGui::SameLine();
-			ImGui::TextColored(catColor, "[ %s ]", lastCategory.c_str());
+
+			// Forced open/closed from our own saved state every frame rather than left to
+			// ImGui's, which does not survive the session. The return value is still the
+			// user's click, so a toggle is caught and written back below.
+			// While searching, every category is forced open: a hit hidden inside a
+			// collapsed category makes the search look broken, and rows shown under a
+			// shut header look like a bug. The saved state is left alone, so clearing
+			// the search puts the collapsed ones back.
+			const bool searching = !searchStr.empty();
+			const bool wasExpanded = musicManager.IsCategoryExpanded(lastCategory);
+			ImGui::SetNextItemOpen(searching || wasExpanded, ImGuiCond_Always);
+			ImGui::PushStyleColor(ImGuiCol_Text, catColor);
+			char header[96];
+			snprintf(header, sizeof(header), "[ %s ]##Cat_%s",
+				lastCategory.c_str(), lastCategory.c_str());
+			categoryOpen = ImGui::CollapsingHeader(header);
+			ImGui::PopStyleColor();
+			if (!searching && categoryOpen != wasExpanded) {
+				musicManager.SetCategoryExpanded(lastCategory, categoryOpen);
+			}
+		}
+
+		if (!categoryOpen) {
+			continue;
 		}
 
 		bool enabled = musicManager.IsTrackEnabled(track->id);
@@ -548,6 +659,11 @@ void JukeboxWindow::DrawTrackList() {
 		if (ImGui::IsItemHovered() && isReplacement) {
 			ImGui::SetTooltipWrapped(L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.").c_str());
 		}
+
+		// Attached to the Selectable, so it is the row that answers a right-click. It has
+		// to come after the hover check above: the MenuItem drawn inside the popup becomes
+		// the last item, and IsItemHovered would then be asking about that instead.
+		DrawTrackContextMenu(*track);
 
 		if (isCurrent) {
 			ImGui::PopStyleColor();
