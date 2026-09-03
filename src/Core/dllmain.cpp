@@ -1,3 +1,4 @@
+#include "Audio/BgmReplacementManager.h"
 #include "crashdump.h"
 #include "info.h"
 #include "BuildInfo.autogen.h"
@@ -200,6 +201,25 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 		Settings::settingsIni.urtReTraceMaxFileMB,
 		Settings::settingsIni.urtReTraceMaxBackups);
 
+	// Saved BGM replacements must be in the filename table BEFORE the game's boot audio
+	// init, not when the overlay comes up at the title screen.
+	//
+	// Most tracks load per match, so a late patch still worked for them. Character Select
+	// does not: 201_charaselect.pac is loaded once during boot, in the same function as
+	// InitParticle / InitFade / InitSystemFont / InitGameSystem, and stays registered in a
+	// fixed audio slot for the rest of the process. A pointer written at the title screen is
+	// permanently too late - which is why replacing that track reported success and always
+	// played the original, while overwriting the shipped .pac on disk worked and proved the
+	// file and cue were fine.
+	//
+	// This is as early as this thread can act: the game's own startup runs concurrently, so
+	// the placement is a race and every step before this one shortens the lead. It sits
+	// straight after logging so the applied entries are still recorded. Initialize() guards
+	// itself, so WindowManager::Initialize's later call is a no-op and interactive changes
+	// keep going through the same path.
+	BgmReplacementManager::GetInstance().Initialize();
+	ForceLog("[Init] BGM replacements applied before game audio init.\n");
+
 	if (Settings::WasDebugLoggingSettingMissing())
 	{
 	LOG(2, "GenerateDebugLogs setting missing in settings.ini; defaulting to enabled and adding it automatically.\n");
@@ -257,6 +277,7 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 
 	g_interfaces.pPaletteManager = new PaletteManager();
 	ForceLog("[Init] PaletteManager constructed.\n");
+
 }
 	catch (const std::exception& ex)
 	{

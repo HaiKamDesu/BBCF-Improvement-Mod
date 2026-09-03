@@ -150,6 +150,8 @@ private:
 	// The game asks XACT for a cue named exactly the original base filename, so this has to
 	// match or the replacement loads and plays nothing.
 	static std::string ReadPacCueName(const std::string& path);
+	// Every table index carrying the same original filename (205_abyss.pac has two).
+	std::vector<int> IndicesSharingFile(int tableIndex) const;
 
 	void Save();
 	void Load();

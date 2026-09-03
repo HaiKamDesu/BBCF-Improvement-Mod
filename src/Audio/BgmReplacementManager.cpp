@@ -139,6 +139,27 @@ bool BgmReplacementManager::SnapshotTable()
 	return true;
 }
 
+// Every table index carrying the same original filename as this one.
+//
+// The table is not one-entry-per-track: 205_abyss.pac occupies BOTH index 76 and index 109.
+// Patching only the selected index means whichever one the game happens to read decides
+// whether the replacement is heard, which is why Grim of Abyss reported as replaced and
+// played the original. Nothing else in the table is duplicated, but keying off the filename
+// rather than a hardcoded pair keeps this correct if that ever changes.
+std::vector<int> BgmReplacementManager::IndicesSharingFile(int tableIndex) const
+{
+	std::vector<int> out;
+	if (tableIndex < 0 || tableIndex >= kEntryCount || !m_original[tableIndex])
+		return out;
+
+	for (int i = 0; i < kEntryCount; ++i)
+	{
+		if (m_original[i] && _stricmp(m_original[i], m_original[tableIndex]) == 0)
+			out.push_back(i);
+	}
+	return out;
+}
+
 bool BgmReplacementManager::WritePointer(int tableIndex, const char* value)
 {
 	if (!m_tableAddr || tableIndex < 0 || tableIndex >= kEntryCount)
@@ -204,6 +225,19 @@ bool BgmReplacementManager::ApplyPointer(int tableIndex)
 
 	RestorePointer(tableIndex);
 	m_owned[tableIndex] = it->second.relPath;
+
+	// Duplicate entries share the primary's buffer; m_owned[tableIndex] outlives them
+	// because it is a fixed array slot that only RestorePointer above ever reassigns.
+	const std::vector<int> shared = IndicesSharingFile(tableIndex);
+	for (int other : shared)
+	{
+		if (other == tableIndex)
+			continue;
+		if (WritePointer(other, m_owned[tableIndex].c_str()))
+			LogRepl("Entry %d also carries \"%s\"; pointed it at the same replacement\n",
+				other, m_original[other] ? m_original[other] : "(null)");
+	}
+
 	if (!WritePointer(tableIndex, m_owned[tableIndex].c_str()))
 	{
 		it->second.state = BgmReplacementState::Failed;
@@ -222,6 +256,14 @@ bool BgmReplacementManager::RestorePointer(int tableIndex)
 {
 	if (tableIndex < 0 || tableIndex >= kEntryCount)
 		return false;
+
+	// Restore the duplicates too, or undoing a replacement leaves the other entry pointing
+	// at a buffer that is about to be reassigned.
+	for (int other : IndicesSharingFile(tableIndex))
+	{
+		if (other != tableIndex)
+			WritePointer(other, m_original[other]);
+	}
 	return WritePointer(tableIndex, m_original[tableIndex]);
 }
 
@@ -293,6 +335,25 @@ void BgmReplacementManager::BuildCatalogue()
 			track.originalDir = kBgmDir;
 		else if (FileExists(GamePath(std::string(kBgmEndDir) + "/" + fileName)))
 			track.originalDir = kBgmEndDir;
+
+		// A duplicated filename is one track to the user, not two rows with the same name
+		// that behave differently depending on which the game reads. ApplyPointer patches
+		// every index sharing the file, so the first one stands for all of them.
+		bool alreadyListed = false;
+		for (const auto& existing : m_tracks)
+		{
+			if (_stricmp(existing.fileName.c_str(), track.fileName.c_str()) == 0)
+			{
+				alreadyListed = true;
+				break;
+			}
+		}
+		if (alreadyListed)
+		{
+			LogRepl("Entry %d duplicates \"%s\" (already listed); it will be patched "
+			        "together with the first entry\n", i, fileName.c_str());
+			continue;
+		}
 
 		m_tracks.push_back(track);
 	}
