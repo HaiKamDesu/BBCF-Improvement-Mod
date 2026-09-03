@@ -842,18 +842,48 @@ namespace
 
 	LPTOP_LEVEL_EXCEPTION_FILTER WINAPI hook_SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER filter)
 	{
-		const LPTOP_LEVEL_EXCEPTION_FILTER previous = g_displacedTopLevelFilter;
-		g_displacedTopLevelFilter = filter;
-
-		// One line per process, not per call: the CRT can come through here repeatedly and
-		// this must not become the next thing that floods DEBUG.txt.
-		if (!g_loggedFilterDisplacement)
+		// Defence in depth. Re-entering this hook is the one mistake it cannot survive, and
+		// the failure is silent: it eats the thread's stack instead of reporting anything.
+		// If a future edit reintroduces a path back into here, this makes it finite.
+		static thread_local bool s_inHook = false;
+		if (s_inHook)
 		{
-			g_loggedFilterDisplacement = true;
-			LOG(1, "[Crash] Another module tried to install top-level filter %p; keeping ours.\n", filter);
+			return g_displacedTopLevelFilter;
+		}
+		s_inHook = true;
+
+		const LPTOP_LEVEL_EXCEPTION_FILTER previous = g_displacedTopLevelFilter;
+
+		// Our own installs are not a displacement, so they are not recorded or announced.
+		if (filter != &UnhandledExFilter)
+		{
+			g_displacedTopLevelFilter = filter;
+
+			// One line per process, not per call: the CRT can come through here repeatedly
+			// and this must not become the next thing that floods DEBUG.txt.
+			if (!g_loggedFilterDisplacement)
+			{
+				g_loggedFilterDisplacement = true;
+				LOG(1, "[Crash] Another module tried to install top-level filter %p; keeping ours.\n", filter);
+			}
 		}
 
-		ReassertUnhandledExceptionFilter();
+		// Through the Detours TRAMPOLINE, never through SetUnhandledExceptionFilter itself.
+		//
+		// This function detours that API, so calling it from in here re-enters this
+		// function. The first version did exactly that - it called a one-line helper that
+		// wrapped the API, which the optimizer inlined into this frame - and recursed until
+		// the thread's 1 MB stack was gone. Confirmed from two crash dumps:
+		// 64,437 frames of "push UnhandledExFilter; call [SetUnhandledExceptionFilter]",
+		// then a stack overflow, and then the crash handler died on the empty stack before
+		// it could write a single line. Steam's own crashhandler.dll installs a top-level
+		// filter, so this fired during ordinary play. See docs/CrashCapture.md.
+		if (orig_SetUnhandledExceptionFilter != nullptr)
+		{
+			orig_SetUnhandledExceptionFilter(UnhandledExFilter);
+		}
+
+		s_inHook = false;
 		return previous;
 	}
 

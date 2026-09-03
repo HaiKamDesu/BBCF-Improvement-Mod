@@ -1207,11 +1207,6 @@ void WriteCrashBundleForCurrentContext(const char* reason, DWORD pseudoException
         WriteCrashBundle(reason, &pointers, showDialog);
 }
 
-void ReassertUnhandledExceptionFilter()
-{
-        SetUnhandledExceptionFilter(UnhandledExFilter);
-}
-
 void InstallCrashHandlers()
 {
         if (!g_vectoredHandler)

@@ -196,14 +196,17 @@ dump was maximal.
 
 ## The crash path must survive a broken process
 
-A real crash on 2026-09-03 produced `[Crash] UnhandledExFilter invoked.` and then nothing:
-no bundle, and because the filter ends in `ExitProcess`, no WER report and no LocalDump
-either. The line reached disk, so the write itself succeeded and `ForceLog` never returned.
+A crash on 2026-09-03 produced `[Crash] UnhandledExFilter invoked.` and then nothing: no
+bundle, and because the filter ends in `ExitProcess`, no WER report and no LocalDump either.
 
-`ForceLog` builds a `std::string` and then pushes a copy into the in-memory ring under the
-log mutex - two heap operations and a second lock acquisition, on a path where the heap may
-be the thing that is broken and where the fault may have happened inside the logger while
-it held that very mutex. Three rules came out of it:
+The root cause turned out to be the recursion documented in the next section, not the crash
+path itself - the handler was running on a stack that had already been consumed. But the
+audit that followed found the crash path was genuinely unsafe anyway, and would have failed
+on its own for a heap-corruption crash. `ForceLog` builds a `std::string` and then pushes a
+copy into the in-memory ring under the log mutex - two heap operations and a second lock
+acquisition, on a path where the heap may be the thing that is broken and where the fault
+may have happened inside the logger while it held that very mutex. Three rules came out of
+it, all of them still worth having:
 
 - **Nothing on the crash path may allocate or block.** `ForceLogRaw` formats nothing and
   takes the log mutex with `try_lock`, writing anyway if it cannot get it. An interleaved
@@ -228,10 +231,59 @@ Verified against the shipped code with `build/crashctx_test` (modes 2, 3 and 4):
 | log ring faults (the real failure) | 1073 B | skipped, reported | 29 MB | `dump ok=1`, bundle survives |
 | context builder faults | - | - | - | SEH caught, process alive, handed to Windows |
 
+## The mod's own detour recursed until the stack was gone
+
+This is the root cause of both 2026-09-03 crashes, and it was ours.
+
+`hook_SetUnhandledExceptionFilter` (Cause 2's fix) ended by calling
+`ReassertUnhandledExceptionFilter()`, a one-line helper that called
+`SetUnhandledExceptionFilter(UnhandledExFilter)`. That is **the very API the hook detours**,
+so the call re-entered the hook. Release LTCG inlined the helper into the hook, which is why
+the mistake is invisible in the source of either function on its own - it only exists once
+they are put together.
+
+Two dumps show it identically. A 16-byte frame repeating to the bottom of the stack:
+
+```
+074b0e90  68f94ac0  dinput8+0x244ac0   <- UnhandledExFilter, pushed as the argument
+074b0e94  68f94ac0  dinput8+0x244ac0
+074b0e98  074b0ea8                      <- saved ebp, chaining to the next frame
+074b0e9c  68f8f520  dinput8+0x23f520   <- return address, inside the hook
+```
+
+**64,437 frames**, and the hook disassembles to exactly that:
+
+```
+68f8f4ea  jne  68f8f515          ; every branch...
+68f8f4fa  je   68f8f515          ; ...converges...
+68f8f503  je   68f8f515          ; ...here
+68f8f515  push offset 68f94ac0   ; UnhandledExFilter
+68f8f51a  call dword ptr [69089144]   ; kernel32!SetUnhandledExceptionFilterStub - detoured
+68f8f520  mov  eax,esi                ; back into this same function
+```
+
+The call is unconditional on every path, so **every** entry into the hook recursed.
+
+The trigger was ordinary: the oldest frames on the stack are `crashhandler.dll` on a thread
+started by `steamclient.dll`. Steam's own crash handler installs a top-level filter, which is
+the exact thing this hook exists to intercept - so this fired during normal play, not in some
+exotic state.
+
+It did not always kill the process: a first stack overflow can be recovered if someone
+handles it, and Steam's crash-handler thread has SEH (`ntdll!_except_handler4` is on the
+stack). Eventually one was not recoverable, and then the layers below made it silent.
+
+The fix is to call the Detours **trampoline** - `orig_SetUnhandledExceptionFilter`, the
+unpatched original - and never the API. A thread-local re-entrancy guard was added on top,
+because a hook that re-enters itself fails silently by eating a stack rather than reporting
+anything, and that is not a failure mode to leave to code review. Verified in the emitted
+machine code: the hook now ends in `mov ecx,[orig]; test ecx,ecx; je; push UnhandledExFilter;
+call ecx`, and the import's IAT slot is no longer referenced anywhere in the function.
+
 ## A stack overflow cannot be reported from the thread that overflowed
 
-Caught in the wild on 2026-09-03, on a build that already had every layer above. The log
-stopped mid-word and there was no `[Crash]` line at all - not even "UnhandledExFilter
+That recursion is *why* the stack was gone; this is why nothing could be reported once it
+was. The log stopped mid-word with no `[Crash]` line at all - not even "UnhandledExFilter
 invoked". WER's LocalDump told the story our own handler could not:
 
 ```
@@ -248,6 +300,11 @@ overflowed it again before it could write one line.
 
 `SetThreadStackGuarantee` does not save this. It is per-thread, and it was only ever called
 on the init thread - never on whichever thread eventually overflows.
+
+The earlier crash the same day, at 17:51, is the same fault at the same instruction
+(`dinput8+0xa84d7`, one build's worth of drift from `+0xa84c7`) with the same repeating
+frame on its stack. Both crashes were the recursion above; the "ForceLog never returned"
+reading of the first one was wrong, though the hardening it prompted stands on its own.
 
 The fix is to report from a thread that still has a stack. A reporter thread is created in
 `InstallCrashHandlers`, while the process is healthy, and parks on an event; the faulting
