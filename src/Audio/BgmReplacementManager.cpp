@@ -1,4 +1,5 @@
 #include "BgmReplacementManager.h"
+#include <vector>
 #include "CustomMusicConverter.h"
 #include "MusicManager.h"
 
@@ -176,6 +177,31 @@ bool BgmReplacementManager::ApplyPointer(int tableIndex)
 
 	// Point the entry back at the shipped string before touching the buffer it may
 	// currently reference - reassigning m_owned frees that memory.
+	// Verify the cue before trusting the file. A mismatch here is the difference between
+	// "replaced" and "replaced and audible", and it is invisible at every other layer.
+	const BgmReplaceableTrack* const verifyTrack = FindTrack(tableIndex);
+	if (verifyTrack != nullptr)
+	{
+		const std::string cue = ReadPacCueName(it->second.pacPath);
+		if (cue.empty())
+		{
+			LogRepl("Entry %d: WARNING could not read a cue name out of \"%s\" - if this "
+			        "track stays silent, that file is not a usable .pac\n",
+				tableIndex, it->second.pacPath.c_str());
+		}
+		else if (_stricmp(cue.c_str(), verifyTrack->baseName.c_str()) != 0)
+		{
+			LogRepl("Entry %d: WARNING cue mismatch - the file carries cue \"%s\" but the "
+			        "game will ask for \"%s\". It will load and play nothing. Rebuild this "
+			        "replacement.\n",
+				tableIndex, cue.c_str(), verifyTrack->baseName.c_str());
+		}
+		else
+		{
+			LogRepl("Entry %d: cue \"%s\" verified\n", tableIndex, cue.c_str());
+		}
+	}
+
 	RestorePointer(tableIndex);
 	m_owned[tableIndex] = it->second.relPath;
 	if (!WritePointer(tableIndex, m_owned[tableIndex].c_str()))
@@ -333,6 +359,45 @@ bool BgmReplacementManager::LooksLikeUsablePac(const std::string& path)
 		return false;
 	// A real BGM .pac is hundreds of KB; anything tiny is a truncated or bogus write.
 	return info.nFileSizeHigh > 0 || info.nFileSizeLow >= 1024;
+}
+
+// Reads the cue name out of a .pac's FPAC file table.
+//
+// This is the one property a replacement must get right and the only one nothing checked.
+// The game asks XACT for a cue named exactly the original base filename, so a .pac whose
+// internal name is anything else loads without error and then silently plays nothing - or
+// leaves whatever was already registered playing, which reads as "the replacement did not
+// apply" with no failure anywhere to point at.
+//
+// Layout (see BuildFpacContainer, verified against all 186 shipped files):
+//   +0x00 "FPAC"; +0x04 dataStart; +0x08 totalSize; +0x0C fileCount; +0x10 = 1;
+//   +0x14 nameField; file table at +0x20, first entry's name is "<cue>.xsb".
+std::string BgmReplacementManager::ReadPacCueName(const std::string& path)
+{
+	std::ifstream file(utf8_to_utf16(path).c_str(), std::ios::binary);
+	if (!file)
+		return std::string();
+
+	char header[0x20] = {};
+	file.read(header, sizeof(header));
+	if (file.gcount() != (std::streamsize)sizeof(header))
+		return std::string();
+	if (memcmp(header, "FPAC", 4) != 0)
+		return std::string();
+
+	unsigned int nameField = 0;
+	memcpy(&nameField, header + 0x14, sizeof(nameField));
+	if (nameField == 0 || nameField > 256)
+		return std::string();
+
+	std::vector<char> name(nameField + 1, '\0');
+	file.read(name.data(), nameField);
+	if (file.gcount() <= 0)
+		return std::string();
+
+	std::string sub(name.data());
+	const size_t dot = sub.rfind('.');
+	return (dot == std::string::npos) ? sub : sub.substr(0, dot);
 }
 
 // ---------------------------------------------------------------------------------------

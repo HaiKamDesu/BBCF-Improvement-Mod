@@ -146,6 +146,10 @@ private:
 	void StartNextJob();
 	// True when the file exists and is big enough to be a real .pac.
 	static bool LooksLikeUsablePac(const std::string& path);
+	// Cue name carried inside a .pac's FPAC file table, or empty if it is not readable.
+	// The game asks XACT for a cue named exactly the original base filename, so this has to
+	// match or the replacement loads and plays nothing.
+	static std::string ReadPacCueName(const std::string& path);
 
 	void Save();
 	void Load();
