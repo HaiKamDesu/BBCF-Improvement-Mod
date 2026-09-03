@@ -695,7 +695,7 @@ void TasWindow::DrawHelpPopup() const {
 
     ImGui::TextDisabled("%s", L("Notation").c_str());
     ImGui::TextWrapped("%s", L("Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash.").c_str());
-    ImGui::TextWrapped("%s", L("A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.").c_str());
+    ImGui::TextWrapped("%s", L("A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. ap is the taunt button, so 5ap is a neutral taunt. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.").c_str());
 
     ImGui::VerticalSpacing(4);
     ImGui::TextDisabled("%s", L("Building a combo").c_str());

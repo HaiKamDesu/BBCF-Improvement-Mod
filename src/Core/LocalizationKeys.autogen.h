@@ -2409,11 +2409,11 @@ struct LocalizationKeysAccessor
         // Imported %s. Save a matching base state before playback.
         inline const char* Imported_s_Save_a_matching_base_state_before_playback() const { return Get("Imported %s. Save a matching base state before playback."); }
 
-        // Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.
-        inline const char* Invalid_P1_input_Use_examples_such_as_5C_28D_623C_or_656() const { return Get("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656."); }
+        // Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.
+        inline const char* Invalid_P1_input_Use_examples_such_as_5C_28D_623C_656_or_5ap() const { return Get("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap."); }
 
-        // Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.
-        inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_or_656() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656."); }
+        // Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.
+        inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_656_or_5ap() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap."); }
 
         // Frame %u
         inline const char* Frame_u() const { return Get("Frame %u"); }
@@ -2577,8 +2577,8 @@ struct LocalizationKeysAccessor
         // Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash.
         inline const char* Directions_follow_the_numpad_7_8_9_on_the_top_row_4_5_6_in_the_middle_1_2_3_on_the_bottom_and_5_for_neutral_Each_digit_is_one_frame_so_66_holds_forward_for_two_frames_and_656_is_a_dash() const { return Get("Directions follow the numpad: 7 8 9 on the top row, 4 5 6 in the middle, 1 2 3 on the bottom, and 5 for neutral. Each digit is one frame, so 66 holds forward for two frames and 656 is a dash."); }
 
-        // A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.
-        inline const char* A_B_C_D_attach_to_the_direction_immediately_before_them_623C_is_three_frames_the_last_of_them_3_with_C_held_Spaces_commas_and_dashes_are_ignored_so_236_236C_reads_the_same_as_236236C() const { return Get("A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C."); }
+        // A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. ap is the taunt button, so 5ap is a neutral taunt. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C.
+        inline const char* A_B_C_D_attach_to_the_direction_immediately_before_them_623C_is_three_frames_the_last_of_them_3_with_C_held_ap_is_the_taunt_button_so_5ap_is_a_neutral_taunt_Spaces_commas_and_dashes_are_ignored_so_236_236C_reads_the_same_as_236236C() const { return Get("A B C D attach to the direction immediately before them: 623C is three frames, the last of them 3 with C held. ap is the taunt button, so 5ap is a neutral taunt. Spaces, commas and dashes are ignored, so 236 - 236C reads the same as 236236C."); }
 
         // Building a combo
         inline const char* Building_a_combo() const { return Get("Building a combo"); }

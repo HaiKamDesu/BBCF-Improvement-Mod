@@ -37,6 +37,9 @@ constexpr unsigned int kPresentationLeadOutFrames = 240;
 constexpr const char* kTasMovieHeaderV1 = "BBCF_TAS_MOVIE_V1";
 constexpr const char* kTasMovieHeaderV2 = "BBCF_TAS_MOVIE_V2";
 
+// Matching the packed values used by hooks_battle_input.h (taunt = 256).
+constexpr uint16_t kInputButtonTaunt = 256;
+
 uint16_t ButtonValue(char button) {
     switch (button) {
     case 'A': return 16;
@@ -55,17 +58,28 @@ bool ParseHumanInput(const std::string& text, uint16_t* result) {
     if (!result) return false;
     uint16_t value = 0;
     bool sawDirection = false;
-    for (char raw : text) {
-        const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(raw)));
+    for (size_t i = 0; i < text.size(); ) {
+        const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(text[i])));
         if (ch >= '1' && ch <= '9') {
             if (sawDirection) return false;
             value = static_cast<uint16_t>(ch - '0');
             sawDirection = true;
+            ++i;
+        } else if (ch == 'A' && i + 1 < text.size() &&
+                   static_cast<char>(std::toupper(static_cast<unsigned char>(text[i + 1]))) == 'P') {
+            // "ap" = taunt button. Checked before the single 'A' branch so 5ap does not
+            // get parsed as "5A" followed by an invalid 'p'.
+            if (!sawDirection || (value & kInputButtonTaunt)) return false;
+            value = static_cast<uint16_t>(value + kInputButtonTaunt);
+            i += 2;
         } else if (ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D') {
             if (!sawDirection || (value & ButtonValue(ch))) return false;
             value = static_cast<uint16_t>(value + ButtonValue(ch));
+            ++i;
         } else if (ch != ' ' && ch != '\t') {
             return false;
+        } else {
+            ++i;
         }
     }
     if (!sawDirection) return false;
@@ -894,7 +908,7 @@ bool TasManager::ExportMovie(const std::string& path, bool includeInitialConditi
         output << "base_snapshot " << (HasBaseSnapshot() ? "available_current_process_only" : "not_saved") << '\n';
         output << "end_initial_conditions\n";
     }
-    output << "# Inputs use numpad notation: 7 8 9 / 4 5 6 / 1 2 3; suffixes A B C D are buttons.\n";
+    output << "# Inputs use numpad notation: 7 8 9 / 4 5 6 / 1 2 3; suffixes A B C D are buttons, ap is the taunt button.\n";
     for (size_t i = 0; i < m_movie.size(); ++i) {
         output << i << " | P1=" << HumanInput(m_movie[i].p1)
                << " | P2=" << HumanInput(m_movie[i].p2) << '\n';
@@ -1031,8 +1045,8 @@ bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>*
     out->clear();
     uint16_t pendingButtons = 0;
     bool sawDirection = false;
-    for (char raw : text) {
-        const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(raw)));
+    for (size_t i = 0; i < text.size(); ) {
+        const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(text[i])));
         if (ch >= '1' && ch <= '9') {
             if (pendingButtons && !out->empty()) {
                 out->back() = static_cast<uint16_t>(out->back() + pendingButtons);
@@ -1040,13 +1054,26 @@ bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>*
             }
             out->push_back(static_cast<uint16_t>(ch - '0'));
             sawDirection = true;
+            ++i;
+        } else if (ch == 'A' && i + 1 < text.size() &&
+                   static_cast<char>(std::toupper(static_cast<unsigned char>(text[i + 1]))) == 'P') {
+            // "ap" = taunt button attached to the current frame. Checked before the single
+            // 'A' branch so 5ap does not get parsed as "5A" followed by an invalid 'p'.
+            if (!sawDirection || out->empty() || (pendingButtons & kInputButtonTaunt)) {
+                return false;
+            }
+            pendingButtons = static_cast<uint16_t>(pendingButtons + kInputButtonTaunt);
+            i += 2;
         } else if (ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D') {
             if (!sawDirection || out->empty()) {
                 return false;
             }
             pendingButtons = static_cast<uint16_t>(pendingButtons + ButtonValue(ch));
+            ++i;
         } else if (ch != ' ' && ch != ',' && ch != '-') {
             return false;
+        } else {
+            ++i;
         }
     }
     if (pendingButtons && !out->empty()) {
@@ -1059,11 +1086,11 @@ bool TasManager::ParseInputs() {
     std::vector<uint16_t> p1;
     std::vector<uint16_t> p2;
     if (!TryParseCommand(m_p1Text, &p1)) {
-        SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
+        SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.").c_str());
         return false;
     }
     if (!TryParseCommand(m_p2Text, &p2)) {
-        SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, or 656.").c_str());
+        SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.").c_str());
         return false;
     }
 
@@ -1091,6 +1118,7 @@ std::string TasManager::FormatInput(uint16_t packed) {
     if (packed & 32) result += 'B';
     if (packed & 64) result += 'C';
     if (packed & 128) result += 'D';
+    if (packed & kInputButtonTaunt) result += "ap";
     return result;
 }
 

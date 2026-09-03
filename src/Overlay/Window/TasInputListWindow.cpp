@@ -31,7 +31,8 @@ constexpr float kPlayedDim = 0.45f;
 const char* kFramePayload = "TAS_FRAME_BLOCK";
 
 ImVec4 InputColour(uint16_t packed) {
-    if ((packed & 0xF0) != 0) {
+    // A/B/C/D occupy 0xF0 and AP (taunt) occupies 0x100.
+    if ((packed & 0x1F0) != 0) {
         return kColAttack;
     }
     return (packed & 0x0F) == 5 ? kColNeutral : kColMovement;
