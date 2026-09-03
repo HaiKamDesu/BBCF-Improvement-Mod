@@ -52,6 +52,11 @@ namespace
         std::atomic<bool> g_crashBundleWritten{ false };
         PVOID g_vectoredHandler = nullptr;
 
+        // The thread that actually faulted. The bundle may be written by a different one
+        // (see the reporter thread below), and MiniDumpWriteDump must still be told which
+        // thread crashed or the dump names the reporter instead.
+        std::atomic<DWORD> g_faultingThreadId{ 0 };
+
         // Every log call in this file can run while the process is dying, so none of them
         // use ForceLog: it allocates twice and blocks on the log mutex, which deadlocks if
         // the fault happened inside the logger. This formats into a stack buffer and hands
@@ -928,7 +933,8 @@ static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, 
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                         MINIDUMP_EXCEPTION_INFORMATION md{};
-                        md.ThreadId = GetCurrentThreadId();
+                        const DWORD faultingThread = g_faultingThreadId.load();
+                        md.ThreadId = (faultingThread != 0) ? faultingThread : GetCurrentThreadId();
                         md.ExceptionPointers = ExPtr;
                         md.ClientPointers = FALSE;
                         const BOOL win = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, DumpFlagsForDetail(Settings::settingsIni.crashDumpDetail), &md, &userStreams, nullptr);
@@ -965,6 +971,11 @@ static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, 
 
         if (showDialog)
         {
+                // The bundle is on disk by now, so the watchdog's job is done - and what
+                // follows is a modal dialog paced by a human. Leaving it armed would
+                // force-fail the process out from under someone who simply had not clicked
+                // OK within a minute, which a test caught it doing exactly.
+                DisarmCrashWatchdog();
                 MessageBox(NULL, messageBuffer, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
         }
 }
@@ -991,6 +1002,74 @@ static LONG FinishCrashHandling(const char* who)
         CrashProgress("[Crash] %s produced no dump; handing the exception to Windows so WER "
                       "and LocalDumps can still capture it.\n", who);
         return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// ---------------------------------------------------------------------------------------
+// Reporter thread.
+//
+// A stack overflow cannot be reported from the thread that overflowed - there is no stack
+// left to report with. Measured on a real crash on 2026-09-03: a thread consumed its whole
+// 1 MB stack, UnhandledExceptionFilter called our filter, and our filter died in __chkstk's
+// probe loop before it could write a single line. No log, no bundle. SetThreadStackGuarantee
+// does not help either: it is per-thread, and we only ever set it on the init thread, never
+// on whichever thread eventually overflows.
+//
+// So the faulting thread hands the work to a thread that has its own untouched stack and
+// waits. Created up front, while the process is still healthy, because creating a thread is
+// exactly the kind of thing that fails when things have gone wrong.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+        struct CrashReportRequest
+        {
+                const char*          reason = nullptr;
+                PEXCEPTION_POINTERS  pointers = nullptr;
+                bool                 showDialog = false;
+        };
+
+        CrashReportRequest g_reportRequest;
+        HANDLE g_reportRequested = nullptr;
+        HANDLE g_reportFinished = nullptr;
+
+        DWORD WINAPI CrashReporterThread(LPVOID)
+        {
+                if (WaitForSingleObject(g_reportRequested, INFINITE) != WAIT_OBJECT_0)
+                {
+                        return 0;
+                }
+
+                WriteCrashBundle(g_reportRequest.reason, g_reportRequest.pointers,
+                                 g_reportRequest.showDialog);
+
+                SetEvent(g_reportFinished);
+                return 0;
+        }
+
+        // Returns once the bundle has been written, or immediately writes it inline if the
+        // reporter thread is not available - inline is what used to happen always, so the
+        // fallback is no worse than the old behaviour.
+        void ReportCrashOffThread(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog)
+        {
+                g_faultingThreadId.store(GetCurrentThreadId());
+
+                if (g_reportRequested == nullptr || g_reportFinished == nullptr)
+                {
+                        CrashProgress("[Crash] No reporter thread; writing the bundle on the "
+                                      "faulting thread instead.\n");
+                        WriteCrashBundle(reason, ExPtr, showDialog);
+                        return;
+                }
+
+                g_reportRequest.reason = reason;
+                g_reportRequest.pointers = ExPtr;
+                g_reportRequest.showDialog = showDialog;
+
+                SetEvent(g_reportRequested);
+
+                // No timeout here on purpose: the hang watchdog owns that decision, and it
+                // force-fails the whole process after a minute if this never comes back.
+                WaitForSingleObject(g_reportFinished, INFINITE);
+        }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1079,7 +1158,7 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
         CrashProgress("[Crash] UnhandledExFilter invoked.\n");
         ArmCrashWatchdog("Unhandled-exception crash handling");
-        WriteCrashBundle("Unhandled exception", ExPtr, true);
+        ReportCrashOffThread("Unhandled exception", ExPtr, true);
         return FinishCrashHandling("UnhandledExFilter");
 }
 
@@ -1098,7 +1177,7 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         {
                 CrashProgress("[Crash] VectoredCrashHandler caught code=0x%08X\n", code);
                 ArmCrashWatchdog("Vectored crash handling");
-                WriteCrashBundle("Vectored crash handler", ExPtr, true);
+                ReportCrashOffThread("Vectored crash handler", ExPtr, true);
                 return FinishCrashHandling("VectoredCrashHandler");
         }
 
@@ -1148,6 +1227,24 @@ void InstallCrashHandlers()
         if (!SetThreadStackGuarantee(&guarantee))
         {
                 CrashProgress("[Crash] SetThreadStackGuarantee failed err=%lu\n", GetLastError());
+        }
+
+        // Up front, while the heap and address space are still healthy.
+        g_reportRequested = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        g_reportFinished = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (g_reportRequested != nullptr && g_reportFinished != nullptr)
+        {
+                const HANDLE reporter = CreateThread(nullptr, 0, CrashReporterThread, nullptr, 0, nullptr);
+                if (reporter != nullptr)
+                {
+                        CloseHandle(reporter);
+                }
+                else
+                {
+                        CrashProgress("[Crash] Could not start the crash reporter thread "
+                                      "(err=%lu); stack-overflow crashes will not be "
+                                      "reportable.\n", GetLastError());
+                }
         }
 
         SetUnhandledExceptionFilter(UnhandledExFilter);

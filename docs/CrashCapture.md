@@ -228,6 +228,38 @@ Verified against the shipped code with `build/crashctx_test` (modes 2, 3 and 4):
 | log ring faults (the real failure) | 1073 B | skipped, reported | 29 MB | `dump ok=1`, bundle survives |
 | context builder faults | - | - | - | SEH caught, process alive, handed to Windows |
 
+## A stack overflow cannot be reported from the thread that overflowed
+
+Caught in the wild on 2026-09-03, on a build that already had every layer above. The log
+stopped mid-word and there was no `[Crash]` line at all - not even "UnhandledExFilter
+invoked". WER's LocalDump told the story our own handler could not:
+
+```
+Fault Module Name   DINPUT8.dll          <- us, not the game
+Exception Code      c0000005
+Exception Offset    000a84c7
+```
+
+`dinput8+0xa84c7` is `__chkstk`'s probe loop - `sub eax,1000h` / `test dword ptr [eax],eax` -
+and `KERNELBASE!UnhandledExceptionFilter` sat in the call stack. The faulting thread had
+consumed **1,037,896 bytes**, a whole default 1 MB stack, before our filter was even
+entered. The original crash was a stack overflow; our filter then ran on the empty stack and
+overflowed it again before it could write one line.
+
+`SetThreadStackGuarantee` does not save this. It is per-thread, and it was only ever called
+on the init thread - never on whichever thread eventually overflows.
+
+The fix is to report from a thread that still has a stack. A reporter thread is created in
+`InstallCrashHandlers`, while the process is healthy, and parks on an event; the faulting
+thread hands over the reason and `EXCEPTION_POINTERS` and waits. `MiniDumpWriteDump` is
+given the faulting thread's id explicitly, because it is no longer the thread calling it.
+If the thread or its events could not be created, the bundle is written inline exactly as
+before, so the fallback is never worse than the old behaviour.
+
+Verified by overflowing a real stack: `Exception code: 0xC00000FD
+(EXCEPTION_STACK_OVERFLOW)` with a complete bundle - context, logs and dump - where the same
+test on the previous build produced nothing.
+
 ## The last resort: a hang watchdog
 
 Everything above defends against the crash path *faulting*. Nothing defends against it
@@ -261,6 +293,7 @@ Verified with the shipped constant rather than a shortened one:
 |---|---|---|
 | armed, then hangs | killed at ~60s | exit code `0xC0000409`, reason logged and flushed first |
 | armed then disarmed, hangs 70s | survives | exit code 0, no kill |
+| bundle written, dialog left open 75s | survives | disarmed before the dialog, no false kill |
 
 ## Reading the residue
 
