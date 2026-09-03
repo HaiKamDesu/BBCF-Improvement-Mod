@@ -194,6 +194,40 @@ Two independent fixes, both shipped:
 The two together are why 14 GB was allowed to happen: nothing capped the count and every
 dump was maximal.
 
+## The crash path must survive a broken process
+
+A real crash on 2026-09-03 produced `[Crash] UnhandledExFilter invoked.` and then nothing:
+no bundle, and because the filter ends in `ExitProcess`, no WER report and no LocalDump
+either. The line reached disk, so the write itself succeeded and `ForceLog` never returned.
+
+`ForceLog` builds a `std::string` and then pushes a copy into the in-memory ring under the
+log mutex - two heap operations and a second lock acquisition, on a path where the heap may
+be the thing that is broken and where the fault may have happened inside the logger while
+it held that very mutex. Three rules came out of it:
+
+- **Nothing on the crash path may allocate or block.** `ForceLogRaw` formats nothing and
+  takes the log mutex with `try_lock`, writing anyway if it cannot get it. An interleaved
+  line beats no report. Every log call in `crashdump.cpp` goes through `CrashProgress`,
+  which formats into a stack buffer; none of them use `ForceLog`.
+- **The bundle writer is SEH-guarded and ordered by value.** `WriteCrashBundle` is a thin
+  wrapper holding no destructor-bearing object so `__try` is legal; the body is
+  `WriteCrashBundleImpl`. Artifacts are written cheapest-and-most-diagnostic first:
+  `crash_context.txt`, then the dump, and the log snapshot last behind its own guard,
+  because reading the ring is the least valuable and most likely thing to fault.
+- **Never swallow a crash we did not capture.** `ExitProcess` was unconditional, which was
+  safe only because the CRT kept unregistering our filter. Now that the filter survives,
+  exiting suppresses WER and LocalDumps too. `FinishCrashHandling` exits quietly only when a
+  dump actually landed; otherwise it returns `EXCEPTION_CONTINUE_SEARCH` and lets Windows
+  capture what we could not.
+
+Verified against the shipped code with `build/crashctx_test` (modes 2, 3 and 4):
+
+| scenario | context | logs | dump | outcome |
+|---|---|---|---|---|
+| normal | 1096 B | 48 B | 29 MB | `dump ok=1`, exit quietly |
+| log ring faults (the real failure) | 1073 B | skipped, reported | 29 MB | `dump ok=1`, bundle survives |
+| context builder faults | - | - | - | SEH caught, process alive, handed to Windows |
+
 ## Reading the residue
 
 When a crash still produces no bundle, the OS still recorded it. In order of usefulness:

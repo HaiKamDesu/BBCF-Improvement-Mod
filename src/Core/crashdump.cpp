@@ -11,7 +11,9 @@
 #include <algorithm>
 #include <codecvt>
 #include <atomic>
+#include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <dbghelp.h>
 #include <limits>
 #include <locale>
@@ -48,6 +50,26 @@ namespace
 
         std::atomic<bool> g_crashBundleWritten{ false };
         PVOID g_vectoredHandler = nullptr;
+
+        // Every log call in this file can run while the process is dying, so none of them
+        // use ForceLog: it allocates twice and blocks on the log mutex, which deadlocks if
+        // the fault happened inside the logger. This formats into a stack buffer and hands
+        // the finished line to ForceLogRaw, which does neither.
+        void CrashProgress(const char* format, ...)
+        {
+                char buffer[1024];
+                va_list args;
+                va_start(args, format);
+                const int written = _vsnprintf_s(buffer, sizeof(buffer), _TRUNCATE, format, args);
+                va_end(args);
+                if (written <= 0)
+                {
+                        return;
+                }
+
+                ForceLogRaw(buffer);
+        }
+
 
         std::string ToUtf8(const std::wstring& value)
         {
@@ -91,7 +113,7 @@ namespace
                 const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
                 if (length == 0 || length >= MAX_PATH)
                 {
-                        ForceLog("[Crash] GetModuleFileNameW failed (len=%lu err=%lu)\n", length, GetLastError());
+                        CrashProgress("[Crash] GetModuleFileNameW failed (len=%lu err=%lu)\n", length, GetLastError());
                         return std::wstring();
                 }
 
@@ -99,7 +121,7 @@ namespace
                 const size_t lastSlash = path.find_last_of(L"\\/");
                 if (lastSlash == std::wstring::npos)
                 {
-                        ForceLog("[Crash] Failed to locate executable directory for %s\n", ToUtf8(path).c_str());
+                        CrashProgress("[Crash] Failed to locate executable directory for %s\n", ToUtf8(path).c_str());
                         return std::wstring();
                 }
 
@@ -111,7 +133,7 @@ namespace
                 const std::wstring exeDir = GetExecutableDirectory();
                 if (exeDir.empty())
                 {
-                        ForceLog("[Crash] Falling back to relative CrashReports path.\n");
+                        CrashProgress("[Crash] Falling back to relative CrashReports path.\n");
                         return L"BBCF_IM\\CrashReports";
                 }
 
@@ -123,7 +145,7 @@ namespace
                 const int result = SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
                 if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
                 {
-                        ForceLog("[Crash] Failed to ensure directory %s (err=%d)\n", ToUtf8(path).c_str(), result);
+                        CrashProgress("[Crash] Failed to ensure directory %s (err=%d)\n", ToUtf8(path).c_str(), result);
                 }
         }
 
@@ -734,26 +756,87 @@ namespace
 
                         if (!RemoveDirectoryW(dir.c_str()))
                         {
-                                ForceLog("[Crash] Kept %s (not empty or in use, err=%lu)\n",
+                                CrashProgress("[Crash] Kept %s (not empty or in use, err=%lu)\n",
                                          ToUtf8(dir).c_str(), GetLastError());
                                 continue;
                         }
 
-                        ForceLog("[Crash] Pruned old crash bundle %s\n", ToUtf8(dir).c_str());
+                        CrashProgress("[Crash] Pruned old crash bundle %s\n", ToUtf8(dir).c_str());
                 }
         }
 }
 
+// ---------------------------------------------------------------------------------------
+// Crash-path plumbing.
+//
+// A real crash on 2026-09-03 produced "[Crash] UnhandledExFilter invoked." and then
+// nothing at all: no bundle, and - because the filter ends in ExitProcess - no WER report
+// and no LocalDump either. The line reached disk, so the write succeeded and ForceLog never
+// returned. ForceLog builds a std::string and then pushes a copy into the in-memory ring
+// under the log mutex, which is two heap operations and a second lock acquisition on a
+// path where the heap may be the thing that is broken.
+//
+// So the crash path no longer uses it. Everything below formats into a stack buffer and
+// writes through ForceLogRaw, which allocates nothing and will not block on the log mutex.
+// ---------------------------------------------------------------------------------------
+
+// Set once the bundle has actually been written, so the handlers can decide whether they
+// are allowed to swallow the crash or have to hand it to Windows.
+static std::atomic<bool> g_crashBundleOk{ false };
+
+
+// GetRecentLogs walks the ring and builds one big string, so it allocates. It is the least
+// valuable artifact in the bundle and the most likely to fault on a corrupt heap, so it is
+// both isolated and written last.
+static void AssignRecentLogs(std::string* out)
+{
+        *out = GetRecentLogs();
+}
+
+static bool TryGetRecentLogs(std::string* out)
+{
+        __try
+        {
+                AssignRecentLogs(out);
+                return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+                return false;
+        }
+}
+
+static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog);
+
+// Deliberately holds no object with a destructor: __try is not allowed in a function that
+// needs unwinding, and this wrapper exists so that a fault anywhere in the bundle writer
+// still leaves a decision the caller can act on instead of taking the process down.
 void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog)
 {
         if (g_crashBundleWritten.exchange(true))
         {
+                CrashProgress("[Crash] WriteCrashBundle re-entered; a bundle was already "
+                              "written or attempted this process.\n");
                 return;
         }
 
-        ForceLog("[Crash] WriteCrashBundle invoked (reason=%s, showDialog=%d)\n",
-                 reason ? reason : "<null>", showDialog ? 1 : 0);
+        CrashProgress("[Crash] WriteCrashBundle invoked (reason=%s, showDialog=%d)\n",
+                      reason ? reason : "<null>", showDialog ? 1 : 0);
 
+        __try
+        {
+                WriteCrashBundleImpl(reason, ExPtr, showDialog);
+        }
+        __except (CrashProgress("[Crash] Faulted while writing the crash bundle "
+                                "(code 0x%08X). Handing the crash to Windows so it is not "
+                                "lost.\n", GetExceptionCode()),
+                  EXCEPTION_EXECUTE_HANDLER)
+        {
+        }
+}
+
+static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDialog)
+{
         MiniDumpWriteDump_t pMiniDumpWriteDump = nullptr;
 
         HMODULE hLib = LoadLibrary(_T("dbghelp"));
@@ -763,7 +846,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         }
         else
         {
-                ForceLog("[Crash] LoadLibrary(dbghelp) failed err=%lu\n", GetLastError());
+                CrashProgress("[Crash] LoadLibrary(dbghelp) failed err=%lu\n", GetLastError());
         }
 
         const std::wstring timestamp = BuildTimestamp();
@@ -773,7 +856,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         const std::wstring logsPath = JoinPath(crashDir, L"logs.txt");
         const std::wstring contextPath = JoinPath(crashDir, L"crash_context.txt");
 
-        ForceLog("[Crash] Crash bundle paths: root=%s dir=%s dump=%s\n",
+        CrashProgress("[Crash] Crash bundle paths: root=%s dir=%s dump=%s\n",
                  ToUtf8(crashRoot).c_str(),
                  ToUtf8(crashDir).c_str(),
                  ToUtf8(dumpPath).c_str());
@@ -782,10 +865,10 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         PruneOldCrashBundles(crashRoot, Settings::settingsIni.crashReportsToKeep);
         EnsureDirectory(crashDir);
 
-        const std::string recentLogs = GetRecentLogs();
-        WriteTextFile(logsPath, recentLogs);
-        ForceLog("[Crash] Wrote logs snapshot (%zu bytes) to %s\n", recentLogs.size(), ToUtf8(logsPath).c_str());
-
+        // Order is deliberate: the context file is the cheapest artifact and the one that
+        // usually answers the report on its own, so it lands before anything that can fail.
+        // The log snapshot is the least valuable and the most likely to fault on a broken
+        // heap, so it goes last.
         SymbolApi symbolApi;
         LoadSymbolApi(hLib, symbolApi);
 
@@ -809,7 +892,21 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 context.push_back('\n');
         }
         WriteTextFile(contextPath, context);
-        ForceLog("[Crash] Wrote crash context (%zu bytes) to %s\n", context.size(), ToUtf8(contextPath).c_str());
+        CrashProgress("[Crash] Wrote crash context (%zu bytes) to %s\n",
+                      context.size(), ToUtf8(contextPath).c_str());
+
+        std::string recentLogs;
+        if (TryGetRecentLogs(&recentLogs))
+        {
+                WriteTextFile(logsPath, recentLogs);
+                CrashProgress("[Crash] Wrote logs snapshot (%zu bytes) to %s\n",
+                              recentLogs.size(), ToUtf8(logsPath).c_str());
+        }
+        else
+        {
+                CrashProgress("[Crash] Could not read the in-memory log ring; continuing "
+                              "without logs.txt.\n");
+        }
 
         const std::string payload = BuildUserStreamPayload(context, recentLogs);
         const ULONG payloadSize = static_cast<ULONG>(std::min<size_t>(payload.size(), std::numeric_limits<ULONG>::max()));
@@ -837,12 +934,15 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
 
                         if (!win)
                         {
-                                ForceLog("[Crash] MiniDumpWriteDump failed err=%lu\n", GetLastError());
+                                CrashProgress("[Crash] MiniDumpWriteDump failed err=%lu\n", GetLastError());
                                 wsprintf(messageBuffer, _T("MiniDumpWriteDump failed. Error: %u\n%ls"), GetLastError(), dumpPath.c_str());
                         }
                         else
                         {
-                                ForceLog("[Crash] MiniDumpWriteDump succeeded for %s\n", ToUtf8(dumpPath).c_str());
+                                CrashProgress("[Crash] MiniDumpWriteDump succeeded for %s\n", ToUtf8(dumpPath).c_str());
+                                // The dump is what makes a crash solvable, so this is what
+                                // decides whether the handlers may swallow the crash.
+                                g_crashBundleOk.store(true);
                                 wsprintf(messageBuffer, _T("Crash bundle created:\n%ls"), crashDir.c_str());
                         }
                         CloseHandle(hFile);
@@ -850,7 +950,7 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 else
                 {
                         const DWORD err = GetLastError();
-                        ForceLog("[Crash] CreateFileW failed for dump path %s (err=%lu)\n", ToUtf8(dumpPath).c_str(), err);
+                        CrashProgress("[Crash] CreateFileW failed for dump path %s (err=%lu)\n", ToUtf8(dumpPath).c_str(), err);
                         wsprintf(messageBuffer, _T("Could not create dump file at:\n%ls\nError: %lu"), dumpPath.c_str(), err);
                 }
         }
@@ -859,7 +959,8 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
                 wsprintf(messageBuffer, _T("Could not load dbghelp; crash context saved at:\n%ls"), crashDir.c_str());
         }
 
-        ForceLog("[Crash] Bundle written to %s\n", ToUtf8(crashDir).c_str());
+        CrashProgress("[Crash] Bundle written to %s (dump ok=%d)\n",
+                      ToUtf8(crashDir).c_str(), g_crashBundleOk.load() ? 1 : 0);
 
         if (showDialog)
         {
@@ -867,14 +968,35 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
         }
 }
 
+// Decides what to do once the bundle writer has had its turn.
+//
+// ExitProcess used to be unconditional, and that was safe only by accident: the CRT kept
+// unregistering our filter, so this rarely ran and crashes fell through to Windows. Now
+// that the filter reliably survives, exiting here also suppresses WER and any configured
+// LocalDumps - so a failure inside the bundle writer meant the crash was lost completely,
+// which is exactly what happened on 2026-09-03.
+//
+// So: exit quietly only when we actually have a dump. Otherwise hand the exception back to
+// Windows, which is worse for the user (they get the OS crash dialog) and much better for
+// the goal, because WER then captures what we could not.
+static LONG FinishCrashHandling(const char* who)
+{
+        if (g_crashBundleOk.load())
+        {
+                ExitProcess(0);
+                return EXCEPTION_EXECUTE_HANDLER; // not reached
+        }
+
+        CrashProgress("[Crash] %s produced no dump; handing the exception to Windows so WER "
+                      "and LocalDumps can still capture it.\n", who);
+        return EXCEPTION_CONTINUE_SEARCH;
+}
+
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
-        ForceLog("[Crash] UnhandledExFilter invoked.\n");
+        CrashProgress("[Crash] UnhandledExFilter invoked.\n");
         WriteCrashBundle("Unhandled exception", ExPtr, true);
-
-        ExitProcess(0);
-
-        return EXCEPTION_EXECUTE_HANDLER;
+        return FinishCrashHandling("UnhandledExFilter");
 }
 
 static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
@@ -890,10 +1012,9 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         // the standard unhandled filter.
         if (code == STATUS_HEAP_CORRUPTION || code == STATUS_FATAL_APP_EXIT)
         {
-                ForceLog("[Crash] VectoredCrashHandler caught code=0x%08X\n", code);
+                CrashProgress("[Crash] VectoredCrashHandler caught code=0x%08X\n", code);
                 WriteCrashBundle("Vectored crash handler", ExPtr, true);
-                ExitProcess(0);
-                return EXCEPTION_CONTINUE_SEARCH;
+                return FinishCrashHandling("VectoredCrashHandler");
         }
 
         return EXCEPTION_CONTINUE_SEARCH;
@@ -932,7 +1053,7 @@ void InstallCrashHandlers()
         if (!g_vectoredHandler)
         {
                 g_vectoredHandler = AddVectoredExceptionHandler(1, VectoredCrashHandler);
-                ForceLog("[Crash] Vectored exception handler installed (%p).\n", g_vectoredHandler);
+                CrashProgress("[Crash] Vectored exception handler installed (%p).\n", g_vectoredHandler);
         }
 
         // A stack overflow leaves too little room for a filter to run and write a dump,
@@ -941,9 +1062,9 @@ void InstallCrashHandlers()
         ULONG_PTR guarantee = 64 * 1024;
         if (!SetThreadStackGuarantee(&guarantee))
         {
-                ForceLog("[Crash] SetThreadStackGuarantee failed err=%lu\n", GetLastError());
+                CrashProgress("[Crash] SetThreadStackGuarantee failed err=%lu\n", GetLastError());
         }
 
         SetUnhandledExceptionFilter(UnhandledExFilter);
-        ForceLog("[Crash] Unhandled exception filter installed.\n");
+        CrashProgress("[Crash] Unhandled exception filter installed.\n");
 }

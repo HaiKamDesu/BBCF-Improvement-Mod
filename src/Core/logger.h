@@ -36,6 +36,15 @@
 
 void logger_with_level(int level, const char* message, ...);
 void ForceLog(const char* message, ...);
+
+// Writes an already-formatted line for a process that is in the middle of dying.
+//
+// ForceLog is not safe on that path: it builds a std::string and then pushes a copy into
+// the in-memory ring under the log mutex, so it allocates twice. A heap-corruption crash
+// dies inside that, which cost a real crash report - the line reached disk and the crash
+// handler never got another instruction. This one allocates nothing, takes no lock it is
+// willing to wait for, and never touches the ring.
+void ForceLogRaw(const char* line);
 void openLogger();
 void closeLogger();
 void SetLoggingEnabled(bool enabled);

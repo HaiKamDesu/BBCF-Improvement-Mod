@@ -311,6 +311,32 @@ void relog_with_level(int level, const char* message, ...)
         fflush(g_reFile);
 }
 
+void ForceLogRaw(const char* line)
+{
+	if (!line || !*line)
+	{
+		return;
+	}
+
+	if (!g_oFile)
+	{
+		OutputDebugStringA(line);
+		return;
+	}
+
+	// A crash can arrive on a thread that already holds this mutex - the fault can be
+	// inside the logger itself. Blocking would deadlock the crash handler and lose the
+	// report entirely, so take the lock if it is free and write anyway if it is not: an
+	// interleaved line is a far better outcome than no crash bundle.
+	const bool locked = g_logMutex.try_lock();
+	fputs(line, g_oFile);
+	fflush(g_oFile);
+	if (locked)
+	{
+		g_logMutex.unlock();
+	}
+}
+
 void ForceLog(const char* message, ...)
 {
 	if (!message)
