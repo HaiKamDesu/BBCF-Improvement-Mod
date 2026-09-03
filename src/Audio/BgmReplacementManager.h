@@ -29,6 +29,18 @@ enum class BgmReplacementState
 	Unavailable,  // the shipped track isn't installed, so there's nothing to stand in for
 };
 
+// When a swap to this track actually starts being heard. The game does not load every BGM
+// the same way, and a replacement that has been written correctly still does nothing until
+// the game next loads that file - which for a couple of tracks means not until it restarts.
+// Saying so on the row is the difference between "applied" and the user believing it worked.
+// Derived in BuildCatalogue; see docs/BgmReplacementTiming.md for how each was established.
+enum class BgmLoadTiming
+{
+	NextMatch,     // loaded with the match: battle, boss, astral
+	NextScreen,    // loaded when its screen comes up: menus, lobby, versus, results
+	GameRestart,   // loaded once during the game's own boot and kept for the whole process
+};
+
 struct BgmReplaceableTrack
 {
 	int         tableIndex = -1;   // index into the game's filename table
@@ -39,6 +51,7 @@ struct BgmReplaceableTrack
 	std::string originalDir;       // folder holding the shipped file; empty if not installed
 	std::string usageNote;         // where this track is actually heard; empty if obvious
 	bool        everUsed = true;   // false for entries the game never reads at all
+	BgmLoadTiming timing = BgmLoadTiming::NextScreen;
 };
 
 class BgmReplacementManager
@@ -99,6 +112,12 @@ public:
 	std::string GetOriginalPreviewPath(int tableIndex) const;
 	std::string GetReplacementPreviewPath(int tableIndex) const;
 
+	// True when this replacement's pointer was already in the table before the game loaded
+	// the track, so it is what you are hearing now. Only ever false for a GameRestart track
+	// that was swapped mid-session: those are read once during the game's boot, so the swap
+	// is correct but silent until the next launch.
+	bool IsLiveNow(int tableIndex) const;
+
 private:
 	BgmReplacementManager() = default;
 	~BgmReplacementManager() = default;
@@ -117,6 +136,8 @@ private:
 		// The song's own ReplayGain, already applied. gainDb is the user's offset on top.
 		float tagGainDb = 0.0f;
 		bool  hasTagGain = false;
+		// Whether the pointer was in place before the game's boot read this entry.
+		bool  appliedBeforeBoot = false;
 	};
 
 	struct Job
@@ -157,6 +178,9 @@ private:
 	void Load();
 
 	bool        m_initialized = false;
+	// Set only while Initialize() re-applies saved assignments, which happens before the
+	// game's own boot audio init; distinguishes those from mid-session swaps.
+	bool        m_applyingSavedAtStartup = false;
 	uintptr_t   m_tableAddr = 0;
 	const char* m_original[175] = {};
 	std::string m_owned[175];

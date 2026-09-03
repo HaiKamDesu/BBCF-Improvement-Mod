@@ -265,9 +265,41 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 		ImGui::TextColored(color, "%s", L("Converting your song...").c_str());
 		break;
 	case BgmReplacementState::Active:
-		ImGui::TextColoredWrapped(color, "%s: %s", L("Now playing your song").c_str(),
+	{
+		// "Now playing your song" was not always true, and that is the whole reason people
+		// swap a track and ask why nothing changed. A replacement is written correctly long
+		// before the game next loads that file, so say which it is.
+		const bool live = mgr.IsLiveNow(tableIndex);
+		ImGui::TextColoredWrapped(color, "%s: %s",
+			(live ? L("Now playing your song") : L("Your song is set")).c_str(),
 			mgr.GetSourceName(tableIndex).c_str());
+
+		const char* when = nullptr;
+		switch (track->timing)
+		{
+		case BgmLoadTiming::NextMatch:
+			when = live ? "Loads with each match." : "Starts playing from your next match.";
+			break;
+		case BgmLoadTiming::NextScreen:
+			when = live ? "Loads each time this screen comes up."
+			            : "Starts playing the next time this screen's music loads.";
+			break;
+		case BgmLoadTiming::GameRestart:
+			when = live ? "The game loads this one at startup, so it is already in use."
+			            : "The game only loads this one while it starts up, so restart the "
+			              "game to hear it. The swap itself is saved and done.";
+			break;
+		}
+		if (when != nullptr)
+		{
+			if (live)
+				ImGui::TextDisabledWrapped("%s", L(when).c_str());
+			else
+				ImGui::TextColoredWrapped(StateColor(BgmReplacementState::Converting), "%s",
+					L(when).c_str());
+		}
 		break;
+	}
 	case BgmReplacementState::Missing:
 	case BgmReplacementState::Failed:
 		ImGui::TextColoredWrapped(color, "%s", mgr.GetError(tableIndex).c_str());

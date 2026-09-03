@@ -1328,3 +1328,10 @@ Setup time (s),Setup time (s),Tiempo de preparacion (s)
 Return to replay,Return to replay,Volver al replay
 Fix playback,Fix playback,Arreglar la reproduccion
 "Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.","Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.","Prueba esto si el takeover se ve mal antes de reportar un problema: lo corrige la mayoria de las veces. Usarlo cuando ya funciona lo rompera, y volver a pulsarlo lo deja como estaba."
+Your song is set,Your song is set,Tu canción está lista
+Loads with each match.,Loads with each match.,Se carga en cada combate.
+Starts playing from your next match.,Starts playing from your next match.,Empieza a sonar desde tu próximo combate.
+Loads each time this screen comes up.,Loads each time this screen comes up.,Se carga cada vez que aparece esta pantalla.
+Starts playing the next time this screen's music loads.,Starts playing the next time this screen's music loads.,Empieza a sonar la próxima vez que se cargue la música de esta pantalla.
+"The game loads this one at startup, so it is already in use.","The game loads this one at startup, so it is already in use.","El juego carga esta al iniciarse, así que ya está en uso."
+"The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.","The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.","El juego solo carga esta mientras arranca, así que reinicia el juego para oírla. El cambio ya está guardado y hecho."

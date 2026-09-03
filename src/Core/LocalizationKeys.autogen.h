@@ -3452,6 +3452,27 @@ struct LocalizationKeysAccessor
 
         // Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.
         inline const char* Try_this_if_the_takeover_looks_wrong_before_reporting_a_problem_it_corrects_it_most_of_the_time_Using_it_while_the_takeover_is_already_working_will_break_it_instead_and_clicking_again_puts_it_back() const { return Get("Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back."); }
+
+        // Your song is set
+        inline const char* Your_song_is_set() const { return Get("Your song is set"); }
+
+        // Loads with each match.
+        inline const char* Loads_with_each_match() const { return Get("Loads with each match."); }
+
+        // Starts playing from your next match.
+        inline const char* Starts_playing_from_your_next_match() const { return Get("Starts playing from your next match."); }
+
+        // Loads each time this screen comes up.
+        inline const char* Loads_each_time_this_screen_comes_up() const { return Get("Loads each time this screen comes up."); }
+
+        // Starts playing the next time this screen's music loads.
+        inline const char* Starts_playing_the_next_time_this_screen_s_music_loads() const { return Get("Starts playing the next time this screen's music loads."); }
+
+        // The game loads this one at startup, so it is already in use.
+        inline const char* The_game_loads_this_one_at_startup_so_it_is_already_in_use() const { return Get("The game loads this one at startup, so it is already in use."); }
+
+        // The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.
+        inline const char* The_game_only_loads_this_one_while_it_starts_up_so_restart_the_game_to_hear_it_The_swap_itself_is_saved_and_done() const { return Get("The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done."); }
 };
 
 

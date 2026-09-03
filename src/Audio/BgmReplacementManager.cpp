@@ -26,6 +26,14 @@ namespace
 	// shipped file is ever touched and Steam's file verification has nothing to restore.
 	const char* kReplacementDir = "BBCFIM_Music";
 
+	// The two entries the game loads during its own boot, verified in the disassembly:
+	// both are read from the function that also carries InitParticle / InitFade /
+	// InitSystemFont / InitGameSystem, and are registered into fixed audio slots (6 and 7)
+	// for the rest of the process. A table pointer written after that is never consulted,
+	// so a swap to either only takes effect on the next launch.
+	const int kCharaSelectIndex  = 72;   // 201_charaselect.pac, read only at 0x00483B55
+	const int kRandomSelectIndex = 85;   // 251_rannyu.pac,      read only at 0x00483ACF
+
 	// Only two prefixes are used for BGM; a track's original tells us which one applies.
 	// These are relative to the GAME FOLDER, never to the working directory - see
 	// GetGameDirectory() for why that distinction matters.
@@ -223,6 +231,8 @@ bool BgmReplacementManager::ApplyPointer(int tableIndex)
 		}
 	}
 
+	it->second.appliedBeforeBoot = m_applyingSavedAtStartup;
+
 	RestorePointer(tableIndex);
 	m_owned[tableIndex] = it->second.relPath;
 
@@ -324,6 +334,28 @@ void BgmReplacementManager::BuildCatalogue()
 			break;
 		}
 
+		// Load timing. Only two entries are genuinely boot-loaded, and they are the reason
+		// this field exists: 201_charaselect and 251_rannyu are both read from the game's
+		// boot init (the function carrying InitParticle / InitFade / InitSystemFont /
+		// InitGameSystem) into fixed audio slots, and stay there for the whole process.
+		// Everything else is loaded when the game next needs it, so the only question is
+		// whether that is a match or a screen.
+		if (i == kCharaSelectIndex || i == kRandomSelectIndex)
+		{
+			track.timing = BgmLoadTiming::GameRestart;
+		}
+		else if (_stricmp(track.category.c_str(), "btl") == 0 ||
+			_stricmp(track.category.c_str(), "boss") == 0 ||
+			_stricmp(track.category.c_str(), "old") == 0 ||
+			_stricmp(track.category.c_str(), "astral") == 0)
+		{
+			track.timing = BgmLoadTiming::NextMatch;
+		}
+		else
+		{
+			track.timing = BgmLoadTiming::NextScreen;
+		}
+
 		if (track.displayName.empty())
 			track.displayName = track.baseName;
 		if (track.category.empty())
@@ -390,6 +422,7 @@ void BgmReplacementManager::Initialize()
 	Load();
 
 	// Re-validate every saved assignment against disk before touching a single pointer.
+	m_applyingSavedAtStartup = true;
 	for (auto& entry : m_assignments)
 	{
 		if (LooksLikeUsablePac(entry.second.pacPath))
@@ -406,6 +439,8 @@ void BgmReplacementManager::Initialize()
 				entry.first, entry.second.pacPath.c_str());
 		}
 	}
+
+	m_applyingSavedAtStartup = false;
 
 	LogRepl("Initialized: %d assignment(s), %d active\n",
 		GetAssignedCount(), GetActiveCount());
@@ -775,6 +810,24 @@ int BgmReplacementManager::GetActiveCount() const
 	for (const auto& entry : m_assignments)
 		if (entry.second.state == BgmReplacementState::Active) ++n;
 	return n;
+}
+
+bool BgmReplacementManager::IsLiveNow(int tableIndex) const
+{
+	auto it = m_assignments.find(tableIndex);
+	if (it == m_assignments.end() || it->second.state != BgmReplacementState::Active)
+		return false;
+
+	const BgmReplaceableTrack* const track = FindTrack(tableIndex);
+	if (track == nullptr)
+		return false;
+
+	// Everything except the boot-loaded pair is read fresh each time the game needs it, so
+	// the pointer being set is enough; the row's timing line says when that next happens.
+	if (track->timing != BgmLoadTiming::GameRestart)
+		return true;
+
+	return it->second.appliedBeforeBoot;
 }
 
 int BgmReplacementManager::GetAssignedCount() const
