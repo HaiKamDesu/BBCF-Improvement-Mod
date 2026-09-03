@@ -2832,8 +2832,8 @@ struct LocalizationKeysAccessor
         // Enable Music Rotation
         inline const char* Enable_Music_Rotation() const { return Get("Enable Music Rotation"); }
 
-        // Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.
-        inline const char* Plays_the_replacement_itself_The_track_it_stands_in_for_is_still_listed_separately_and_still_plays_the_original_Set_its_volume_in_the_music_replacement_window() const { return Get("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window."); }
+        // Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.
+        inline const char* Plays_the_replacement_itself_The_track_it_stands_in_for_is_still_listed_separately_and_still_plays_the_original_Its_volume_is_the_same_setting_the_music_replacement_window_shows() const { return Get("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows."); }
 
         // Enable music rotation
         inline const char* Enable_music_rotation_2() const { return Get("Enable music rotation"); }
@@ -3458,6 +3458,9 @@ struct LocalizationKeysAccessor
 
         // not applied yet
         inline const char* not_applied_yet() const { return Get("not applied yet"); }
+
+        // converting...
+        inline const char* converting_2() const { return Get("converting..."); }
 
         // Untouched up to
         inline const char* Untouched_up_to() const { return Get("Untouched up to"); }

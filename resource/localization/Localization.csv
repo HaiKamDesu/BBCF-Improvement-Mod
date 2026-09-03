@@ -1120,7 +1120,7 @@ Jukebox,Jukebox,Jukebox
 Music,Music,Música
 Loading custom music...,Loading custom music...,Cargando música personalizada...
 Enable Music Rotation,Enable Music Rotation,Activar rotación de música
-"Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.","Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.","Reproduce el reemplazo en sí. La pista a la que sustituye sigue apareciendo por separado y sigue reproduciendo la original. Ajusta su volumen en la ventana de reemplazo de música."
+"Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.","Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.","Reproduce el reemplazo en sí. La pista a la que sustituye sigue apareciendo por separado y sigue reproduciendo la original. Su volumen es el mismo ajuste que muestra la ventana de reemplazo de música."
 Enable music rotation,Enable music rotation,Activar rotación de música
 Enable/disable automatic music rotation in-game,Enable/disable automatic music rotation in-game,Activa o desactiva la rotación automática de música durante la partida
 Rotation Mode:,Rotation Mode:,Modo de rotación:
@@ -1329,6 +1329,7 @@ Releases,Releases,Versiones
 You must be in a mode where state can be saved.,You must be in a mode where state can be saved.,Tienes que estar en un modo donde se pueda guardar el estado.
 You cannot use this feature while searching for a ranked match.,You cannot use this feature while searching for a ranked match.,No puedes usar esta función mientras buscas una partida clasificatoria.
 not applied yet,not applied yet,sin aplicar todavía
+converting...,converting...,convirtiendo...
 Untouched up to,Untouched up to,Sin alterar hasta
 Above,Above,Por encima de
 this song gets squashed to fit.,this song gets squashed to fit.,esta canción se comprime para caber.

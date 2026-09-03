@@ -132,6 +132,12 @@ public:
         return trackId >= kCustomTrackIdBase && trackId < kReplacementTrackIdBase;
     }
     static bool IsReplacementTrackId(int trackId) { return trackId >= kReplacementTrackIdBase; }
+    // The BgmReplacementManager table index a published replacement row came from, or -1 for
+    // any other id. The mapping lives with the id scheme so no caller has to redo the
+    // arithmetic and get it wrong.
+    static int GetReplacementTableIndex(int trackId) {
+        return IsReplacementTrackId(trackId) ? trackId - kReplacementTrackIdBase : -1;
+    }
 
     static const char* GetBgmFilename(int trackId);
     // The XACT cue to play a track by, which is NOT always its filename:

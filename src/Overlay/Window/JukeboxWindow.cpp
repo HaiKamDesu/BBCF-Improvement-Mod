@@ -7,6 +7,7 @@
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
 #include "Audio/AudioDecode.h"
+#include "Audio/BgmReplacementManager.h"
 #include "Core/NativeFileDialog.h"
 #include "Core/utils.h"
 
@@ -22,6 +23,13 @@ namespace
 {
 	const char* const kJukeboxDialogOwner = "jukebox_window";
 	const char* const kCustomDirRel = "data/Sound/BGM/custom";
+
+	std::string FormatDb(float value)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "%+.1f dB", value);
+		return buf;
+	}
 
 	std::string FileNameOf(const std::string& path)
 	{
@@ -247,8 +255,13 @@ void JukeboxWindow::PollRestartAfterVolume() {
 		return;
 
 	MusicManager& musicManager = GetMusicManager();
-	if (musicManager.IsCustomMusicLoading())
+	const int tableIndex = MusicManager::GetReplacementTableIndex(m_restartAfterVolumeTrackId);
+	if (tableIndex >= 0) {
+		if (GetBgmReplacements().GetState(tableIndex) == BgmReplacementState::Converting)
+			return; // still reconverting
+	} else if (musicManager.IsCustomMusicLoading()) {
 		return; // still reconverting
+	}
 
 	const int trackId = m_restartAfterVolumeTrackId;
 	m_restartAfterVolumeTrackId = -1;
@@ -261,19 +274,33 @@ void JukeboxWindow::PollRestartAfterVolume() {
 	musicManager.PlayTrack(trackId, true);
 }
 
-// A small button per custom track opening a volume popup. A slider on every row would
-// swamp a list that is mostly there for choosing what to play.
-void JukeboxWindow::DrawCustomTrackVolume(int trackId) {
+// A small button per row opening a volume popup. A slider on every row would swamp a list
+// that is mostly there for choosing what to play.
+//
+// Both kinds of row bake the level into the converted .pac, because the game plays that file
+// through its own XACT engine where the mod has no volume control - so both apply by
+// re-converting, and neither costs anything until Apply. What differs is only where the
+// stored level lives: a custom song's here, a replacement's in BgmReplacementManager, which
+// is the same value the music replacement window edits. Reading and writing through the
+// owner is what keeps the two windows showing one number rather than two copies of it.
+void JukeboxWindow::DrawTrackVolume(int trackId) {
 	MusicManager& musicManager = GetMusicManager();
+	BgmReplacementManager& replacements = GetBgmReplacements();
+
+	const int tableIndex = MusicManager::GetReplacementTableIndex(trackId);
+	const bool isReplacement = tableIndex >= 0;
+
+	const float saved = isReplacement
+		? replacements.GetGainDb(tableIndex)
+		: musicManager.GetCustomTrackVolumeDb(trackId);
 
 	const std::string popupId = "##vol" + std::to_string(trackId);
-	const float current = musicManager.GetCustomTrackVolumeDb(trackId);
 
 	char label[48];
-	if (current == 0.0f)
+	if (saved == 0.0f)
 		snprintf(label, sizeof(label), "%s%s", L("vol").c_str(), popupId.c_str());
 	else
-		snprintf(label, sizeof(label), "%+.0f dB%s", current, popupId.c_str());
+		snprintf(label, sizeof(label), "%+.0f dB%s", saved, popupId.c_str());
 
 	if (ImGui::SmallButton(label))
 		ImGui::OpenPopup(popupId.c_str());
@@ -282,18 +309,24 @@ void JukeboxWindow::DrawCustomTrackVolume(int trackId) {
 		ImGui::SetTooltipWrapped(L("Set how loud this song is. The file is converted again when you apply it.").c_str());
 
 	if (ImGui::BeginPopup(popupId.c_str())) {
-		// The draft only exists while this popup is open.
-		if (m_volumePopupTrackId != trackId) {
+		// The draft only exists while this popup is open, and re-seeds if the stored value
+		// moves underneath it - an apply from the music replacement window, or this one's
+		// own reconversion landing.
+		if (m_volumePopupTrackId != trackId || m_volumeSavedSeen != saved) {
 			m_volumePopupTrackId = trackId;
-			m_volumeDraft = current;
+			m_volumeDraft = saved;
+			m_volumeSavedSeen = saved;
 		}
 
 		// If the song carries a loudness tag it has already been levelled by it, and this
 		// slider is an adjustment on top rather than the whole story. Saying so is the
 		// difference between "0 dB means untouched" and "0 dB means whatever the tag said".
 		float tagGain = 0.0f;
-		if (musicManager.GetCustomTrackTagGainDb(trackId, tagGain)) {
-			char note[128];
+		const bool hasTag = isReplacement
+			? replacements.GetTagGainDb(tableIndex, tagGain)
+			: musicManager.GetCustomTrackTagGainDb(trackId, tagGain);
+		if (hasTag) {
+			char note[160];
 			snprintf(note, sizeof(note), "%s %+.1f dB", L("Levelled by the song's own tag:").c_str(), tagGain);
 			ImGui::TextDisabled("%s", note);
 		}
@@ -301,10 +334,31 @@ void JukeboxWindow::DrawCustomTrackVolume(int trackId) {
 		ImGui::SetNextItemWidth(200.0f);
 		ImGui::SliderFloat(L("Adjust").c_str(), &m_volumeDraft, -40.0f, 40.0f, "%+.1f dB");
 
-		const bool busy = musicManager.IsCustomMusicLoading();
-		ImGui::BeginDisabled(busy || m_volumeDraft == current);
+		// How much of that is free. Up to the song's own headroom nothing is altered at all;
+		// past it the loud parts have to be held down to fit, and the song is being squashed
+		// rather than turned up. Only measured for replacements so far.
+		if (isReplacement) {
+			const float headroom = replacements.GetHeadroomDb(tableIndex);
+			if (headroom > -200.0f) {
+				if (m_volumeDraft > headroom) {
+					ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s",
+						(L("Above") + " " + FormatDb(headroom) + " " + L("this song gets squashed to fit.")).c_str());
+				} else {
+					ImGui::TextDisabled("%s", (L("Untouched up to") + " " + FormatDb(headroom)).c_str());
+				}
+			}
+		}
+
+		const bool busy = isReplacement
+			? replacements.GetState(tableIndex) == BgmReplacementState::Converting
+			: musicManager.IsCustomMusicLoading();
+
+		ImGui::BeginDisabled(busy || m_volumeDraft == saved);
 		if (ImGui::Button(L("Apply volume").c_str())) {
-			musicManager.SetCustomTrackVolumeDb(trackId, m_volumeDraft);
+			if (isReplacement)
+				replacements.SetGainDb(tableIndex, m_volumeDraft);
+			else
+				musicManager.SetCustomTrackVolumeDb(trackId, m_volumeDraft);
 			// The rebuild is asynchronous, and the game is still holding the old file. If
 			// this is what is playing, it has to be reloaded once the new one exists.
 			m_restartAfterVolumeTrackId = trackId;
@@ -312,7 +366,10 @@ void JukeboxWindow::DrawCustomTrackVolume(int trackId) {
 		}
 		ImGui::EndDisabled();
 
-		if (m_volumeDraft != current) {
+		if (busy) {
+			ImGui::SameLine();
+			ImGui::TextDisabled("%s", L("converting...").c_str());
+		} else if (m_volumeDraft != saved) {
 			ImGui::SameLine();
 			ImGui::TextColored(ImVec4(1.0f, 0.80f, 0.35f, 1.0f), "%s", L("not applied yet").c_str());
 		}
@@ -471,17 +528,15 @@ void JukeboxWindow::DrawTrackList() {
 
 		ImGui::SameLine();
 
-		// Custom tracks get a volume of their own. Native ones are already balanced
-		// against each other by the game, so there is nothing to fix there - and a
-		// replacement's gain belongs to the replacement browser, which owns the
-		// reconversion that applying it needs, so it is deliberately not offered twice.
-		const bool isCustom = MusicManager::IsCustomTrackId(track->id);
+		// Custom songs and replacements both get a volume of their own. Native tracks are
+		// already balanced against each other by the game, so there is nothing to fix there.
 		const bool isReplacement = MusicManager::IsReplacementTrackId(track->id);
+		const bool hasVolume = MusicManager::IsCustomTrackId(track->id) || isReplacement;
 
 		// A Selectable spans the rest of the line by default, which puts it underneath
 		// anything drawn after it on the same row - that is why the volume button could
 		// not be clicked, the row was swallowing the press. Reserve the space instead.
-		const float volumeWidth = isCustom ? 70.0f : 0.0f;
+		const float volumeWidth = hasVolume ? 70.0f : 0.0f;
 		const float selectableWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x - volumeWidth);
 
 		if (ImGui::Selectable((std::to_string(track->id) + ": " + track->name + "##Sel" + std::to_string(track->id)).c_str(),
@@ -491,16 +546,16 @@ void JukeboxWindow::DrawTrackList() {
 		}
 
 		if (ImGui::IsItemHovered() && isReplacement) {
-			ImGui::SetTooltipWrapped(L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Set its volume in the music replacement window.").c_str());
+			ImGui::SetTooltipWrapped(L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.").c_str());
 		}
 
 		if (isCurrent) {
 			ImGui::PopStyleColor();
 		}
 
-		if (isCustom) {
+		if (hasVolume) {
 			ImGui::SameLine();
-			DrawCustomTrackVolume(track->id);
+			DrawTrackVolume(track->id);
 		}
 	}
 

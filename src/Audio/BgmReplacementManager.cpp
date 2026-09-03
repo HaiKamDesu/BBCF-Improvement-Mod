@@ -861,7 +861,17 @@ BgmReplacementManager::GetActiveReplacements() const
 		if (track.originalDir != kBgmDir)
 			continue;
 		const auto it = m_assignments.find(track.tableIndex);
-		if (it == m_assignments.end() || it->second.state != BgmReplacementState::Active)
+		if (it == m_assignments.end())
+			continue;
+		// Converting counts as listable, on one condition. A gain change re-converts, and
+		// dropping the row for those few seconds would take it out from under the volume
+		// popup that started it - and out from under the player, if it was playing. The
+		// converter writes a .tmp and moves it into place, so the file already there stays
+		// whole and playable the entire time. Requiring the file is what keeps a
+		// first-time conversion, which has nothing on disk yet, from being offered.
+		const bool listable = it->second.state == BgmReplacementState::Active ||
+			it->second.state == BgmReplacementState::Converting;
+		if (!listable || !FileExists(it->second.pacPath))
 			continue;
 
 		ActiveReplacement entry;
@@ -885,9 +895,15 @@ unsigned int BgmReplacementManager::GetActiveSignature() const
 	unsigned int signature = 2166136261u;
 	for (const auto& entry : m_assignments)
 	{
-		if (entry.second.state != BgmReplacementState::Active)
+		if (entry.second.state != BgmReplacementState::Active &&
+			entry.second.state != BgmReplacementState::Converting)
 			continue;
+		// The state is mixed in as well as the index, so a first-time conversion finishing
+		// is seen (its row could not be listed while it had no file yet). A gain change
+		// therefore also re-publishes, which costs one rebuild and changes nothing about
+		// the row - the point is only that it does not disappear.
 		signature = (signature ^ static_cast<unsigned int>(entry.first)) * 16777619u;
+		signature = (signature ^ static_cast<unsigned int>(entry.second.state)) * 16777619u;
 	}
 	return signature;
 }
