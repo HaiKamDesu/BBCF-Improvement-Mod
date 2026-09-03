@@ -24,6 +24,14 @@ namespace
 	const char* const kJukeboxDialogOwner = "jukebox_window";
 	const char* const kCustomDirRel = "data/Sound/BGM/custom";
 
+	// Centres a row of buttons whose combined width is known, so a dialog's actions sit
+	// under the middle of its text rather than hugging the left edge.
+	void CenterNextButtonsRow(float totalWidth)
+	{
+		const float offset = (std::max)(0.0f, (ImGui::GetContentRegionAvail().x - totalWidth) * 0.5f);
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+	}
+
 	std::string FormatDb(float value)
 	{
 		char buf[32];
@@ -482,10 +490,20 @@ void JukeboxWindow::DrawTrackContextMenu(const MusicTrack& track) {
 }
 
 void JukeboxWindow::DrawDeleteTrackModal() {
-	const char* modalId = "##jukebox_delete_track";
+	// A translated caption over a stable id: ImGui hashes only what follows the ###, so
+	// changing language cannot orphan a popup that is already open.
+	const std::string modalTitle = L("Delete track") + "###jukebox_delete_track";
+
 	if (m_deleteModalQueued) {
 		m_deleteModalQueued = false;
-		ImGui::OpenPopup(modalId);
+		// Positioned and sized on the frame it opens, which is the frame BeginPopupModal
+		// below first begins the window. DisplaySize rather than the viewport, because the
+		// mod overrides it when scaling the overlay and that is the space windows live in.
+		const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f,
+			ImGui::GetIO().DisplaySize.y * 0.5f);
+		ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(520.0f, 0.0f), ImGuiCond_Appearing);
+		ImGui::OpenPopup(modalTitle.c_str());
 	}
 	if (m_deleteRequestTrackId < 0) {
 		return;
@@ -493,13 +511,13 @@ void JukeboxWindow::DrawDeleteTrackModal() {
 	// Escape dismisses a modal without going through either button, so the request is
 	// dropped once the popup is gone rather than left pointing at a track that may not
 	// even be in the list any more.
-	if (!ImGui::IsPopupOpen(modalId)) {
+	if (!ImGui::IsPopupOpen(modalTitle.c_str())) {
 		m_deleteRequestTrackId = -1;
 		m_deleteRequestName.clear();
 		return;
 	}
 
-	if (!ImGui::BeginPopupModal(modalId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		return;
 	}
 
@@ -507,9 +525,16 @@ void JukeboxWindow::DrawDeleteTrackModal() {
 	const int tableIndex = MusicManager::GetReplacementTableIndex(trackId);
 	const bool isReplacement = tableIndex >= 0;
 
-	ImGui::TextWrapped("%s", (L("Delete") + " \"" + m_deleteRequestName + "\"?").c_str());
+	ImGui::TextWrapped("%s", L("Remove this track from the Jukebox?").c_str());
 	ImGui::Spacing();
 
+	// Coloured like its row in the list, so it is obvious which of the two kinds this is
+	// before reading the explanation under it.
+	ImGui::PushStyleColor(ImGuiCol_Text, GetCategoryColor(isReplacement ? "replacements" : "custom"));
+	ImGui::TextWrapped("%s", m_deleteRequestName.c_str());
+	ImGui::PopStyleColor();
+
+	ImGui::Spacing();
 	if (isReplacement) {
 		ImGui::TextWrapped("%s", L("This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.").c_str());
 	} else {
@@ -520,7 +545,18 @@ void JukeboxWindow::DrawDeleteTrackModal() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	if (ImGui::Button(L("Delete track").c_str(), ImVec2(120.0f, 0.0f))) {
+	const float buttonWidth = 130.0f;
+	CenterNextButtonsRow(buttonWidth * 2.0f + ImGui::GetStyle().ItemSpacing.x);
+
+	// Tinted red: it is the destructive half of the choice, and a confirmation whose two
+	// buttons look identical is one people click through without reading.
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.60f, 0.18f, 0.18f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.24f, 0.24f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.30f, 0.30f, 1.0f));
+	const bool confirmed = ImGui::Button(L("Delete track").c_str(), ImVec2(buttonWidth, 0.0f));
+	ImGui::PopStyleColor(3);
+
+	if (confirmed) {
 		bool ok = true;
 		if (isReplacement) {
 			GetBgmReplacements().Unassign(tableIndex);
@@ -536,8 +572,9 @@ void JukeboxWindow::DrawDeleteTrackModal() {
 		m_deleteRequestName.clear();
 		ImGui::CloseCurrentPopup();
 	}
+
 	ImGui::SameLine();
-	if (ImGui::Button(L("Cancel").c_str(), ImVec2(120.0f, 0.0f))) {
+	if (ImGui::Button(L("Cancel").c_str(), ImVec2(buttonWidth, 0.0f))) {
 		m_deleteRequestTrackId = -1;
 		m_deleteRequestName.clear();
 		ImGui::CloseCurrentPopup();

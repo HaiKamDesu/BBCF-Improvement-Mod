@@ -3465,6 +3465,9 @@ struct LocalizationKeysAccessor
         // Delete track
         inline const char* Delete_track() const { return Get("Delete track"); }
 
+        // Remove this track from the Jukebox?
+        inline const char* Remove_this_track_from_the_Jukebox() const { return Get("Remove this track from the Jukebox?"); }
+
         // This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted.
         inline const char* This_removes_the_replacement_itself_so_the_track_it_stands_in_for_goes_back_to_the_original_song_everywhere_the_music_replacement_window_included_The_song_you_picked_is_not_touched_only_the_converted_copy_is_deleted() const { return Get("This removes the replacement itself, so the track it stands in for goes back to the original song everywhere - the music replacement window included. The song you picked is not touched; only the converted copy is deleted."); }
 
