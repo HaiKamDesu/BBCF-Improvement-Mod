@@ -543,7 +543,10 @@ int TasWindow::DrawComposerRow(TasManager& manager, int player, const char* labe
     // While one player is being recorded the other player's button is dead: only one
     // capture at a time, and only the row that owns it can stop it.
     ImGui::BeginDisabled(recording && !recordingThis);
-    if (ImGui::Button(recordLabel.c_str())) {
+    // Both rows draw this button, and a bare label is its own ImGui id - two "Record"
+    // buttons in one window is an id collision, which ImGui reports as a visible error.
+    const std::string recordId = recordLabel + "##rec" + std::to_string(player);
+    if (ImGui::Button(recordId.c_str())) {
         if (recordingThis) {
             manager.StopLiveRecording();
         } else {
