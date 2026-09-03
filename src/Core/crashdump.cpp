@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <dbghelp.h>
+#include <intrin.h>
 #include <limits>
 #include <locale>
 #include <shlobj.h>
@@ -992,9 +993,92 @@ static LONG FinishCrashHandling(const char* who)
         return EXCEPTION_CONTINUE_SEARCH;
 }
 
+// ---------------------------------------------------------------------------------------
+// Hang watchdog.
+//
+// Everything else here defends against the crash path FAULTING. Nothing defends against it
+// HANGING, and SEH cannot: MiniDumpWriteDump takes the loader lock, so a crash caused by
+// heap or loader corruption can wedge the code trying to report it. Because the handler has
+// by then already decided not to hand the exception to Windows, the result is a process
+// that sits there forever with no report from anyone.
+//
+// A minute is deliberately generous. Writing a full-memory dump of this game took 13
+// seconds on a reporter's machine, so anything still running at 60s is genuinely stuck, not
+// slow, and firing this can never be mistaken for impatience.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+        constexpr DWORD kWatchdogDeadlineMs = 60 * 1000;
+        constexpr DWORD kWatchdogStepMs = 250;
+
+        // Bumped by both arming and disarming, so a superseded thread retires instead of
+        // firing on a later, healthy state.
+        std::atomic<unsigned int> g_watchdogGeneration{ 0 };
+        char g_watchdogReason[128] = {};
+
+        DWORD WINAPI CrashWatchdogThread(LPVOID param)
+        {
+                const unsigned int myGeneration = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(param));
+
+                for (DWORD waited = 0; waited < kWatchdogDeadlineMs; waited += kWatchdogStepMs)
+                {
+                        if (g_watchdogGeneration.load() != myGeneration)
+                        {
+                                return 0;
+                        }
+                        Sleep(kWatchdogStepMs);
+                }
+
+                if (g_watchdogGeneration.load() != myGeneration)
+                {
+                        return 0;
+                }
+
+                CrashProgress("[Crash] %s has not finished after %lu seconds and is presumed "
+                              "deadlocked. Forcing termination so Windows Error Reporting and "
+                              "LocalDumps still capture a dump of the hang.\n",
+                              g_watchdogReason, kWatchdogDeadlineMs / 1000);
+
+                // Not ExitProcess and not TerminateProcess: both end the process cleanly, and
+                // WER would see nothing - which is the situation this exists to prevent.
+                // __fastfail raises STATUS_STACK_BUFFER_OVERRUN, which cannot be swallowed by
+                // any handler and which WER does capture, and the dump it writes contains
+                // every thread including the stuck one.
+                __fastfail(FAST_FAIL_FATAL_APP_EXIT);
+                return 0; // not reached; __fastfail is not declared noreturn
+        }
+}
+
+void ArmCrashWatchdog(const char* reason)
+{
+        strncpy_s(g_watchdogReason, sizeof(g_watchdogReason),
+                  reason ? reason : "Crash handling", _TRUNCATE);
+
+        const unsigned int generation = g_watchdogGeneration.fetch_add(1) + 1;
+
+        const HANDLE thread = CreateThread(nullptr, 0, CrashWatchdogThread,
+                reinterpret_cast<LPVOID>(static_cast<uintptr_t>(generation)), 0, nullptr);
+        if (thread == nullptr)
+        {
+                CrashProgress("[Crash] Could not start the crash watchdog (err=%lu); a hang "
+                              "in the crash path will not be caught.\n", GetLastError());
+                return;
+        }
+        CloseHandle(thread);
+
+        CrashProgress("[Crash] Watchdog armed for \"%s\" (%lus).\n",
+                      g_watchdogReason, kWatchdogDeadlineMs / 1000);
+}
+
+void DisarmCrashWatchdog()
+{
+        g_watchdogGeneration.fetch_add(1);
+}
+
 LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
 {
         CrashProgress("[Crash] UnhandledExFilter invoked.\n");
+        ArmCrashWatchdog("Unhandled-exception crash handling");
         WriteCrashBundle("Unhandled exception", ExPtr, true);
         return FinishCrashHandling("UnhandledExFilter");
 }
@@ -1013,6 +1097,7 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         if (code == STATUS_HEAP_CORRUPTION || code == STATUS_FATAL_APP_EXIT)
         {
                 CrashProgress("[Crash] VectoredCrashHandler caught code=0x%08X\n", code);
+                ArmCrashWatchdog("Vectored crash handling");
                 WriteCrashBundle("Vectored crash handler", ExPtr, true);
                 return FinishCrashHandling("VectoredCrashHandler");
         }

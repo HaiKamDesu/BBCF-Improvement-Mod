@@ -24,3 +24,17 @@ void WriteCrashBundleForCurrentContext(const char* reason, DWORD pseudoException
 // and dinput8 is a static import so our DllMain always registers first and is always the
 // one displaced.
 void ReassertUnhandledExceptionFilter();
+
+// Last resort for a crash handler that HANGS rather than faults.
+//
+// SEH cannot catch a deadlock, and the realistic candidate is real: MiniDumpWriteDump takes
+// the loader lock, so a crash caused by heap or loader corruption can wedge the very code
+// trying to report it. The process then sits there forever having already suppressed
+// Windows' own reporting, which is the one outcome worse than crashing.
+//
+// Arm before entering a crash path that is known to end in termination. Disarm only where
+// the process is expected to carry on afterwards (BBCF's own exception filter continues to
+// its Steam minidump), because a watchdog that fires on a process that was going to survive
+// would be far worse than the hang it is guarding against.
+void ArmCrashWatchdog(const char* reason);
+void DisarmCrashWatchdog();

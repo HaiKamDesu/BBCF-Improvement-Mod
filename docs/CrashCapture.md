@@ -228,6 +228,40 @@ Verified against the shipped code with `build/crashctx_test` (modes 2, 3 and 4):
 | log ring faults (the real failure) | 1073 B | skipped, reported | 29 MB | `dump ok=1`, bundle survives |
 | context builder faults | - | - | - | SEH caught, process alive, handed to Windows |
 
+## The last resort: a hang watchdog
+
+Everything above defends against the crash path *faulting*. Nothing defends against it
+*hanging*, and SEH cannot: `MiniDumpWriteDump` takes the loader lock, so a crash caused by
+heap or loader corruption can wedge the very code trying to report it. Because the handler
+has by then already decided not to hand the exception to Windows, the result would be a
+process sitting there forever with no report from anyone.
+
+`ArmCrashWatchdog()` starts a thread that force-fails the process if crash handling has not
+finished in **60 seconds**. A minute is deliberately generous - a full-memory dump of this
+game took 13 seconds on a reporter's machine - so anything still running at 60s is genuinely
+stuck, not slow, and the watchdog can never be mistaken for impatience.
+
+It terminates with `__fastfail(FAST_FAIL_FATAL_APP_EXIT)`, not `ExitProcess` or
+`TerminateProcess`. Both of those end the process *cleanly* and WER would see nothing, which
+is the outcome this exists to prevent. `__fastfail` raises `STATUS_STACK_BUFFER_OVERRUN`,
+which no handler can swallow and which WER does capture - and the dump it writes contains
+every thread, including the stuck one.
+
+**Where it is armed matters.** Terminal paths arm and never disarm: the unhandled filter, the
+vectored handler, and the CRT fastfail hooks (the original `int 29h` runs the moment those
+return, so the process is dying anyway). BBCF's own exception filter arms and then **disarms**
+around our work only, because the game continues to its Steam minidump afterwards - a
+watchdog left running there could fire on a process that was going to shut down on its own,
+which would be far worse than the hang it guards against. Arming bumps a generation counter,
+so a superseded watchdog retires instead of firing on a later healthy state.
+
+Verified with the shipped constant rather than a shortened one:
+
+| harness mode | behaviour | result |
+|---|---|---|
+| armed, then hangs | killed at ~60s | exit code `0xC0000409`, reason logged and flushed first |
+| armed then disarmed, hangs 70s | survives | exit code 0, no kill |
+
 ## Reading the residue
 
 When a crash still produces no bundle, the OS still recorded it. In order of usefulness:

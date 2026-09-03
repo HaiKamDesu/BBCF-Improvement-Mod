@@ -9330,17 +9330,25 @@ namespace
 			g_bbcfFilterExceptionPointers->ContextRecord != nullptr &&
 			!IsBadReadPtr(g_bbcfFilterExceptionPointers->ContextRecord, sizeof(CONTEXT)))
 		{
+			// Armed and disarmed around our own work only. BBCF continues to its Steam
+			// minidump after this filter returns, so the process is not ours to kill once
+			// we are done - a watchdog left running here could fire on a process that was
+			// going to shut down on its own.
+			ArmCrashWatchdog("Game-filter crash handling");
 			WriteCrashBundle("Game's own exception filter (BBCF caught this crash itself)",
 				g_bbcfFilterExceptionPointers, false);
+			DisarmCrashWatchdog();
 			return;
 		}
 
 		LOG(0, "[Crash] Filter arguments were not readable; falling back to the captured "
 		       "register state.\n");
+		ArmCrashWatchdog("Game-filter crash handling");
 		WriteCrashBundleForCurrentContext(
 			"Game's own exception filter (arguments unreadable)",
 			g_bbcfFilterExceptionCode != 0 ? g_bbcfFilterExceptionCode : 0x40000015 /* STATUS_FATAL_APP_EXIT */,
 			false);
+		DisarmCrashWatchdog();
 	}
 }
 
@@ -9370,6 +9378,10 @@ namespace
 	{
 		LOG(0, "[Crash] Intercepted CRT fastfail (%s). This path never reaches an exception "
 		       "handler, so without this hook the process would have vanished silently.\n", what);
+
+		// The original int 29h runs the moment this returns, so the process is dying either
+		// way; no disarm is needed. This only guards against the bundle write itself wedging.
+		ArmCrashWatchdog("CRT fastfail crash handling");
 
 		// 0xC0000409 is the code the kernel would have raised. eip in the report points at
 		// the interception point rather than the trap; the walked stack above it is what
