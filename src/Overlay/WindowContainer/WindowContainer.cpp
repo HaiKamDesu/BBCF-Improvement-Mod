@@ -25,6 +25,7 @@
 #include "Overlay/Window/Ranked/RankedLeaderboardWindow.h"
 #include "Overlay/Window/ReleaseCheckerWindow.h"
 #include "Overlay/Window/TasWindow.h"
+#include "Overlay/Window/TasRecordingWindow.h"
 #include "Overlay/Window/TasInputListWindow.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
@@ -121,6 +122,10 @@ WindowContainer::WindowContainer()
         AddWindow(WindowType_Tas,
                 new TasWindow((L("TAS combo editor") + "###Tas").c_str(), true, *this,
                         ImGuiWindowFlags_AlwaysVerticalScrollbar));
+
+        AddWindow(WindowType_TasRecording,
+                new TasRecordingWindow((L("TAS recording") + "###TasRecording").c_str(), true, *this,
+                        ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_TasInputList,
                 new TasInputListWindow((L("TAS input list") + "###TasInputList").c_str(), true, *this));

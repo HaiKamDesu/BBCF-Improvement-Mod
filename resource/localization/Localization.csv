@@ -1056,6 +1056,15 @@ Load TAS movie,Load TAS movie,Cargar película TAS
 TAS Movie (*.txt),TAS Movie (*.txt),Película TAS (*.txt)
 Waiting for the file picker...,Waiting for the file picker...,Esperando al selector de archivos...
 TAS input list,TAS input list,Lista de entradas TAS
+TAS recording,TAS recording,Grabación TAS
+Record P1,Record P1,Grabar P1
+End recording and export .txt,End recording and export .txt,Terminar la grabación y exportar .txt
+Export TAS recording,Export TAS recording,Exportar la grabación TAS
+"Recording: %u frames","Recording: %u frames","Grabando: %u frames"
+Open the standalone P1 real-time TAS recording window.,Open the standalone P1 real-time TAS recording window.,Abre la ventana independiente de grabación TAS de P1 en tiempo real.
+"Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open.","Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open.","Graba los inputs de P1 frame a frame durante una partida de entrenamiento y los guarda como una película TAS que el editor de combos puede abrir."
+Leave the TAS combo editor before recording.,Leave the TAS combo editor before recording.,Sal del editor de combos TAS antes de grabar.
+The recording was discarded because the training match ended.,The recording was discarded because the training match ended.,La grabación se descartó porque la partida de entrenamiento terminó.
 Follow playhead,Follow playhead,Seguir el cabezal
 Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays.,Keeps the list scrolled to the current frame. Turn it off to read through the movie while it plays.,Mantiene la lista desplazada al frame actual. Desactívalo para leer la película mientras se reproduce.
 Click to watch from this frame. Nothing is deleted.,Click to watch from this frame. Nothing is deleted.,Haz clic para ver desde este frame. No se borra nada.

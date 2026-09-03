@@ -2640,6 +2640,33 @@ struct LocalizationKeysAccessor
         // TAS input list
         inline const char* TAS_input_list() const { return Get("TAS input list"); }
 
+        // TAS recording
+        inline const char* TAS_recording() const { return Get("TAS recording"); }
+
+        // Record P1
+        inline const char* Record_P1() const { return Get("Record P1"); }
+
+        // End recording and export .txt
+        inline const char* End_recording_and_export_txt() const { return Get("End recording and export .txt"); }
+
+        // Export TAS recording
+        inline const char* Export_TAS_recording() const { return Get("Export TAS recording"); }
+
+        // Recording: %u frames
+        inline const char* Recording_u_frames() const { return Get("Recording: %u frames"); }
+
+        // Open the standalone P1 real-time TAS recording window.
+        inline const char* Open_the_standalone_P1_real_time_TAS_recording_window() const { return Get("Open the standalone P1 real-time TAS recording window."); }
+
+        // Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open.
+        inline const char* Records_P1_s_inputs_frame_by_frame_during_a_training_match_then_saves_them_as_a_TAS_movie_the_combo_editor_can_open() const { return Get("Records P1's inputs frame by frame during a training match, then saves them as a TAS movie the combo editor can open."); }
+
+        // Leave the TAS combo editor before recording.
+        inline const char* Leave_the_TAS_combo_editor_before_recording() const { return Get("Leave the TAS combo editor before recording."); }
+
+        // The recording was discarded because the training match ended.
+        inline const char* The_recording_was_discarded_because_the_training_match_ended() const { return Get("The recording was discarded because the training match ended."); }
+
         // Follow playhead
         inline const char* Follow_playhead() const { return Get("Follow playhead"); }
 
