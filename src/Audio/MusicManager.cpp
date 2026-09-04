@@ -1485,8 +1485,14 @@ static bool EndsWithExt(const char* name, int nameLen, const char* dotExt) {
 // the sub-files' absolute offsets (from buf start) and sizes. It does NOT require
 // the sub-file DATA to be in the buffer — the caller checks that before use (so
 // this works both on a fully-loaded file and on just the header read from disk).
+// `xsbBaseName` (optional) receives the .xsb sub-file's name minus the extension, which
+// is the cue name the file actually carries. Every .pac the game ships and every one the
+// mod generates names its sub-files after its own cue, so this is how to ask a file what
+// it answers to instead of assuming it answers to its filename.
 static bool ParseFpacTable(const char* buf, int bufSize,
-                           int* xsbOff, int* xsbSize, int* xwbOff, int* xwbSize) {
+                           int* xsbOff, int* xsbSize, int* xwbOff, int* xwbSize,
+                           char* xsbBaseName = nullptr, int xsbBaseNameSize = 0) {
+	if (xsbBaseName && xsbBaseNameSize > 0) xsbBaseName[0] = '\0';
 	if (!buf || bufSize < 0x20) return false;
 	if (memcmp(buf, "FPAC", 4) != 0) return false;
 
@@ -1522,7 +1528,16 @@ static bool ParseFpacTable(const char* buf, int bufSize,
 		if (off > 0x7FFFFFFFu || dataStart + off > 0x7FFFFFFFu) return false;
 		int aoff = (int)(dataStart + off);
 
-		if (EndsWithExt(nm, nl, ".xsb")) { *xsbOff = aoff; *xsbSize = (int)size; gotXsb = true; }
+		if (EndsWithExt(nm, nl, ".xsb")) {
+			*xsbOff = aoff; *xsbSize = (int)size; gotXsb = true;
+			if (xsbBaseName && xsbBaseNameSize > 0) {
+				int base = nl - 4;                    // strip ".xsb"
+				if (base > xsbBaseNameSize - 1) base = xsbBaseNameSize - 1;
+				if (base < 0) base = 0;
+				memcpy(xsbBaseName, nm, (size_t)base);
+				xsbBaseName[base] = '\0';
+			}
+		}
 		else if (EndsWithExt(nm, nl, ".xwb")) { *xwbOff = aoff; *xwbSize = (int)size; gotXwb = true; }
 	}
 	return gotXsb && gotXwb;
@@ -1842,7 +1857,9 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// those and crashed on "old" tracks), and bounds-checks the data so a
 	// malformed .pac fails gracefully instead of crashing.
 	int xsbOff = 0, xsbSize = 0, xwbOff = 0, xwbSize = 0;
-	if (!ParseFpacTable((const char*)soundObj, (int)fileSize, &xsbOff, &xsbSize, &xwbOff, &xwbSize)) {
+	char fileCue[128] = {};
+	if (!ParseFpacTable((const char*)soundObj, (int)fileSize, &xsbOff, &xsbSize, &xwbOff, &xwbSize,
+			fileCue, (int)sizeof(fileCue))) {
 		LogMusic("MusicManager: FAIL - Could not parse FPAC file table for %s\n", bgmName);
 		return false;
 	}
@@ -1934,9 +1951,26 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 				// a replacement's cue is the original base filename, not its own path,
 				// and a custom track's is the native template's.
 				const char* resolvedCue = MusicManager::GetBgmCueName(trackId);
-				const char* playCueName = cueOverride
+				const char* expectedCue = cueOverride
 					? cueOverride
 					: (resolvedCue ? resolvedCue : bgmName);
+				// ...but what the sound bank answers to is decided by the file, not by the
+				// id, and the two part company as soon as a .pac is not the one its name
+				// says it is - most simply, a user who renamed one track's file over
+				// another's. GetCueIndex then finds nothing and the Jukebox plays silence
+				// while the file itself is perfectly good. So ask the file: every shipped
+				// .pac and every one the mod builds names its sub-files after its own cue,
+				// so for a file that IS what it claims this resolves to exactly the same
+				// string and nothing changes.
+				const char* playCueName = expectedCue;
+				if (fileCue[0] != '\0') {
+					playCueName = fileCue;
+					if (!expectedCue || _stricmp(fileCue, expectedCue) != 0) {
+						LogMusic("MusicManager: \"%s\" carries cue \"%s\", not \"%s\" - playing "
+							"the cue the file actually has\n",
+							bgmName, fileCue, expectedCue ? expectedCue : "(none)");
+					}
+				}
 				playCue(bank13, &playResult, playCueName, dummyParams);
 				LogMusic("MusicManager: Direct CSoundBank_XACT::Play(\"%s\") returned %d\n", playCueName, playResult);
 			}
