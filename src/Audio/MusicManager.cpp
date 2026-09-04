@@ -1265,11 +1265,22 @@ void MusicManager::ChangeMusicIfNeeded() {
 		return;
 	}
 
-	// Select the next track
+	// Select the next track. A track that cannot be played at all - its .pac renamed,
+	// deleted or otherwise unreadable, which is easy to arrange in a folder people mod -
+	// must not stop the rotation: SelectNextTrack keys off m_currentTrackId, and a failed
+	// PlayTrack leaves that untouched, so in Sequential the same unplayable id would be
+	// chosen again on the very next frame, for ever. The song already playing just keeps
+	// looping and rotation looks dead. Step over the bad track instead, bounded by the
+	// size of the playlist so a folder full of broken files still costs one frame.
+	int candidates = (int)GetEnabledTracks().size();
 	int nextTrackId = SelectNextTrack();
-	if (nextTrackId < 0) return;
-
-	PlayTrack(nextTrackId);
+	while (nextTrackId >= 0 && candidates-- > 0) {
+		if (PlayTrack(nextTrackId))
+			return;
+		LogMusic("MusicManager: Track %d could not be played; skipping it in the rotation\n",
+			nextTrackId);
+		nextTrackId = SelectNextTrackAfter(nextTrackId);
+	}
 }
 
 int MusicManager::SelectNextTrack() {
@@ -2016,13 +2027,13 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	return true;
 }
 
-void MusicManager::PlayTrack(int trackId, bool force) {
+bool MusicManager::PlayTrack(int trackId, bool force) {
 	LogMusic("MusicManager: PlayTrack(%d)\n", trackId);
 
 	HMODULE hMod = GetModuleHandleA("BBCF.exe");
 	if (!hMod) {
 		LogMusic("MusicManager: PlayTrack(%d) - FAIL: BBCF.exe module not found\n", trackId);
-		return;
+		return false;
 	}
 
 	uintptr_t modBase = (uintptr_t)hMod;
@@ -2032,14 +2043,14 @@ void MusicManager::PlayTrack(int trackId, bool force) {
 	// caller needs it reloaded because the file behind it has been rewritten.
 	if (m_currentTrackId == trackId && !force) {
 		LogMusic("MusicManager: Track %d already playing, skipping\n", trackId);
-		return;
+		return true;
 	}
 
 	// Determine BGM filename
 	const char* bgmName = GetBgmFilename(trackId);
 	if (!bgmName) {
 		LogMusic("MusicManager: PlayTrack(%d) - FAIL: Unknown BGM filename\n", trackId);
-		return;
+		return false;
 	}
 
 	LogMusic("MusicManager: Changing BGM from %d to %d (%s)\n", m_currentTrackId, trackId, bgmName);
@@ -2061,7 +2072,7 @@ void MusicManager::PlayTrack(int trackId, bool force) {
 
 	if (!PlayTrackPhysically(modBase, trackId, bgmName, &m_currentTrackDurationFrames, m_anchorTrackId)) {
 		LogMusic("MusicManager: PlayTrackPhysically failed\n");
-		return;
+		return false;
 	}
 
 	LogMusic("MusicManager: Successfully changed BGM to track %d (%s)\n", trackId, bgmName);

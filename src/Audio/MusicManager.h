@@ -56,7 +56,10 @@ public:
     // `force` reloads a track that is already playing. Normally that is skipped, but
     // after the file has been rewritten - a volume change reconverts it - the game is
     // still holding the old one and has to be made to read it again.
-    void PlayTrack(int trackId, bool force = false);
+    // Returns false when the track could not be started at all (no such filename, or the
+    // .pac behind it is missing/unreadable). Rotation uses that to move past a track it
+    // cannot play instead of asking for it again forever.
+    bool PlayTrack(int trackId, bool force = false);
 
     // Play an arbitrary .pac for auditioning, given a path relative to data/Sound/BGM/
     // (without the .pac extension) and the cue name inside it. Used by the replacement
