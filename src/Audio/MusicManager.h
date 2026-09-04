@@ -309,6 +309,10 @@ private:
     // True length of the currently-playing track in frames (60fps), read from its
     // XACT wave bank. 0 = unknown -> use the precomputed per-track table.
     int m_currentTrackDurationFrames = 0;
+    // Track id the length-from-disk probe has already been run for, so it runs once per
+    // track rather than every frame. -1 means "not probed yet"; every place that clears
+    // m_currentTrackDurationFrames clears this too.
+    int m_durationProbedTrackId = -1;
     int m_lastGameState = -1;      // last GameState (scene); for scene-exit detection
     int m_lastMatchState = -1;     // last MatchState; for match-end (-> VictoryScreen) detection
     int m_lastPlaylistTrackId = -1; // last track successfully played by the Jukebox in the current VS/Online set

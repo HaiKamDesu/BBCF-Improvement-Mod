@@ -1187,6 +1187,7 @@ void MusicManager::UpdateMusicState() {
 		m_songPlaybackFrames = 0;
 		m_songStartTime = std::chrono::steady_clock::now();
 		m_currentTrackDurationFrames = GetTrackDurationFramesFromPac(gameMusicId);
+		m_durationProbedTrackId = gameMusicId;
 
 		m_currentTrack = nullptr;
 		for (const auto& track : m_tracks) {
@@ -1201,6 +1202,24 @@ void MusicManager::UpdateMusicState() {
 			LogMusic("MusicManager: Audio engine playing ID %d = \"%s\" (duration %d frames ~%02d:%02d)\n",
 				gameMusicId, m_currentTrack->name.c_str(), m_currentTrackDurationFrames, durSec / 60, durSec % 60);
 		}
+	}
+
+	// The block above is the ONLY place a game-loaded track's length was ever read, and it
+	// runs on a CHANGE of track. The track the game is already playing when we start
+	// watching never changes: m_currentTrackId is latched from musicSelect_X at startup and
+	// re-synced to the anchor by OnMatchInit, so for that track no length is ever read.
+	// That went unnoticed while the precomputed table covered the gap, but the table
+	// describes shipped audio and is deliberately skipped for a replaced track - which then
+	// has no length from either source and holds rotation for ever. Read it here instead,
+	// once per track, so "no length" means the file could not be read rather than that
+	// nothing asked.
+	if (!m_modControllingBgm && m_currentTrackId >= 0 &&
+		m_currentTrackDurationFrames <= 0 && m_durationProbedTrackId != m_currentTrackId) {
+		m_durationProbedTrackId = m_currentTrackId;
+		m_currentTrackDurationFrames = GetTrackDurationFramesFromPac(m_currentTrackId);
+		const int durSec = m_currentTrackDurationFrames / 60;
+		LogMusic("MusicManager: Read length of the already-playing track %d from disk: %d frames (~%02d:%02d)\n",
+			m_currentTrackId, m_currentTrackDurationFrames, durSec / 60, durSec % 60);
 	}
 }
 
@@ -1231,19 +1250,37 @@ int MusicManager::GetRotationThresholdFrames() const {
 		return MIN_FRAMES_BETWEEN_CHANGES;
 	}
 
-	// A replacement whose length could not be read: both sources above describe a file
-	// that is not playing, and the short default would machine-gun through the playlist.
-	// 0 says "length unknown" - ChangeMusicIfNeeded holds the song on it, and the Jukebox's
-	// own "is there a total to show" check already treats it as no total.
-	// Warned once per track, because this runs every frame from ChangeMusicIfNeeded and
-	// again from the Jukebox window.
-	static int s_lastHeldTrackId = -1;
-	if (s_lastHeldTrackId != m_currentTrackId) {
-		s_lastHeldTrackId = m_currentTrackId;
-		LogMusic("MusicManager: WARNING - no duration for replaced track %d; rotation held\n",
+	// A replacement whose length is not known yet. 0 says "length unknown" -
+	// ChangeMusicIfNeeded holds the song on it rather than advancing on a guess, and the
+	// Jukebox's own "is there a total to show" check already renders that as no total.
+	// That hold is only correct while the answer is still coming: the probe in
+	// UpdateMusicState reads the length off disk once per track, and until it has run there
+	// is a real length to wait for. Once it has run and come back empty the file cannot be
+	// read at all, and holding for ever would strand the rotation on one song - which is
+	// exactly what stranded a session on the replaced Ragna theme for twelve minutes. Fall
+	// back the way this function did before replacements existed: the shipped track's own
+	// length if we have it, else the two-minute net.
+	if (m_durationProbedTrackId != m_currentTrackId) {
+		// Warned once per track, because this runs every frame from ChangeMusicIfNeeded and
+		// again from the Jukebox window.
+		static int s_lastHeldTrackId = -1;
+		if (s_lastHeldTrackId != m_currentTrackId) {
+			s_lastHeldTrackId = m_currentTrackId;
+			LogMusic("MusicManager: no duration yet for replaced track %d; holding rotation "
+				"until its length has been read\n", m_currentTrackId);
+		}
+		return 0;
+	}
+
+	static int s_lastUnreadableTrackId = -1;
+	if (s_lastUnreadableTrackId != m_currentTrackId) {
+		s_lastUnreadableTrackId = m_currentTrackId;
+		LogMusic("MusicManager: WARNING - could not read a length for replaced track %d; "
+			"falling back to the original's length so rotation still advances\n",
 			m_currentTrackId);
 	}
-	return 0;
+	const int precomputed = GetTrackDuration(m_currentTrackId);
+	return (precomputed > MIN_PLAUSIBLE) ? precomputed : MIN_FRAMES_BETWEEN_CHANGES;
 }
 
 void MusicManager::ChangeMusicIfNeeded() {
@@ -2296,6 +2333,7 @@ void MusicManager::UnloadCustomBgm() {
         if (t.id == m_anchorTrackId) { m_currentTrack = &t; break; }
     }
     m_currentTrackDurationFrames = 0;
+    m_durationProbedTrackId = -1;
     m_framesSinceLastChange = 0;
     m_songPlaybackFrames = 0;
     LogMusic("MusicManager: Custom BGM unloaded; restored anchor track %d for scene change\n", m_anchorTrackId);
@@ -2336,6 +2374,7 @@ void MusicManager::RestoreAnchorForSceneExit() {
     }
     m_currentTrackId = m_anchorTrackId;
     m_currentTrackDurationFrames = restored ? anchorDuration : 0;
+    m_durationProbedTrackId = restored ? m_anchorTrackId : -1;
     m_gameMusicId = m_anchorTrackId;
     m_currentTrack = nullptr;
     for (const auto& t : m_tracks) {
@@ -2438,6 +2477,7 @@ void MusicManager::ClearBgmForSceneExit() {
     m_modControllingBgm = false;
     m_currentTrackId = m_anchorTrackId;
     m_currentTrackDurationFrames = 0;
+    m_durationProbedTrackId = -1;
     m_framesSinceLastChange = 0;
     m_songPlaybackFrames = 0;
     LogMusic("MusicManager: ClearBgmForSceneExit: Bank[13] cleared for native char-select reload (anchor=%d)\n",
