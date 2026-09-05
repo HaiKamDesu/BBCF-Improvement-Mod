@@ -3,12 +3,15 @@
 #include "Core/HotkeyManager.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
+#include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 #include "Overlay/Window/Ranked/RankedProgressWindow.h"
 #include "Overlay/Window/ScrWindow.h"
+#include "Network/LobbyAvatarManager.h"
+#include "Network/ProfileBlobSeal.h"
 
 #include "imgui.h"
 
@@ -25,14 +28,47 @@ namespace MainMenu
 				return;
 			}
 
-			ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Avatar(), g_gameVals.playerAvatarAddr, 0, 0x2F);
+			// Every slider writes straight into the game's avatar fields, so an edit is
+			// only visible to the persistence code as "the values changed". Telling it
+			// explicitly keeps a re-apply that is still running from dragging the slider
+			// back out from under the user.
+			bool edited = false;
+
+			ImGui::HorizontalSpacing(); edited |= ImGui::SliderInt(Messages.Avatar(), g_gameVals.playerAvatarAddr, 0, 0x2F);
 			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_icon_tooltip());
-			ImGui::HorizontalSpacing(); ImGui::SliderInt(Messages.Color(), g_gameVals.playerAvatarColAddr, 0, 0x3);
+			ImGui::HorizontalSpacing(); edited |= ImGui::SliderInt(Messages.Color(), g_gameVals.playerAvatarColAddr, 0, 0x3);
 			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_color_tooltip());
-			ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_1(), g_gameVals.playerAvatarAcc1, 0, 0xCF);
+			ImGui::HorizontalSpacing(); edited |= ImGui::SliderByte(Messages.Accessory_1(), g_gameVals.playerAvatarAcc1, 0, 0xCF);
 			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_accessory1_tooltip());
-			ImGui::HorizontalSpacing(); ImGui::SliderByte(Messages.Accessory_2(), g_gameVals.playerAvatarAcc2, 0, 0xCF);
+			ImGui::HorizontalSpacing(); edited |= ImGui::SliderByte(Messages.Accessory_2(), g_gameVals.playerAvatarAcc2, 0, 0xCF);
 			ImGui::ShowHelpMarkerSameLine(Messages.Avatar_accessory2_tooltip());
+
+			if (edited)
+			{
+				// The sliders write into the player's own network profile blob, which is
+				// checksummed and uploaded to Steam. Resealing here is what stops a drag
+				// from killing profile uploads for the rest of the session; this hazard
+				// predates the persistence feature below. See ProfileBlobSeal.h.
+				ProfileBlobSeal::Reseal();
+				LobbyAvatarManager::GetInstance().OnUserEdited();
+			}
+
+			ImGui::VerticalSpacing(4);
+
+			// Lives next to the sliders rather than only in Settings because this is where
+			// people notice the problem it solves.
+			ImGui::HorizontalSpacing();
+			static bool rememberAvatar = Settings::settingsIni.rememberLobbyAvatar;
+			if (ImGui::CheckboxWrapped(L("Put this back on automatically next launch").c_str(), &rememberAvatar))
+			{
+				Settings::settingsIni.rememberLobbyAvatar = rememberAvatar;
+				Settings::changeSetting("RememberLobbyAvatar", rememberAvatar ? "1" : "0");
+				if (rememberAvatar)
+				{
+					LobbyAvatarManager::GetInstance().OnUserEdited();
+				}
+			}
+			ImGui::ShowHelpMarkerSameLine(L("The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode.").c_str());
 		}
 	}
 
@@ -79,7 +115,7 @@ namespace MainMenu
 		// training tools in the old States window. One checkbox, so it stays one checkbox.
 		Anchor(Online_ForeignPalettes);
 		static bool loadForeignPalettes = g_modVals.enableForeignPalettes;
-		if (ImGui::Checkbox(L("Load other players' custom palettes").c_str(), &loadForeignPalettes))
+		if (ImGui::CheckboxWrapped(L("Load other players' custom palettes").c_str(), &loadForeignPalettes))
 		{
 			g_modVals.enableForeignPalettes = loadForeignPalettes;
 		}

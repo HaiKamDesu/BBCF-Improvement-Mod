@@ -803,3 +803,69 @@ static constexpr uintptr_t OFFSET_PendingPalBlockP1    = 0x1648;     // +8 = nat
 static constexpr uintptr_t OFFSET_PendingPalBlockP2    = 0x1668;
 static constexpr uintptr_t OFFSET_CommittedPalBlockP1  = 0x24D8;
 static constexpr uintptr_t OFFSET_CommittedPalBlockP2  = 0x24F8;
+
+// ---------------------------------------------------------------------------
+// Own network profile blob + its checksum seal (RE'd 2026-09-05 while tracking
+// down "you don't have a profile" caused by the mod's own avatar writes; see
+// src/Network/ProfileBlobSeal.h for the full write-up).
+//
+// The LOCAL player's profile blob is netUserData(base+0x8AD0C0) + 0xD0, size
+// 0x6800 - the same layout as the per-member rows above, and the buffer the
+// game FileShare()s to Steam Cloud as bbdc.dat. Confirmed live: netUserData
+// 0x0092D0C0, blob 0x0092D190, which is exactly the value the mod already
+// tracks as g_gameVals.playerAvatarBaseAddr. The lobby avatar fields sit
+// INSIDE it (+0x610C icon, +0x6110 colour, +0x61C4/+0x61C5 accessories), so
+// the Online page's avatar sliders edit a checksummed payload.
+//
+// Blob header, per the sealer:
+//   +0x00 uint16 checksum   (+0x02 is left zero: sealer clears a dword, writes a word)
+//   +0x04 uint32 stamp      FUN_0040BF90(0), refreshed on every seal
+//
+// Upload path: FUN_004A96D0 early-returns when the TUS latch DAT_00CF77A8 is
+// set, otherwise seals the blob (FUN_004A1C10) and queues the transfer. The
+// upload strategy tick then RE-verifies the same buffer at item-state 0 before
+// any Steam call, so a write landing between seal and tick fails the upload
+// with no Steam round-trip and trips the latch.
+// ---------------------------------------------------------------------------
+static constexpr uintptr_t OFFSET_OwnProfileBlob       = 0xD0;    // from netUserData
+static constexpr size_t    SIZE_ProfileBlob            = 0x6800;
+static constexpr uintptr_t OFFSET_ProfileBlobChecksum  = 0x00;    // uint16
+static constexpr uintptr_t OFFSET_ProfileBlobStamp     = 0x04;    // uint32
+// Ghidra FUN_0040DEC0 - the SEALER: writes stamp at +4, zeroes the dword at +0,
+// sums the buffer as size/2 words with end-around carry, stores ~sum as a word
+// at +0. Counterpart to ADDR_ProfileChecksum16 (FUN_0040DF10) above.
+static constexpr uintptr_t ADDR_ProfileChecksumSeal    = 0x0000DEC0;
+// Ghidra FUN_004A1C10 - thin wrapper: FUN_0040DEC0(this, 0x6800)
+static constexpr uintptr_t ADDR_ProfileBlobSealBlob    = 0x000A1C10;
+// Ghidra FUN_0049D5C0 - returns the own profile blob (== netUserData + 0xD0)
+static constexpr uintptr_t ADDR_GetOwnProfileBlob      = 0x0009D5C0;
+// Ghidra FUN_004A96D0 - "upload my profile blob as bbdc.dat"
+static constexpr uintptr_t ADDR_UploadOwnProfile       = 0x000A96D0;
+// Ghidra FUN_0040BF90 - source of the +0x04 stamp
+static constexpr uintptr_t ADDR_ProfileStampSource     = 0x0000BF90;
+
+// ---------------------------------------------------------------------------
+// Lobby avatar: the profile-blob fields are a MIRROR, not the source of truth
+// (RE'd 2026-09-05). The blob copies at +0x610C icon, +0x6110 colour,
+// +0x61C4/+0x61C5 accessories are re-derived from local state and overwritten
+// a couple of seconds after every network connect, which is why poking them
+// does not survive a relaunch (observed: colour set to 3, colour 0 came back).
+//
+// Refresh path (FUN_00492xxx region, blob via FUN_0049D5C0):
+//   icon      <- [src+0x6388] - 1, clamped   @ 0x004924F8
+//   colour    <- [src+0x638C]                 @ 0x0049250A
+//   accessory <- FUN_004923C0, from [obj+0x9A4] << 8 into +0x61C4
+// Consumer that drives the on-screen avatar: 0x0051D115 reads all four straight
+// out of the blob and feeds them to the avatar UI object.
+//
+// So the blob is the right place to poke for LOCAL display, and it is also the
+// payload other members download (their rows share this layout) -- but it is
+// re-derived, so it is a cache. Anything that needs to persist or to be
+// reliably visible to others should write the SOURCE structs above instead,
+// then let the game's own refresh + seal carry it into the blob.
+// ---------------------------------------------------------------------------
+static constexpr uintptr_t ADDR_AvatarBlobRefresh      = 0x000924D8; // icon/colour copy
+static constexpr uintptr_t ADDR_AvatarAccessoryToBlob  = 0x000923C0; // FUN_004923C0
+static constexpr uintptr_t ADDR_AvatarBlobToUi         = 0x0011D0FE; // 0x0051D0FE
+static constexpr uintptr_t OFFSET_AvatarSourceIcon     = 0x6388;     // from the source struct
+static constexpr uintptr_t OFFSET_AvatarSourceColor    = 0x638C;

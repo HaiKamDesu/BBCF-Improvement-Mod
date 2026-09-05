@@ -221,3 +221,22 @@ SETTING(float, unlimitedPlaybackLoopEndingSeconds, "UnlimitedPlaybackLoopEndingS
 SETTING(bool, unlimitedPlaybackLoopRestartLabState, "UnlimitedPlaybackLoopRestartLabState", "0");
 SETTING(int, unlimitedPlaybackLoopRestartMode, "UnlimitedPlaybackLoopRestartMode", "0");
 // SETTING(std::string, replayDatabaseFrontendUrl, "ReplayDatabaseFrontendUrl", "http://89.167.76.6:2000/");
+
+// Lobby avatar persistence. Puts the avatar, colour and both accessory slots you last had
+// equipped back on when you connect to network mode -- including the accessory slots the
+// game's own equip menu hides, which the game never saves.
+//
+// These fields live inside the checksummed profile blob the game uploads to Steam, so every
+// write is followed by a reseal; without it, profile uploads fail and the game claims you
+// have no network profile. Read src/Network/ProfileBlobSeal.h before touching any of this.
+// Confirmed end to end 2026-09-05: re-apply held over both of the game's own writes,
+// blobValid=1 at settle, TUS latch never tripped across a 12-minute session.
+//
+// The four values below are written by the mod, not meant to be set by hand; -1 means
+// nothing has been remembered yet, and so does anything outside the Online page's ranges
+// (icon 0-47, colour 0-3, accessories 0-207).
+SETTING(bool, rememberLobbyAvatar, "RememberLobbyAvatar", "1");
+SETTING(int, lobbyAvatarIcon, "LobbyAvatarIcon", "-1");
+SETTING(int, lobbyAvatarColor, "LobbyAvatarColor", "-1");
+SETTING(int, lobbyAvatarAccessory1, "LobbyAvatarAccessory1", "-1");
+SETTING(int, lobbyAvatarAccessory2, "LobbyAvatarAccessory2", "-1");

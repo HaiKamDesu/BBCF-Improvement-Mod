@@ -17,6 +17,7 @@
 
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
+#include "Network/LobbyAvatarManager.h"
 #include "Network/LobbyLinkManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 
@@ -837,6 +838,10 @@ void WindowManager::HandleButtons()
 	// fires while the match frame counter advances, so it ticks in training but is dead
 	// on the online room screen -- exactly where copying a room link has to work.
 	LobbyLinkManager::GetInstance().Tick();
+
+	// Same reason as above: the lobby avatar only exists on menu screens, where the frame
+	// counter hook never fires.
+	LobbyAvatarManager::GetInstance().Tick();
 }
 
 void WindowManager::DrawAllWindows() const

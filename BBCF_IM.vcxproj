@@ -106,6 +106,8 @@
     <ClCompile Include="src\Core\NativeFileDialog.cpp" />
     <ClCompile Include="src\Network\NetworkManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
+    <ClCompile Include="src\Network\LobbyAvatarManager.cpp" />
+    <ClCompile Include="src\Network\ProfileBlobSeal.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
@@ -282,6 +284,8 @@
     <ClInclude Include="src\Network\NetworkManager.h" />
     <ClInclude Include="src\Network\OnlinePaletteManager.h" />
     <ClInclude Include="src\Network\Packet.h" />
+    <ClInclude Include="src\Network\LobbyAvatarManager.h" />
+    <ClInclude Include="src\Network\ProfileBlobSeal.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Network\RoomManager.h" />

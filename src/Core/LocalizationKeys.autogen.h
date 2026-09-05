@@ -3231,6 +3231,12 @@ struct LocalizationKeysAccessor
         // Open the online window
         inline const char* Open_the_online_window() const { return Get("Open the online window"); }
 
+        // Put this back on automatically next launch
+        inline const char* Put_this_back_on_automatically_next_launch() const { return Get("Put this back on automatically next launch"); }
+
+        // The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode.
+        inline const char* The_game_only_saves_the_accessories_its_own_equip_menu_offers_so_the_hidden_ones_are_gone_every_time_you_relaunch_With_this_on_whatever_you_last_had_equipped_is_re_applied_when_you_connect_to_network_mode() const { return Get("The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode."); }
+
         // Opens a window per player showing the inputs they are actually sending, one line per frame.
         inline const char* Opens_a_window_per_player_showing_the_inputs_they_are_actually_sending_one_line_per_frame() const { return Get("Opens a window per player showing the inputs they are actually sending, one line per frame."); }
 

@@ -23,6 +23,11 @@ namespace {
 
 	static const SettingMetadata kSettingMetadata[] = {
 		{ "LobbyLinkHotkeysEnabled", "Room link hotkeys", "Hotkeys", "Master switch for the two room-link shortcuts below. Turn it off if those key combinations get in the way of something else." },
+		{ "RememberLobbyAvatar", "Remember my lobby avatar", "Online", "Puts your lobby avatar, its colour and both accessory slots back on when you connect to network mode. The game only saves the accessories its own equip menu offers, so without this the hidden ones are gone every time you relaunch. Anything you change afterwards - on the Online page or in the game\'s equip menu - becomes what gets remembered." },
+		{ "LobbyAvatarIcon", "Remembered avatar", "Online", "The avatar icon that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },
+		{ "LobbyAvatarColor", "Remembered avatar colour", "Online", "The avatar colour that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },
+		{ "LobbyAvatarAccessory1", "Remembered accessory 1", "Online", "The first accessory slot that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },
+		{ "LobbyAvatarAccessory2", "Remembered accessory 2", "Online", "The second accessory slot that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },
 		{ "DinputDllWrapper", "Extra input DLL to load", "System", "For people who already use another input tool (a stick remapper, a wrapper) that also installs itself as dinput8.dll. Put its filename here so both it and the mod load. Leave it on \"none\" unless someone told you otherwise - a wrong name here can stop the game starting." },
 		{ "RenderingWidth", "Custom render width", "Graphics", "How wide the game renders internally when Viewport mode is set to use a custom size. Set it below 1280x768 to trade image quality for framerate on a weak PC. Ignored unless the viewport mode uses it." },
 		{ "RenderingHeight", "Custom render height", "Graphics", "How tall the game renders internally when Viewport mode is set to use a custom size. Set it below 1280x768 to trade image quality for framerate on a weak PC. Ignored unless the viewport mode uses it." },
@@ -159,6 +164,7 @@ namespace {
 		"Graphics",
 		"Controller",
 		"Ranked",
+		"Online",
 		"Frame History",
 		"Replay Database",
 		"Unlimited Playback",

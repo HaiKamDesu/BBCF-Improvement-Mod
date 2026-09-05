@@ -184,6 +184,8 @@
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
     <ClCompile Include="src\Network\OnlinePaletteManager.cpp" />
+    <ClCompile Include="src\Network\LobbyAvatarManager.cpp" />
+    <ClCompile Include="src\Network\ProfileBlobSeal.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Palette\CharPaletteHandle.cpp" />
@@ -416,6 +418,8 @@
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Game\Room\Room.h" />
     <ClInclude Include="src\Network\RoomManager.h" />
+    <ClInclude Include="src\Network\LobbyAvatarManager.h" />
+    <ClInclude Include="src\Network\ProfileBlobSeal.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Game\Room\RoomMemberEntry.h" />
