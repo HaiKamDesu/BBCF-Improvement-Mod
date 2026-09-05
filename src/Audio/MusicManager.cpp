@@ -1,6 +1,7 @@
 #include "MusicManager.h"
 #include "BgmReplacementManager.h"
 #include "CustomMusicConverter.h"
+#include "PacFile.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
@@ -16,6 +17,7 @@
 #include <psapi.h>
 #include <sstream>
 #include <cstdarg>
+#include <cstdlib>
 #include <iomanip>
 #pragma comment(lib, "psapi.lib")
 
@@ -1609,6 +1611,48 @@ static void ResolveBgmLoadName(const char* bgmName, bool mustBeWhatTheGameLoaded
 	strcpy_s(out, outSize, replacement.empty() ? bgmName : replacement.c_str());
 }
 
+// Load a .pac off disk as the plain FPAC bytes everything below expects, taking off the
+// DFASFPAC zlib envelope when the file has one. The game reads both shapes, so anyone
+// running a music mod may well have a compressed .pac sitting where a shipped track was,
+// and refusing to read it would leave the Jukebox unable to play a track the game plays
+// fine. Returns a malloc'd buffer the caller frees, or null.
+//
+// malloc rather than std::vector because the callers sit inside __try, which MSVC will
+// not accept in a function holding an unwindable local (C2712).
+static unsigned char* LoadPacBytes(const char* path, DWORD* sizeOut) {
+	if (sizeOut) *sizeOut = 0;
+
+	std::string error;
+	std::vector<unsigned char> bytes;
+	if (!PacFile::Read(path, bytes, &error)) {
+		LogMusic("MusicManager: %s\n", error.c_str());
+		return nullptr;
+	}
+
+	unsigned char* buf = (unsigned char*)malloc(bytes.size());
+	if (!buf) return nullptr;
+	memcpy(buf, bytes.data(), bytes.size());
+	if (sizeOut) *sizeOut = (DWORD)bytes.size();
+	return buf;
+}
+
+// The duration read below only touches a few hundred bytes of a normal .pac. A compressed
+// one has to be inflated whole before anything in it can be read, so it takes this path.
+static int DurationFramesFromCompressedPac(const char* path) {
+	DWORD size = 0;
+	unsigned char* pac = LoadPacBytes(path, &size);
+	if (!pac) return 0;
+
+	int frames = 0;
+	int xsbOff, xsbSize, xwbOff, xwbSize;
+	if (ParseFpacTable((const char*)pac, (int)size, &xsbOff, &xsbSize, &xwbOff, &xwbSize) &&
+		xwbOff > 0 && xwbSize >= 0x34 && (DWORD)xwbOff + (DWORD)xwbSize <= size) {
+		frames = ParseWbndDurationFrames((const char*)pac + xwbOff, xwbSize);
+	}
+	free(pac);
+	return frames;
+}
+
 static int GetTrackDurationFramesFromPac(int trackId) {
 	const char* bgmName = MusicManager::GetBgmFilename(trackId);
 	if (!bgmName) return 0;
@@ -1627,6 +1671,19 @@ static int GetTrackDurationFramesFromPac(int trackId) {
 	HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) return 0;
+
+	// Peek at the envelope before committing to the cheap path.
+	char magic[0x10] = {};
+	DWORD magicGot = 0;
+	const bool compressed =
+		ReadFile(hFile, magic, sizeof(magic), &magicGot, NULL) &&
+		magicGot == sizeof(magic) &&
+		PacFile::IsCompressed(magic, sizeof(magic));
+	if (compressed) {
+		CloseHandle(hFile);
+		return DurationFramesFromCompressedPac(path);
+	}
+	SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
 
 	int frames = 0;
 	__try {
@@ -1854,16 +1911,14 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	}
 
 	// --- STEP 2: Read physical BGM file synchronously and allocate slot buffer ---
-	HANDLE hFile = CreateFileA(physicalPath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		LogMusic("MusicManager: FAIL - Cannot open physical BGM file: %s\n", physicalPath);
-		return false;
-	}
-
-	DWORD fileSize = GetFileSize(hFile, NULL);
-	if (fileSize == INVALID_FILE_SIZE || fileSize == 0) {
-		LogMusic("MusicManager: FAIL - Invalid file size for: %s\n", physicalPath);
-		CloseHandle(hFile);
+	// Loaded before the slot is allocated, because a compressed .pac inflates to a size
+	// the file itself does not tell you, and the slot has to be allocated for the bytes
+	// XACT will actually be handed.
+	DWORD fileSize = 0;
+	unsigned char* pacBytes = LoadPacBytes(physicalPath, &fileSize);
+	if (!pacBytes || fileSize == 0) {
+		LogMusic("MusicManager: FAIL - Cannot read physical BGM file: %s\n", physicalPath);
+		free(pacBytes);
 		return false;
 	}
 
@@ -1876,7 +1931,7 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 		LogMusic("MusicManager: RegisterBgm CRASHED! Exception 0x%08X\n", GetExceptionCode());
-		CloseHandle(hFile);
+		free(pacBytes);
 		return false;
 	}
 
@@ -1884,20 +1939,13 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	void* soundObj = getSoundObj((void*)soundSlotMgrAddr, BGM_SLOT_INDEX);
 	if (!soundObj) {
 		LogMusic("MusicManager: FAIL - GetSoundObjectPtr returned null\n");
-		CloseHandle(hFile);
+		free(pacBytes);
 		return false;
 	}
 
-	// Read file contents synchronously into the allocated slot buffer
-	DWORD bytesRead = 0;
-	BOOL readSuccess = ReadFile(hFile, soundObj, fileSize, &bytesRead, NULL);
-	CloseHandle(hFile);
-
-	if (!readSuccess || bytesRead != fileSize) {
-		LogMusic("MusicManager: FAIL - ReadFile failed (read %d of %d bytes)\n", bytesRead, fileSize);
-		return false;
-	}
-	LogMusic("MusicManager: Successfully read %d BGM bytes directly into slot buffer %p\n", bytesRead, soundObj);
+	memcpy(soundObj, pacBytes, fileSize);
+	free(pacBytes);
+	LogMusic("MusicManager: Copied %d BGM bytes into slot buffer %p\n", fileSize, soundObj);
 
 	// Parse the FPAC container to locate the .xsb (Sound Bank) and .xwb (Wave
 	// Bank) streams. Walks the file table so it works for ANY filename length

@@ -1,5 +1,6 @@
 #include "CustomMusicConverter.h"
 #include "AudioDecode.h"
+#include "PacFile.h"
 #include "ReplayGain.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
@@ -931,30 +932,20 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
     // values (a pair of 0/0xFFFF reference fields at +0xFA and near the tail differ
     // between shipped tracks), and copying them is the only way to be sure a replacement
     // behaves exactly like the track it replaces.
-    HANDLE hIn = CreateFileA(originalPacPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
-        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hIn == INVALID_HANDLE_VALUE) {
-        char buf[320];
-        sprintf_s(buf, "Could not open original track '%s' (error %lu)",
-            originalPacPath.c_str(), GetLastError());
-        return fail(buf);
-    }
-    const DWORD inSize = GetFileSize(hIn, NULL);
-    if (inSize == INVALID_FILE_SIZE || inSize == 0) {
-        CloseHandle(hIn);
-        return fail("Original track '" + originalPacPath + "' is empty or unreadable");
-    }
-    std::vector<unsigned char> originalPac(inSize);
-    DWORD got = 0;
-    const BOOL readOk = ReadFile(hIn, originalPac.data(), inSize, &got, NULL);
-    CloseHandle(hIn);
-    if (!readOk || got != inSize)
-        return fail("Short read on original track '" + originalPacPath + "'");
+    //
+    // PacFile::Read unwraps the DFASFPAC envelope when there is one. Anyone running a
+    // music mod already has compressed BGM pacs in place of the shipped ones, and asking
+    // them to go find pristine originals to build a replacement is not an answer.
+    std::vector<unsigned char> originalPac;
+    std::string readError;
+    if (!PacFile::Read(originalPacPath, originalPac, &readError))
+        return fail(readError);
 
     std::vector<unsigned char> originalXsb;
     std::string baseName;
     if (!ExtractPacSubFile(originalPac, ".xsb", &originalXsb, &baseName))
-        return fail("No sound bank inside '" + originalPacPath + "' - not a BGM .pac?");
+        return fail("No sound bank inside '" + originalPacPath + "' - not a BGM .pac? ("
+            + PacFile::DescribeHeader(originalPac) + ")");
 
     LogCustom("Replacement for \"%s\": reusing its %zu-byte sound bank verbatim\n",
         baseName.c_str(), originalXsb.size());

@@ -1,6 +1,7 @@
 #include "BgmReplacementManager.h"
 #include <vector>
 #include "CustomMusicConverter.h"
+#include "PacFile.h"
 #include "MusicManager.h"
 
 #include "Core/logger.h"
@@ -465,7 +466,8 @@ bool BgmReplacementManager::LooksLikeUsablePac(const std::string& path)
 // leaves whatever was already registered playing, which reads as "the replacement did not
 // apply" with no failure anywhere to point at.
 //
-// Layout (see BuildFpacContainer, verified against all 186 shipped files):
+// Layout (see BuildFpacContainer, verified against all 186 shipped files), after
+// PacFile has taken off the DFASFPAC envelope a repacked .pac may be wearing:
 //   +0x00 "FPAC"; +0x04 dataStart; +0x08 totalSize; +0x0C fileCount; +0x10 = 1;
 //   +0x14 nameField; file table at +0x20, first entry's name is "<cue>.xsb".
 std::string BgmReplacementManager::ReadPacCueName(const std::string& path)
@@ -478,6 +480,18 @@ std::string BgmReplacementManager::ReadPacCueName(const std::string& path)
 	file.read(header, sizeof(header));
 	if (file.gcount() != (std::streamsize)sizeof(header))
 		return std::string();
+
+	// A compressed .pac tells us nothing until it is inflated, so that one goes the long
+	// way round: read the whole file and unwrap it. Only files a music mod (or a repack
+	// tool) produced land here; the mod's own output is always bare FPAC.
+	std::vector<unsigned char> inflated;
+	if (PacFile::IsCompressed(header, sizeof(header)))
+	{
+		file.close();
+		if (!PacFile::Read(path, inflated, nullptr) || inflated.size() < sizeof(header))
+			return std::string();
+		memcpy(header, inflated.data(), sizeof(header));
+	}
 	if (memcmp(header, "FPAC", 4) != 0)
 		return std::string();
 
@@ -487,9 +501,18 @@ std::string BgmReplacementManager::ReadPacCueName(const std::string& path)
 		return std::string();
 
 	std::vector<char> name(nameField + 1, '\0');
-	file.read(name.data(), nameField);
-	if (file.gcount() <= 0)
-		return std::string();
+	if (!inflated.empty())
+	{
+		if (inflated.size() < sizeof(header) + nameField)
+			return std::string();
+		memcpy(name.data(), inflated.data() + sizeof(header), nameField);
+	}
+	else
+	{
+		file.read(name.data(), nameField);
+		if (file.gcount() <= 0)
+			return std::string();
+	}
 
 	std::string sub(name.data());
 	const size_t dot = sub.rfind('.');

@@ -30,6 +30,7 @@
     <ClCompile Include="src\Audio\BgmReplacementManager.cpp" />
     <ClCompile Include="src\Overlay\Window\BgmReplacementWindow.cpp" />
     <ClCompile Include="src\Audio\CustomMusicConverter.cpp" />
+    <ClCompile Include="src\Audio\PacFile.cpp" />
     <ClCompile Include="src\Audio\AudioDecode.cpp" />
     <ClCompile Include="src\Audio\ReplayGain.cpp" />
     <ClCompile Include="src\Audio\MiniaudioImpl.cpp" />
@@ -359,6 +360,7 @@
     <ClInclude Include="src\Audio\BgmReplacementManager.h" />
     <ClInclude Include="src\Overlay\Window\BgmReplacementWindow.h" />
     <ClInclude Include="src\Audio\CustomMusicConverter.h" />
+    <ClInclude Include="src\Audio\PacFile.h" />
     <ClInclude Include="src\Audio\AudioDecode.h" />
     <ClInclude Include="src\Audio\ReplayGain.h" />
     <ClInclude Include="src\Overlay\Window\JukeboxWindow.h" />
