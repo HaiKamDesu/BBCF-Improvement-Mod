@@ -45,7 +45,7 @@ namespace ControllerSettings
 
                 ImGui::SameLineOrWrap(ImGui::CheckboxWidth(Messages.Auto_refresh()));
                 bool autoRefreshEnabled = controllerManager.IsAutoRefreshEnabled();
-                if (ImGui::Checkbox(Messages.Auto_refresh(), &autoRefreshEnabled))
+                if (ImGui::CheckboxWrapped(Messages.Auto_refresh(), &autoRefreshEnabled))
                 {
                         controllerManager.SetAutoRefreshEnabled(autoRefreshEnabled);
                         Settings::settingsIni.autoUpdateControllers = autoRefreshEnabled;

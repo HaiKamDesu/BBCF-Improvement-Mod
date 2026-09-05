@@ -222,7 +222,7 @@ void ScrWindow::DrawWakeupBody() {
         return;
     }
 
-    ImGui::Checkbox(L("Override the dummy's wake-up timing").c_str(), &s_wakeupOverrideEnabled);
+    ImGui::CheckboxWrapped(L("Override the dummy's wake-up timing").c_str(), &s_wakeupOverrideEnabled);
     ImGui::ShowHelpMarkerSameLine(Messages.Enable_wakeup_delay_override_tooltip());
     if (s_wakeupOverrideEnabled) {
         DrawWakeupDelayControl();
@@ -389,7 +389,7 @@ void ScrWindow::DrawPositionsBody()
     ImGui::ShowHelpMarkerSameLine(Messages.Swap_coordinates_tooltip());
     const std::string alwaysSwapLabel = L("Swap sides on every reset");
     ImGui::SameLineOrWrap(ImGui::CheckboxWidth(alwaysSwapLabel.c_str()));
-    ImGui::Checkbox(alwaysSwapLabel.c_str(), &s_swapCoordsToggle);
+    ImGui::CheckboxWrapped(alwaysSwapLabel.c_str(), &s_swapCoordsToggle);
     ImGui::ShowHelpMarkerSameLine(L("Always swap coordinates help").c_str());
 }
 
@@ -470,7 +470,7 @@ void ScrWindow::DrawDummyActionsBody()
         ImGui::BeginGroup();
         static bool isActive_old;
         static bool isActive = false;
-        if (ImGui::Checkbox("Naoto EN specials toggle", &isActive)) {
+        if (ImGui::CheckboxWrapped("Naoto EN specials toggle", &isActive)) {
             memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
         }
         ImGui::SameLine();
@@ -650,7 +650,7 @@ void ScrWindow::DrawDummyActionsBody()
         static int throwtech_delay = 0;
 
           
-        ImGui::Checkbox("Burst on hit", &burst_onhit_toggle);
+        ImGui::CheckboxWrapped("Burst on hit", &burst_onhit_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Burst_on_hit_tooltip());
         if (burst_onhit_toggle) {
@@ -716,7 +716,7 @@ void ScrWindow::DrawDummyActionsBody()
             ImGui::ShowHelpMarker(Messages.Burst_onhit_cooldown_tooltip());
             ImGui::EndChild();
         }
-        ImGui::Checkbox("Add delays to actions", &action_delays_toggle);
+        ImGui::CheckboxWrapped("Add delays to actions", &action_delays_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Add_delays_to_actions_tooltip());
         if (action_delays_toggle) {
@@ -866,13 +866,13 @@ void ScrWindow::DrawDummyActionsBody()
 
         }
         //static bool old_way = false;
-        //ImGui::Checkbox("old_way##testchoose", &old_way);
+        //ImGui::CheckboxWrapped("old_way##testchoose", &old_way);
         //static bool hitstun_0 = true;
-        //ImGui::Checkbox("hitstun_0##testchoose", &hitstun_0);
+        //ImGui::CheckboxWrapped("hitstun_0##testchoose", &hitstun_0);
         //static bool curr_action_not_ukemi = false;
-        //ImGui::Checkbox("curr_action_not_ukemi##testchoose", &curr_action_not_ukemi);      
+        //ImGui::CheckboxWrapped("curr_action_not_ukemi##testchoose", &curr_action_not_ukemi);      
         //static bool hitstun_0_curr_action_not_ukemi = false;
-        //ImGui::Checkbox("hitstun_0_curr_action_not_ukemi##testchoose", &hitstun_0_curr_action_not_ukemi);
+        //ImGui::CheckboxWrapped("hitstun_0_curr_action_not_ukemi##testchoose", &hitstun_0_curr_action_not_ukemi);
 
         static std::vector<std::tuple<std::string, int>> wakeup_length_pairs{
             //{"CmnActUkemiLandN",30} ,
@@ -1264,7 +1264,7 @@ void ScrWindow::DrawRecordingSlotsBody() {
         ImGui::TextDisabled("%s", L("Popup is always available. Runtime actions only work in the right context.").c_str());
         ImGui::TextWrapped("%s", unlimitedPlayback.GetStatusText().c_str());
 
-        ImGui::Checkbox(L("Loop current playback").c_str(), &loop_playback);
+        ImGui::CheckboxWrapped(L("Loop current playback").c_str(), &loop_playback);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(L("This will continuously loop the current recording slot, subject to absolute positioning.").c_str());
         ScrWindow::DrawPlaybackEditor();
@@ -1289,30 +1289,30 @@ void ScrWindow::DrawRecordingSlotsBody() {
         static bool random_wakeup_slot_toggle = false;
         static bool random_gap_slot_toggle = false;
         ImGui::Columns(2);
-        ImGui::Checkbox("Gap random slots##gap_random_slots", &random_gap_slot_toggle);
+        ImGui::CheckboxWrapped("Gap random slots##gap_random_slots", &random_gap_slot_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Gap_random_slots_tooltip());
         if (random_gap_slot_toggle){
-            if (ImGui::Checkbox("Slot1##gap_random_slots", &random_gap_slot1)) {
+            if (ImGui::CheckboxWrapped("Slot1##gap_random_slots", &random_gap_slot1)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot1, 1);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
 
-            if(ImGui::Checkbox("Slot2##gap_random_slots", &random_gap_slot2)) {
+            if(ImGui::CheckboxWrapped("Slot2##gap_random_slots", &random_gap_slot2)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot2, 2);
 
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
 
-            if(ImGui::Checkbox("Slot3##gap_random_slots", &random_gap_slot3)) {
+            if(ImGui::CheckboxWrapped("Slot3##gap_random_slots", &random_gap_slot3)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot3, 3);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
 
-            if (ImGui::Checkbox("Slot4##gap_random_slots", &random_gap_slot4)) {
+            if (ImGui::CheckboxWrapped("Slot4##gap_random_slots", &random_gap_slot4)) {
                 treat_random_slot_checkbox(random_gap, random_gap_slot4, 4);
             }
             ImGui::SameLine();
@@ -1321,29 +1321,29 @@ void ScrWindow::DrawRecordingSlotsBody() {
 
         }
         ImGui::NextColumn();
-        ImGui::Checkbox("Wakeup random slots##wakeup_random_slots", &random_wakeup_slot_toggle);
+        ImGui::CheckboxWrapped("Wakeup random slots##wakeup_random_slots", &random_wakeup_slot_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Wakeup_random_slots_tooltip());
         if (random_wakeup_slot_toggle) {
-            if (ImGui::Checkbox("Slot1##wakeup_random_slots", &random_wakeup_slot1)) {
+            if (ImGui::CheckboxWrapped("Slot1##wakeup_random_slots", &random_wakeup_slot1)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot1, 1);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
 
-            if(ImGui::Checkbox("Slot2##wakeup_random_slots", &random_wakeup_slot2)) {
+            if(ImGui::CheckboxWrapped("Slot2##wakeup_random_slots", &random_wakeup_slot2)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot2, 2);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
 
-            if(ImGui::Checkbox("Slot3##wakeup_random_slots", &random_wakeup_slot3)) {
+            if(ImGui::CheckboxWrapped("Slot3##wakeup_random_slots", &random_wakeup_slot3)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot3, 3);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
 
-            if(ImGui::Checkbox("Slot4##wakeup_random_slots", &random_wakeup_slot4)) {
+            if(ImGui::CheckboxWrapped("Slot4##wakeup_random_slots", &random_wakeup_slot4)) {
                 treat_random_slot_checkbox(random_wakeup, random_wakeup_slot4, 4);
             }
             ImGui::SameLine();
@@ -1790,7 +1790,7 @@ void ScrWindow::DrawLocalReplaysBody() {
         ImGui::ShowHelpMarker("Archiving will copy and rename all current replays to Save/Replay/archive/ .");
 
         ImGui::SameLine();
-        if (ImGui::Checkbox("Auto archive saved replays", &Settings::settingsIni.autoArchive)) {
+        if (ImGui::CheckboxWrapped("Auto archive saved replays", &Settings::settingsIni.autoArchive)) {
             Settings::changeSetting("autoArchive", std::to_string((int)Settings::settingsIni.autoArchive));
         }
         ImGui::SameLine();
@@ -2048,7 +2048,7 @@ void ScrWindow::DrawLocalReplaysBody() {
                     ImGui::ShowHelpMarker(Messages.Replay_play_restart_tooltip());
 
                     ImGui::SameLine();
-                    ImGui::Checkbox("autoplay", &autoplay);
+                    ImGui::CheckboxWrapped("autoplay", &autoplay);
                     ImGui::SameLine();
                     ImGui::ShowHelpMarker(Messages.Replay_autoplay_tooltip());
                 }

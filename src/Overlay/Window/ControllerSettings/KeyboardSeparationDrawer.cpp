@@ -13,7 +13,7 @@ namespace ControllerSettings
         {
                 ImGui::HorizontalSpacing();
                 bool controllerPositionSwapped = controllerManager.IsKeyboardControllerSeparated();
-                if (ImGui::Checkbox(Messages.Swap_P1_Controller_to_P2(), &controllerPositionSwapped))
+                if (ImGui::CheckboxWrapped(Messages.Swap_P1_Controller_to_P2(), &controllerPositionSwapped))
                 {
                         controllerManager.SetControllerPosSwap(controllerPositionSwapped);
                         Settings::settingsIni.swapControllerPos = controllerPositionSwapped;

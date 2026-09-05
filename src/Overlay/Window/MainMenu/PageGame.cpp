@@ -89,7 +89,7 @@ namespace MainMenu
 			ImGui::BeginDisabled();
 			bool placeholder = false;
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Hide_HUD_checkbox(), &placeholder);
+			ImGui::CheckboxWrapped(Messages.Hide_HUD_checkbox(), &placeholder);
 			ImGui::EndDisabled();
 			const std::string note = L("(in a match)");
 			ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
@@ -98,7 +98,7 @@ namespace MainMenu
 		else
 		{
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Hide_HUD_checkbox(), (bool*)g_gameVals.pIsHUDHidden);
+			ImGui::CheckboxWrapped(Messages.Hide_HUD_checkbox(), (bool*)g_gameVals.pIsHUDHidden);
 			ImGui::ShowHelpMarkerSameLine(Messages.Hide_HUD_tooltip());
 		}
 	}

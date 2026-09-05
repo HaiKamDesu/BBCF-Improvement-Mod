@@ -16,7 +16,7 @@ namespace RankedUi
 
 		ImGui::HorizontalSpacing();
 		bool showRankedProgress = Settings::settingsIni.showRankedProgress;
-		if (ImGui::Checkbox(L("Show ranked progress").c_str(), &showRankedProgress))
+		if (ImGui::CheckboxWrapped(L("Show ranked progress").c_str(), &showRankedProgress))
 		{
 			Settings::settingsIni.showRankedProgress = showRankedProgress;
 			Settings::changeSetting("ShowRankedProgress", showRankedProgress ? "1" : "0");
@@ -26,7 +26,7 @@ namespace RankedUi
 
 		ImGui::HorizontalSpacing();
 		bool showSquareColorProgress = Settings::settingsIni.showSquareColorProgress;
-		if (ImGui::Checkbox(L("Show square color progress").c_str(), &showSquareColorProgress))
+		if (ImGui::CheckboxWrapped(L("Show square color progress").c_str(), &showSquareColorProgress))
 		{
 			Settings::settingsIni.showSquareColorProgress = showSquareColorProgress;
 			Settings::changeSetting("ShowSquareColorProgress", showSquareColorProgress ? "1" : "0");
@@ -36,7 +36,7 @@ namespace RankedUi
 
 		ImGui::HorizontalSpacing();
 		bool showRankedPrediction = Settings::settingsIni.showRankedPrediction;
-		if (ImGui::Checkbox(L("Show ranked prediction").c_str(), &showRankedPrediction))
+		if (ImGui::CheckboxWrapped(L("Show ranked prediction").c_str(), &showRankedPrediction))
 		{
 			Settings::settingsIni.showRankedPrediction = showRankedPrediction;
 			Settings::changeSetting("ShowRankedPrediction", showRankedPrediction ? "1" : "0");
@@ -46,7 +46,7 @@ namespace RankedUi
 
 		ImGui::HorizontalSpacing();
 		bool showRankedListFilterWindow = Settings::settingsIni.showRankedListFilterWindow;
-		if (ImGui::Checkbox(L("Show ranked list config window").c_str(), &showRankedListFilterWindow))
+		if (ImGui::CheckboxWrapped(L("Show ranked list config window").c_str(), &showRankedListFilterWindow))
 		{
 			Settings::settingsIni.showRankedListFilterWindow = showRankedListFilterWindow;
 			Settings::changeSetting("ShowRankedListFilterWindow", showRankedListFilterWindow ? "1" : "0");

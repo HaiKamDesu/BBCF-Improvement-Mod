@@ -233,6 +233,37 @@ void ImGui::HorizontalSpacing(float width)
 	SameLine();
 }
 
+bool ImGui::CheckboxWrapped(const char* label, bool* v)
+{
+    // The label doubles as the ID on the stock widget; keep that, then hide it on the box
+    // itself so the text can be drawn separately with a wrap position.
+    PushID(label);
+
+    BeginGroup();
+    bool changed = Checkbox("##checkbox", v);
+
+    SameLine(0.0f, GetStyle().ItemInnerSpacing.x);
+
+    // Wrap at the window's right edge, minus room for a help marker. Computed every frame
+    // rather than cached so it tracks a resize.
+    const float wrapAt = GetCursorPosX() + GetContentRegionAvail().x
+        - (HelpMarkerWidth() + GetStyle().ItemInnerSpacing.x);
+    PushTextWrapPos(wrapAt);
+    TextUnformatted(label);
+    PopTextWrapPos();
+
+    // Stock Checkbox toggles when its label is clicked; the text item is inert, so do it here.
+    if (!changed && IsItemHovered() && IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        *v = !*v;
+        changed = true;
+    }
+    EndGroup();
+
+    PopID();
+    return changed;
+}
+
 bool ImGui::SliderByte(const char* label, unsigned char* v, unsigned char v_min, unsigned char v_max, const char* display_format)
 {
     if (!display_format)

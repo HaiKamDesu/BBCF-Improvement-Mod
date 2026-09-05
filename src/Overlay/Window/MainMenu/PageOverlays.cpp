@@ -31,7 +31,7 @@ namespace MainMenu
 			static bool isOpen = false;
 
 			ImGui::HorizontalSpacing();
-			const bool toggled = ImGui::Checkbox(Messages.Enable_hitbox_overlay_section(), &isOpen);
+			const bool toggled = ImGui::CheckboxWrapped(Messages.Enable_hitbox_overlay_section(), &isOpen);
 			ImGui::ShowHelpMarkerSameLine(Messages.Enable_hitbox_overlay_tooltip());
 			if (toggled)
 			{
@@ -54,13 +54,13 @@ namespace MainMenu
 			if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr())
 			{
 				ImGui::HorizontalSpacing();
-				ImGui::Checkbox(Messages.Player1(), &overlay->drawCharacterHitbox[0]);
+				ImGui::CheckboxWrapped(Messages.Player1(), &overlay->drawCharacterHitbox[0]);
 				ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player1.GetData()->charIndex).c_str());
 				ImGui::SameLine(); ImGui::HorizontalSpacing();
 				ImGui::TextUnformatted(g_interfaces.player1.GetData()->currentAction);
 
 				ImGui::HorizontalSpacing();
-				ImGui::Checkbox(Messages.Player2(), &overlay->drawCharacterHitbox[1]);
+				ImGui::CheckboxWrapped(Messages.Player2(), &overlay->drawCharacterHitbox[1]);
 				ImGui::HoverTooltip(getCharacterNameByIndexA(g_interfaces.player2.GetData()->charIndex).c_str());
 				ImGui::SameLine(); ImGui::HorizontalSpacing();
 				ImGui::TextUnformatted(g_interfaces.player2.GetData()->currentAction);
@@ -74,19 +74,19 @@ namespace MainMenu
 			overlay->DrawRectFillTransparencySlider();
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Draw_hitbox_hurtbox(), &overlay->drawHitboxHurtbox);
+			ImGui::CheckboxWrapped(Messages.Draw_hitbox_hurtbox(), &overlay->drawHitboxHurtbox);
 			ImGui::ShowHelpMarkerSameLine(Messages.Draw_hitbox_hurtbox_tooltip());
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Draw_origin(), &overlay->drawOriginLine);
+			ImGui::CheckboxWrapped(Messages.Draw_origin(), &overlay->drawOriginLine);
 			ImGui::ShowHelpMarkerSameLine(Messages.Origin_point_note());
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Draw_collision(), &overlay->drawCollisionBoxes);
+			ImGui::CheckboxWrapped(Messages.Draw_collision(), &overlay->drawCollisionBoxes);
 			ImGui::ShowHelpMarkerSameLine(Messages.Collision_box_note());
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Draw_throw_range_boxes(), &overlay->drawRangeCheckBoxes);
+			ImGui::CheckboxWrapped(Messages.Draw_throw_range_boxes(), &overlay->drawRangeCheckBoxes);
 			ImGui::ShowHelpMarkerSameLine(Messages.Throw_range_help());
 		}
 
@@ -102,7 +102,7 @@ namespace MainMenu
 			}
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
+			ImGui::CheckboxWrapped(Messages.Freeze_frame(), &g_gameVals.isFrameFrozen);
 			ImGui::ShowHelpMarkerSameLine(Messages.Freeze_frame_tooltip());
 
 			// No Ctrl check needed any more: HotkeyManager matches modifiers exactly, so a
@@ -162,11 +162,11 @@ namespace MainMenu
 
 			static bool isFrameAdvantageOpen = false;
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Enable_framedata_section(), &isFrameAdvantageOpen);
+			ImGui::CheckboxWrapped(Messages.Enable_framedata_section(), &isFrameAdvantageOpen);
 			ImGui::ShowHelpMarkerSameLine(Messages.Enable_framedata_tooltip());
 
 			ImGui::HorizontalSpacing();
-			ImGui::Checkbox(Messages.Advantage_on_stagger_hit(), &idleActionToggles.ukemiStaggerHit);
+			ImGui::CheckboxWrapped(Messages.Advantage_on_stagger_hit(), &idleActionToggles.ukemiStaggerHit);
 			ImGui::ShowHelpMarkerSameLine(Messages.Advantage_stagger_hit_tooltip());
 
 			if (isFrameAdvantageOpen)
@@ -192,7 +192,7 @@ namespace MainMenu
 
 			ImGui::HorizontalSpacing();
 			bool isOpen = Settings::settingsIni.frameHistoryEnabled;
-			if (ImGui::Checkbox(Messages.Enable_framehistory_section(), &isOpen))
+			if (ImGui::CheckboxWrapped(Messages.Enable_framehistory_section(), &isOpen))
 			{
 				Settings::settingsIni.frameHistoryEnabled = isOpen;
 				Settings::changeSetting("FrameHistoryEnabled", isOpen ? "1" : "0");
@@ -204,7 +204,7 @@ namespace MainMenu
 				frameHistWin->Close();
 
 			ImGui::HorizontalSpacing();
-			if (ImGui::Checkbox(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))
+			if (ImGui::CheckboxWrapped(Messages.Auto_Reset_Reset_after_each_idle_frame(), &frameHistWin->resetting))
 			{
 				Settings::settingsIni.frameHistoryAutoReset = frameHistWin->resetting;
 				Settings::changeSetting("FrameHistoryAutoReset", frameHistWin->resetting ? "1" : "0");
@@ -212,7 +212,7 @@ namespace MainMenu
 			ImGui::ShowHelpMarkerSameLine(Messages.FrameHistory_auto_reset_help());
 
 			ImGui::HorizontalSpacing();
-			if (ImGui::Checkbox(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
+			if (ImGui::CheckboxWrapped(Messages.Count_empty_frames_framehistory(), &frameHistWin->countEmptyFrames))
 			{
 				Settings::settingsIni.frameHistoryCountEmptyFrames = frameHistWin->countEmptyFrames;
 				Settings::changeSetting("FrameHistoryCountEmptyFrames", frameHistWin->countEmptyFrames ? "1" : "0");

@@ -56,4 +56,17 @@ namespace ImGui
 
 	/* SetTooltip does not wrap either; this matches ShowHelpMarker's wrap width. */
 	IMGUI_API void SetTooltipWrapped(const char* text);
+
+	/* Checkbox whose label wraps instead of running off the window.
+
+	   The stock Checkbox draws its label as a single unwrapped line. That is fine for a
+	   one-word label and wrong for ours, which are full sentences, in a window the user can
+	   resize down to whatever they like - the tail of the label simply disappears. This
+	   draws the box with a hidden label and the text beside it with a wrap position at the
+	   window's right edge, so narrowing the window costs height instead of words.
+
+	   Room for a help marker is reserved on the right whether or not one follows, so the
+	   common "checkbox then (?)" pair keeps the marker on the first line rather than being
+	   pushed onto its own. Clicking the label toggles, as it does on the stock widget. */
+	IMGUI_API bool CheckboxWrapped(const char* label, bool* v);
 }

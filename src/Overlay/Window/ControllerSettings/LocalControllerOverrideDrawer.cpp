@@ -35,7 +35,7 @@ namespace ControllerSettings
                 {
                         ImGui::BeginDisabled();
                 }
-                if (ImGui::Checkbox(Messages.Local_Controller_Override(), &overrideEnabled))
+                if (ImGui::CheckboxWrapped(Messages.Local_Controller_Override(), &overrideEnabled))
                 {
                         controllerManager.SetOverrideEnabled(overrideEnabled);
                 }

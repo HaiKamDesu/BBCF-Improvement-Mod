@@ -25,7 +25,7 @@ namespace ControllerSettings
                 const char* renamePopupId = Messages.Rename_keyboard();
                 const char* mappingPopupId = Messages.Configure_keyboard_mapping();
                 const char* ignoredKeyboardWindowId = Messages.Ignored_keyboards();
-                if (ImGui::Checkbox(Messages.Multiple_keyboards_override(), &multiKeyboardOverride))
+                if (ImGui::CheckboxWrapped(Messages.Multiple_keyboards_override(), &multiKeyboardOverride))
                 {
                         controllerManager.SetMultipleKeyboardOverrideEnabled(multiKeyboardOverride);
                 }
@@ -107,7 +107,7 @@ ImGui::ShowHelpMarker(Messages.Keyboard_player1_help());
 						bool selected = controllerManager.IsP1KeyboardHandle(device.deviceHandle);
 						std::string rowId = !device.canonicalId.empty() ? device.canonicalId : (!device.deviceId.empty() ? device.deviceId : std::to_string(reinterpret_cast<uintptr_t>(device.deviceHandle)));
                                                 ImGui::PushID(rowId.c_str());
-                                                if (ImGui::Checkbox("##p1-keyboard", &selected))
+                                                if (ImGui::CheckboxWrapped("##p1-keyboard", &selected))
                                                 {
                                                         controllerManager.SetP1KeyboardHandleEnabled(device.deviceHandle, selected);
                                                 }
