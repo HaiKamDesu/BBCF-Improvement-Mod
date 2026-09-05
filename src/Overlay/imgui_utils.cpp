@@ -249,7 +249,12 @@ bool ImGui::CheckboxWrapped(const char* label, bool* v)
     const float wrapAt = GetCursorPosX() + GetContentRegionAvail().x
         - (HelpMarkerWidth() + GetStyle().ItemInnerSpacing.x);
     PushTextWrapPos(wrapAt);
-    TextUnformatted(label);
+    // Stop at "##", exactly as the stock widgets do. Everything from there on is ID, not
+    // text: "Slot1##gap_random_slots" draws as "Slot1", and a label that is nothing but an
+    // ID ("##p1-keyboard") draws as nothing at all. Drawing the raw label instead is what
+    // put "###frame history" and friends on screen.
+    const char* labelEnd = FindRenderedTextEnd(label);
+    TextUnformatted(label, labelEnd);
     PopTextWrapPos();
 
     // Stock Checkbox toggles when its label is clicked; the text item is inert, so do it here.
