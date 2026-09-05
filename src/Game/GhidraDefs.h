@@ -869,3 +869,26 @@ static constexpr uintptr_t ADDR_AvatarAccessoryToBlob  = 0x000923C0; // FUN_0049
 static constexpr uintptr_t ADDR_AvatarBlobToUi         = 0x0011D0FE; // 0x0051D0FE
 static constexpr uintptr_t OFFSET_AvatarSourceIcon     = 0x6388;     // from the source struct
 static constexpr uintptr_t OFFSET_AvatarSourceColor    = 0x638C;
+
+// ---------------------------------------------------------------------------
+// Abyss HP numbers (RE'd 2026-09-05).
+//
+// HP NUMBERS. Abyss draws the exact HP over each health bar; nothing else does.
+// The HUD update reaches that widget through one mode check:
+//   005F08FD call 0047E860            ; scene object (+0x108 game mode, +0x10C game state)
+//   005F0902 cmp [eax+108h],10h       ; 7 bytes, imm8 form (83 B8 ..), NOT 81 B8
+//   005F0909 jne 005F0969             ; short jne, 2 bytes
+//   005F095D call 004EA740            ; widget singleton getter -> 0x00EE0338
+//   005F0964 call 004EB410            ; draw/update it
+// The widget is fed the ratio computed above the check plus the generic per-player
+// accessors, so nothing in it is Abyss-only. AbyssHpNumbersGate in hooks_bbcf.cpp
+// replaces the cmp and steers the jne. Siblings gated the same way, leave them off:
+// 005E7CB0 builds "DEPTH %d", 005E7DA0 builds "REWARD %d".
+// ---------------------------------------------------------------------------
+static constexpr uintptr_t ADDR_HudAbyssHpNumberCheck  = 0x001F0902; // the cmp
+static constexpr uintptr_t ADDR_AbyssHudSingletonGet   = 0x000EA740;
+static constexpr uintptr_t ADDR_AbyssHudDraw           = 0x000EB410;
+static constexpr uintptr_t ADDR_AbyssHudSingleton      = 0x00AE0338; // 0x00EE0338 VA
+static constexpr uintptr_t ADDR_SceneObjectGet         = 0x0007E860; // FUN_0047E860
+static constexpr uintptr_t OFFSET_SceneGameMode        = 0x108;
+static constexpr uintptr_t OFFSET_SceneGameState       = 0x10C;

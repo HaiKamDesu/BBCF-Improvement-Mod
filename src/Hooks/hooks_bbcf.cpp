@@ -9105,6 +9105,82 @@ void __declspec(naked)GetIsHUDHidden()
 	}
 }
 
+// ---------------------------------------------------------------------------------------
+// HP numbers on the health bars, outside Abyss.
+//
+// Abyss draws the exact HP figure over each health bar; nothing else does. The HUD update
+// reaches that widget through a plain mode check, at 0x005F0902:
+//
+//     005F08FD  call 0047E860              ; the scene object
+//     005F0902  cmp  [eax+00000108h],10h   ; +0x108 is the game mode; 0x10 is Abyss
+//     005F0909  jne  005F0969              ; not Abyss -> skip the widget entirely
+//     005F090B  ...                        ; per-player values, then
+//     005F095D  call 004EA740              ; the widget singleton at 0x00EE0338
+//     005F0964  call 004EB410              ; ... draw/update it
+//
+// The values it is handed come from the ratio computed just above the check and from the
+// generic per-player accessors, so nothing about the widget itself is Abyss-only - only
+// the branch that reaches it.
+//
+// The hook replaces the 7-byte cmp and hands the following jne the answer it wants: ZF set
+// means "do not jump", i.e. draw. Both arms set flags through esp compares so that no
+// register is disturbed - the code on either side of the branch still expects eax to hold
+// the scene pointer that the call above produced.
+DWORD AbyssHpNumbersGateJmpBackAddr = 0;
+static BYTE g_hpNumberGateShow = 0;
+
+// Training only, deliberately. The figure is a real advantage to read mid-match, and this
+// exists to answer "how much did that combo actually do" in the lab. Widening it is one
+// line, but it should be a decision rather than a side effect.
+//
+// extern "C" and noinline so the `call` in the naked hook below resolves to a real, plainly
+// named function with its own stack frame.
+extern "C" __declspec(noinline) int __cdecl BbcfHpNumberGateDecide(int gameMode)
+{
+	if (gameMode == GameMode_Abyss)
+		return 1;   // what the game does on its own; never taken away
+
+	if (!Settings::settingsIni.showHpNumbers)
+		return 0;
+
+	return (gameMode == GameMode_Training) ? 1 : 0;
+}
+
+// NOTHING but asm may live in this function body.
+//
+// The first cut had one C++ statement here - `flag = Decide(mode) ? 1 : 0;` - and it crashed
+// the game on entering a match with FAST_FAIL_STACK_COOKIE_CHECK_FAILURE. The ternary needed
+// a temporary, and MSVC spilled it with `mov [ebp-4],eax`. A naked function has no prologue,
+// so ebp still belongs to the interrupted game function, and [ebp-4] there is exactly where
+// /GS keeps its stack cookie: we overwrote it, and the epilogue at 0x005F0C77 caught it.
+//
+// Other naked hooks in this file do carry C++ between their asm blocks and are fine, which
+// is what makes this a trap rather than an obvious rule - they only assign straight to
+// globals, so the compiler never needs a stack temporary. Anything that does (a ternary, a
+// call result feeding an expression, a local) writes into the game's frame. Keep the body
+// pure asm and let the called function have a frame of its own.
+void __declspec(naked) AbyssHpNumbersGate()
+{
+	__asm
+	{
+		pushad
+		push dword ptr[eax + 108h]        // the scene's game mode, what the original cmp read
+		call BbcfHpNumberGateDecide
+		add esp, 4
+		mov g_hpNumberGateShow, al        // before popad, while al is still ours
+		popad
+
+		cmp g_hpNumberGateShow, 0
+		je HIDE_HP_NUMBERS
+		cmp esp, esp                      // ZF = 1: the jne below is not taken, widget draws
+		jmp HP_NUMBERS_DONE
+	HIDE_HP_NUMBERS:
+		cmp esp, 0                        // ZF = 0: jne taken, original behaviour
+	HP_NUMBERS_DONE:
+		jmp[AbyssHpNumbersGateJmpBackAddr]
+	}
+}
+
 DWORD GetViewAndProjMatrixesJmpBackAddr = 0;
 void __declspec(naked)GetViewAndProjMatrixes()
 {
@@ -9682,6 +9758,14 @@ bool placeHooks_bbcf()
 
 	GetIsHUDHiddenJmpBackAddr = HookManager::SetHook("GetIsHUDHidden", "\x83\x88\x78\x27\x00\x00\x00\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07",
 		"xxxxxx?xxxxxx?x????x????xx????xxxxxxxx?x????x????xx????xxxx", 7, GetIsHUDHidden);
+
+	// Only the 7-byte cmp is overwritten; the jne right after it is what the hook steers.
+	// The signature runs through that jne and into the first instruction of the Abyss arm
+	// (push [edi+119Ch]), which makes it unique in the whole binary - the bare cmp is not,
+	// there are dozens of mode checks against 0x10.
+	AbyssHpNumbersGateJmpBackAddr = HookManager::SetHook("AbyssHpNumbersGate",
+		"\x83\xB8\x08\x01\x00\x00\x10\x75\x5E\xFF\xB7\x9C\x11\x00\x00",
+		"xxxxxxxxxxxxxxx", 7, AbyssHpNumbersGate);
 
 	GetViewAndProjMatrixesJmpBackAddr = HookManager::SetHook("GetViewAndProjMatrixes", "\xF3\x0F\x00\x00\x00\xC7\x45\xA4\x00\x00\x00\x00\xE8",
 		"xx???xxx????x", 12, GetViewAndProjMatrixes);

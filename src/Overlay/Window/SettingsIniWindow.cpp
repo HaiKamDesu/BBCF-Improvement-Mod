@@ -23,6 +23,7 @@ namespace {
 
 	static const SettingMetadata kSettingMetadata[] = {
 		{ "LobbyLinkHotkeysEnabled", "Room link hotkeys", "Hotkeys", "Master switch for the two room-link shortcuts below. Turn it off if those key combinations get in the way of something else." },
+		{ "ShowHpNumbers", "Show HP numbers in training", "Interface", "Draws the exact remaining HP over each health bar while you are in training, the way Abyss mode already does. Training only - it stays off everywhere else." },
 		{ "RememberLobbyAvatar", "Remember my lobby avatar", "Online", "Puts your lobby avatar, its colour and both accessory slots back on when you connect to network mode. The game only saves the accessories its own equip menu offers, so without this the hidden ones are gone every time you relaunch. Anything you change afterwards - on the Online page or in the game\'s equip menu - becomes what gets remembered." },
 		{ "LobbyAvatarIcon", "Remembered avatar", "Online", "The avatar icon that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },
 		{ "LobbyAvatarColor", "Remembered avatar colour", "Online", "The avatar colour that will be put back on when you connect to network mode. Set by the mod when you change your avatar; -1 means nothing has been remembered yet. Use the sliders on the Online page rather than editing this." },

@@ -240,3 +240,9 @@ SETTING(int, lobbyAvatarIcon, "LobbyAvatarIcon", "-1");
 SETTING(int, lobbyAvatarColor, "LobbyAvatarColor", "-1");
 SETTING(int, lobbyAvatarAccessory1, "LobbyAvatarAccessory1", "-1");
 SETTING(int, lobbyAvatarAccessory2, "LobbyAvatarAccessory2", "-1");
+
+// Draw the exact HP figure over each health bar in training, the way Abyss mode does on its
+// own. Training only: reading the number mid-match is a real advantage, and this is meant to
+// answer "how much did that combo actually do" in the lab. See AbyssHpNumbersGate in
+// src/Hooks/hooks_bbcf.cpp.
+SETTING(bool, showHpNumbers, "ShowHpNumbers", "0");

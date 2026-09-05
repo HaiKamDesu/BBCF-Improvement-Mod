@@ -39,6 +39,7 @@ namespace MainMenu
 			{ Page_Overlays, Item_Group,   "Freeze & frame step", "freeze pause frame step advance counter slow motion" },
 			{ Page_Overlays, Item_Group,   "Frame advantage",     "framedata frame advantage plus minus stagger" },
 			{ Page_Overlays, Item_Group,   "Frame history",       "framehistory startup active recovery timeline bar" },
+			{ Page_Overlays, Item_Group,   "HP numbers",          "hp number health bar damage abyss figure training" },
 			{ Page_Overlays, Item_Loose,   "Input display",       "input buffer p1 p2 inputs notation display" },
 			{ Page_Overlays, Item_Loose,   "Combo data",          "combo damage proration counter hits" },
 

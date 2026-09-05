@@ -242,6 +242,10 @@ namespace MainMenu
 		const bool frameToolsUsable = isInMatch() && g_gameVals.pGameMode
 			&& (*g_gameVals.pGameMode == GameMode_Training || *g_gameVals.pGameMode == GameMode_ReplayTheater);
 
+		// Narrower than the others on purpose: the HP figure is drawn in training only.
+		const bool hpNumbersUsable = isInMatch() && g_gameVals.pGameMode
+			&& *g_gameVals.pGameMode == GameMode_Training;
+
 		if (BeginSection(Overlays_Hitboxes, overlaysUsable))
 			DrawHitboxes(ctx);
 
@@ -255,6 +259,22 @@ namespace MainMenu
 		ImGui::VerticalSpacing(4);
 		GroupLabel(Overlays_FrameHistory, isFrameHistoryEnabledInCurrentState());
 		DrawFrameHistory(ctx);
+
+		ImGui::VerticalSpacing(4);
+		// Greyed on the same terms as the blocks above: this only does anything in a training
+		// match, so say so the way Frame history and Frame advantage do. The checkbox itself
+		// stays live either way - it writes a setting, which is worth being able to set before
+		// loading in.
+		GroupLabel(Overlays_HpNumbers, hpNumbersUsable);
+		{
+			static bool showHpNumbers = Settings::settingsIni.showHpNumbers;
+			if (ImGui::CheckboxWrapped(L("Show the exact HP over the health bars").c_str(), &showHpNumbers))
+			{
+				Settings::settingsIni.showHpNumbers = showHpNumbers;
+				Settings::changeSetting("ShowHpNumbers", showHpNumbers ? "1" : "0");
+			}
+			ImGui::ShowHelpMarkerSameLine(L("Abyss mode draws the remaining HP as a number over each health bar; this turns the same display on in training. It stays off in every other mode.").c_str());
+		}
 
 		ImGui::VerticalSpacing(8);
 		ImGui::Separator();

@@ -57,6 +57,7 @@ namespace MainMenu
 		Overlays_FrameStep,
 		Overlays_FrameAdvantage,
 		Overlays_FrameHistory,
+		Overlays_HpNumbers,
 		Overlays_InputDisplay,
 		Overlays_ComboData,
 

@@ -3018,6 +3018,12 @@ struct LocalizationKeysAccessor
         // Change...
         inline const char* Change() const { return Get("Change..."); }
 
+        // Show the exact HP over the health bars
+        inline const char* Show_the_exact_HP_over_the_health_bars() const { return Get("Show the exact HP over the health bars"); }
+
+        // Abyss mode draws the remaining HP as a number over each health bar; this turns the same display on in training. It stays off in every other mode.
+        inline const char* Abyss_mode_draws_the_remaining_HP_as_a_number_over_each_health_bar_this_turns_the_same_display_on_in_training_It_stays_off_in_every_other_mode() const { return Get("Abyss mode draws the remaining HP as a number over each health bar; this turns the same display on in training. It stays off in every other mode."); }
+
         // Build this replacement again from the same source.
         inline const char* Build_this_replacement_again_from_the_same_source() const { return Get("Build this replacement again from the same source."); }
 
