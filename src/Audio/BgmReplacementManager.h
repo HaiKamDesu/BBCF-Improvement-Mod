@@ -79,7 +79,20 @@ public:
 	std::string GetError(int tableIndex) const;
 
 	// Queues a conversion. The pointer is patched only once it succeeds.
+	//
+	// A source path ending in .pac is transplanted rather than transcoded (see
+	// BuildReplacementPacFromPac), which is what lets one shipped track stand in for
+	// another and what makes a .pac from a music mod usable directly. Everything else about
+	// the assignment - persistence, Retry, the pointer dance - is identical.
 	void Assign(int tableIndex, const std::string& mp3Path);
+
+	// Assign the shipped file of `sourceTableIndex` as the replacement for `tableIndex`.
+	// Both must be installed tracks; a no-op otherwise.
+	void AssignFromVanilla(int tableIndex, int sourceTableIndex);
+
+	// True when this assignment came from a .pac rather than a user audio file, so its
+	// audio was transplanted and there is no gain stage to offer.
+	bool IsPacSource(int tableIndex) const;
 
 	// Gain is baked into the converted .pac, because the game plays it through its own
 	// XACT engine where the mod has no volume control. Changing it therefore re-runs the
@@ -181,6 +194,9 @@ private:
 	struct Job
 	{
 		int         tableIndex = -1;
+		// The source. A .pac here means transplant, anything else means transcode; the
+		// extension is the whole distinction, which keeps it true across a save/load with
+		// no extra field in the file.
 		std::string mp3Path;
 		std::string originalPac;
 		std::string outPac;

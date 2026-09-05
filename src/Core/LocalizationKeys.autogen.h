@@ -3018,6 +3018,39 @@ struct LocalizationKeysAccessor
         // Change...
         inline const char* Change() const { return Get("Change..."); }
 
+        // Build this replacement again from the same source.
+        inline const char* Build_this_replacement_again_from_the_same_source() const { return Get("Build this replacement again from the same source."); }
+
+        // Replace with File
+        inline const char* Replace_with_File() const { return Get("Replace with File"); }
+
+        // Replace with Vanilla OST
+        inline const char* Replace_with_Vanilla_OST() const { return Get("Replace with Vanilla OST"); }
+
+        // Change with File
+        inline const char* Change_with_File() const { return Get("Change with File"); }
+
+        // Change with Vanilla OST
+        inline const char* Change_with_Vanilla_OST() const { return Get("Change with Vanilla OST"); }
+
+        // Play another track instead
+        inline const char* Play_another_track_instead() const { return Get("Play another track instead"); }
+
+        // Choose the track to play instead of
+        inline const char* Choose_the_track_to_play_instead_of() const { return Get("Choose the track to play instead of"); }
+
+        // Double-click a track to use it.
+        inline const char* Double_click_a_track_to_use_it() const { return Get("Double-click a track to use it."); }
+
+        // No tracks match.
+        inline const char* No_tracks_match() const { return Get("No tracks match."); }
+
+        // now plays
+        inline const char* now_plays() const { return Get("now plays"); }
+
+        // Copied as-is, so it plays at its original volume.
+        inline const char* Copied_as_is_so_it_plays_at_its_original_volume() const { return Get("Copied as-is, so it plays at its original volume."); }
+
         // Rebuild
         inline const char* Rebuild() const { return Get("Rebuild"); }
 

@@ -77,6 +77,23 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
                                   float* headroomOut = nullptr,
                                   float* tagGainOut = nullptr);
 
+// Build a replacement out of another .pac instead of a user audio file: the source's audio
+// is transplanted whole, rather than decoded and re-encoded.
+//
+// This is how one shipped track stands in for another (Rebellion II playing Rebellion I),
+// and how a .pac from a music mod is accepted directly. The wave bank is taken from
+// `sourcePacPath` byte for byte and only its szBankName is rewritten, while the sound bank
+// still comes from `originalPacPath` verbatim - so the cue name and the target's authoring
+// values are preserved exactly as in ConvertAudioToReplacementPac, and the audio is
+// bit-identical to the source rather than surviving a WMA -> PCM -> WMA round trip.
+//
+// It follows that gain cannot be applied here: there is no PCM stage to scale. Callers that
+// need a volume offset have to go through the decode path instead.
+bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
+                                const std::string& originalPacPath,
+                                const std::string& outPacPath,
+                                std::string* errorOut = nullptr);
+
 using CustomMusicProgressCallback = std::function<void(int, int, const std::string&)>;
 // The user's volume OFFSET for one custom track, in dB, by file name. Any ReplayGain tag
 // in the file is applied first and this is added to it. Returns 0 for an untouched track.

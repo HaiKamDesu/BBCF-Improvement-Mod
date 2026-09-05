@@ -8,6 +8,7 @@
 #include "Overlay/imgui_utils.h"
 
 #include <algorithm>
+#include <cctype>
 #include <vector>
 
 namespace
@@ -94,6 +95,8 @@ void BgmReplacementWindow::Draw()
 	ImGui::Separator();
 	DrawFilters();
 	DrawTrackList();
+
+	DrawVanillaPickerModal();
 }
 
 void BgmReplacementWindow::DrawSummary()
@@ -355,10 +358,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 	ImGui::SameLine();
 	if (state == BgmReplacementState::Original)
 	{
-		if (ImGui::Button(L("Replace...").c_str()))
-			OpenPickerFor(tableIndex);
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltipWrapped(L("Pick a song to play instead of this track.").c_str());
+		DrawSourceMenuButton(tableIndex, true);
 	}
 	else if (state == BgmReplacementState::Converting)
 	{
@@ -366,8 +366,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 	}
 	else
 	{
-		if (ImGui::Button(L("Change...").c_str()))
-			OpenPickerFor(tableIndex);
+		DrawSourceMenuButton(tableIndex, false);
 
 		if (state == BgmReplacementState::Missing || state == BgmReplacementState::Failed)
 		{
@@ -378,7 +377,7 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 				m_lastMessage = L("Rebuilding") + " " + track->displayName + "...";
 			}
 			if (ImGui::IsItemHovered())
-				ImGui::SetTooltipWrapped(L("Convert the same MP3 again.").c_str());
+				ImGui::SetTooltipWrapped(L("Build this replacement again from the same source.").c_str());
 		}
 
 		ImGui::SameLine();
@@ -391,10 +390,17 @@ void BgmReplacementWindow::DrawTrackRow(int tableIndex)
 			ImGui::SetTooltipWrapped(L("Put the original back and delete the converted file.").c_str());
 	}
 
-	if (state == BgmReplacementState::Active || state == BgmReplacementState::Missing ||
-		state == BgmReplacementState::Failed)
+	// A .pac source is transplanted rather than decoded, so there is no PCM stage for a gain
+	// to be applied to and no slider to offer. Saying so beats a control that does nothing.
+	const bool pacSource = mgr.IsPacSource(tableIndex);
+	if ((state == BgmReplacementState::Active || state == BgmReplacementState::Missing ||
+		state == BgmReplacementState::Failed) && !pacSource)
 	{
 		DrawGainRow(tableIndex);
+	}
+	else if (state == BgmReplacementState::Active && pacSource)
+	{
+		ImGui::TextDisabled("%s", L("Copied as-is, so it plays at its original volume.").c_str());
 	}
 
 	ImGui::Unindent(22.0f);
@@ -517,6 +523,140 @@ void BgmReplacementWindow::PollRestartAfterApply()
 
 	MusicManager::GetInstance().PreviewPac(relPath, track->baseName);
 	m_lastMessage = track->displayName + " " + L("is playing at the new volume.");
+}
+
+// The button that used to open the file dialog straight away. There are two kinds of
+// source now, so it opens a menu and the dialog is one of the two entries.
+void BgmReplacementWindow::DrawSourceMenuButton(int tableIndex, bool firstTime)
+{
+	// Each menu entry is a whole key rather than a verb glued to a suffix: "Replace" and
+	// "with File" do not reliably join into a sentence once translated.
+	const char* buttonLabel = firstTime ? L("Replace...").c_str() : L("Change...").c_str();
+	const char* fileLabel = firstTime ? L("Replace with File").c_str() : L("Change with File").c_str();
+	const char* vanillaLabel = firstTime
+		? L("Replace with Vanilla OST").c_str() : L("Change with Vanilla OST").c_str();
+
+	if (ImGui::Button(buttonLabel))
+		ImGui::OpenPopup("##source_menu");
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Pick a song to play instead of this track.").c_str());
+
+	// The row already pushes the track index as an ID, so this id is unique per row.
+	if (ImGui::BeginPopup("##source_menu"))
+	{
+		if (ImGui::Selectable(fileLabel))
+			OpenPickerFor(tableIndex);
+
+		if (ImGui::Selectable(vanillaLabel))
+		{
+			m_vanillaPickFor = tableIndex;
+			m_openVanillaModal = true;
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
+// Choosing one shipped track to play in place of another. Double-click picks, because a
+// single click in a long list is too easy to do by accident and this rewrites a file.
+void BgmReplacementWindow::DrawVanillaPickerModal()
+{
+	BgmReplacementManager& mgr = GetBgmReplacements();
+
+	// Title and ID in one string, with the ID half fixed so translating the title does not
+	// hand ImGui a different popup.
+	const std::string popupId = L("Play another track instead") + "##vanilla_picker";
+
+	if (m_openVanillaModal)
+	{
+		ImGui::OpenPopup(popupId.c_str());
+		m_openVanillaModal = false;
+		m_vanillaSearch[0] = '\0';
+	}
+
+	ImGui::SetNextWindowSize(ImVec2(560, 560), ImGuiCond_Appearing);
+	if (!ImGui::BeginPopupModal(popupId.c_str(), nullptr, ImGuiWindowFlags_NoSavedSettings))
+		return;
+
+	const BgmReplaceableTrack* target = mgr.FindTrack(m_vanillaPickFor);
+	if (!target)
+	{
+		// The row went away underneath the modal; nothing sensible left to choose for.
+		ImGui::CloseCurrentPopup();
+		ImGui::EndPopup();
+		return;
+	}
+
+	ImGui::TextWrapped("%s", (L("Choose the track to play instead of") + " " +
+		target->displayName).c_str());
+	ImGui::Spacing();
+	ImGui::SetNextItemWidth(-1.0f);
+	ImGui::InputTextWithHint("##vanilla_search", L("Search").c_str(),
+		m_vanillaSearch, sizeof(m_vanillaSearch));
+	ImGui::Spacing();
+
+	const float footer = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
+	ImGui::BeginChild("##vanilla_list", ImVec2(0, -footer), true);
+
+	std::string needle = m_vanillaSearch;
+	std::transform(needle.begin(), needle.end(), needle.begin(),
+		[](unsigned char c) { return (char)tolower(c); });
+
+	int shown = 0;
+	for (const BgmReplaceableTrack& candidate : mgr.GetTracks())
+	{
+		// Only tracks whose file is actually on disk can donate their audio, and a track
+		// cannot stand in for itself.
+		if (candidate.originalDir.empty() || !candidate.everUsed)
+			continue;
+		if (candidate.fileName == target->fileName)
+			continue;
+
+		if (!needle.empty())
+		{
+			std::string haystack = candidate.displayName + " " + candidate.baseName;
+			std::transform(haystack.begin(), haystack.end(), haystack.begin(),
+				[](unsigned char c) { return (char)tolower(c); });
+			if (haystack.find(needle) == std::string::npos)
+				continue;
+		}
+
+		++shown;
+		ImGui::PushID(candidate.tableIndex);
+		if (ImGui::Selectable(candidate.displayName.c_str(), false,
+			ImGuiSelectableFlags_AllowDoubleClick))
+		{
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+			{
+				mgr.AssignFromVanilla(m_vanillaPickFor, candidate.tableIndex);
+				m_lastMessage = target->displayName + " " + L("now plays") + " " +
+					candidate.displayName + ".";
+				m_vanillaPickFor = -1;
+				ImGui::PopID();
+				ImGui::CloseCurrentPopup();
+				break;
+			}
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("%s", candidate.baseName.c_str());
+		ImGui::PopID();
+	}
+
+	if (shown == 0)
+		ImGui::TextDisabled("%s", L("No tracks match.").c_str());
+
+	ImGui::EndChild();
+
+	ImGui::Spacing();
+	if (ImGui::Button(L("Cancel").c_str(), ImVec2(120, 0)))
+	{
+		m_vanillaPickFor = -1;
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("%s", L("Double-click a track to use it.").c_str());
+
+	ImGui::EndPopup();
 }
 
 void BgmReplacementWindow::OpenPickerFor(int tableIndex)

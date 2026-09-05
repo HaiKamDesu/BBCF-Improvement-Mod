@@ -914,6 +914,118 @@ static bool ExtractPacSubFile(const std::vector<unsigned char>& pac,
     return false;
 }
 
+// Rewrite the szBankName of an already-built wave bank in place.
+//
+// Layout is the one BuildWaveBank writes: header +0x0C holds the BankData segment offset,
+// and BankData is dwFlags(4) + dwEntryCount(4) + szBankName[64]. The reused sound bank
+// refers to its wave bank by name, so a transplanted bank has to answer to the target's
+// name rather than the one it was authored under.
+static bool RenameWaveBank(std::vector<unsigned char>& xwb, const std::string& bankName,
+                           std::string* errorOut) {
+    const size_t kHeaderSize = 52;
+    const size_t kNameOffsetInBankData = 8;
+    const size_t kNameSize = 64;
+
+    if (xwb.size() < kHeaderSize || memcmp(xwb.data(), "WBND", 4) != 0) {
+        if (errorOut) *errorOut = "The source wave bank is not a WBND bank";
+        return false;
+    }
+    if (bankName.size() >= kNameSize) {
+        if (errorOut) *errorOut = "Track name too long for a wave bank name field";
+        return false;
+    }
+
+    unsigned int bankDataOff = *(const unsigned int*)&xwb[12];
+    const size_t nameOff = (size_t)bankDataOff + kNameOffsetInBankData;
+    if (nameOff + kNameSize > xwb.size()) {
+        if (errorOut) *errorOut = "The source wave bank's header points outside the file";
+        return false;
+    }
+
+    memset(&xwb[nameOff], 0, kNameSize);
+    memcpy(&xwb[nameOff], bankName.c_str(), bankName.size());
+    return true;
+}
+
+// Write `pac` to `outPacPath` via a temp file, so a failure never leaves a half-written
+// .pac where the game will find it - writing a pointer at one hangs the match load.
+static bool WritePacAtomically(const std::vector<unsigned char>& pac,
+                               const std::string& outPacPath, std::string* errorOut) {
+    const std::string tmpPath = outPacPath + ".tmp";
+    HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hOut == INVALID_HANDLE_VALUE) {
+        if (errorOut) *errorOut = "Could not create the output file";
+        return false;
+    }
+
+    DWORD written = 0;
+    const BOOL wrote = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
+    CloseHandle(hOut);
+    if (!wrote || written != (DWORD)pac.size()) {
+        DeleteFileA(tmpPath.c_str());
+        if (errorOut) *errorOut = "Short write on the output file";
+        return false;
+    }
+    if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+        DeleteFileA(tmpPath.c_str());
+        if (errorOut) *errorOut = "Could not replace the existing file";
+        return false;
+    }
+    return true;
+}
+
+bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
+                                const std::string& originalPacPath,
+                                const std::string& outPacPath,
+                                std::string* errorOut) {
+    auto fail = [&](const std::string& msg) {
+        if (errorOut) *errorOut = msg;
+        LogCustom("%s\n", msg.c_str());
+        return false;
+    };
+
+    std::vector<unsigned char> sourcePac;
+    std::string readError;
+    if (!PacFile::Read(sourcePacPath, sourcePac, &readError))
+        return fail(readError);
+
+    std::vector<unsigned char> sourceXwb;
+    std::string sourceBaseName;
+    if (!ExtractPacSubFile(sourcePac, ".xwb", &sourceXwb, &sourceBaseName))
+        return fail("No wave bank inside '" + sourcePacPath + "' - not a BGM .pac? ("
+            + PacFile::DescribeHeader(sourcePac) + ")");
+
+    // The target's sound bank is reused byte for byte, exactly as in
+    // ConvertAudioToReplacementPac: it carries the cue name the game will ask for, plus the
+    // per-track authoring values that make the replacement behave like what it replaces.
+    std::vector<unsigned char> originalPac;
+    if (!PacFile::Read(originalPacPath, originalPac, &readError))
+        return fail(readError);
+
+    std::vector<unsigned char> originalXsb;
+    std::string baseName;
+    if (!ExtractPacSubFile(originalPac, ".xsb", &originalXsb, &baseName))
+        return fail("No sound bank inside '" + originalPacPath + "' - not a BGM .pac? ("
+            + PacFile::DescribeHeader(originalPac) + ")");
+
+    std::string renameError;
+    if (!RenameWaveBank(sourceXwb, baseName, &renameError))
+        return fail(renameError);
+
+    LogCustom("Replacement for \"%s\": transplanting the %zu-byte wave bank from \"%s\"\n",
+        baseName.c_str(), sourceXwb.size(), sourceBaseName.c_str());
+
+    std::vector<unsigned char> pac = BuildFpacContainer(baseName, originalXsb, sourceXwb);
+
+    std::string writeError;
+    if (!WritePacAtomically(pac, outPacPath, &writeError))
+        return fail(writeError);
+
+    return true;
+}
+
 bool ConvertAudioToReplacementPac(const std::string& srcPath,
                                   float gainDb,
                                   const std::string& originalPacPath,

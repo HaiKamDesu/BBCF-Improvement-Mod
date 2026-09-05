@@ -26,6 +26,11 @@ private:
 	void DrawGainRow(int tableIndex);
 	void PollRestartAfterApply();
 
+	// The "Replace.../Change..." button is a menu, not a direct action: a replacement can
+	// come from a file on disk or from another shipped track.
+	void DrawSourceMenuButton(int tableIndex, bool firstTime);
+	void DrawVanillaPickerModal();
+
 	void OpenPickerFor(int tableIndex);
 	void PollPicker();
 
@@ -33,6 +38,12 @@ private:
 	bool m_onlyReplaced = false;
 	int  m_categoryFilter = 0;      // 0 = all
 	int  m_pendingPickIndex = -1;   // track whose picker is open
+	// Track the vanilla-OST modal is choosing a stand-in for, and the one-shot that opens
+	// it. Opening is deferred to the end of the frame because the menu that triggers it is
+	// drawn inside the scrolling track list, and a modal has to be opened at window level.
+	int  m_vanillaPickFor = -1;
+	bool m_openVanillaModal = false;
+	char m_vanillaSearch[64] = {};
 	// One draft per track, not one shared draft: every assigned track draws its own
 	// slider each frame, so a single draft was overwritten by the next row drawn and the
 	// value snapped back the moment the mouse was released.

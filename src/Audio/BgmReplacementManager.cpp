@@ -10,6 +10,7 @@
 
 #include <windows.h>
 #include <algorithm>
+#include <cctype>
 #include <cstdarg>
 #include <cstdio>
 #include <fstream>
@@ -26,6 +27,18 @@ namespace
 	// Replacements live in a subfolder of whichever directory holds the original, so no
 	// shipped file is ever touched and Steam's file verification has nothing to restore.
 	const char* kReplacementDir = "BBCFIM_Music";
+
+	// A .pac source means the audio is transplanted rather than transcoded. The extension
+	// carries that distinction on its own, which is why nothing extra has to be written to
+	// the saved assignments for it to survive a restart.
+	bool IsPacPath(const std::string& path)
+	{
+		if (path.size() < 4)
+			return false;
+		std::string tail = path.substr(path.size() - 4);
+		for (char& c : tail) c = (char)tolower((unsigned char)c);
+		return tail == ".pac";
+	}
 
 	// The two entries the game loads during its own boot, verified in the disassembly:
 	// both are read from the function that also carries InitParticle / InitFade /
@@ -541,11 +554,23 @@ void BgmReplacementManager::StartNextJob()
 		JobResult result;
 		result.tableIndex = job.tableIndex;
 		std::string error;
-		float tagGain = 0.0f;
-		result.ok = ConvertAudioToReplacementPac(job.mp3Path, job.gainDb, job.originalPac, job.outPac,
-			&error, &result.headroomDb, &tagGain);
-		result.tagGainDb = tagGain;
-		result.hasTagGain = (tagGain != 0.0f);
+
+		if (IsPacPath(job.mp3Path))
+		{
+			// A .pac source is transplanted whole: no decode, no gain, and so no headroom
+			// or tag to report. It is also near-instant, but it still goes through the job
+			// queue so it shares one state machine with everything else.
+			result.ok = BuildReplacementPacFromPac(job.mp3Path, job.originalPac, job.outPac, &error);
+		}
+		else
+		{
+			float tagGain = 0.0f;
+			result.ok = ConvertAudioToReplacementPac(job.mp3Path, job.gainDb, job.originalPac, job.outPac,
+				&error, &result.headroomDb, &tagGain);
+			result.tagGainDb = tagGain;
+			result.hasTagGain = (tagGain != 0.0f);
+		}
+
 		result.error = error;
 		return result;
 	});
@@ -747,6 +772,42 @@ void BgmReplacementManager::SetGainDb(int tableIndex, float gainDb)
 	Assign(tableIndex, source);
 }
 
+void BgmReplacementManager::AssignFromVanilla(int tableIndex, int sourceTableIndex)
+{
+	if (!m_initialized)
+		return;
+
+	const BgmReplaceableTrack* source = FindTrack(sourceTableIndex);
+	const BgmReplaceableTrack* target = FindTrack(tableIndex);
+	if (!source || !target)
+		return;
+
+	// Compared by filename rather than by index: a couple of entries share one file
+	// (205_abyss.pac has two), and standing a track in for itself would build a copy of the
+	// original and call it a replacement.
+	if (source->fileName == target->fileName)
+		return;
+
+	if (source->originalDir.empty())
+	{
+		// Nothing on disk to take the audio from. Assign() reports the mirror of this for
+		// the target, so say it about the source here rather than failing a job later.
+		Assignment bad;
+		bad.state = BgmReplacementState::Failed;
+		bad.error = "\"" + source->displayName + "\" isn't installed, so its music can't be copied";
+		m_assignments[tableIndex] = bad;
+		return;
+	}
+
+	Assign(tableIndex, GamePath(source->originalDir + "/" + source->fileName));
+}
+
+bool BgmReplacementManager::IsPacSource(int tableIndex) const
+{
+	auto it = m_assignments.find(tableIndex);
+	return it != m_assignments.end() && IsPacPath(it->second.sourcePath);
+}
+
 void BgmReplacementManager::Retry(int tableIndex)
 {
 	auto it = m_assignments.find(tableIndex);
@@ -812,7 +873,25 @@ BgmReplacementState BgmReplacementManager::GetState(int tableIndex) const
 std::string BgmReplacementManager::GetSourceName(int tableIndex) const
 {
 	auto it = m_assignments.find(tableIndex);
-	return it == m_assignments.end() ? std::string() : FileNameOf(it->second.sourcePath);
+	if (it == m_assignments.end())
+		return std::string();
+
+	const std::string fileName = FileNameOf(it->second.sourcePath);
+
+	// A shipped track standing in for another was chosen by its name in the picker, so
+	// report it that way rather than as "012_btl_xx.pac", which is not what the user picked
+	// and not something they can recognise. Foreign .pacs have no catalogue entry and keep
+	// their filename, which is the best label available for them.
+	if (IsPacPath(fileName))
+	{
+		for (const BgmReplaceableTrack& track : m_tracks)
+		{
+			if (track.fileName == fileName && !track.displayName.empty())
+				return track.displayName;
+		}
+	}
+
+	return fileName;
 }
 
 std::string BgmReplacementManager::GetSourcePath(int tableIndex) const

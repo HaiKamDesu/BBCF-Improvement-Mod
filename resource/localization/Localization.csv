@@ -1182,6 +1182,17 @@ Replace...,Replace...,Reemplazar...
 Pick a song to play instead of this track.,Pick a song to play instead of this track.,Elige una canción para que suene en lugar de esta pista.
 please wait,please wait,espera un momento
 Change...,Change...,Cambiar...
+Build this replacement again from the same source.,Build this replacement again from the same source.,Volver a crear este reemplazo a partir de la misma fuente.
+Replace with File,Replace with File,Reemplazar con un archivo
+Replace with Vanilla OST,Replace with Vanilla OST,Reemplazar con música original del juego
+Change with File,Change with File,Cambiar por un archivo
+Change with Vanilla OST,Change with Vanilla OST,Cambiar por música original del juego
+Play another track instead,Play another track instead,Reproducir otra pista en su lugar
+Choose the track to play instead of,Choose the track to play instead of,Elige la pista que sonará en lugar de
+Double-click a track to use it.,Double-click a track to use it.,Haz doble clic en una pista para usarla.
+No tracks match.,No tracks match.,Ninguna pista coincide.
+now plays,now plays,ahora reproduce
+"Copied as-is, so it plays at its original volume.","Copied as-is, so it plays at its original volume.","Se copia tal cual, así que suena a su volumen original."
 Rebuild,Rebuild,Reconstruir
 Rebuilding,Rebuilding,Reconstruyendo
 Convert the same song again.,Convert the same song again.,Vuelve a convertir la misma canción.
