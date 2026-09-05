@@ -518,7 +518,13 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
                         Settings::settingsIni.EnableControllerHooks = 0;
                 }
 
-                if (!Settings::settingsIni.ForceEnableControllerSettingHooks)
+                // Asked once, ever. Neither button used to record anything the open
+                // condition looked at, so a Linux user was handed the same modal on every
+                // single launch with no way to answer it for good short of setting the
+                // force flag - which is the unsupported option the prompt exists to warn
+                // them about.
+                if (!Settings::settingsIni.ForceEnableControllerSettingHooks &&
+                    !Settings::settingsIni.wineControllerPromptAnswered)
                 {
                         m_windowContainer->GetWindow<WinePopupWindow>(WindowType_WinePopup)->Open();
                 }

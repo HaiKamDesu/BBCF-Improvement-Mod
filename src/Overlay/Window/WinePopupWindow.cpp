@@ -6,6 +6,15 @@
 
 #include <imgui.h>
 
+// Both answers are final. Whichever the user picks, the prompt is done asking: it is the
+// same question with the same answer on every launch, and it was being asked on every
+// launch because nothing recorded that it had been answered.
+static void RememberAnswer()
+{
+    Settings::changeSetting("WineControllerPromptAnswered", "1");
+    Settings::settingsIni.wineControllerPromptAnswered = 1;
+}
+
 void WinePopupWindow::Update()
 {
     if (!m_windowOpen)
@@ -38,14 +47,20 @@ void WinePopupWindow::Draw()
     if (ImGui::BeginPopupModal(Messages.Wine_or_Proton_detected(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::PushStyleColor(ImGuiCol_Text, warningColor);
-        ImGui::TextWrapped(Messages.Wine_Proton_detected_Controller_hooks_were_disabled_to_prevent_startup_crashes_Enable_below_or_set_ForceEnableControllerSettingHooks_to_1_in_settings_ini_to_override_detection());
+        ImGui::TextWrapped(Messages.Wine_Proton_detected_The_mod_turned_its_controller_tools_off_so_the_game_does_not_crash_at_startup_This_choice_is_remembered_you_can_change_it_later_under_Controller_in_the_mod_settings_Forcing_them_on_is_unsupported_and_applies_the_next_time_you_start_the_game());
         ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::AlignItemHorizontalCenter(buttonSize.x);
         if (ImGui::Button(Messages.Enable_anyway(), buttonSize))
         {
-            Settings::changeSetting("EnableControllerHooks", "1");
-            Settings::settingsIni.EnableControllerHooks = 1;
+            // The force flag, not EnableControllerHooks. Turning the plain setting back on
+            // achieved nothing: the startup gate rewrites it to 0 on the next Wine launch
+            // before anything reads it, so "Enable anyway" quietly undid itself. The force
+            // flag is the one that survives that gate and overrides the platform check on
+            // its own - it is also, deliberately, the unsupported option.
+            Settings::changeSetting("ForceEnableControllerSettingHooks", "1");
+            Settings::settingsIni.ForceEnableControllerSettingHooks = 1;
+            RememberAnswer();
             ImGui::CloseCurrentPopup();
             Close();
         }
@@ -55,6 +70,9 @@ void WinePopupWindow::Draw()
         {
             Settings::changeSetting("EnableControllerHooks", "0");
             Settings::settingsIni.EnableControllerHooks = 0;
+            Settings::changeSetting("ForceEnableControllerSettingHooks", "0");
+            Settings::settingsIni.ForceEnableControllerSettingHooks = 0;
+            RememberAnswer();
             ImGui::CloseCurrentPopup();
             Close();
         }

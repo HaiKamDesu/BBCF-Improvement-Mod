@@ -1227,8 +1227,8 @@ struct LocalizationKeysAccessor
         // Wine or Proton detected
         inline const char* Wine_or_Proton_detected() const { return Get("Wine or Proton detected"); }
 
-        // Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection.
-        inline const char* Wine_Proton_detected_Controller_hooks_were_disabled_to_prevent_startup_crashes_Enable_below_or_set_ForceEnableControllerSettingHooks_to_1_in_settings_ini_to_override_detection() const { return Get("Wine/Proton detected. Controller hooks were disabled to prevent startup crashes. Enable below or set ForceEnableControllerSettingHooks to 1 in settings.ini to override detection."); }
+        // Wine/Proton detected. The mod turned its controller tools off so the game does not crash at startup. This choice is remembered - you can change it later under Controller in the mod settings. Forcing them on is unsupported and applies the next time you start the game.
+        inline const char* Wine_Proton_detected_The_mod_turned_its_controller_tools_off_so_the_game_does_not_crash_at_startup_This_choice_is_remembered_you_can_change_it_later_under_Controller_in_the_mod_settings_Forcing_them_on_is_unsupported_and_applies_the_next_time_you_start_the_game() const { return Get("Wine/Proton detected. The mod turned its controller tools off so the game does not crash at startup. This choice is remembered - you can change it later under Controller in the mod settings. Forcing them on is unsupported and applies the next time you start the game."); }
 
         // Enable anyway
         inline const char* Enable_anyway() const { return Get("Enable anyway"); }
