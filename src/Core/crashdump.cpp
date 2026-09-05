@@ -493,6 +493,122 @@ namespace
                 oss << "\n";
         }
 
+        // ntdll raises STATUS_HEAP_CORRUPTION with exactly one parameter: a pointer to the
+        // heap manager's own failure record (ntdll!_HEAP_FAILURE_INFORMATION). It is the
+        // record `!heap -s` prints, and it carries the only facts a heap crash can be
+        // triaged from - which heap, which block, and the two blocks either side that were
+        // still intact. None of that is anywhere else in a dump, and reconstructing it by
+        // hand means decoding ntdll's LFH checks instruction by instruction.
+        //
+        // Layout verified field-by-field against a real 0xC0000374 dump (Win11 26100 x86)
+        // and against ntdll's public symbols; Version/StructureSize are checked before any
+        // other field is read, so a future layout change degrades to "not decoded" rather
+        // than printing nonsense.
+        struct HeapFailureRecord
+        {
+                ULONG Version;                   // 0x00
+                ULONG StructureSize;             // 0x04
+                ULONG FailureType;               // 0x08
+                PVOID HeapAddress;               // 0x0C
+                PVOID Address;                   // 0x10
+                PVOID Param1;                    // 0x14
+                PVOID Param2;                    // 0x18
+                PVOID Param3;                    // 0x1C
+                PVOID PreviousBlock;             // 0x20
+                PVOID NextBlock;                 // 0x24
+                ULONG_PTR ExpectedDecodedEntry[2]; // 0x28
+                PVOID StackTrace[32];            // 0x30
+        };
+
+        const char* HeapFailureTypeName(ULONG type)
+        {
+                // ntdll!_HEAP_FAILURE_TYPE.
+                static const char* const kNames[] = {
+                        "internal", "unknown", "generic", "entry_corruption",
+                        "multiple_entries_corruption", "virtual_block_corruption",
+                        "buffer_overrun", "buffer_underrun", "block_not_busy",
+                        "invalid_argument", "invalid_allocation_type", "usage_after_free",
+                        "cross_heap_operation", "freelists_corruption", "listentry_corruption",
+                        "lfh_bitmap_mismatch", "segment_lfh_bitmap_corruption",
+                        "segment_lfh_double_free", "vs_subsegment_corruption", "null_heap",
+                        "allocation_limit", "commit_limit", "invalid_va_mgr_query",
+                        "segment_lfh_delay_free_corruption",
+                };
+                return (type < _countof(kNames)) ? kNames[type] : "<unknown>";
+        }
+
+        // No C++ objects with destructors here: the __try makes them illegal (C2712).
+        bool ReadHeapFailureRecord(uintptr_t address, HeapFailureRecord* out)
+        {
+                __try
+                {
+                        const HeapFailureRecord* src = reinterpret_cast<const HeapFailureRecord*>(address);
+                        if (src->Version > 8 ||
+                            src->StructureSize < sizeof(HeapFailureRecord) ||
+                            src->StructureSize > 0x4000)
+                        {
+                                return false;
+                        }
+                        *out = *src;
+                        return true;
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                        return false;
+                }
+        }
+
+        void AppendHeapFailureDetail(std::ostringstream& oss, PEXCEPTION_POINTERS ExPtr)
+        {
+                if (ExPtr == nullptr || ExPtr->ExceptionRecord == nullptr ||
+                    ExPtr->ExceptionRecord->ExceptionCode != STATUS_HEAP_CORRUPTION ||
+                    ExPtr->ExceptionRecord->NumberParameters < 1)
+                {
+                        return;
+                }
+
+                HeapFailureRecord record{};
+                const uintptr_t recordAddress =
+                        static_cast<uintptr_t>(ExPtr->ExceptionRecord->ExceptionInformation[0]);
+                if (!ReadHeapFailureRecord(recordAddress, &record))
+                {
+                        oss << "\nHeap failure record at 0x" << Hex32(static_cast<uint32_t>(recordAddress))
+                            << " could not be decoded.\n";
+                        return;
+                }
+
+                oss << "\nHeap failure record (ntdll): type " << record.FailureType
+                    << " heap_failure_" << HeapFailureTypeName(record.FailureType) << "\n";
+                oss << "  Heap:          0x" << Hex32(reinterpret_cast<uint32_t>(record.HeapAddress));
+                if (record.HeapAddress == GetProcessHeap())
+                {
+                        oss << "  (the process default heap - the game's CRT and the mod's CRT\n"
+                               "                              both allocate from it, so either side can be the culprit)";
+                }
+                oss << "\n";
+                oss << "  Block:         0x" << Hex32(reinterpret_cast<uint32_t>(record.Address)) << "\n";
+                oss << "  Intact before: 0x" << Hex32(reinterpret_cast<uint32_t>(record.PreviousBlock)) << "\n";
+                oss << "  Intact after:  0x" << Hex32(reinterpret_cast<uint32_t>(record.NextBlock)) << "\n";
+
+                oss << "  Heap manager stack:\n";
+                for (size_t i = 0; i < _countof(record.StackTrace); ++i)
+                {
+                        const uintptr_t frame = reinterpret_cast<uintptr_t>(record.StackTrace[i]);
+                        if (frame == 0)
+                        {
+                                break;
+                        }
+                        oss << "    0x" << Hex32(static_cast<uint32_t>(frame)) << "  "
+                            << DescribeAddress(frame) << "\n";
+                }
+
+                oss << "  NOTE: this is corruption *detected* while the heap was being used, not the\n"
+                       "        write that caused it. The culprit ran earlier and left no trace in this\n"
+                       "        dump. To catch the writer itself, reproduce once under Page Heap:\n"
+                       "          gflags /p /enable BBCF.exe /full   (elevated, then reproduce)\n"
+                       "          gflags /p /disable BBCF.exe        (afterwards)\n";
+        }
+
         void AppendExceptionDetail(std::ostringstream& oss, PEXCEPTION_POINTERS ExPtr)
         {
                 if (ExPtr == nullptr || ExPtr->ExceptionRecord == nullptr)
@@ -611,6 +727,7 @@ namespace
                 oss << "Dump file: " << ToUtf8(dumpPath) << "\n";
 
                 AppendExceptionDetail(oss, ExPtr);
+                AppendHeapFailureDetail(oss, ExPtr);
                 AppendRegisters(oss, ExPtr);
                 AppendStackTrace(oss, ExPtr, api);
 
@@ -655,6 +772,170 @@ namespace
                 return oss.str();
         }
 
+        // ---------------------------------------------------------------------------
+        // Targeted extra memory
+        // ---------------------------------------------------------------------------
+        //
+        // A medium dump captures thread stacks and whatever they point at, which leaves
+        // exactly the memory a corruption bug is diagnosed from out of the file: the
+        // faulting heap region is not referenced by any stack, so it arrived as a 1 KB
+        // sliver that ended mid-structure. These ranges are named explicitly instead, and
+        // cost tens of KB against a dump already measured in tens of MB.
+        struct DumpRange
+        {
+                ULONG64 base;
+                ULONG size;
+        };
+
+        DumpRange g_extraRanges[96] = {};
+        int g_extraRangeCount = 0;
+        int g_extraRangeCursor = 0;
+
+        // Heap handles, snapshotted while the process is healthy. A heap-corruption crash
+        // usually faults *inside* the heap lock, and the faulting thread is parked holding
+        // it while the reporter thread writes the bundle - so calling GetProcessHeaps here
+        // would deadlock the report. Reading a plain array cannot.
+        HANDLE g_processHeaps[64] = {};
+        std::atomic<DWORD> g_processHeapCount{ 0 };
+
+        // Refreshed on a slow cadence from the watchdog thread, because a heap created
+        // after startup (the game loads codecs and D3D drivers long after DllMain) would
+        // otherwise never be in the list. Entries are written before the count, so a crash
+        // landing mid-refresh reads handles that are stale at worst - never past the end.
+        void RefreshProcessHeapSnapshot()
+        {
+                HANDLE heaps[_countof(g_processHeaps)] = {};
+                DWORD count = GetProcessHeaps(static_cast<DWORD>(_countof(heaps)), heaps);
+                if (count == 0)
+                {
+                        return;
+                }
+                if (count > _countof(heaps))
+                {
+                        count = static_cast<DWORD>(_countof(heaps));
+                }
+                memcpy(g_processHeaps, heaps, count * sizeof(HANDLE));
+                g_processHeapCount.store(count);
+        }
+
+        void AddDumpRange(uintptr_t base, SIZE_T size)
+        {
+                if (base == 0 || size == 0 || g_extraRangeCount >= static_cast<int>(_countof(g_extraRanges)))
+                {
+                        return;
+                }
+                g_extraRanges[g_extraRangeCount].base = static_cast<ULONG64>(base);
+                g_extraRanges[g_extraRangeCount].size = static_cast<ULONG>(size);
+                ++g_extraRangeCount;
+        }
+
+        // Captures the committed region an address lives in, so a structure is whole in the
+        // dump instead of clipped. VirtualQuery takes no heap lock, so it is safe on this
+        // path; a region larger than the cap is windowed around the address instead.
+        void AddDumpRegionAround(uintptr_t address, SIZE_T cap)
+        {
+                if (address == 0)
+                {
+                        return;
+                }
+
+                MEMORY_BASIC_INFORMATION mbi{};
+                if (VirtualQuery(reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi)) != sizeof(mbi) ||
+                    mbi.State != MEM_COMMIT)
+                {
+                        return;
+                }
+
+                uintptr_t base = reinterpret_cast<uintptr_t>(mbi.BaseAddress);
+                SIZE_T size = mbi.RegionSize;
+                if (size > cap)
+                {
+                        const SIZE_T half = cap / 2;
+                        uintptr_t start = (address > base + half) ? (address - half) : base;
+                        if (start + cap > base + size)
+                        {
+                                start = base + size - cap;
+                        }
+                        base = start;
+                        size = cap;
+                }
+                AddDumpRange(base, size);
+        }
+
+        void PrepareExtraDumpRanges(PEXCEPTION_POINTERS ExPtr)
+        {
+                g_extraRangeCount = 0;
+                g_extraRangeCursor = 0;
+
+                // The heap headers. `!heap` needs them for the encoding key and the segment
+                // list, and without them every heap extension in the debugger refuses to
+                // run ("Failed to read heap key"). One page each, so <256 KB in total.
+                const DWORD heapCount = g_processHeapCount.load();
+                for (DWORD i = 0; i < heapCount; ++i)
+                {
+                        AddDumpRange(reinterpret_cast<uintptr_t>(g_processHeaps[i]), 0x1000);
+                }
+
+                if (ExPtr == nullptr || ExPtr->ExceptionRecord == nullptr)
+                {
+                        return;
+                }
+
+                const EXCEPTION_RECORD& record = *ExPtr->ExceptionRecord;
+
+                if (record.ExceptionCode == STATUS_HEAP_CORRUPTION && record.NumberParameters >= 1)
+                {
+                        const uintptr_t infoAddress = static_cast<uintptr_t>(record.ExceptionInformation[0]);
+                        AddDumpRange(infoAddress, 0x400); // the failure record itself
+
+                        HeapFailureRecord failure{};
+                        if (ReadHeapFailureRecord(infoAddress, &failure))
+                        {
+                                // The corrupted block and its neighbours, whole. 1 MB covers
+                                // an LFH subsegment and everything around it with room to
+                                // spare; the region is usually far smaller than the cap.
+                                AddDumpRegionAround(reinterpret_cast<uintptr_t>(failure.Address), 1u << 20);
+                                AddDumpRegionAround(reinterpret_cast<uintptr_t>(failure.PreviousBlock), 1u << 20);
+                                AddDumpRegionAround(reinterpret_cast<uintptr_t>(failure.NextBlock), 1u << 20);
+                                AddDumpRange(reinterpret_cast<uintptr_t>(failure.HeapAddress), 0x1000);
+                        }
+                }
+                else if ((record.ExceptionCode == EXCEPTION_ACCESS_VIOLATION ||
+                          record.ExceptionCode == EXCEPTION_IN_PAGE_ERROR) &&
+                         record.NumberParameters >= 2)
+                {
+                        // The object that was being read or written, when it is mapped at
+                        // all. A null or otherwise wild address simply yields nothing.
+                        AddDumpRegionAround(static_cast<uintptr_t>(record.ExceptionInformation[1]), 256u * 1024u);
+                }
+        }
+
+        BOOL CALLBACK MinidumpCallback(PVOID, const PMINIDUMP_CALLBACK_INPUT input, PMINIDUMP_CALLBACK_OUTPUT output)
+        {
+                if (input == nullptr || output == nullptr)
+                {
+                        return TRUE;
+                }
+                if (input->CallbackType != MemoryCallback)
+                {
+                        return TRUE; // every other decision keeps dbghelp's default
+                }
+
+                if (g_extraRangeCursor < g_extraRangeCount)
+                {
+                        const DumpRange& range = g_extraRanges[g_extraRangeCursor++];
+                        output->MemoryBase = range.base;
+                        output->MemorySize = range.size;
+                        return TRUE;
+                }
+
+                // A zero-sized range is how the enumeration ends; returning FALSE here
+                // would fail the whole dump.
+                output->MemoryBase = 0;
+                output->MemorySize = 0;
+                return TRUE;
+        }
+
         // enum: 0 = small, 1 = medium, 2 = full. Same order as CrashDumpDetail in
         // settings.def and kCrashDumpDetailOptions in SettingsIniWindow.cpp.
         MINIDUMP_TYPE DumpFlagsForDetail(int detail)
@@ -666,6 +947,7 @@ namespace
                         // site and read a call stack; not enough to inspect an object.
                         return static_cast<MINIDUMP_TYPE>(MiniDumpWithThreadInfo |
                                                           MiniDumpWithUnloadedModules |
+                                                          MiniDumpWithFullMemoryInfo |
                                                           MiniDumpScanMemory);
 
                 case 2:
@@ -692,6 +974,11 @@ namespace
                         // third-party modules, not a different flag - flag combinations
                         // were measured and none of them move it.
                         //
+                        // MiniDumpWithFullMemoryInfo is the address-space map (the VAD
+                        // list), not memory: a few hundred KB that make !address, !vprot
+                        // and the heap extensions work instead of guessing from whatever
+                        // slices happened to be captured.
+                        //
                         // Everything the crash context and a stack walk actually consume:
                         // stacks, the memory those stacks point at (so the faulting
                         // object is inspectable), module data segments, handles and thread
@@ -703,6 +990,7 @@ namespace
                                                           MiniDumpWithThreadInfo |
                                                           MiniDumpWithProcessThreadData |
                                                           MiniDumpWithUnloadedModules |
+                                                          MiniDumpWithFullMemoryInfo |
                                                           MiniDumpScanMemory);
                 }
         }
@@ -937,7 +1225,13 @@ static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, 
                         md.ThreadId = (faultingThread != 0) ? faultingThread : GetCurrentThreadId();
                         md.ExceptionPointers = ExPtr;
                         md.ClientPointers = FALSE;
-                        const BOOL win = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, DumpFlagsForDetail(Settings::settingsIni.crashDumpDetail), &md, &userStreams, nullptr);
+                        PrepareExtraDumpRanges(ExPtr);
+                        MINIDUMP_CALLBACK_INFORMATION callbackInfo{};
+                        callbackInfo.CallbackRoutine = MinidumpCallback;
+                        callbackInfo.CallbackParam = nullptr;
+                        CrashProgress("[Crash] Naming %d extra memory range(s) for the dump.\n", g_extraRangeCount);
+
+                        const BOOL win = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, DumpFlagsForDetail(Settings::settingsIni.crashDumpDetail), &md, &userStreams, &callbackInfo);
 
                         if (!win)
                         {
@@ -1089,34 +1383,63 @@ namespace
 {
         constexpr DWORD kWatchdogDeadlineMs = 60 * 1000;
         constexpr DWORD kWatchdogStepMs = 250;
+        constexpr DWORD kHeapRefreshIntervalMs = 30 * 1000;
 
-        // Bumped by both arming and disarming, so a superseded thread retires instead of
+        // Bumped by both arming and disarming, so a superseded countdown retires instead of
         // firing on a later, healthy state.
         std::atomic<unsigned int> g_watchdogGeneration{ 0 };
         char g_watchdogReason[128] = {};
 
-        DWORD WINAPI CrashWatchdogThread(LPVOID param)
-        {
-                const unsigned int myGeneration = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(param));
+        // The watchdog thread is created once, at install time, and parked on this event.
+        //
+        // It used to be created by ArmCrashWatchdog, i.e. from inside the crash. That works
+        // for every crash except the one the watchdog matters most for: a heap corruption
+        // raised while the heap lock is held. Starting a thread runs LdrInitializeThunk,
+        // which allocates the new thread's CRT data - so the watchdog blocked on the very
+        // lock the faulting thread was holding and never ran a single instruction of its
+        // own body. Reproduced with build/crashctx_test mode 8: the process sat wedged past
+        // 240 seconds with the reporter stuck and the 60-second deadline never firing.
+        // Parking a thread that already exists costs one SetEvent and cannot allocate.
+        HANDLE g_watchdogArm = nullptr;
 
-                for (DWORD waited = 0; waited < kWatchdogDeadlineMs; waited += kWatchdogStepMs)
+        DWORD WINAPI CrashWatchdogThread(LPVOID)
+        {
+                for (;;)
                 {
-                        if (g_watchdogGeneration.load() != myGeneration)
+                        const DWORD wait = WaitForSingleObject(g_watchdogArm, kHeapRefreshIntervalMs);
+                        if (wait == WAIT_TIMEOUT)
+                        {
+                                RefreshProcessHeapSnapshot();
+                                continue;
+                        }
+                        if (wait != WAIT_OBJECT_0)
                         {
                                 return 0;
                         }
-                        Sleep(kWatchdogStepMs);
-                }
 
-                if (g_watchdogGeneration.load() != myGeneration)
-                {
-                        return 0;
-                }
+                        const unsigned int myGeneration = g_watchdogGeneration.load();
+                        bool superseded = false;
+                        for (DWORD waited = 0; waited < kWatchdogDeadlineMs; waited += kWatchdogStepMs)
+                        {
+                                if (g_watchdogGeneration.load() != myGeneration)
+                                {
+                                        superseded = true;
+                                        break;
+                                }
+                                Sleep(kWatchdogStepMs);
+                        }
 
-                CrashProgress("[Crash] %s has not finished after %lu seconds and is presumed "
-                              "deadlocked. Forcing termination so Windows Error Reporting and "
-                              "LocalDumps still capture a dump of the hang.\n",
-                              g_watchdogReason, kWatchdogDeadlineMs / 1000);
+                        if (superseded || g_watchdogGeneration.load() != myGeneration)
+                        {
+                                continue;
+                        }
+
+                        CrashProgress("[Crash] %s has not finished after %lu seconds and is presumed "
+                                      "deadlocked. Forcing termination so Windows Error Reporting and "
+                                      "LocalDumps still capture a dump of the hang.\n",
+                                      g_watchdogReason, kWatchdogDeadlineMs / 1000);
+                        break;
+                }
 
                 // Not ExitProcess and not TerminateProcess: both end the process cleanly, and
                 // WER would see nothing - which is the situation this exists to prevent.
@@ -1128,22 +1451,48 @@ namespace
         }
 }
 
+static void StartCrashWatchdogThread()
+{
+        if (g_watchdogArm != nullptr)
+        {
+                return;
+        }
+
+        g_watchdogArm = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (g_watchdogArm == nullptr)
+        {
+                CrashProgress("[Crash] Could not create the watchdog event (err=%lu); a hang "
+                              "in the crash path will not be caught.\n", GetLastError());
+                return;
+        }
+
+        const HANDLE thread = CreateThread(nullptr, 0, CrashWatchdogThread, nullptr, 0, nullptr);
+        if (thread == nullptr)
+        {
+                CrashProgress("[Crash] Could not start the crash watchdog (err=%lu); a hang "
+                              "in the crash path will not be caught.\n", GetLastError());
+                CloseHandle(g_watchdogArm);
+                g_watchdogArm = nullptr;
+                return;
+        }
+        CloseHandle(thread);
+        CrashProgress("[Crash] Crash watchdog thread parked and ready.\n");
+}
+
 void ArmCrashWatchdog(const char* reason)
 {
         strncpy_s(g_watchdogReason, sizeof(g_watchdogReason),
                   reason ? reason : "Crash handling", _TRUNCATE);
 
-        const unsigned int generation = g_watchdogGeneration.fetch_add(1) + 1;
+        g_watchdogGeneration.fetch_add(1);
 
-        const HANDLE thread = CreateThread(nullptr, 0, CrashWatchdogThread,
-                reinterpret_cast<LPVOID>(static_cast<uintptr_t>(generation)), 0, nullptr);
-        if (thread == nullptr)
+        if (g_watchdogArm == nullptr)
         {
-                CrashProgress("[Crash] Could not start the crash watchdog (err=%lu); a hang "
-                              "in the crash path will not be caught.\n", GetLastError());
+                CrashProgress("[Crash] Watchdog is not available; a hang in the crash path "
+                              "will not be caught.\n");
                 return;
         }
-        CloseHandle(thread);
+        SetEvent(g_watchdogArm);
 
         CrashProgress("[Crash] Watchdog armed for \"%s\" (%lus).\n",
                       g_watchdogReason, kWatchdogDeadlineMs / 1000);
@@ -1224,7 +1573,16 @@ void InstallCrashHandlers()
                 CrashProgress("[Crash] SetThreadStackGuarantee failed err=%lu\n", GetLastError());
         }
 
-        // Up front, while the heap and address space are still healthy.
+        // Up front, while the heap and address space are still healthy. The heap list is
+        // taken here for the same reason and one more: GetProcessHeaps takes the process
+        // heap lock, which the faulting thread is usually holding by the time a heap
+        // crash is being reported.
+        RefreshProcessHeapSnapshot();
+        CrashProgress("[Crash] Snapshotted %lu process heap(s) for dump capture.\n",
+                      g_processHeapCount.load());
+
+        StartCrashWatchdogThread();
+
         g_reportRequested = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         g_reportFinished = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (g_reportRequested != nullptr && g_reportFinished != nullptr)

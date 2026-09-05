@@ -367,6 +367,48 @@ An `Exception Offset` plus `0x400000` is a static address you can look straight 
 and it is enough to identify a crash site without any dump at all. `bbcf-crash-triage`
 automates the search.
 
+## Heap corruption: what a bundle can and cannot answer (2026-09-04)
+
+`Crash_20260904_011426` was a `0xC0000374` STATUS_HEAP_CORRUPTION. The bundle was complete -
+dump, logs, context - and still could not be triaged from, because everything the failure is
+actually described by lived outside it. What that cost, and what now closes each gap:
+
+| gap | consequence in that report | change |
+|---|---|---|
+| the heap manager's own failure record was nowhere in the text | which heap, which block and the neighbouring intact blocks all had to be recovered by decoding ntdll's LFH check instruction by instruction | `AppendHeapFailureDetail` decodes `ntdll!_HEAP_FAILURE_INFORMATION` straight into `crash_context.txt` |
+| the failing heap region was captured as a 1 KB sliver | the subsegment header that had been zeroed was cut off mid-structure | a `MemoryCallback` names the whole committed region around the block |
+| no heap metadata | every `!heap` command failed with "Failed to read heap key" | one page per process heap is named too, snapshotted at install and refreshed every 30 s |
+| no address-space map | `!address` reported dump-slice bounds instead of real regions | `MiniDumpWithFullMemoryInfo` added to the small and medium presets |
+| no symbols for the shipped DLL | mod frames were bare `dinput8+0x994ac` offsets, decoded by hand out of the shipped binary with objdump | `package_release.ps1` archives the matching `.pdb` to `build/symbols/<tag>/<config>/` |
+
+The added ranges are tens of KB. Medium dumps stay the same order of size.
+
+**The limit that no dump size fixes.** Heap corruption is detected when the heap is next
+walked, which is arbitrarily long after the write that caused it, and nothing anywhere
+records who wrote. `crash_context.txt` now says so directly and points at the only tool that
+answers it - Page Heap, which turns the corrupting write into an immediate access violation:
+
+```
+gflags /p /enable BBCF.exe /full     # elevated, then reproduce
+gflags /p /disable BBCF.exe          # afterwards
+```
+
+### The watchdog could not fire on the crash it exists for
+
+Found while testing the above (`build/crashctx_test` mode 8, a real overrun-then-free).
+`ArmCrashWatchdog` used to `CreateThread` from inside the crash. Starting a thread runs
+`LdrInitializeThunk`, which allocates the new thread's CRT data - so on a heap corruption
+raised while the heap lock is held, the watchdog blocked on the very lock the faulting
+thread was holding and never ran an instruction of its own body. Measured: the process sat
+wedged past 240 seconds, reporter stuck, 60-second deadline never firing, no bundle and no
+WER report.
+
+The watchdog thread is now created once at install time and parked on an event, so arming it
+is a `SetEvent` that cannot allocate. Same test now fastfails at 60 s and WER captures the
+hang. The reporter thread still deadlocks in that scenario - it allocates, and on a held heap
+lock nothing in-process can avoid that - so the watchdog handing off to WER *is* the capture
+path for this crash class, not a fallback.
+
 ## Sources
 
 - [STATUS_STACK_BUFFER_OVERRUN doesn't mean that there was a stack buffer overrun](https://devblogs.microsoft.com/oldnewthing/20190108-00/?p=100655)

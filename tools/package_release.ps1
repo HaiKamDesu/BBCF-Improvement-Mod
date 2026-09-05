@@ -70,6 +70,22 @@ $manifestJson = $manifest | ConvertTo-Json -Depth 4
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8NoBom)
 
+# Archive the symbols for exactly this binary before bin\ is cleaned. A crash dump names
+# the mod's frames as raw "dinput8+0x<rva>" offsets, and only the .pdb built alongside the
+# shipped DLL turns those back into function names - regenerating it later produces a
+# different binary and does not match. The DLL is kept next to it so the pair stays
+# self-consistent even after the staging folder is rebuilt.
+$symbolDir = Join-Path $repoRoot "build\symbols\$tagWithV\$Configuration"
+New-Item -ItemType Directory -Force $symbolDir | Out-Null
+foreach ($symFile in @("dinput8.pdb", "dinput8.dll")) {
+    $symSource = Join-Path $outRoot $symFile
+    if (Test-Path $symSource) {
+        Copy-Item $symSource (Join-Path $symbolDir $symFile) -Force
+    }
+}
+Write-Host "Archived symbols to $symbolDir"
+
+Remove-Item -Force (Join-Path $outRoot "dinput8.pdb") -ErrorAction SilentlyContinue
 Remove-Item -Force (Join-Path $outRoot "BBCFIMUpdater.exe") -ErrorAction SilentlyContinue
 Remove-Item -Force (Join-Path $outRoot "BBCFIMUpdater.pdb") -ErrorAction SilentlyContinue
 Remove-Item -Force (Join-Path $outRoot "dinput8.dll") -ErrorAction SilentlyContinue
