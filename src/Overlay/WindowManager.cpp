@@ -123,6 +123,14 @@ static void ApplyViewportOverride()
 	}
 }
 
+// GetTickCount() of the last frame the overlay actually submitted to ImGui. Read by
+// PassKeyboardInputToGame in hooks_bbcf.cpp, which cannot trust io.WantCaptureKeyboard on
+// its own: that flag is only recomputed inside NewFrame/EndFrame, and every early return in
+// Render below leaves the last value latched for as long as the overlay stays dark.
+// A 32-bit tick is written and read as one instruction on x86, so no lock is needed; a
+// wrap after 49 days costs at most one frame of keys reaching the game.
+unsigned int g_overlayLastRenderTick = 0;
+
 // Counted in hooks_bbcf.cpp by the wrapper around ImGui_ImplWin32_WndProcHandler.
 extern unsigned int g_overlayMouseMoveMsgs;
 extern unsigned int g_overlayMouseButtonMsgs;
@@ -180,11 +188,22 @@ static void LogOverlayInputState(int openWindows)
 	// it flips twice per click, which measured at 1200 lines for ten minutes of ordinary
 	// clicking while telling us nothing the clicksSeen bit does not already say. Same for
 	// the cursor position and the vertex count.
+	// WantCaptureKeyboard and ActiveId are keyed on, not just reported. They are the two
+	// values that decide whether the GAME sees a keystroke at all: PassKeyboardInputToGame
+	// (hooks_bbcf.cpp) skips the game's keyboard read whenever the first is set, and ImGui
+	// sets it whenever a modal exists OR an item is active - so a widget that captured
+	// ActiveId and never released it withholds the keyboard just as completely as a modal,
+	// with nothing on screen to explain why. "The game doesn't recognise my inputs" is the
+	// same bug reported from the other side, and neither could be told apart from a log.
+	ImGuiContext& g = *ImGui::GetCurrentContext();
 	char key[384];
 	snprintf(key, sizeof(key),
-		"display=%.0fx%.0f openWindows=%d capture=%d drew=%d modal='%s' modalOnScreen=%d clicksSeen=%d",
+		"display=%.0fx%.0f openWindows=%d capture=%d wantKb=%d activeId=0x%08X drew=%d modal='%s' "
+		"modalOnScreen=%d clicksSeen=%d",
 		io.DisplaySize.x, io.DisplaySize.y, openWindows,
 		io.WantCaptureMouse ? 1 : 0,
+		io.WantCaptureKeyboard ? 1 : 0,
+		(unsigned int)g.ActiveId,
 		totalVtx > 0 ? 1 : 0, modalName, modalOnScreen ? 1 : 0,
 		g_overlayMouseButtonMsgs != 0 ? 1 : 0);
 
@@ -315,6 +334,100 @@ static void LogOverlayInputState(int openWindows)
 			       "what is asking.\n",
 				modalName, (nowMs - s_modalSinceMs) / 1000, modalOnScreen ? 1 : 0,
 				modalPos.x, modalPos.y, modalSize.x, modalSize.y);
+		}
+	}
+
+	// The same treatment for the keyboard, which the modal warning above does not cover: a
+	// stuck ActiveId withholds every keystroke from the game with no modal and nothing
+	// visible at all. Reported as "I'm stuck on the title screen and the game doesn't
+	// recognise my inputs", which reads like a broken keyboard hook and is not one.
+	static unsigned long long s_kbSinceMs = 0;
+	static bool s_kbWarned = false;
+	if (!io.WantCaptureKeyboard)
+	{
+		s_kbSinceMs = 0;
+		s_kbWarned = false;
+	}
+	else
+	{
+		if (s_kbSinceMs == 0)
+		{
+			s_kbSinceMs = nowMs;
+		}
+		if (!s_kbWarned && (nowMs - s_kbSinceMs) >= 10000)
+		{
+			s_kbWarned = true;
+			LOG(0, "[OverlayInput] The overlay has withheld the keyboard from the game for "
+			       "%llus (modal='%s' activeId=0x%08X activeIdWindow='%s'). The game reads no "
+			       "keys at all while this is set, so a keyboard player cannot move, and "
+			       "cannot answer whatever is asking for it either.\n",
+				(nowMs - s_kbSinceMs) / 1000, modalName, (unsigned int)g.ActiveId,
+				g.ActiveIdWindow != nullptr ? g.ActiveIdWindow->Name : "<none>");
+		}
+	}
+
+	// Every window ImGui actually placed this frame, by name and rect. The open-window COUNT
+	// could never answer the report this exists for - "there is a small square in the corner
+	// that I can't move, close or click past" - because the only thing that identifies which
+	// window that is, is its name. Change-driven and hard-capped: in a steady state this
+	// writes nothing.
+	unsigned int layoutHash = 2166136261u;
+	int placedCount = 0;
+	for (int i = 0; i < g.Windows.Size; ++i)
+	{
+		const ImGuiWindow* const w = g.Windows[i];
+		if (w == nullptr || !w->WasActive)
+		{
+			continue;
+		}
+		++placedCount;
+		const unsigned int bits[] = {
+			(unsigned int)(uintptr_t)w, (unsigned int)w->Pos.x, (unsigned int)w->Pos.y,
+			(unsigned int)w->Size.x, (unsigned int)w->Size.y, (unsigned int)w->Flags,
+			w->Collapsed ? 1u : 0u,
+		};
+		for (unsigned int b : bits)
+		{
+			layoutHash = (layoutHash ^ b) * 16777619u;
+		}
+	}
+
+	static unsigned int s_lastLayoutHash = 0;
+	static unsigned int s_layoutDumps = 0;
+	if (layoutHash != s_lastLayoutHash && s_layoutDumps < 30)
+	{
+		s_lastLayoutHash = layoutHash;
+		++s_layoutDumps;
+		LOG(1, "[OverlayWindows] %d placed, display=%.0fx%.0f, openPopupStack=%d:\n", placedCount,
+			io.DisplaySize.x, io.DisplaySize.y, g.OpenPopupStack.Size);
+
+		// The popup stack, because BeginPopupModal only returns true when the popup sits at
+		// the level the caller is at: IsPopupOpen tests OpenPopupStack[BeginPopupStack.Size].
+		// Two of the mod's popup windows each calling OpenPopup every frame therefore fight
+		// over level 0 - the later one evicts the earlier, whose BeginPopupModal then returns
+		// false and leaves only its wrapper Begin() on screen: an empty, title-less window,
+		// which is what "a small square in the corner I can't move or close" is. Whether that
+		// is happening is not guessable from anything else in this log.
+		for (int i = 0; i < g.OpenPopupStack.Size; ++i)
+		{
+			const ImGuiPopupData& popup = g.OpenPopupStack[i];
+			LOG(1, "[OverlayWindows]   popup[%d] id=0x%08X window='%s' openedOnFrame=%d\n", i,
+				(unsigned int)popup.PopupId,
+				popup.Window != nullptr ? popup.Window->Name : "<not begun>",
+				popup.OpenFrameCount);
+		}
+		for (int i = 0; i < g.Windows.Size; ++i)
+		{
+			const ImGuiWindow* const w = g.Windows[i];
+			if (w == nullptr || !w->WasActive)
+			{
+				continue;
+			}
+			LOG(1, "[OverlayWindows]   '%s' pos=(%.0f,%.0f) size=(%.0fx%.0f) flags=0x%08X "
+			       "collapsed=%d hidden=%d focused=%d\n",
+				w->Name, w->Pos.x, w->Pos.y, w->Size.x, w->Size.y,
+				(unsigned int)w->Flags, w->Collapsed ? 1 : 0, w->Hidden ? 1 : 0,
+				(g.NavWindow == w) ? 1 : 0);
 		}
 	}
 }
@@ -665,6 +778,7 @@ void WindowManager::Render()
 	g_notificationBar->DrawNotifications();
 
 	ImGui::Render();
+	g_overlayLastRenderTick = GetTickCount();
 	LogOverlayInputState(openWindowCount);
 	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 }

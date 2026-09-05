@@ -8613,6 +8613,9 @@ EXIT:
 	}
 }
 
+// Set by WindowManager::Render on every frame the overlay actually submits.
+extern unsigned int g_overlayLastRenderTick;
+
 int PassKeyboardInputToGame()
 {
 	if (GetForegroundWindow() != g_gameProc.hWndGameWindow)
@@ -8625,7 +8628,37 @@ int PassKeyboardInputToGame()
 	// before that asserts on a NULL context since ImGui 1.60 -- pressing a key to skip the
 	// intro videos was enough to take the game down. (Under 1.53 GImGui pointed at a static
 	// default context, so the early call happened to be harmless.)
-	if (IsImGuiContextReady() && ImGui::GetIO().WantCaptureKeyboard)
+	if (!IsImGuiContextReady())
+	{
+		return 1;
+	}
+
+	// io.WantCaptureKeyboard is only true-for-the-frame-it-was-computed-in: ImGui recomputes
+	// it in EndFrame, and NewFrame/EndFrame run in exactly one place, WindowManager::Render.
+	// Every early return in that function - the Steam overlay being up, the window minimised,
+	// the overlay A/B skip, or anything that stops EndScene reaching us at all - leaves the
+	// last computed value latched.
+	//
+	// That is a lockout, not a glitch, because the value that gets latched is `true` whenever
+	// the overlay's last drawn frame had a modal open, and ImGui sets WantCaptureKeyboard
+	// unconditionally while any modal exists (imgui.cpp: `(g.ActiveId != 0) || (modal_window
+	// != NULL)`). An unanswered first-launch consent prompt is exactly such a modal, so a
+	// player whose overlay went dark with that prompt up has the game's keyboard read skipped
+	// on every keystroke for the rest of the session - and cannot answer the prompt to clear
+	// it, because answering it needs the overlay they can no longer see. Reported as "the
+	// game doesn't recognise my inputs, I'm stuck on the title screen"; keyboard only,
+	// because this is the only path a pad does not take.
+	//
+	// So the flag is honoured only while the overlay is demonstrably still producing frames.
+	// Stale means the overlay is not on screen, and an overlay that is not on screen has no
+	// claim on the keyboard.
+	const unsigned int sinceRender = GetTickCount() - g_overlayLastRenderTick;
+	if (g_overlayLastRenderTick == 0 || sinceRender > 250)
+	{
+		return 1;
+	}
+
+	if (ImGui::GetIO().WantCaptureKeyboard)
 	{
 		return 0;
 	}

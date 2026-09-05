@@ -238,9 +238,26 @@ bool Settings::loadSettingsFile()
         debugLoggingSettingMissing = IsSettingMissingInIni(L"GenerateDebugLogs", strINIPath);
 	ForceLog("[Init][Settings] debug logging missing=%d\n", debugLoggingSettingMissing ? 1 : 0);
 
+        // Keys the file does not contain at all. GetPrivateProfileString cannot tell "absent"
+        // from "present and equal to the default", so without this a settings.ini that
+        // predates a feature looks identical in a log to one that opted out of it - and the
+        // difference is the whole bug: a first-launch prompt is triggered by -1, and -1 is
+        // what an absent key reads as. It also makes the standard support answer ("open
+        // settings.ini, search for AllowPaletteDownloads, set it to 0") fail silently,
+        // because on an upgraded install there is no such line to find. v3.110's shipped
+        // settings.ini has no AllowPaletteDownloads at all, and dropping a new dinput8.dll
+        // onto that install - keeping the old settings.ini - is how users get there.
+        std::string missingKeys;
+        int missingCount = 0;
+
         //X-Macro
 #define SETTING(_type, _var, _inistring, _defaultval) \
         ForceLog("[Init][Settings] reading " _inistring "\n"); \
+        if (IsSettingMissingInIni(L##_inistring, strINIPath)) { \
+                ++missingCount; \
+                if (missingKeys.size() < 900) { \
+                        if (!missingKeys.empty()) missingKeys += ", "; \
+                        missingKeys += _inistring; } } \
         iniPtr = &settingsIni.##_var; \
         if(strcmp(#_type, "bool") == 0) { \
 		*(bool*)iniPtr = readSettingsFilePropertyInt(L##_inistring, L##_defaultval, strINIPath) != 0; } \
@@ -257,6 +274,14 @@ bool Settings::loadSettingsFile()
         if (debugLoggingSettingMissing)
         {
                 settingsIni.generateDebugLogs = true;
+        }
+
+        if (missingCount > 0)
+        {
+                ForceLog("[Init][Settings] %d key(s) are not present in settings.ini and fell back "
+                         "to their built-in default: %s%s\n",
+                         missingCount, missingKeys.c_str(),
+                         (missingKeys.size() >= 900) ? ", ..." : "");
         }
 
 	ForceLog("[Init][Settings] raw settings read complete\n");
