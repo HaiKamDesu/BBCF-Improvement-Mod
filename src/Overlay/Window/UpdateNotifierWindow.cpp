@@ -1,6 +1,7 @@
 #include "UpdateNotifierWindow.h"
 
 #include "Overlay/WindowManager.h"
+#include "Overlay/Widget/UpdateProgressWidget.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 
 #include "Core/info.h"
@@ -11,6 +12,7 @@
 #include "Updater/UpdateCoordinator.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -94,20 +96,8 @@ namespace
 		}
 	}
 
-	bool IsBusy(const Updater::UpdateUiSnapshot& update)
-	{
-		return update.state == Updater::UpdateUiState_Downloading ||
-			update.state == Updater::UpdateUiState_Verifying ||
-			update.state == Updater::UpdateUiState_Staging ||
-			update.state == Updater::UpdateUiState_LaunchingUpdater;
-	}
-
-	float EstimateWrappedHeight(const std::string& text, float wrapWidth)
-	{
-		if (text.empty())
-			return 0.0f;
-		return ImGui::CalcTextSize(text.c_str(), nullptr, false, wrapWidth).y;
-	}
+	// Both the opening size and the floor below which the window cannot be resized.
+	const ImVec2 kWindowSize(760, 600);
 }
 
 void UpdateNotifierWindow::Update()
@@ -136,14 +126,24 @@ void UpdateNotifierWindow::BeforeDraw()
 {
 	const ImGuiIO& io = ImGui::GetIO();
 	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-	ImGui::SetNextWindowSize(ImVec2(760, 600), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(kWindowSize, ImGuiCond_FirstUseEver);
+
+	// FirstUseEver alone was not enough: the size is remembered in imgui.ini, so anyone who
+	// once shrank this window - or inherited a small size from an older build - reopens it
+	// too small to read the release notes, with no hint that it is meant to be bigger. A
+	// floor makes that unreachable. Clamped to the display so it stays usable when the game
+	// renders at a low resolution.
+	const ImVec2 minSize(
+		(std::min)(kWindowSize.x, io.DisplaySize.x * 0.9f),
+		(std::min)(kWindowSize.y, io.DisplaySize.y * 0.9f));
+	ImGui::SetNextWindowSizeConstraints(minSize, ImVec2(FLT_MAX, FLT_MAX));
 }
 
 void UpdateNotifierWindow::Draw()
 {
 	Updater::UpdateUiSnapshot update = Updater::UpdateCoordinator::GetInstance().GetSnapshot();
 	const char* tag = update.tag.empty() ? GetNewVersionNum().c_str() : update.tag.c_str();
-	const bool busy = IsBusy(update);
+	const bool busy = UpdateProgressWidget::IsBusy(update);
 	if (ImGui::IsWindowAppearing() || m_lastReleaseNotesTag != tag)
 	{
 		m_lastReleaseNotesTag = tag;
@@ -164,14 +164,7 @@ void UpdateNotifierWindow::Draw()
 	const float rowWidth = (buttonSize.x * 3.0f) + (ImGui::GetStyle().ItemSpacing.x * 2.0f);
 	const float wrapWidth = ImGui::GetContentRegionAvail().x;
 	float bottomReserve = ImGui::GetStyle().ItemSpacing.y + buttonSize.y + ImGui::GetStyle().ItemSpacing.y;
-	if (!update.statusText.empty())
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + EstimateWrappedHeight(update.statusText, wrapWidth);
-	if (busy)
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeight();
-	if (!update.errorText.empty())
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + EstimateWrappedHeight(update.errorText, wrapWidth);
-	if (!update.autoApplySupported && !update.autoApplyDisabledReason.empty())
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + EstimateWrappedHeight(update.autoApplyDisabledReason, wrapWidth);
+	bottomReserve += UpdateProgressWidget::EstimateHeight(update, wrapWidth, true);
 	bottomReserve += ImGui::GetStyle().ItemSpacing.y;
 
 	if (!update.releaseNotes.empty())
@@ -205,30 +198,7 @@ void UpdateNotifierWindow::Draw()
 	}
 	m_resetReleaseNotesScroll = false;
 
-	if (!update.statusText.empty())
-	{
-		ImGui::Spacing();
-		ImGui::TextWrapped("%s", update.statusText.c_str());
-	}
-	if (update.state == Updater::UpdateUiState_Downloading ||
-		update.state == Updater::UpdateUiState_Verifying ||
-		update.state == Updater::UpdateUiState_Staging ||
-		update.state == Updater::UpdateUiState_LaunchingUpdater)
-	{
-		ImGui::ProgressBar(update.progressPercent / 100.0f, ImVec2(-1, 0));
-	}
-	if (!update.errorText.empty())
-	{
-		ImGui::Spacing();
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.35f, 0.35f, 1.0f));
-		ImGui::TextWrapped("%s", update.errorText.c_str());
-		ImGui::PopStyleColor();
-	}
-	if (!update.autoApplySupported && !update.autoApplyDisabledReason.empty())
-	{
-		ImGui::Spacing();
-		ImGui::TextWrapped("%s", update.autoApplyDisabledReason.c_str());
-	}
+	UpdateProgressWidget::Draw(update, true);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 7));
 

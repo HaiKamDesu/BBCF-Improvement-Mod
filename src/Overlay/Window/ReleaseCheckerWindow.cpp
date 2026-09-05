@@ -3,6 +3,7 @@
 #include "Core/info.h"
 #include "Core/RuntimePlatform.h"
 #include "Overlay/imgui_utils.h"
+#include "Overlay/Widget/UpdateProgressWidget.h"
 #include "Overlay/Widget/MarkdownRenderer.h"
 #include "imgui_internal.h"
 #include "Updater/GitHubReleaseClient.h"
@@ -10,6 +11,7 @@
 #include "Updater/UpdateCoordinator.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -20,6 +22,9 @@
 
 namespace
 {
+	// Both the opening size and the floor below which the window cannot be resized.
+	const ImVec2 kWindowSize(760, 620);
+
 
 	std::string FormatGitHubDate(const std::string& value)
 	{
@@ -91,7 +96,14 @@ void ReleaseCheckerWindow::BeforeDraw()
 	ImGui::SetNextWindowPos(
 		ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
 		ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-	ImGui::SetNextWindowSize(ImVec2(760, 620), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(kWindowSize, ImGuiCond_FirstUseEver);
+
+	// Same floor as the update prompt, for the same reason: the size lives in imgui.ini, so
+	// one accidental resize follows the user forever. See UpdateNotifierWindow::BeforeDraw.
+	const ImVec2 minSize(
+		(std::min)(kWindowSize.x, io.DisplaySize.x * 0.9f),
+		(std::min)(kWindowSize.y, io.DisplaySize.y * 0.9f));
+	ImGui::SetNextWindowSizeConstraints(minSize, ImVec2(FLT_MAX, FLT_MAX));
 }
 
 DWORD WINAPI ReleaseCheckerWindow::FetchThreadProc(LPVOID param)
@@ -199,14 +211,8 @@ void ReleaseCheckerWindow::Draw()
 	// Calculate bottom reserve height
 	const ImVec2 buttonSize = ImVec2(110, 24);
 	float bottomReserve = ImGui::GetStyle().ItemSpacing.y * 3.0f + buttonSize.y;
-	if (coordinatorBusy)
-	{
-		if (!coordSnap.statusText.empty())
-			bottomReserve += ImGui::GetStyle().ItemSpacing.y + ImGui::GetTextLineHeightWithSpacing();
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeight();
-	}
-	if (!coordSnap.errorText.empty())
-		bottomReserve += ImGui::GetStyle().ItemSpacing.y + ImGui::GetTextLineHeightWithSpacing();
+	bottomReserve += UpdateProgressWidget::EstimateHeight(
+		coordSnap, ImGui::GetContentRegionAvail().x, false);
 
 	// Scrollable release list
 	ImGui::Spacing();
@@ -265,21 +271,8 @@ void ReleaseCheckerWindow::Draw()
 
 	ImGui::EndChild();
 
-	// Install progress (when coordinator is busy)
-	if (coordinatorBusy)
-	{
-		if (!coordSnap.statusText.empty())
-		{
-			ImGui::Spacing();
-			ImGui::TextWrapped("%s", coordSnap.statusText.c_str());
-		}
-		ImGui::ProgressBar(coordSnap.progressPercent / 100.0f, ImVec2(-1, 0));
-	}
-	if (!coordSnap.errorText.empty())
-	{
-		ImGui::Spacing();
-		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", coordSnap.errorText.c_str());
-	}
+	// Install progress and errors, shared with the update prompt so both report identically.
+	UpdateProgressWidget::Draw(coordSnap, false);
 
 	// Manual install nested popup
 	if (m_openManualPopup)
@@ -491,10 +484,11 @@ void ReleaseCheckerWindow::DrawRelease(const Updater::GitHubRelease& release, si
 		}
 		if (ImGui::Button(("Install##" + release.tagName).c_str(), actionBtnSize))
 		{
+			// Install here, in this window. This used to hand the job to the update prompt
+			// and close itself, which threw away the list the user was browsing and moved
+			// them to a window that talks about "the update" rather than the release they
+			// picked. The progress block at the bottom reports it instead.
 			Updater::UpdateCoordinator::GetInstance().StartInstallRelease(release);
-			Updater::UpdateCoordinator::GetInstance().OpenPopup();
-			ImGui::CloseCurrentPopup();
-			Close();
 		}
 		if (coordinatorBusy)
 		{

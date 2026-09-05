@@ -204,6 +204,7 @@
     <ClCompile Include="src\Overlay\Widget\HotkeyBindWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\ActiveGameModeWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\MarkdownRenderer.cpp" />
+    <ClCompile Include="src\Overlay\Widget\UpdateProgressWidget.cpp" />
     <ClCompile Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.cpp" />
     <ClCompile Include="src\Game\Scr\ScrStateReader.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
@@ -440,6 +441,7 @@
     <ClInclude Include="src\Overlay\Widget\HotkeyBindWidget.h" />
     <ClInclude Include="src\Overlay\Widget\ActiveGameModeWidget.h" />
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
+    <ClInclude Include="src\Overlay\Widget\UpdateProgressWidget.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackSlot.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackManager.h" />
