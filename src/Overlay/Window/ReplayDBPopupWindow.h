@@ -10,6 +10,7 @@ public:
 		WindowContainer& windowContainer, ImGuiWindowFlags windowFlags = 0)
 		: IWindow(windowTitle, windowClosable, windowFlags), m_pWindowContainer(&windowContainer) {}
 	~ReplayDBPopupWindow() override = default;
+	void Update() override;
 protected:
 	void Draw();
 	WindowContainer* m_pWindowContainer = nullptr;

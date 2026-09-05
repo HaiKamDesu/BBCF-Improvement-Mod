@@ -11,15 +11,15 @@ void WinePopupWindow::Update()
     if (!m_windowOpen)
         return;
 
-    // prevent 2 popups from showing up at once, there's probably a more scalable way of doing this, but for now its fine.
-    if (m_pWindowContainer->GetWindow(WindowType_ReplayDBPopup)->IsOpen())
+    // The scalable way this asked for: one rule, in WindowContainer, that every exclusive
+    // popup consults - including the update notifier, which this ad-hoc check never knew
+    // about and which is the pairing that actually bit users.
+    if (m_pWindowContainer->ShouldDeferExclusivePopup(WindowType_WinePopup))
         return;
 
     BeforeDraw();
 
-    ImGui::Begin(m_windowTitle.c_str(), &m_windowOpen, m_windowFlags);
     Draw();
-    ImGui::End();
 
     AfterDraw();
 }

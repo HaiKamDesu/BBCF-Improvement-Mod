@@ -14,17 +14,16 @@ void PaletteSharePopupWindow::Update()
 	if (!m_windowOpen)
 		return;
 
-	// Same one-popup-at-a-time rule as WinePopupWindow: wait until the other
-	// first-launch popups are answered before showing this one.
-	if (m_pWindowContainer->GetWindow(WindowType_ReplayDBPopup)->IsOpen() ||
-		m_pWindowContainer->GetWindow(WindowType_WinePopup)->IsOpen())
+	if (m_pWindowContainer->ShouldDeferExclusivePopup(WindowType_PaletteSharePopup))
 		return;
 
 	BeforeDraw();
 
-	ImGui::Begin(m_windowTitle.c_str(), &m_windowOpen, m_windowFlags);
+	// No wrapper Begin: everything this window draws lives inside the modal in Draw(), so a
+	// wrapper is an empty title-less ImGui window - a small box in the corner with nothing in
+	// it, which cannot be moved, resized or closed and which the mod menu hotkey does not
+	// touch. UpdateNotifierWindow has always done it this way.
 	Draw();
-	ImGui::End();
 
 	AfterDraw();
 }

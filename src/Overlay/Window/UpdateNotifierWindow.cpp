@@ -1,5 +1,8 @@
 #include "UpdateNotifierWindow.h"
 
+#include "Overlay/WindowManager.h"
+#include "Overlay/WindowContainer/WindowContainer.h"
+
 #include "Core/info.h"
 #include "Core/Localization.h"
 #include "Overlay/imgui_utils.h"
@@ -110,6 +113,13 @@ namespace
 void UpdateNotifierWindow::Update()
 {
 	if (!m_windowOpen)
+		return;
+
+	// Last in the exclusive order. An out-of-date install is exactly the install whose
+	// settings.ini also predates the consent settings, so this prompt and a first-launch
+	// prompt come up together - and before this check the two evicted each other from
+	// ImGui's popup slot on every frame.
+	if (WindowManager::GetInstance().GetWindowContainer()->ShouldDeferExclusivePopup(WindowType_UpdateNotifier))
 		return;
 
 	BeforeDraw();
