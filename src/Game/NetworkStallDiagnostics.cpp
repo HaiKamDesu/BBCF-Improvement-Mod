@@ -88,6 +88,53 @@ namespace
 	// Full derivation: docs/Research/DCodeNetworkStallBug.md (phases 18-23).
 	constexpr uintptr_t kTusDisabledGateRva = 0x008F77A8;
 
+	// ---- ArcSys WebApi client -- the actual D-Code transport ----
+	// 2026-09-06 (phases 27-29): "TUS" has nothing to do with Steam. The fetch
+	// bottoms out in FUN_00434750, which POSTs to the base URL at 009D4C48,
+	// http://153.122.81.62/steam/api, with the endpoint taken from the table at
+	// 009D4C54 by request type: 1 = user/login, 9 = tus/read, 10 = tus/write.
+	// Every request body is Jansson json_pack("{ss,ss,si,si,ss,si}", ...) reading
+	// these fields straight out of the client singleton DAT_00A5A168 (FUN_00432730,
+	// key literals verified in the binary at 00850A30):
+	//   +0x00 steamId  (u64, formatted "%lld")
+	//   +0x08 session  (inline NUL-terminated char array, through +0x2B)
+	//   +0x2C language (int)
+	//   +0x30 date     (time64, rewritten before every request; low dword sent)
+	//   +0x38 platform (int)
+	//   +0x40..+0x6F   twelve per-request-type pending slots (ctor FUN_004309B0
+	//                  memsets exactly this range), object is 0x148 bytes
+	// The session token is obtained ONCE at boot by FUN_0042E660 (user/login) and
+	// reused by every later request -- which is why a wedge is session-wide, hits
+	// our own account as readily as an opponent's, and survives every retry.
+	// Logging it across the healthy -> wedged boundary is the test that decides
+	// whether the server is invalidating our session.
+	//
+	// steamId is logged as a deliberate self-check: it must equal our own Steam
+	// ID. If it does, this whole field map is confirmed live; if it doesn't, the
+	// rest of the line is noise and the raw hexdump beside it is the fallback.
+	constexpr uintptr_t kWebApiClientPtrRva = 0x0065A168;
+	constexpr uintptr_t kWebApiSteamIdOffset = 0x00;
+	constexpr uintptr_t kWebApiSessionOffset = 0x08;
+	constexpr size_t kWebApiSessionMaxLen = 0x24;
+	constexpr uintptr_t kWebApiLanguageOffset = 0x2C;
+	constexpr uintptr_t kWebApiDateOffset = 0x30;
+	constexpr uintptr_t kWebApiPlatformOffset = 0x38;
+	constexpr size_t kWebApiHeaderDumpBytes = 0x40;
+
+	// ---- Work-manager completion codes (DAT_00A5A050+4) ----
+	// The strategy ticks publish their outcome here:
+	//   1 login ok (FUN_0042E660), 4 user created (FUN_004287E0),
+	//   7 tus/read ok, 8 tus/write ok,
+	//   9 tus/read returned a payload whose length != 0x6800 -- the game's own
+	//     error string DAT_008503DC is "TUS data absent"; this is the observed
+	//     D-Code wedge,
+	//   0xB request refused / HTTP error (DAT_00850400, "TUS read failed").
+	// FUN_00422B00 clears the field between attempts, so by the time a failure
+	// surfaces as fetch state 6 the code is already gone. Sample it every tick
+	// instead, so the next capture states the outcome instead of us inferring it
+	// from how long the attempt took.
+	int32_t g_lastWorkMgrState = 0;
+
 	bool IsDiagnosticsEnabled()
 	{
 		return Settings::settingsIni.enableInDevelopmentFeatures;
@@ -360,6 +407,190 @@ namespace
 		}
 	}
 
+	// ---- ArcSys WebApi session ----
+
+	const uint8_t* WebApiClient(uintptr_t moduleBase)
+	{
+		const uint8_t* const* const ptr =
+			reinterpret_cast<const uint8_t* const*>(moduleBase + kWebApiClientPtrRva);
+		if (IsBadReadPtr(ptr, sizeof(void*)))
+		{
+			return nullptr;
+		}
+		const uint8_t* const client = *ptr;
+		if (client == nullptr || IsBadReadPtr(client, kWebApiHeaderDumpBytes))
+		{
+			return nullptr;
+		}
+		return client;
+	}
+
+	// The session token is a live credential for that backend, and these logs get
+	// attached to bug reports, so it is never written out verbatim -- only its
+	// length and a hash. That answers the only question the capture needs to
+	// answer ("is this the same token as before?") without leaking it.
+	//
+	// The field is an inline char array and is not guaranteed NUL-terminated if
+	// the object is in a half-initialised state, so bound it explicitly.
+	uint32_t WebApiSessionFingerprint(const uint8_t* client, size_t* lengthOut)
+	{
+		uint32_t hash = 2166136261u; // FNV-1a
+		size_t length = 0;
+		for (size_t i = 0; i < kWebApiSessionMaxLen; ++i)
+		{
+			const uint8_t c = client[kWebApiSessionOffset + i];
+			if (c == 0)
+			{
+				break;
+			}
+			hash = (hash ^ c) * 16777619u;
+			++length;
+		}
+		if (lengthOut != nullptr)
+		{
+			*lengthOut = length;
+		}
+		return length != 0 ? hash : 0;
+	}
+
+	// "steamId=... sessionLen=... sessionHash=... language=... date=... platform=..."
+	// steamId is the deliberate self-check described at kWebApiClientPtrRva: it
+	// must equal our own Steam ID, and if it does then this whole field map --
+	// including the session offset -- is confirmed live.
+	bool DescribeWebApiSession(uintptr_t moduleBase, char* out, size_t outSize)
+	{
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			sprintf_s(out, outSize, "webapi client not constructed yet");
+			return false;
+		}
+
+		uint64_t steamId = 0;
+		memcpy(&steamId, client + kWebApiSteamIdOffset, sizeof(steamId));
+		int32_t language = 0;
+		memcpy(&language, client + kWebApiLanguageOffset, sizeof(language));
+		int32_t date = 0;
+		memcpy(&date, client + kWebApiDateOffset, sizeof(date));
+		int32_t platform = 0;
+		memcpy(&platform, client + kWebApiPlatformOffset, sizeof(platform));
+
+		size_t sessionLength = 0;
+		const uint32_t sessionHash = WebApiSessionFingerprint(client, &sessionLength);
+
+		sprintf_s(out, outSize,
+			"steamId=%llu sessionLen=%u sessionHash=%08X language=%d date=%d platform=%d",
+			steamId, static_cast<unsigned>(sessionLength), sessionHash, language, date, platform);
+		return true;
+	}
+
+	uint32_t g_lastWebApiSessionHash = 0;
+	size_t g_lastWebApiSessionLength = 0;
+	bool g_haveWebApiSession = false;
+
+	// The token ROTATES on every completed request (confirmed 2026-09-06: 9
+	// rotations for 9 results in one session, sessionLen constant at 13). So a
+	// changed hash is the normal case and logging every rotation is pure noise --
+	// the per-result lines below carry the hash instead, which makes "did it stop
+	// rotating?" answerable by reading straight down the log with no extra state
+	// and no sampling race. Only genuinely notable transitions are logged here:
+	// first sight, and the token appearing or disappearing (login / logout).
+	void WatchWebApiSession(uintptr_t moduleBase)
+	{
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return;
+		}
+
+		size_t sessionLength = 0;
+		const uint32_t sessionHash = WebApiSessionFingerprint(client, &sessionLength);
+		const bool notable = !g_haveWebApiSession ||
+			(sessionLength == 0) != (g_lastWebApiSessionLength == 0) ||
+			sessionLength != g_lastWebApiSessionLength;
+
+		g_lastWebApiSessionHash = sessionHash;
+		g_lastWebApiSessionLength = sessionLength;
+		if (!notable)
+		{
+			return;
+		}
+
+		char described[256];
+		DescribeWebApiSession(moduleBase, described, sizeof(described));
+		IncidentPrintf("[WebApi] %s: %s\n",
+			g_haveWebApiSession ? "session token replaced" : "session state at first sight",
+			described);
+		g_haveWebApiSession = true;
+	}
+
+	// Failure-time dump: the decoded fields plus the raw header bytes, so the
+	// capture stays useful even if any single offset above turns out to be off.
+	// The session range is masked -- see WebApiSessionFingerprint.
+	void LogWebApiSessionDetail(uintptr_t moduleBase)
+	{
+		char described[256];
+		DescribeWebApiSession(moduleBase, described, sizeof(described));
+		IncidentPrintf("[DCodeTick] WebApi %s\n", described);
+
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return;
+		}
+
+		uint8_t masked[kWebApiHeaderDumpBytes];
+		memcpy(masked, client, sizeof(masked));
+		memset(masked + kWebApiSessionOffset, 0xCC, kWebApiSessionMaxLen); // token withheld
+		LogBlobHexdump("[DCodeTick] WebApi client (session bytes masked CC)", masked, sizeof(masked));
+	}
+
+	// Records every non-zero outcome the strategy ticks publish, so a capture
+	// says "9" (no TUS data) or "0xB" (HTTP error) outright.
+	void SampleWorkMgrState(uintptr_t moduleBase)
+	{
+		const int32_t* const statePtr = reinterpret_cast<const int32_t*>(moduleBase + kSteamWorkMgrRva + 4);
+		if (IsBadReadPtr(statePtr, sizeof(int32_t)))
+		{
+			return;
+		}
+		const int32_t state = *statePtr;
+		if (state == g_lastWorkMgrState)
+		{
+			return;
+		}
+		g_lastWorkMgrState = state;
+		if (state == 0)
+		{
+			return; // cleared between attempts, not an outcome
+		}
+
+		const char* meaning = "?";
+		switch (state)
+		{
+		case 1:   meaning = "user/login ok"; break;
+		case 4:   meaning = "user/create ok"; break;
+		case 7:   meaning = "tus/read ok"; break;
+		case 8:   meaning = "tus/write ok"; break;
+		case 9:   meaning = "tus/read returned no data (length != 0x6800)"; break;
+		case 0xB: meaning = "request refused / HTTP error"; break;
+		default:  break;
+		}
+		// The session fingerprint rides along on every outcome, so the wedge
+		// signature is readable directly: `result 9` repeating while sessionHash
+		// stops advancing == the token desynchronised; `result 9` with the hash
+		// still advancing == the session is fine and the record itself is empty.
+		size_t sessionLength = 0;
+		uint32_t sessionHash = 0;
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client != nullptr)
+		{
+			sessionHash = WebApiSessionFingerprint(client, &sessionLength);
+		}
+		IncidentPrintf("[WebApi] work manager result %d (%s) sessionHash=%08X sessionLen=%u\n",
+			state, meaning, sessionHash, static_cast<unsigned>(sessionLength));
+	}
+
 	// ---- TUS latch handling (shared by the 200ms poll and the failure handler) ----
 
 	int32_t* TusGatePtr(uintptr_t moduleBase)
@@ -486,11 +717,34 @@ namespace
 	// found this had 7503 near-identical failure lines in one session -- so
 	// logging is rate-limited to the first few occurrences plus periodic
 	// heartbeats.
-	uint32_t g_lastUploadReqId = 0;
-	bool g_uploadInFlight = false;
+	// 2026-09-06: the previous "is this a new request?" test compared worker+0x90
+	// against the last value seen. FUN_00423950 stores the SOURCE BUFFER POINTER
+	// there, and bbdc always uploads out of the same static buffer, so after the
+	// first upload of a session every later one was deduped away as "already
+	// seen". Confirmed against DCodeIncidents.log: exactly one
+	// "[Upload] profile upload finished ok" per session in every session on
+	// record, always ~1.5s after that session's first save. Upload failures were
+	// therefore invisible -- the very thing this watcher exists to catch.
+	//
+	// Use the worker's own run bracket instead. FUN_004230A0 (CUMSTask::Run) is:
+	//     errFlags &= ~3;                              // entry: clear done+error
+	//     if (+0x94) download(); else if (+0x90) share();
+	//     errFlags |= 2;                               // exit: done
+	// so bit1 of errFlags is an exact per-run edge, and testing +0x94 before
+	// +0x90 classifies the run the same way the game itself does. Neither
+	// request field is cleared on completion -- which is precisely why the old
+	// value-based dedupe could never work.
+	constexpr uint8_t kUmsRunDoneBit = 0x02;
+	constexpr uint8_t kUmsRunErrorBit = 0x01;
+
+	int g_lastUmsRunDoneBit = -1; // -1 = never sampled
+	bool g_umsRunIsUpload = false;
 	int g_uploadConsecutiveFailures = 0;
+	int g_uploadSuccesses = 0;
 	constexpr int kUploadFailureFullLogCount = 3;     // log full detail this many times
 	constexpr int kUploadFailureHeartbeatEvery = 200; // then only a periodic count
+	constexpr int kUploadSuccessFullLogCount = 20;    // then only every Nth
+	constexpr int kUploadSuccessHeartbeatEvery = 20;
 
 	// Own-profile buffer at netUserData+0xD0 (see FUN_0049D5C0 in the comment
 	// above). Distinct from the per-slot room-row blob this file already reads.
@@ -516,73 +770,79 @@ namespace
 		}
 
 		const uint32_t uploadReq = *reinterpret_cast<const uint32_t*>(worker + 0x90);
-		const uint8_t done = worker[0x1C];
-		const uint8_t busy = worker[0x1D];
+		const uint32_t downloadReq = *reinterpret_cast<const uint32_t*>(worker + 0x94);
 		const uint8_t errFlags = worker[0xC0];
+		const int doneBit = (errFlags & kUmsRunDoneBit) != 0 ? 1 : 0;
 
-		// The worker doesn't clear its request-id field (+0x90) once a transfer
-		// completes, so without the uploadReq != g_lastUploadReqId check below,
-		// every subsequent poll would re-see the same "done, not busy" request
-		// and log a fresh finished/recovered line forever (observed live:
-		// 16000+ near-identical "finished ok" lines in one session, continuously
-		// growing DCodeIncidents.log). Only react to a request once.
-		if (uploadReq != 0 && !g_uploadInFlight && uploadReq != g_lastUploadReqId)
+		const int previousDoneBit = g_lastUmsRunDoneBit;
+		g_lastUmsRunDoneBit = doneBit;
+
+		if (doneBit == 0)
 		{
-			g_uploadInFlight = true;
+			// A run is in progress. Classify it exactly as FUN_004230A0 does.
+			g_umsRunIsUpload = (downloadReq == 0 && uploadReq != 0);
+			return;
 		}
-		else if (uploadReq != 0 && g_uploadInFlight && done != 0 && busy == 0)
+
+		// Only the 0 -> 1 edge is a completion. Anything else is either the idle
+		// tail of a run already accounted for, or a run that started and finished
+		// entirely between two polls (nothing we can report on).
+		if (previousDoneBit != 0)
 		{
-			g_uploadInFlight = false;
-			g_lastUploadReqId = uploadReq;
-			const bool failed = (errFlags & 1) != 0;
-
-			if (!failed)
-			{
-				if (g_uploadConsecutiveFailures > 0)
-				{
-					IncidentPrintf("[Upload] profile upload recovered after %d consecutive failure(s), %s\n",
-						g_uploadConsecutiveFailures, progress ? progress : "");
-				}
-				else
-				{
-					IncidentPrintf("[Upload] profile upload finished ok, %s\n", progress ? progress : "");
-				}
-				g_uploadConsecutiveFailures = 0;
-				return;
-			}
-
-			++g_uploadConsecutiveFailures;
-			const bool logFull = g_uploadConsecutiveFailures <= kUploadFailureFullLogCount ||
-				(g_uploadConsecutiveFailures % kUploadFailureHeartbeatEvery) == 0;
-			if (!logFull)
-			{
-				return;
-			}
-
-			IncidentPrintf("[Upload] !!! profile upload FAILED (errFlags=%02X, streak=%d), %s\n",
-				errFlags, g_uploadConsecutiveFailures, progress ? progress : "");
-
-			if (g_uploadConsecutiveFailures <= kUploadFailureFullLogCount)
-			{
-				const uint8_t* const netUserData =
-					reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
-				const uint8_t* const ownBuffer = netUserData + kOwnProfileBufferOffset;
-				if (!IsBadReadPtr(ownBuffer, kProfileBlobSize))
-				{
-					const uint16_t sum = ProfileChecksum16(ownBuffer, kProfileBlobSize);
-					IncidentPrintf("[Upload] own profile buffer (netUserData+0x%X) checksum16=0x%04X (valid=0xFFFF)\n",
-						static_cast<unsigned>(kOwnProfileBufferOffset), sum);
-					LogBlobHexdump("[Upload] own buffer", ownBuffer, 0x40);
-				}
-				else
-				{
-					IncidentPrintf("[Upload] own profile buffer unreadable\n");
-				}
-			}
+			return;
 		}
-		else if (uploadReq == 0)
+		if (!g_umsRunIsUpload)
 		{
-			g_uploadInFlight = false;
+			return; // downloads are covered by the fetch-state layer
+		}
+
+		if ((errFlags & kUmsRunErrorBit) == 0)
+		{
+			++g_uploadSuccesses;
+			if (g_uploadConsecutiveFailures > 0)
+			{
+				IncidentPrintf("[Upload] profile upload recovered after %d consecutive failure(s), %s\n",
+					g_uploadConsecutiveFailures, progress ? progress : "");
+			}
+			else if (g_uploadSuccesses <= kUploadSuccessFullLogCount ||
+				(g_uploadSuccesses % kUploadSuccessHeartbeatEvery) == 0)
+			{
+				IncidentPrintf("[Upload] profile upload finished ok (#%d this session), %s\n",
+					g_uploadSuccesses, progress ? progress : "");
+			}
+			g_uploadConsecutiveFailures = 0;
+			return;
+		}
+
+		++g_uploadConsecutiveFailures;
+		const bool logFull = g_uploadConsecutiveFailures <= kUploadFailureFullLogCount ||
+			(g_uploadConsecutiveFailures % kUploadFailureHeartbeatEvery) == 0;
+		if (!logFull)
+		{
+			return;
+		}
+
+		IncidentPrintf("[Upload] !!! profile upload FAILED (errFlags=%02X, streak=%d), %s\n",
+			errFlags, g_uploadConsecutiveFailures, progress ? progress : "");
+
+		if (g_uploadConsecutiveFailures <= kUploadFailureFullLogCount)
+		{
+			LogWebApiSessionDetail(moduleBase);
+
+			const uint8_t* const netUserData =
+				reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
+			const uint8_t* const ownBuffer = netUserData + kOwnProfileBufferOffset;
+			if (!IsBadReadPtr(ownBuffer, kProfileBlobSize))
+			{
+				const uint16_t sum = ProfileChecksum16(ownBuffer, kProfileBlobSize);
+				IncidentPrintf("[Upload] own profile buffer (netUserData+0x%X) checksum16=0x%04X (valid=0xFFFF)\n",
+					static_cast<unsigned>(kOwnProfileBufferOffset), sum);
+				LogBlobHexdump("[Upload] own buffer", ownBuffer, 0x40);
+			}
+			else
+			{
+				IncidentPrintf("[Upload] own profile buffer unreadable\n");
+			}
 		}
 	}
 
@@ -604,6 +864,10 @@ namespace
 		if (moduleBase != 0)
 		{
 			LogUMSWorkerState(moduleBase);
+			// The session token every tus/read carries. Compare it against the
+			// "[WebApi] session acquired" line from this session's boot: unchanged
+			// means the server stopped honouring a session it had been accepting.
+			LogWebApiSessionDetail(moduleBase);
 		}
 
 		if (track.haveSnapshot)
@@ -668,6 +932,11 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 	{
 		return;
 	}
+
+	// Every tick, not just on transitions: FUN_00422B00 clears the work-manager
+	// result between attempts, so this is the only place the 7/8/9/0xB outcome
+	// can be caught while it is still there.
+	SampleWorkMgrState(moduleBase);
 
 	uint8_t* const row = static_cast<uint8_t*>(rowPtr);
 	const int slot = DeriveSlotIndex(reinterpret_cast<uintptr_t>(row), moduleBase);
@@ -851,6 +1120,14 @@ void NetworkStallDiagnostics::OnUpdate()
 		// Watched unconditionally, and also checked at failure time inside
 		// HandleSlotFailure so recovery happens on the same frame as the symptom.
 		HandleTusGate(moduleBase, now, progress);
+
+		// --- ArcSys WebApi session ---
+		// Logged at first sight and on every change, so a capture shows whether
+		// the token survived across the healthy -> wedged boundary. Backs up the
+		// per-frame result sampling too, in case the DCodeFetchTick hook is not
+		// installed on a patched exe.
+		WatchWebApiSession(moduleBase);
+		SampleWorkMgrState(moduleBase);
 
 		// --- Profile upload activity ---
 		// FUN_004A96D0 rebuilds the whole 0x6800 profile from live state before

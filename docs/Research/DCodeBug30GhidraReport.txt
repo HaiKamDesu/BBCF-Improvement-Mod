@@ -1,0 +1,559 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== XREFS TO 00A5A070 (login latch?) =====
+  READ  from 004280bd in FUN_00428050
+
+===== XREFS TO 00A5A050 (work manager base) =====
+  DATA  from 00848319 in FUN_008482f0
+  DATA  from 00848329 in FUN_008482f0
+  DATA  from 00427d3a in FUN_00427cd0
+  DATA  from 00427d0a in FUN_00427cd0
+  DATA  from 0042808d in FUN_00428050
+  DATA  from 00824380 in Unwind@00824380
+  DATA  from 008243be in Unwind@008243be
+  DATA  from 008243fe in Unwind@008243fe
+  DATA  from 00848363 in FUN_008482f0
+
+----- DECOMPILE 00428050 (re-arm Login strategy (the candidate repair entry point)) -----
+
+void __fastcall FUN_00428050(int param_1)
+
+{
+  undefined4 uVar1;
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_00824408;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a5a138 & 1) == 0) {
+    DAT_00a5a138 = DAT_00a5a138 | 1;
+    local_8 = 0;
+    FUN_004276a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    DAT_00a5a130 = 0;
+    local_8 = local_8 & 0xffffff00;
+    _atexit(FUN_008482f0);
+  }
+  local_8 = 0xffffffff;
+  if (DAT_00a5a070 == '\0') {
+    FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+    uVar1 = FUN_004291d0(1,param_1);
+    *(undefined4 *)(param_1 + 0xe0) = uVar1;
+  }
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+--- callers of 00428050 ---
+  0046bf10 FUN_0046bf10
+
+----- DECOMPILE 00427c40 (manager shutdown/reset?) -----
+
+void __fastcall FUN_00427c40(int param_1)
+
+{
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  *(undefined4 *)(param_1 + 0xe0) = 0;
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  *(undefined4 *)(param_1 + 0xe4) = 0;
+  FUN_00432e10();
+  FUN_00434d30();
+  return;
+}
+
+
+
+--- callers of 00427C40 ---
+  0041c820 FUN_0041c820
+  008480b0 FUN_008480b0
+
+----- DECOMPILE 004279a0 (manager dtor?) -----
+
+void __fastcall FUN_004279a0(int param_1)
+
+{
+  int iVar1;
+  uint uVar2;
+  int iVar3;
+  void *local_10;
+  undefined1 *puStack_c;
+  int local_8;
+  
+  puStack_c = &LAB_008242e2;
+  local_10 = ExceptionList;
+  uVar2 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_8 = 3;
+  if (7 < *(uint *)(param_1 + 0xb8)) {
+    FID_conflict__free(*(void **)(param_1 + 0xa4));
+  }
+  *(undefined4 *)(param_1 + 0xb8) = 7;
+  *(undefined4 *)(param_1 + 0xb4) = 0;
+  *(undefined2 *)(param_1 + 0xa4) = 0;
+  local_8._0_1_ = 2;
+  if (0xf < *(uint *)(param_1 + 0x58)) {
+    FID_conflict__free(*(void **)(param_1 + 0x44));
+  }
+  *(undefined4 *)(param_1 + 0x58) = 0xf;
+  *(undefined4 *)(param_1 + 0x54) = 0;
+  *(undefined1 *)(param_1 + 0x44) = 0;
+  local_8._0_1_ = 1;
+  if (*(void **)(param_1 + 0x30) != (void *)0x0) {
+    FID_conflict__free(*(void **)(param_1 + 0x30));
+    *(undefined4 *)(param_1 + 0x30) = 0;
+    *(undefined4 *)(param_1 + 0x34) = 0;
+    *(undefined4 *)(param_1 + 0x38) = 0;
+  }
+  local_8 = (uint)local_8._1_3_ << 8;
+  iVar3 = *(int *)(param_1 + 0x24);
+  if (iVar3 != 0) {
+    iVar1 = *(int *)(param_1 + 0x28);
+    for (; iVar3 != iVar1; iVar3 = iVar3 + 0x28) {
+      FUN_00427b80(uVar2);
+    }
+    FID_conflict__free(*(void **)(param_1 + 0x24));
+    *(undefined4 *)(param_1 + 0x24) = 0;
+    *(undefined4 *)(param_1 + 0x28) = 0;
+    *(undefined4 *)(param_1 + 0x2c) = 0;
+  }
+  local_8 = 0xffffffff;
+  if (7 < *(uint *)(param_1 + 0x1c)) {
+    FID_conflict__free(*(void **)(param_1 + 8));
+  }
+  *(undefined4 *)(param_1 + 0x1c) = 7;
+  *(undefined4 *)(param_1 + 0x18) = 0;
+  *(undefined2 *)(param_1 + 8) = 0;
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+--- callers of 004279A0 ---
+  008243be Unwind@008243be
+  008243fe Unwind@008243fe
+  00824380 Unwind@00824380
+  008482f0 FUN_008482f0
+
+----- DECOMPILE 004282c0 (manager init tail) -----
+
+void __fastcall FUN_004282c0(undefined4 *param_1)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  int iVar3;
+  
+  puVar2 = param_1 + 2;
+  *param_1 = 0;
+  param_1[1] = 0;
+  param_1[6] = 0;
+  if (7 < (uint)param_1[7]) {
+    puVar2 = (undefined4 *)*puVar2;
+  }
+  *(undefined2 *)puVar2 = 0;
+  FUN_0041da40(&DAT_0084fa98,0);
+  *(undefined1 *)(param_1 + 8) = 0;
+  iVar1 = param_1[10];
+  for (iVar3 = param_1[9]; iVar3 != iVar1; iVar3 = iVar3 + 0x28) {
+    FUN_00427b80();
+  }
+  param_1[10] = param_1[9];
+  param_1[0xd] = param_1[0xc];
+  *(undefined1 *)(param_1 + 0xf) = 0;
+  param_1[0x10] = 0;
+  FUN_004054d0(&PTR_0084ec44,0);
+  param_1[0x17] = 0;
+  FUN_0079f840(param_1 + 0x18,0,0x40);
+  puVar2 = param_1 + 0x29;
+  param_1[0x28] = 0;
+  param_1[0x2d] = 0;
+  if (7 < (uint)param_1[0x2e]) {
+    puVar2 = (undefined4 *)*puVar2;
+  }
+  *(undefined2 *)puVar2 = 0;
+  param_1[0x30] = 0;
+  param_1[0x31] = 0;
+  *(undefined2 *)(param_1 + 0x32) = 0;
+  param_1[0x34] = 0;
+  param_1[0x35] = 0;
+  return;
+}
+
+
+
+--- callers of 004282C0 ---
+  00427e40 FUN_00427e40
+  004281e0 FUN_004281e0
+  004276a0 FUN_004276a0
+
+----- DECOMPILE 00427e00 (?) -----
+
+int __thiscall FUN_00427e00(int param_1,int param_2)
+
+{
+  return *(int *)(param_1 + 0x24) + param_2 * 0x28;
+}
+
+
+
+--- callers of 00427E00 ---
+  0046a970 FUN_0046a970
+
+----- DECOMPILE 00427e40 (request: ?) -----
+
+void __fastcall FUN_00427e40(int param_1)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  undefined4 uVar5;
+  undefined1 local_c [8];
+  
+  iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+  puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_c);
+  uVar5 = 2;
+  uVar3 = puVar2[1];
+  uVar4 = *puVar2;
+  FUN_00432e10(uVar4,uVar3,2);
+  FUN_00432f50(uVar4,uVar3,uVar5);
+  FUN_004282c0();
+  uVar3 = FUN_004291d0(0,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar3;
+  uVar3 = FUN_004291d0(0,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar3;
+  return;
+}
+
+
+
+--- callers of 00427E40 ---
+  0041ca20 FUN_0041ca20
+
+----- DECOMPILE 00427ec0 (request: ?) -----
+
+void __fastcall FUN_00427ec0(int param_1)
+
+{
+  undefined4 uVar1;
+  
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  uVar1 = FUN_004291d0(2,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar1;
+  return;
+}
+
+
+
+--- callers of 00427EC0 ---
+  0046bf20 FUN_0046bf20
+
+----- DECOMPILE 00427f60 (request: ?) -----
+
+void __thiscall
+FUN_00427f60(int param_1,int param_2,int param_3,int param_4,undefined4 param_5,undefined4 param_6)
+
+{
+  undefined4 *puVar1;
+  int iVar2;
+  undefined4 uVar3;
+  
+  iVar2 = *(int *)(*(int *)(*(int *)(param_1 + 0x24) + 0x1c + param_2 * 0x28) + 0x1c +
+                  param_3 * 0x28);
+  puVar1 = (undefined4 *)(iVar2 + param_4 * 0x44);
+  FUN_004283a0(*puVar1,puVar1 + 7,*(undefined4 *)(iVar2 + 0x34 + param_4 * 0x44),param_5,param_6);
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  uVar3 = FUN_004291d0(4,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar3;
+  return;
+}
+
+
+
+--- callers of 00427F60 ---
+  0041bed1 FUN_0041bed1
+
+----- DECOMPILE 00427fd0 (request: ?) -----
+
+void __fastcall FUN_00427fd0(int param_1)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  uVar2 = 2;
+  FUN_004b9770();
+  iVar1 = FUN_00439980();
+  if (iVar1 == 0) {
+    uVar2 = 1;
+  }
+  FUN_00432e10(uVar2);
+  FUN_00434a30(uVar2);
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  uVar2 = FUN_004291d0(3,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar2;
+  return;
+}
+
+
+
+--- callers of 00427FD0 ---
+  0046be70 FUN_0046be70
+
+----- DECOMPILE 00428020 (request: ?) -----
+
+void __fastcall FUN_00428020(int param_1)
+
+{
+  undefined4 uVar1;
+  
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  uVar1 = FUN_004291d0(5,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar1;
+  return;
+}
+
+
+
+--- callers of 00428020 ---
+  0041bf70 FUN_0041bf70
+
+----- DECOMPILE 00428110 (request: ?) -----
+
+void __thiscall FUN_00428110(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  FUN_00428460(param_2,param_3);
+  if (*(undefined4 **)(param_1 + 0xe0) == (undefined4 *)0x0) {
+    uVar2 = 0;
+  }
+  else {
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe0))();
+    if (iVar1 == 5) {
+      return;
+    }
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe0))();
+    if (iVar1 == 6) {
+      (**(code **)(**(int **)(param_1 + 0xe0) + 4))();
+      return;
+    }
+    uVar2 = *(undefined4 *)(param_1 + 0xe0);
+  }
+  FUN_00429390(uVar2,param_1);
+  uVar2 = FUN_004291d0(6,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar2;
+  return;
+}
+
+
+
+--- callers of 00428110 ---
+  0041d3d0 FUN_0041d3d0
+
+----- DECOMPILE 00428180 (request: ?) -----
+
+void __thiscall FUN_00428180(int param_1,undefined4 param_2,undefined4 param_3)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  *(undefined4 *)(param_1 + 0xd8) = param_2;
+  *(undefined4 *)(param_1 + 0xdc) = param_3;
+  if (*(undefined4 **)(param_1 + 0xe4) != (undefined4 *)0x0) {
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe4))();
+    if (iVar1 == 8) {
+      (**(code **)(**(int **)(param_1 + 0xe4) + 4))(param_1);
+      return;
+    }
+  }
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  uVar2 = FUN_004291d0(8,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar2;
+  return;
+}
+
+
+
+--- callers of 00428180 ---
+  00423a50 FUN_00423a50
+
+----- DECOMPILE 004281e0 (request: ?) -----
+
+void __fastcall FUN_004281e0(int param_1)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  uVar2 = 2;
+  FUN_004b9770();
+  iVar1 = FUN_00439980();
+  if (iVar1 == 0) {
+    uVar2 = 1;
+  }
+  FUN_00432e10(uVar2);
+  FUN_00434a30(uVar2);
+  FUN_004282c0();
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe0),param_1);
+  uVar2 = FUN_004291d0(0,param_1);
+  *(undefined4 *)(param_1 + 0xe0) = uVar2;
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  uVar2 = FUN_004291d0(0,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar2;
+  return;
+}
+
+
+
+--- callers of 004281E0 ---
+  0046bf80 FUN_0046bf80
+
+----- DECOMPILE 00428ef0 (type-1 strategy ctor (Login)) -----
+
+undefined4 * __fastcall FUN_00428ef0(undefined4 *param_1)
+
+{
+  *param_1 = uei::ThinkLogicStrategyBase::vftable;
+  *param_1 = uei::ThinkLogicStrategyLogin::vftable;
+  return param_1;
+}
+
+
+
+--- callers of 00428EF0 ---
+  004291d0 FUN_004291d0
+
+----- DECOMPILE 008482f0 (touches 00A5A050) -----
+
+void FUN_008482f0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  puStack_c = &LAB_0082438a;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  local_8 = 0;
+  FUN_00429390(DAT_00a5a130,&DAT_00a5a050,DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+  DAT_00a5a130 = 0;
+  FUN_00429390(DAT_00a5a134,&DAT_00a5a050);
+  DAT_00a5a134 = 0;
+  FUN_00432e10();
+  FUN_00434d30();
+  local_8 = 0xffffffff;
+  FUN_004279a0();
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+--- callers of 008482F0 ---
+
+----- DECOMPILE 00427cd0 (touches 00A5A050) -----
+
+undefined * FUN_00427cd0(void)
+
+{
+  void *local_10;
+  undefined1 *puStack_c;
+  uint local_8;
+  
+  puStack_c = &LAB_008243c8;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  if ((DAT_00a5a138 & 1) == 0) {
+    DAT_00a5a138 = DAT_00a5a138 | 1;
+    local_8 = 0;
+    FUN_004276a0(DAT_00a0e0b8 ^ (uint)&stack0xfffffffc);
+    DAT_00a5a130 = 0;
+    local_8 = local_8 & 0xffffff00;
+    _atexit(FUN_008482f0);
+  }
+  ExceptionList = local_10;
+  return &DAT_00a5a050;
+}
+
+
+
+--- callers of 00427CD0 ---
+  0046be70 FUN_0046be70
+  0046a8f0 FUN_0046a8f0
+  0041ca20 FUN_0041ca20
+  0046a970 FUN_0046a970
+  0046a7e0 FUN_0046a7e0
+  0046bf10 FUN_0046bf10
+  008480b0 FUN_008480b0
+  0046a390 FUN_0046a390
+  0046a960 FUN_0046a960
+  0041bf70 FUN_0041bf70
+  0041c820 FUN_0041c820
+  0046a8d0 FUN_0046a8d0
+  0046bf80 FUN_0046bf80
+  00422b00 FUN_00422b00
+  0041c590 FUN_0041c590
+  0041d3d0 FUN_0041d3d0
+  0046a9b0 FUN_0046a9b0
+  0046b560 FUN_0046b560
+  0041bed1 FUN_0041bed1
+  0041c540 FUN_0041c540
+  0041d4c0 FUN_0041d4c0
+  0041d410 FUN_0041d410
+  0046a7c0 FUN_0046a7c0
+  0046bf20 FUN_0046bf20
+  0041d230 FUN_0041d230
+  00423a50 FUN_00423a50
+  0046a930 FUN_0046a930
+  0046a3d0 FUN_0046a3d0
+
+----- DECOMPILE 00824380 (touches 00A5A050) -----
+
+void Unwind_00824380(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+--- callers of 00824380 ---
+
+----- DECOMPILE 008243be (touches 00A5A050) -----
+
+void Unwind_008243be(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+--- callers of 008243BE ---
+
+----- DECOMPILE 008243fe (touches 00A5A050) -----
+
+void Unwind_008243fe(void)
+
+{
+  FUN_004279a0();
+  return;
+}
+
+
+
+--- callers of 008243FE ---
+

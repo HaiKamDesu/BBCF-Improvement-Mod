@@ -597,3 +597,257 @@ elsewhere ran against the wrong region), all-garbage (heap corruption
 elsewhere clobbering it), or plausibly-structured-but-wrong (a stale/partial
 write) — each points to a different, and only then would a targeted repair
 be safe to design.
+
+## 2026-09-06: ROOT CAUSE — it was never Steam. It is an ArcSys HTTP web API.
+
+Natural repro captured on 2026-09-05 (session 22:09:27–23:15, `BBCF_IM\DEBUG.txt`,
+`DCodeIncidents.log`, blob dumps `DCodeBlobFail_slot{0,4,5}_tick7036*`).
+Phases 27–29 (`DCodeBug27/28/29GhidraReport.txt`) resolve the transport, and
+**every Steam-side theory in the sections above is wrong**: there is no UGC
+handle, no FileShare, no lost CallResult, and `worker+0xB8` is not an EResult.
+
+### The actual transport
+
+`uei::ThinkLogicStrategyDownloadTUS::Tick` (`FUN_00428AC0`) builds a
+`uei::tl::ReadTusRequestParam` and hands it to `FUN_00434750`, which does:
+
+```c
+FUN_0042b130(PTR_u_http___153_122_81_62_steam_api_009d4c48);  // base URL
+psVar4 = (&PTR_u_user_create_009d4c54)[iVar2];                 // endpoint by type
+```
+
+- base URL `http://153.122.81.62/steam/api` (plain HTTP, hardcoded IP, Apache + PHP 5.3.3)
+- endpoint table at `009D4C54`: `0 user/create`, `1 user/login`, `2 catalog/get_region`,
+  `3 catalog/get_area`, `4 catalog/get_lobby`, `5 lobby/get_status`,
+  `6 matching/start`, `7 matching/confirm`, `8 matching/end`,
+  **`9 tus/read`**, **`10 tus/write`**, `11 tss/read`
+- `ReadTusRequestParam` sets type 9, `WriteTusRequestParam` type 10
+  (`FUN_0042EDD0`), `LoginRequestParam` type 1 (`FUN_0042E660`).
+
+So the D-Code / net-color profile blob (0x6800 bytes, encrypted with the 16-byte
+key `{0x84A9E134, 0x7B8315F0, steamID_lo, steamID_hi}` — `FUN_00428950`) lives on
+ArcSys's own PHP server, not in Steam Cloud.
+
+Every request body is Jansson `json_pack` (`FUN_00432730`):
+
+```c
+sprintf_s(buf, 0x20, "%lld", singleton[0], singleton[1]);      // steamID64
+json_pack("{ss,ss,si,si,ss,si}",
+          "steamId",  buf,
+          "session",  singleton + 2,        // inline token at singleton+0x8
+          "language", singleton[0xB],
+          <DAT_00850A58>, singleton[0xC],
+          "version",  "0.0.1",
+          "platform", singleton[0xE]);
+```
+
+The WebApi singleton is `DAT_00A5A168` (RVA `0x65A168`, 0x148 bytes, ctor
+`FUN_004309B0`); the per-request-type pending slots are at `+0x40 + type*4`.
+
+### The failure
+
+`FUN_00428AC0` phase 1, on a completed response:
+
+```c
+if (httpErr == 0) {
+    if (recvLen == mgr[0xDC/4]) { ...checksum, decrypt, memcpy...; mgr[1] = 7; }
+    else { state = 3; report(&DAT_008503DC); mgr[1] = 9; }      // <-- observed
+} else       { state = 3; report(&DAT_00850400); mgr[1] = 0xB; }
+```
+
+- `DAT_008503DC` (UTF-16) = 「TUSデータなし…メッセージ」 — **"no TUS data"** → 9
+- `DAT_00850400` = 「TUS読み込み失敗…メッセージ」 — "TUS read failed" → 0xB (not our case)
+
+`FUN_00422B00` then turns state 9 into the CUMSTask error bit
+(`requested 0x6800 != received 0`, `worker+0xB8 = 0`), which the fetch state
+machine reports as **state 6**. `FUN_0040DF10` is confirmed as a 16-bit
+ones'-complement sum returning `sum == 0xFFFF`, so the blob dumps' 83 non-zero
+bytes out of 26624 are simply a buffer nothing was ever written into.
+
+A bare probe of the live endpoint reproduces the exact shape:
+
+```
+$ curl -i http://153.122.81.62/steam/api/tus/read
+HTTP/1.1 200 OK
+Server: Apache
+X-Powered-By: PHP/5.3.3
+Content-Length: 0
+```
+
+**200 OK with an empty body** — no HTTP error, zero-length payload → "no TUS data".
+
+Note `FUN_00433010` returns 1 exactly when a pending object exists with
+`+0xE38 == 0`, so the guard in `FUN_00434750` reads `(gate == 0) || <the same
+condition that made gate == 1>` and is always true: requests really are issued
+every time. The ~700 ms fast-fails are real HTTP round-trips coming back empty,
+not skipped requests.
+
+### Evidence from the 2026-09-05 capture
+
+- Work-manager steamIDs are stable per room slot: slots 0/4 =
+  `0110000113455C91` (opponent), slot 5 = `01100001088DE5A1` = **76561198103782817,
+  the user's own account**. `tus/read` returned "no data" for the user's own
+  profile, 25 minutes after that same account read back fine at 22:35.
+- First failure of a streak is slow (4.2 s / 4.7 s / 9.4 s across captures),
+  every later one ~700–780 ms.
+- Session-wide from 23:00:16 onward; all auto-recover budgets exhausted; healed
+  only by restart.
+- Ranked LP is **not** affected — rank went 33→31 and `UploadLeaderboardScore`
+  kept succeeding at 23:13 and 23:15, because LP rides Steam leaderboards. What
+  froze is the net-color counter (netUserData+0x195): 54→55→54→53→52→51 up to
+  22:28:29, then **51 for the rest of the session**, ~30 min *before* the first
+  read failure — consistent with `tus/write` (same `session` field) dying first.
+
+### Leading hypothesis and the decisive test
+
+One `session` token is obtained at boot by `FUN_0042E660` (`user/login`, retries
+up to 0xB4 polls) and reused by every later request. A server-side session that
+lapses or is invalidated explains all of it at once: self and opponent break
+together (one token, not per-account data), retries at every layer are useless,
+and only a restart heals it because only a restart re-runs `user/login`. It is
+**not proven** — `tus/read` could also be answering empty for another reason
+(per-IP throttling on the PHP box, backend hiccup).
+
+Decisive next capture: log the live `session` string (`DAT_00A5A168 + 0x8`) at
+each fetch, plus the raw response length, and check whether the token is
+unchanged across the healthy→wedged boundary. If the token is the same and the
+server starts answering empty, it is server-side session invalidation.
+
+### Repair path, if confirmed
+
+`FUN_00428050(workMgr)` releases the strategy at `mgr+0xE0` and creates a type-1
+(Login) strategy when `DAT_00A5A070 == 0` — i.e. it re-runs `user/login` and
+refreshes the token in place. Forcing that on a state-9 streak is the natural
+in-process fix, and is far more likely to work than the existing state-6
+auto-recovery, which only resets the fetch state machine above a layer that is
+already wedged. Needs verification that a mid-session re-login does not disturb
+matchmaking (`matching/*` uses the same session).
+
+### Instrumentation bug found while reading the capture
+
+`ObserveProfileUploads` dedupes on `worker+0x90`, but `FUN_00423950` writes the
+**source buffer pointer** there, and bbdc always uses the same static buffer. So
+`uploadReq != g_lastUploadReqId` suppresses every upload after the first, in
+every session — which is why `DCodeIncidents.log` shows exactly one
+`[Upload] profile upload finished ok` per session (20:33:46, 20:47:48, 21:06:29,
+22:10:15), always ~1.5 s after the first save. Upload failures are currently
+invisible. Fix: edge-trigger on `busy` (`worker+0x1D`) 0→1→0 instead.
+
+## 2026-09-06 (later): first capture with the new instrumentation
+
+Session 00:04:01–00:20:55 on the build carrying the `[WebApi]` logging. No
+failures this session (every outcome was 7/8), so this is the healthy baseline.
+
+**The field map is confirmed live.** The self-check line reads
+`steamId=76561198103782817` — the correct account — and `date` advances 797 s
+across 799 s of wall clock (1788663844 → 1788664641). `DAT_00A5A168` and the
++0x00/+0x08/+0x2C/+0x30/+0x38 layout are right.
+
+**New: the session token rotates on every request.** `sessionLen=13`, constant,
+but the hash changes after every single completed request — 9 rotations for 9
+work-manager results, each ~1–150 ms after the result:
+
+```
+[WebApi] session acquired: ... sessionLen=0  sessionHash=00000000   (pre-login)
+[WebApi] session CHANGED  ... sessionLen=13 sessionHash=FC779650    (login, +16s)
+[WebApi] work manager result 7 (tus/read ok)
+[WebApi] session CHANGED  ... sessionHash=53744944
+[WebApi] work manager result 7 (tus/read ok)
+[WebApi] session CHANGED  ... sessionHash=700CF627
+```
+
+This **refutes the simple "the session expires after ~50 minutes" story** from
+the section above. A rolling token suggests a better mechanism for the wedge:
+**desynchronisation.** If one response is lost or times out, the client keeps a
+token the server has already rotated past, and every later request is rejected
+with 200/empty forever. That fits the signature exactly — the first failure of
+every streak on record is slow (4.2 s / 4.7 s / 9.4 s) and every one after it is
+a ~700 ms fast-fail. On this reading the timeout *is* the desync event, not an
+incidental symptom.
+
+Still undetermined: whether the token is server-issued in each response or
+client-generated per request. Either way `FUN_00432730` sends whatever sits at
++0x08 as `"session"`, so it is the field that matters.
+
+**Predicted wedge signature, now directly testable:** during a wedge,
+`[WebApi] work manager result 9` should repeat while the session hash STOPS
+rotating. If instead it keeps rotating through the wedge, the token is fine and
+the empty body is about the record rather than the session.
+
+### The rollback, measured exactly
+
+Ranked state at the end of the wedged 2026-09-05 session vs. the start of the
+next one:
+
+| | rank | lp | wins | matches |
+|---|---|---|---|---|
+| 22:49:56 (last durable) | 32 | 200680 | 1269 | 2944 |
+| 23:15:37 (session end)  | 31 | 187368 | 1270 | 2951 |
+| next session start      | 32 | 200680 | 1269 | 2944 |
+
+The restart reverted to **exactly** the 22:49:56 state — **7 matches lost**, and
+the 33→32→31 demotion undone. The first fetch failure was at **23:00:16**, and
+the match that finished at 23:00:17 (matches=2945) was already not persisted.
+So reads and writes die together, within the same ~10 min window, on one shared
+session — as expected for a single transport.
+
+### Correction to the section above
+
+"the net-color counter froze at 22:28, ~30 min before the first read failure,
+consistent with `tus/write` dying first" is **wrong**. Writes were still landing
+at 22:49:56 — that state is exactly what the next session restored. The
+counter=51 freeze is therefore *not* an early write failure and remains an open,
+separate question. Supporting that: in this healthy 00:04 session the counter
+sits at 51 through three confirmed `tus/write ok` uploads. 51 is plausibly just
+a clamp within net-color band 2 rather than a stall.
+
+### Upload detector
+
+Works. Three uploads observed, each preceded by its `result 8 (tus/write ok)`:
+`[Upload] profile upload finished ok (#1/#2/#3 this session)`. Under the old
+value-dedupe only #1 would have been logged.
+
+## 2026-09-06 phase 30: can a re-login be forced safely? (partly)
+
+`DCodeBug30GhidraReport.txt`. The work manager exposes one request function per
+strategy type, and they split across **two independent strategy slots**:
+
+| fn | type | slot |
+|---|---|---|
+| `FUN_00427E40` | 0 (Idle), both slots | +0xE0 and +0xE4 |
+| **`FUN_00428050`** | **1 (Login)** | **+0xE0** |
+| `FUN_00427EC0` | 2 | +0xE0 |
+| `FUN_00427FD0` | 3 | +0xE0 |
+| `FUN_00427F60` | 4 | +0xE0 |
+| `FUN_00428020` | 5 | +0xE0 |
+| `FUN_00428110` | 6 | +0xE0 |
+| `FUN_00427EF0` | 7 (DownloadTUS) | +0xE4 |
+| `FUN_00428180` | 8 (UploadTUS) | +0xE4 |
+| `FUN_004281E0` | 0, resets both | +0xE0 and +0xE4 |
+
+**This is the good news for a repair:** Login lives at +0xE0, the TUS transfers
+at +0xE4. Re-arming Login therefore cannot free or disturb an in-flight
+`tus/read` / `tus/write`. The two TUS request functions are also the only ones
+called from the CUMSTask worker thread (`FUN_00422B00` and `FUN_00423A50`),
+while the +0xE0 family is called from the game-side `FUN_0046Bxxx` handlers --
+so the slots are thread-separated as well.
+
+`DAT_00A5A070` is **mgr+0x20**, not an unrelated global. It has exactly one
+direct xref (the read inside `FUN_00428050`), and `FUN_004282C0` clears it via
+`*(undefined1 *)(param_1 + 8) = 0`. No writer that *sets* it was found -- but
+because it lives inside the manager object a computed `mgr+0x20` write elsewhere
+cannot be excluded from xrefs alone.
+
+`FUN_00428050`'s own caller is `FUN_0046BF10` -- the game's native "start login"
+entry point. Driving *that* (or whatever calls it) is a safer repair than
+poking `FUN_00428050` directly, because it is a path the game already takes.
+
+### Still open before any auto-repair can ship
+
+1. **Which thread ticks the strategies?** Something calls `vftable+0x1C` on the
+   +0xE0 / +0xE4 objects every frame; `FUN_00422B00` only submits and polls
+   `mgr+4`. Until the ticker is identified, `FUN_00429390` freeing the +0xE0
+   strategy from our hook is an unproven cross-thread free.
+2. **Can mgr+0x20 ever be 1?** If it can, the re-arm silently no-ops.
+3. **The hypothesis itself is unconfirmed.** No wedge has yet been captured on
+   the instrumented build, so "re-login fixes it" is still an inference.

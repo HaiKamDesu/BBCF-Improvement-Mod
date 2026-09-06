@@ -1,0 +1,589 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== MATCHING SYMBOLS =====
+  008502f8  uei::tl::UserCreateRequestParam::vftable_meta_ptr
+  008502fc  uei::tl::UserCreateRequestParam::vftable
+  008503d4  uei::tl::ReadTusRequestParam::vftable_meta_ptr
+  008503d8  uei::tl::ReadTusRequestParam::vftable
+  008506e4  uei::tl::LoginRequestParam::vftable_meta_ptr
+  008506e8  uei::tl::LoginRequestParam::vftable
+  008506ec  uei::tl::WriteTusRequestParam::vftable_meta_ptr
+  008506f0  uei::tl::WriteTusRequestParam::vftable
+  00850bd0  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::vftable_meta_ptr
+  00850bd4  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::vftable
+  009a79c4  uei::tl::WebApiRequestParam::RTTI_Class_Hierarchy_Descriptor
+  009a79d4  uei::tl::WebApiRequestParam::RTTI_Base_Class_Array
+  009a79dc  uei::tl::WebApiRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a79f8  uei::tl::UserCreateRequestParam::RTTI_Complete_Object_Locator
+  009a7a0c  uei::tl::UserCreateRequestParam::RTTI_Class_Hierarchy_Descriptor
+  009a7a1c  uei::tl::UserCreateRequestParam::RTTI_Base_Class_Array
+  009a7a28  uei::tl::UserCreateRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a7a44  uei::tl::ReadTusRequestParam::RTTI_Complete_Object_Locator
+  009a7a58  uei::tl::ReadTusRequestParam::RTTI_Class_Hierarchy_Descriptor
+  009a7a68  uei::tl::ReadTusRequestParam::RTTI_Base_Class_Array
+  009a7a74  uei::tl::ReadTusRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a8054  uei::tl::LoginRequestParam::RTTI_Complete_Object_Locator
+  009a8068  uei::tl::LoginRequestParam::RTTI_Class_Hierarchy_Descriptor
+  009a8078  uei::tl::LoginRequestParam::RTTI_Base_Class_Array
+  009a8084  uei::tl::LoginRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a80a0  uei::tl::WriteTusRequestParam::RTTI_Complete_Object_Locator
+  009a80b4  uei::tl::WriteTusRequestParam::RTTI_Class_Hierarchy_Descriptor
+  009a80c4  uei::tl::WriteTusRequestParam::RTTI_Base_Class_Array
+  009a80d0  uei::tl::WriteTusRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009a8700  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Complete_Object_Locator
+  009a8714  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Class_Hierarchy_Descriptor
+  009a8724  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Base_Class_Array
+  009a8730  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64)
+  009d47d0  uei::tl::WebApiRequestParam::RTTI_Type_Descriptor
+  009d47f8  uei::tl::UserCreateRequestParam::RTTI_Type_Descriptor
+  009d4824  uei::tl::ReadTusRequestParam::RTTI_Type_Descriptor
+  009d4bf4  uei::tl::LoginRequestParam::RTTI_Type_Descriptor
+  009d4c1c  uei::tl::WriteTusRequestParam::RTTI_Type_Descriptor
+  009d5090  uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Type_Descriptor
+
+===== XREFS TO uei::tl::UserCreateRequestParam::vftable_meta_ptr (008502f8) =====
+
+===== XREFS TO uei::tl::UserCreateRequestParam::vftable (008502fc) =====
+  from 004288f7 in FUN_004287e0
+
+===== XREFS TO uei::tl::ReadTusRequestParam::vftable_meta_ptr (008503d4) =====
+
+===== XREFS TO uei::tl::ReadTusRequestParam::vftable (008503d8) =====
+  from 00428cb9 in FUN_00428ac0
+
+===== XREFS TO uei::tl::LoginRequestParam::vftable_meta_ptr (008506e4) =====
+
+===== XREFS TO uei::tl::LoginRequestParam::vftable (008506e8) =====
+  from 0042e765 in FUN_0042e660
+
+===== XREFS TO uei::tl::WriteTusRequestParam::vftable_meta_ptr (008506ec) =====
+
+===== XREFS TO uei::tl::WriteTusRequestParam::vftable (008506f0) =====
+  from 0042ef78 in FUN_0042edd0
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::vftable_meta_ptr (00850bd0) =====
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::vftable (00850bd4) =====
+  from 00433fb8 in FUN_00433fa0
+
+===== XREFS TO uei::tl::WebApiRequestParam::RTTI_Class_Hierarchy_Descriptor (009a79c4) =====
+  from 009a79f4 in ?
+
+===== XREFS TO uei::tl::WebApiRequestParam::RTTI_Base_Class_Array (009a79d4) =====
+  from 009a79d0 in ?
+
+===== XREFS TO uei::tl::WebApiRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a79dc) =====
+  from 009a7a20 in ?
+  from 009a79d4 in ?
+  from 009a7a6c in ?
+  from 009a7ef8 in ?
+  from 009a7f44 in ?
+  from 009a7f90 in ?
+  from 009a807c in ?
+  from 009a80c8 in ?
+
+===== XREFS TO uei::tl::UserCreateRequestParam::RTTI_Complete_Object_Locator (009a79f8) =====
+  from 008502f8 in ?
+
+===== XREFS TO uei::tl::UserCreateRequestParam::RTTI_Class_Hierarchy_Descriptor (009a7a0c) =====
+  from 009a7a08 in ?
+  from 009a7a40 in ?
+
+===== XREFS TO uei::tl::UserCreateRequestParam::RTTI_Base_Class_Array (009a7a1c) =====
+  from 009a7a18 in ?
+
+===== XREFS TO uei::tl::UserCreateRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a7a28) =====
+  from 009a7a1c in ?
+
+===== XREFS TO uei::tl::ReadTusRequestParam::RTTI_Complete_Object_Locator (009a7a44) =====
+  from 008503d4 in ?
+
+===== XREFS TO uei::tl::ReadTusRequestParam::RTTI_Class_Hierarchy_Descriptor (009a7a58) =====
+  from 009a7a54 in ?
+  from 009a7a8c in ?
+
+===== XREFS TO uei::tl::ReadTusRequestParam::RTTI_Base_Class_Array (009a7a68) =====
+  from 009a7a64 in ?
+
+===== XREFS TO uei::tl::ReadTusRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a7a74) =====
+  from 009a7a68 in ?
+
+===== XREFS TO uei::tl::LoginRequestParam::RTTI_Complete_Object_Locator (009a8054) =====
+  from 008506e4 in ?
+
+===== XREFS TO uei::tl::LoginRequestParam::RTTI_Class_Hierarchy_Descriptor (009a8068) =====
+  from 009a8064 in ?
+  from 009a809c in ?
+
+===== XREFS TO uei::tl::LoginRequestParam::RTTI_Base_Class_Array (009a8078) =====
+  from 009a8074 in ?
+
+===== XREFS TO uei::tl::LoginRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a8084) =====
+  from 009a8078 in ?
+
+===== XREFS TO uei::tl::WriteTusRequestParam::RTTI_Complete_Object_Locator (009a80a0) =====
+  from 008506ec in ?
+
+===== XREFS TO uei::tl::WriteTusRequestParam::RTTI_Class_Hierarchy_Descriptor (009a80b4) =====
+  from 009a80b0 in ?
+  from 009a80e8 in ?
+
+===== XREFS TO uei::tl::WriteTusRequestParam::RTTI_Base_Class_Array (009a80c4) =====
+  from 009a80c0 in ?
+
+===== XREFS TO uei::tl::WriteTusRequestParam::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a80d0) =====
+  from 009a80c4 in ?
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Complete_Object_Locator (009a8700) =====
+  from 00850bd0 in ?
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Class_Hierarchy_Descriptor (009a8714) =====
+  from 009a8710 in ?
+  from 009a8748 in ?
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Base_Class_Array (009a8724) =====
+  from 009a8720 in ?
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) (009a8730) =====
+  from 009a8724 in ?
+
+===== XREFS TO uei::tl::WebApiRequestParam::RTTI_Type_Descriptor (009d47d0) =====
+  from 009a79dc in ?
+
+===== XREFS TO uei::tl::UserCreateRequestParam::RTTI_Type_Descriptor (009d47f8) =====
+  from 009a7a04 in ?
+  from 009a7a28 in ?
+
+===== XREFS TO uei::tl::ReadTusRequestParam::RTTI_Type_Descriptor (009d4824) =====
+  from 009a7a50 in ?
+  from 009a7a74 in ?
+
+===== XREFS TO uei::tl::LoginRequestParam::RTTI_Type_Descriptor (009d4bf4) =====
+  from 009a8060 in ?
+  from 009a8084 in ?
+
+===== XREFS TO uei::tl::WriteTusRequestParam::RTTI_Type_Descriptor (009d4c1c) =====
+  from 009a80ac in ?
+  from 009a80d0 in ?
+
+===== XREFS TO uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::RTTI_Type_Descriptor (009d5090) =====
+  from 009a870c in ?
+  from 009a8730 in ?
+
+===== XREFS TO __decompile__ (004287e0) =====
+  from 008504a0 in ?
+
+===== XREFS TO __decompile__ (00428ac0) =====
+  from 00850580 in ?
+
+===== XREFS TO __decompile__ (0042e660) =====
+  from 0085047c in ?
+
+===== XREFS TO __decompile__ (0042edd0) =====
+  from 008505a4 in ?
+
+===== XREFS TO __decompile__ (00433fa0) =====
+  from 0042e6c5 in FUN_0042e660
+
+===== DECOMPILES OF XREF SITES =====
+----- DECOMPILE 004287e0  -----
+
+void __thiscall FUN_004287e0(int param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  undefined1 *puVar3;
+  wchar_t *pwVar4;
+  undefined ***pppuVar5;
+  undefined1 local_dc [8];
+  undefined **local_d4;
+  undefined4 local_d0;
+  undefined4 local_cc;
+  undefined4 local_c8;
+  undefined1 local_c4 [24];
+  int local_ac;
+  int local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008250c7;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  if (*(int *)(param_1 + 4) == 0) {
+    iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210,local_14);
+    puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_dc);
+    local_cc = *puVar2;
+    local_c8 = puVar2[1];
+    pppuVar5 = &local_d4;
+    local_d0 = 0;
+    local_d4 = uei::tl::UserCreateRequestParam::vftable;
+    FUN_00432e10(pppuVar5);
+    iVar1 = FUN_00434750(pppuVar5);
+    if (iVar1 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *param_2 = 0xb;
+    }
+    else {
+      *(undefined4 *)(param_1 + 4) = 1;
+    }
+  }
+  else if (*(int *)(param_1 + 4) == 1) {
+    FUN_004284a0();
+    local_8 = 2;
+    puVar3 = local_c4;
+    FUN_00432e10(puVar3);
+    iVar1 = FUN_00434020(puVar3);
+    if (iVar1 != 0) {
+      if (local_ac == 0) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        *param_2 = 4;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        if (local_18 == 1) {
+          pwVar4 = L"TL_CREATE_USER_ERR_NONUNIQUE";
+        }
+        else if (local_18 == 0xcd) {
+          pwVar4 = L"TL_CREATE_USER_ERR_LLIMIT";
+        }
+        else if (local_18 == 0xce) {
+          pwVar4 = L"TL_CREATE_USER_ERR_ULIMIT";
+        }
+        else {
+          pwVar4 = L"TL_CREATE_USER_ERR_ANY";
+        }
+        FUN_00428780(pwVar4);
+        *param_2 = 0xb;
+      }
+    }
+    local_8 = 0xffffffff;
+    FUN_004285e0();
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 00428ac0  -----
+
+void __thiscall FUN_00428ac0(int param_1,int param_2)
+
+{
+  uint uVar1;
+  int iVar2;
+  undefined1 *puVar3;
+  undefined *puVar4;
+  undefined ***pppuVar5;
+  undefined1 local_120 [24];
+  int local_108;
+  void *local_70;
+  int local_6c;
+  undefined4 local_68;
+  undefined **local_64;
+  undefined4 local_60;
+  undefined4 local_5c;
+  undefined4 local_58;
+  undefined1 local_54;
+  undefined1 local_53 [63];
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082467d;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_14 = uVar1;
+  if (*(int *)(param_1 + 4) == 0) {
+    local_5c = *(undefined4 *)(param_2 + 0xd0);
+    local_58 = *(undefined4 *)(param_2 + 0xd4);
+    pppuVar5 = &local_64;
+    local_60 = 9;
+    local_64 = uei::tl::ReadTusRequestParam::vftable;
+    FUN_00432e10(pppuVar5,uVar1);
+    iVar2 = FUN_00434750(pppuVar5);
+    if (iVar2 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+    else {
+      *(undefined4 *)(param_1 + 4) = 1;
+    }
+    goto LAB_00428ce7;
+  }
+  if (*(int *)(param_1 + 4) != 1) goto LAB_00428ce7;
+  FUN_004284a0();
+  local_70 = (void *)0x0;
+  local_6c = 0;
+  local_68 = 0;
+  local_8 = 4;
+  puVar3 = local_120;
+  FUN_00432e10(puVar3,uVar1);
+  iVar2 = FUN_00433fe0(puVar3);
+  if (iVar2 != 0) {
+    if (local_108 == 0) {
+      if (local_6c - (int)local_70 == *(int *)(param_2 + 0xdc)) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        iVar2 = FUN_0040df10(local_70,local_6c - (int)local_70);
+        if (iVar2 == 0) {
+          FUN_00428950(*(undefined4 *)(param_2 + 0xd0),*(undefined4 *)(param_2 + 0xd4));
+          local_54 = 0;
+          FUN_0079f840(local_53,0,0x3f);
+          FUN_00778d00(&local_64,0x10,&local_54);
+          FUN_00778e00(&local_54,0x40,local_70,local_6c - (int)local_70);
+          iVar2 = FUN_0040df10(local_70,local_6c - (int)local_70);
+          if (iVar2 == 0) {
+            puVar4 = &DAT_008503dc;
+            goto LAB_00428c3a;
+          }
+        }
+        _memcpy_s(*(void **)(param_2 + 0xd8),*(rsize_t *)(param_2 + 0xdc),local_70,
+                  local_6c - (int)local_70);
+        *(undefined4 *)(param_2 + 4) = 7;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        FUN_00428780(&DAT_008503dc);
+        *(undefined4 *)(param_2 + 4) = 9;
+      }
+    }
+    else {
+      puVar4 = &DAT_00850400;
+LAB_00428c3a:
+      *(undefined4 *)(param_1 + 4) = 3;
+      FUN_00428780(puVar4);
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+  }
+  local_8 = 5;
+  if (local_70 != (void *)0x0) {
+    FID_conflict__free(local_70);
+    local_70 = (void *)0x0;
+    local_6c = 0;
+    local_68 = 0;
+  }
+  local_8 = 0xffffffff;
+  FUN_004285e0();
+LAB_00428ce7:
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 0042e660  -----
+
+void __thiscall FUN_0042e660(int param_1,undefined4 *param_2)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  undefined1 *puVar3;
+  undefined ***pppuVar4;
+  undefined1 local_dc [8];
+  undefined **local_d4;
+  undefined4 local_d0;
+  undefined4 local_cc;
+  undefined4 local_c8;
+  undefined1 local_c4 [24];
+  int local_ac;
+  int local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008250c7;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  if (*(int *)(param_1 + 4) == 0) {
+    iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210,local_14);
+    puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_dc);
+    local_cc = *puVar2;
+    local_c8 = puVar2[1];
+    pppuVar4 = &local_d4;
+    local_d0 = 1;
+    local_d4 = uei::tl::LoginRequestParam::vftable;
+    FUN_00432e10(pppuVar4);
+    iVar1 = FUN_00434750(pppuVar4);
+    if (iVar1 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *param_2 = 0xb;
+    }
+    else {
+      *(undefined4 *)(param_1 + 4) = 1;
+    }
+  }
+  else if (*(int *)(param_1 + 4) == 1) {
+    FUN_004284a0();
+    local_8 = 2;
+    puVar3 = local_c4;
+    FUN_00432e10(puVar3);
+    iVar1 = FUN_00433fa0(puVar3);
+    if (iVar1 == 0) {
+      *(int *)(param_1 + 8) = *(int *)(param_1 + 8) + 1;
+      if (0xb4 < *(int *)(param_1 + 8)) {
+        *(undefined4 *)(param_1 + 4) = 3;
+        *param_2 = 0xb;
+      }
+    }
+    else if (local_ac == 0) {
+      *(undefined4 *)(param_1 + 4) = 2;
+      *(undefined1 *)(param_2 + 8) = 1;
+      *param_2 = 1;
+    }
+    else {
+      *(undefined4 *)(param_1 + 4) = 3;
+      if (local_18 == 0x65) {
+        *param_2 = 2;
+      }
+    }
+    local_8 = 0xffffffff;
+    FUN_004285e0();
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 0042edd0  -----
+
+void __thiscall FUN_0042edd0(int param_1,int param_2)
+
+{
+  rsize_t _DstSize;
+  void *_Src;
+  int iVar1;
+  undefined4 *puVar2;
+  void *_Dst;
+  undefined1 *puVar3;
+  undefined ***pppuVar4;
+  undefined1 local_140 [8];
+  undefined **local_138;
+  undefined4 local_134;
+  void *local_130;
+  rsize_t local_12c;
+  undefined4 local_128;
+  undefined4 local_124;
+  int local_120;
+  undefined1 local_11c [24];
+  int local_104;
+  undefined1 local_6c [8];
+  undefined1 local_64 [8];
+  undefined1 local_5c;
+  undefined1 local_5b [63];
+  undefined4 local_1c;
+  undefined4 local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00825207;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_120 = param_1;
+  if (*(int *)(param_1 + 4) == 0) {
+    iVar1 = FUN_0040df10(*(undefined4 *)(param_2 + 0xd8),*(undefined4 *)(param_2 + 0xdc),local_14);
+    if (iVar1 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+    else {
+      iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+      puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_140);
+      local_128 = *puVar2;
+      local_124 = puVar2[1];
+      local_1c = 0x84a9e134;
+      local_18 = 0x7b8315f0;
+      _memcpy_s(local_6c,8,&local_1c,8);
+      _memcpy_s(local_64,8,&local_128,8);
+      local_5c = 0;
+      FUN_0079f840(local_5b,0,0x3f);
+      FUN_00778d00(local_6c,0x10,&local_5c);
+      _DstSize = *(rsize_t *)(param_2 + 0xdc);
+      _Src = *(void **)(param_2 + 0xd8);
+      _Dst = (void *)FUN_00787469(_DstSize);
+      _memcpy_s(_Dst,_DstSize,_Src,_DstSize);
+      FUN_00778ee0(&local_5c,0x40,_Dst,_DstSize);
+      pppuVar4 = &local_138;
+      local_134 = 10;
+      local_138 = uei::tl::WriteTusRequestParam::vftable;
+      local_130 = _Dst;
+      local_12c = _DstSize;
+      FUN_00432e10(pppuVar4);
+      iVar1 = FUN_00434750(pppuVar4);
+      if (iVar1 == 0) {
+        *(undefined4 *)(local_120 + 4) = 3;
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+      else {
+        *(undefined4 *)(local_120 + 4) = 1;
+      }
+      FID_conflict__free(_Dst);
+    }
+  }
+  else if (*(int *)(param_1 + 4) == 1) {
+    FUN_004284a0();
+    local_8 = 2;
+    puVar3 = local_11c;
+    FUN_00432e10(puVar3);
+    iVar1 = FUN_00434060(puVar3);
+    if (iVar1 != 0) {
+      if (local_104 == 0) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        *(undefined4 *)(param_2 + 4) = 8;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        FUN_00428780(&DAT_008506f4);
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+    }
+    local_8 = 0xffffffff;
+    FUN_004285e0();
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+----- DECOMPILE 00433fa0  -----
+
+undefined4 __thiscall FUN_00433fa0(int param_1,undefined4 param_2)
+
+{
+  undefined4 uVar1;
+  undefined **local_c;
+  undefined4 local_8;
+  
+  if (*(int *)(param_1 + 0x44) != 0) {
+    local_8 = param_2;
+    local_c = uei::tl::ResponseParameterParser<struct_uei::tl::ResponseLogin>::vftable;
+    uVar1 = FUN_00433d90(*(int *)(param_1 + 0x44),&local_c);
+    return uVar1;
+  }
+  return 0;
+}
+
+
+

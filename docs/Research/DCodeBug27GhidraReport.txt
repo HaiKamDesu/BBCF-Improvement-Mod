@@ -1,0 +1,624 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== ERROR / TAG STRINGS =====
+008503DC @008503dc: 54 00 55 00 53 00 C7 30 FC 30 BF 30 6A 30 57 30 66 30 4D 30 6A 30 E1 30 C3 30 BB 30 FC 30 B8 30 00 00 00 00 54 00 55 00 53 00 AD 8A 7F 30 BC 8F
+008503DC ascii: T.U.S..0.0.0j0W0f0M0j0.0.0.0.0.0....T.U.S....0..
+00850400 @00850400: 54 00 55 00 53 00 AD 8A 7F 30 BC 8F 7F 30 31 59 57 65 66 30 4D 30 6A 30 E1 30 C3 30 BB 30 FC 30 B8 30 00 00 C4 7A 9A 00 A0 9D 6A 00 C0 9D 42 00
+00850400 ascii: T.U.S....0...01YWef0M0j0.0.0.0.0.0...z....j...B.
+008503C0 @008503c0: 5F 00 45 00 52 00 52 00 5F 00 41 00 4E 00 59 00 00 00 00 00 44 7A 9A 00 30 26 43 00 54 00 55 00 53 00 C7 30 FC 30 BF 30 6A 30 57 30 66 30 4D 30
+008503C0 ascii: _.E.R.R._.A.N.Y.....Dz..0&C.T.U.S..0.0.0j0W0f0M0
+00850420 @00850420: B8 30 00 00 C4 7A 9A 00 A0 9D 6A 00 C0 9D 42 00 C0 9D 42 00 C0 9D 42 00 10 7B 9A 00 5C E0 79 00 F0 93 42 00 C0 93 42 00 30 94 42 00 70 90 42 00
+00850420 ascii: .0...z....j...B...B...B..{..\.y...B...B.0.B.p.B.
+
+===== uei::tl::ReadTusRequestParam::vftable at 008503d8 =====
+  +0x00 -> 00432630 FUN_00432630
+  +0x04 -> 00550054 (not a function entry, stop)
+
+----- DECOMPILE 00434750 (issue TUS request (returns 0 -> mgr+4=0xB)) -----
+Function: FUN_00434750
+
+void __thiscall FUN_00434750(undefined4 *param_1,undefined4 *param_2)
+
+{
+  short sVar1;
+  int iVar2;
+  int *piVar3;
+  short *psVar4;
+  void *pvVar5;
+  uint uVar6;
+  int iVar7;
+  undefined4 *puVar8;
+  undefined4 uVar9;
+  int iVar10;
+  short *psVar11;
+  undefined4 *puVar12;
+  undefined4 *puVar13;
+  __time64_t _Var14;
+  void *local_40;
+  int local_3c;
+  undefined4 local_38;
+  undefined4 *local_34;
+  undefined4 *local_30;
+  undefined4 local_2c;
+  undefined4 local_1c;
+  uint local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082615b;
+  local_10 = ExceptionList;
+  uVar6 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_34 = param_2;
+  iVar2 = param_2[1];
+  local_30 = param_1;
+  local_14 = uVar6;
+  iVar7 = FUN_00433010(iVar2);
+  if ((iVar7 == 0) ||
+     ((((int *)param_1[iVar2 + 0x10] != (int *)0x0 &&
+       (iVar7 = *(int *)param_1[iVar2 + 0x10], iVar7 != 0)) && (*(int *)(iVar7 + 0xe38) == 0)))) {
+    piVar3 = (int *)param_1[iVar2 + 0x10];
+    if (piVar3 != (int *)0x0) {
+      if (*piVar3 != 0) {
+        FUN_00438a30(*piVar3,uVar6);
+        *piVar3 = 0;
+      }
+      FID_conflict__free(piVar3);
+      param_1[iVar2 + 0x10] = 0;
+    }
+    puVar8 = (undefined4 *)operator_new(0x50);
+    local_8 = 0;
+    if (puVar8 == (undefined4 *)0x0) {
+      puVar8 = (undefined4 *)0x0;
+    }
+    else {
+      *puVar8 = 0;
+      puVar8[0x12] = 0xffffffff;
+      FUN_0079f840(puVar8 + 2,0,0x40);
+    }
+    local_8 = 0xffffffff;
+    param_1[iVar2 + 0x10] = puVar8;
+    _Var14 = __time64((__time64_t *)0x0);
+    puVar8 = local_30;
+    *(__time64_t *)(param_1 + 0xc) = _Var14;
+    puVar12 = local_30;
+    puVar13 = (undefined4 *)(param_1[iVar2 + 0x10] + 8);
+    for (iVar7 = 0x10; iVar7 != 0; iVar7 = iVar7 + -1) {
+      *puVar13 = *puVar12;
+      puVar12 = puVar12 + 1;
+      puVar13 = puVar13 + 1;
+    }
+    *(int *)(local_30[iVar2 + 0x10] + 0x48) = iVar2;
+    uVar9 = (**(code **)*local_34)();
+    iVar7 = FUN_00432730(puVar8,uVar9);
+    local_40 = (void *)0x0;
+    local_3c = 0;
+    local_38 = 0;
+    local_8 = 2;
+    uVar9 = FUN_00403ff0(iVar7,0x20);
+    FUN_00434a40(&local_40,uVar9);
+    if (((iVar7 != 0) && (*(int *)(iVar7 + 4) != -1)) &&
+       (iVar10 = *(int *)(iVar7 + 4) + -1, *(int *)(iVar7 + 4) = iVar10, iVar10 == 0)) {
+      FUN_004013f0(iVar7);
+    }
+    local_18 = 7;
+    local_1c = 0;
+    local_2c = (undefined4 *)((uint)local_2c._2_2_ << 0x10);
+    local_8 = CONCAT31(local_8._1_3_,4);
+    FUN_0042b130(PTR_u_http___153_122_81_62_steam_api_009d4c48);
+    FUN_0041da40(&DAT_00850bc0,1);
+    psVar4 = (short *)(&PTR_u_user_create_009d4c54)[iVar2];
+    if (*psVar4 == 0) {
+      iVar7 = 0;
+    }
+    else {
+      psVar11 = psVar4;
+      do {
+        sVar1 = *psVar11;
+        psVar11 = psVar11 + 1;
+      } while (sVar1 != 0);
+      iVar7 = (int)psVar11 - (int)(psVar4 + 1) >> 1;
+    }
+    FUN_0041da40(psVar4,iVar7);
+    pvVar5 = local_40;
+    piVar3 = (int *)puVar8[iVar2 + 0x10];
+    local_34 = (undefined4 *)(local_3c - (int)local_40);
+    local_30 = &local_2c;
+    if (7 < local_18) {
+      local_30 = local_2c;
+    }
+    if (*piVar3 != 0) {
+      FUN_00438a30(*piVar3);
+      *piVar3 = 0;
+    }
+    iVar7 = FUN_00438890(local_30,1,pvVar5,(int)local_34 + -1);
+    *piVar3 = iVar7;
+    if (iVar7 == 0) {
+      piVar3 = (int *)puVar8[iVar2 + 0x10];
+      if (piVar3 != (int *)0x0) {
+        if (*piVar3 != 0) {
+          FUN_00438a30(*piVar3);
+          *piVar3 = 0;
+        }
+        FID_conflict__free(piVar3);
+      }
+      puVar8[iVar2 + 0x10] = 0;
+    }
+    else if (*(int *)puVar8[iVar2 + 0x10] != 0) {
+      FUN_00438d20(*(int *)puVar8[iVar2 + 0x10]);
+    }
+    local_8 = CONCAT31(local_8._1_3_,2);
+    if (7 < local_18) {
+      FID_conflict__free(local_2c);
+    }
+    local_18 = 7;
+    local_1c = 0;
+    local_2c = (undefined4 *)((uint)local_2c & 0xffff0000);
+    local_8 = 0xffffffff;
+    if (local_40 != (void *)0x0) {
+      FID_conflict__free(local_40);
+      local_40 = (void *)0x0;
+      local_3c = 0;
+      local_38 = 0;
+    }
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+--- callees of 00434750 ---
+  00438d20 FUN_00438d20
+  00438a30 FUN_00438a30
+  00432730 FUN_00432730
+  00403ff0 FUN_00403ff0
+  00438890 FUN_00438890
+  0079e869 __security_check_cookie
+  0079f840 FUN_0079f840
+  007a1f43 __time64
+  0079e086 operator_new
+  0042b130 FUN_0042b130
+  00434a40 FUN_00434a40
+  0079e0d5 FID_conflict:_free
+  004013f0 FUN_004013f0
+  0041da40 FUN_0041da40
+  00433010 FUN_00433010
+--- callers of 00434750 ---
+  0042e660 FUN_0042e660
+  0042edd0 FUN_0042edd0
+  0042b810 FUN_0042b810
+  00428ac0 FUN_00428ac0
+  004287e0 FUN_004287e0
+
+----- DECOMPILE 00433fe0 (poll TUS result (out buf/len, +0x108 err)) -----
+Function: FUN_00433fe0
+
+undefined4 __thiscall FUN_00433fe0(int param_1,undefined4 param_2)
+
+{
+  undefined4 uVar1;
+  undefined **local_c;
+  undefined4 local_8;
+  
+  if (*(int *)(param_1 + 100) != 0) {
+    local_8 = param_2;
+    local_c = uei::tl::ResponseParameterParser<struct_uei::tl::ResponseReadTus>::vftable;
+    uVar1 = FUN_00433d90(*(int *)(param_1 + 100),&local_c);
+    return uVar1;
+  }
+  return 0;
+}
+
+
+
+--- callees of 00433FE0 ---
+  00433d90 FUN_00433d90
+--- callers of 00433FE0 ---
+  00428ac0 FUN_00428ac0
+
+----- DECOMPILE 00432e10 (request param helper / ctor) -----
+Function: FUN_00432e10
+
+void FUN_00432e10(void)
+
+{
+  uint uVar1;
+  void *pvVar2;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_0082e0fb;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  if (DAT_00a5a168 == 0) {
+    pvVar2 = operator_new(0x148);
+    local_8 = 0;
+    if (pvVar2 == (void *)0x0) {
+      DAT_00a5a168 = 0;
+    }
+    else {
+      DAT_00a5a168 = FUN_004309b0(uVar1,pvVar2);
+    }
+  }
+  ExceptionList = local_10;
+  return;
+}
+
+
+
+--- callees of 00432E10 ---
+  0079e086 operator_new
+  004309b0 FUN_004309b0
+--- callers of 00432E10 ---
+  0042e660 FUN_0042e660
+  0042d710 FUN_0042d710
+  0042edd0 FUN_0042edd0
+  00427fd0 FUN_00427fd0
+  00427c40 FUN_00427c40
+  004287e0 FUN_004287e0
+  004281e0 FUN_004281e0
+  008482f0 FUN_008482f0
+  00429df0 FUN_00429df0
+  0042eba0 FUN_0042eba0
+  00427e40 FUN_00427e40
+  0042e580 FUN_0042e580
+  0042b810 FUN_0042b810
+  00428ac0 FUN_00428ac0
+
+----- DECOMPILE 004284a0 (called each poll tick of DownloadTUS) -----
+Function: FUN_004284a0
+
+undefined2 * __fastcall FUN_004284a0(undefined2 *param_1)
+
+{
+  *(undefined4 *)(param_1 + 10) = 7;
+  *(undefined4 *)(param_1 + 8) = 0;
+  *param_1 = 0;
+  *(undefined4 *)(param_1 + 0x18) = 7;
+  *(undefined4 *)(param_1 + 0x16) = 0;
+  param_1[0xe] = 0;
+  *(undefined4 *)(param_1 + 0x24) = 7;
+  *(undefined4 *)(param_1 + 0x22) = 0;
+  param_1[0x1a] = 0;
+  *(undefined4 *)(param_1 + 0x30) = 7;
+  *(undefined4 *)(param_1 + 0x2e) = 0;
+  param_1[0x26] = 0;
+  *(undefined4 *)(param_1 + 0x3c) = 7;
+  *(undefined4 *)(param_1 + 0x3a) = 0;
+  param_1[0x32] = 0;
+  *(undefined4 *)(param_1 + 0x48) = 7;
+  *(undefined4 *)(param_1 + 0x46) = 0;
+  param_1[0x3e] = 0;
+  *(undefined4 *)(param_1 + 0x54) = 7;
+  *(undefined4 *)(param_1 + 0x52) = 0;
+  param_1[0x4a] = 0;
+  return param_1;
+}
+
+
+
+--- callees of 004284A0 ---
+--- callers of 004284A0 ---
+  0042e660 FUN_0042e660
+  0042edd0 FUN_0042edd0
+  0042ad70 FUN_0042ad70
+  00428ac0 FUN_00428ac0
+  004287e0 FUN_004287e0
+
+----- DECOMPILE 00428780 (error reporter (takes a string ptr)) -----
+Function: FUN_00428780
+
+void __thiscall FUN_00428780(int param_1,short *param_2)
+
+{
+  short sVar1;
+  undefined4 *puVar2;
+  short *psVar3;
+  
+  puVar2 = (undefined4 *)(param_1 + 8);
+  *(undefined4 *)(param_1 + 0x18) = 0;
+  if (7 < *(uint *)(param_1 + 0x1c)) {
+    puVar2 = (undefined4 *)*puVar2;
+  }
+  *(undefined2 *)puVar2 = 0;
+  if (*param_2 != 0) {
+    psVar3 = param_2;
+    do {
+      sVar1 = *psVar3;
+      psVar3 = psVar3 + 1;
+    } while (sVar1 != 0);
+    FUN_0041da40(param_2,(int)psVar3 - (int)(param_2 + 1) >> 1);
+    return;
+  }
+  FUN_0041da40(param_2,0);
+  return;
+}
+
+
+
+--- callees of 00428780 ---
+  0041da40 FUN_0041da40
+--- callers of 00428780 ---
+  0042edd0 FUN_0042edd0
+  00429df0 FUN_00429df0
+  0042eba0 FUN_0042eba0
+  0042e580 FUN_0042e580
+  00428ac0 FUN_00428ac0
+  004287e0 FUN_004287e0
+
+----- DECOMPILE 00428950 (success-path notify(steamId)) -----
+Function: FUN_00428950
+
+void __fastcall FUN_00428950(void *param_1)
+
+{
+  undefined4 local_10;
+  undefined4 local_c;
+  uint local_8;
+  
+  local_8 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  local_10 = 0x84a9e134;
+  local_c = 0x7b8315f0;
+  _memcpy_s(param_1,8,&local_10,8);
+  _memcpy_s((void *)((int)param_1 + 8),8,&stack0x00000004,8);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+--- callees of 00428950 ---
+  0079e869 __security_check_cookie
+  007a1bdf _memcpy_s
+--- callers of 00428950 ---
+  00428ac0 FUN_00428ac0
+
+----- DECOMPILE 0040df10 (profile checksum16 validator) -----
+Function: FUN_0040df10
+
+bool FUN_0040df10(int param_1,uint param_2)
+
+{
+  int iVar1;
+  uint uVar2;
+  uint uVar3;
+  
+  iVar1 = 0;
+  uVar3 = 0;
+  if (param_2 >> 1 != 0) {
+    do {
+      uVar2 = iVar1 + (uint)*(ushort *)(param_1 + uVar3 * 2);
+      uVar3 = uVar3 + 1;
+      iVar1 = (uVar2 & 0xffff) + (uVar2 >> 0x10);
+    } while (uVar3 < param_2 >> 1);
+  }
+  return (short)iVar1 == -1;
+}
+
+
+
+--- callees of 0040DF10 ---
+--- callers of 0040DF10 ---
+  004b0970 FUN_004b0970
+  0042edd0 FUN_0042edd0
+  006c4990 FUN_006c4990
+  00428ac0 FUN_00428ac0
+  004bb080 FUN_004bb080
+  004a1dd0 FUN_004a1dd0
+
+----- DECOMPILE 00427ef0 (workmgr: start bbdc download) -----
+Function: FUN_00427ef0
+
+void __thiscall
+FUN_00427ef0(int param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,undefined4 param_5
+            )
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  
+  *(undefined4 *)(param_1 + 0xd0) = param_2;
+  *(undefined4 *)(param_1 + 0xd4) = param_3;
+  *(undefined4 *)(param_1 + 0xd8) = param_4;
+  *(undefined4 *)(param_1 + 0xdc) = param_5;
+  if (*(undefined4 **)(param_1 + 0xe4) != (undefined4 *)0x0) {
+    iVar1 = (**(code **)**(undefined4 **)(param_1 + 0xe4))();
+    if (iVar1 == 7) {
+      (**(code **)(**(int **)(param_1 + 0xe4) + 4))(param_1);
+      return;
+    }
+  }
+  FUN_00429390(*(undefined4 *)(param_1 + 0xe4),param_1);
+  uVar2 = FUN_004291d0(7,param_1);
+  *(undefined4 *)(param_1 + 0xe4) = uVar2;
+  return;
+}
+
+
+
+--- callees of 00427EF0 ---
+  004291d0 FUN_004291d0
+  00429390 FUN_00429390
+--- callers of 00427EF0 ---
+  00422b00 FUN_00422b00
+
+----- DECOMPILE 0042edd0 (UploadTUS tick) -----
+Function: FUN_0042edd0
+
+void __thiscall FUN_0042edd0(int param_1,int param_2)
+
+{
+  rsize_t _DstSize;
+  void *_Src;
+  int iVar1;
+  undefined4 *puVar2;
+  void *_Dst;
+  undefined1 *puVar3;
+  undefined ***pppuVar4;
+  undefined1 local_140 [8];
+  undefined **local_138;
+  undefined4 local_134;
+  void *local_130;
+  rsize_t local_12c;
+  undefined4 local_128;
+  undefined4 local_124;
+  int local_120;
+  undefined1 local_11c [24];
+  int local_104;
+  undefined1 local_6c [8];
+  undefined1 local_64 [8];
+  undefined1 local_5c;
+  undefined1 local_5b [63];
+  undefined4 local_1c;
+  undefined4 local_18;
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00825207;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_120 = param_1;
+  if (*(int *)(param_1 + 4) == 0) {
+    iVar1 = FUN_0040df10(*(undefined4 *)(param_2 + 0xd8),*(undefined4 *)(param_2 + 0xdc),local_14);
+    if (iVar1 == 0) {
+      *(undefined4 *)(param_1 + 4) = 3;
+      *(undefined4 *)(param_2 + 4) = 0xb;
+    }
+    else {
+      iVar1 = SteamInternal_ContextInit(&PTR_FUN_009d3210);
+      puVar2 = (undefined4 *)(**(code **)(**(int **)(iVar1 + 4) + 8))(local_140);
+      local_128 = *puVar2;
+      local_124 = puVar2[1];
+      local_1c = 0x84a9e134;
+      local_18 = 0x7b8315f0;
+      _memcpy_s(local_6c,8,&local_1c,8);
+      _memcpy_s(local_64,8,&local_128,8);
+      local_5c = 0;
+      FUN_0079f840(local_5b,0,0x3f);
+      FUN_00778d00(local_6c,0x10,&local_5c);
+      _DstSize = *(rsize_t *)(param_2 + 0xdc);
+      _Src = *(void **)(param_2 + 0xd8);
+      _Dst = (void *)FUN_00787469(_DstSize);
+      _memcpy_s(_Dst,_DstSize,_Src,_DstSize);
+      FUN_00778ee0(&local_5c,0x40,_Dst,_DstSize);
+      pppuVar4 = &local_138;
+      local_134 = 10;
+      local_138 = uei::tl::WriteTusRequestParam::vftable;
+      local_130 = _Dst;
+      local_12c = _DstSize;
+      FUN_00432e10(pppuVar4);
+      iVar1 = FUN_00434750(pppuVar4);
+      if (iVar1 == 0) {
+        *(undefined4 *)(local_120 + 4) = 3;
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+      else {
+        *(undefined4 *)(local_120 + 4) = 1;
+      }
+      FID_conflict__free(_Dst);
+    }
+  }
+  else if (*(int *)(param_1 + 4) == 1) {
+    FUN_004284a0();
+    local_8 = 2;
+    puVar3 = local_11c;
+    FUN_00432e10(puVar3);
+    iVar1 = FUN_00434060(puVar3);
+    if (iVar1 != 0) {
+      if (local_104 == 0) {
+        *(undefined4 *)(param_1 + 4) = 2;
+        *(undefined4 *)(param_2 + 4) = 8;
+      }
+      else {
+        *(undefined4 *)(param_1 + 4) = 3;
+        FUN_00428780(&DAT_008506f4);
+        *(undefined4 *)(param_2 + 4) = 0xb;
+      }
+    }
+    local_8 = 0xffffffff;
+    FUN_004285e0();
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+--- callees of 0042EDD0 ---
+  00434060 FUN_00434060
+  00778ee0 FUN_00778ee0
+  0079e869 __security_check_cookie
+  00432e10 FUN_00432e10
+  0079f840 FUN_0079f840
+  EXTERNAL:0000000b SteamInternal_ContextInit
+  00787469 FUN_00787469
+  007a1bdf _memcpy_s
+  004284a0 FUN_004284a0
+  00428780 FUN_00428780
+  0079e864 FID_conflict:_free
+  00434750 FUN_00434750
+  00778d00 FUN_00778d00
+  004285e0 FUN_004285e0
+  0040df10 FUN_0040df10
+--- callers of 0042EDD0 ---
+
+----- DECOMPILE 00434d30 (sibling of 00432e10 (from atexit)) -----
+Function: FUN_00434d30
+
+undefined4 __fastcall FUN_00434d30(int param_1)
+
+{
+  int *_Memory;
+  void *_Memory_00;
+  int iVar1;
+  undefined4 *puVar2;
+  
+  puVar2 = (undefined4 *)(param_1 + 0x40);
+  iVar1 = 0xc;
+  do {
+    _Memory = (int *)*puVar2;
+    if (_Memory != (int *)0x0) {
+      if (*_Memory != 0) {
+        FUN_00438a30(*_Memory);
+        *_Memory = 0;
+      }
+      FID_conflict__free(_Memory);
+      *puVar2 = 0;
+    }
+    puVar2 = puVar2 + 1;
+    iVar1 = iVar1 + -1;
+  } while (iVar1 != 0);
+  _Memory_00 = *(void **)(param_1 + 0x70);
+  if (_Memory_00 != (void *)0x0) {
+    FUN_00427150();
+    FID_conflict__free(_Memory_00);
+    *(undefined4 *)(param_1 + 0x70) = 0;
+  }
+  return 1;
+}
+
+
+
+--- callees of 00434D30 ---
+  00438a30 FUN_00438a30
+  00427150 FUN_00427150
+  0079e0d5 FID_conflict:_free
+--- callers of 00434D30 ---
+  008482f0 FUN_008482f0
+  00432f50 FUN_00432f50
+  00427c40 FUN_00427c40
+
