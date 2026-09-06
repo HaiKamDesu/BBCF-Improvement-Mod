@@ -1715,6 +1715,68 @@ bool placeD3D9FactoryHooks_detours()
 	return true;
 }
 
+// SteamAPI_Init, on its own, as early as the D3D factory exports.
+//
+// The game calls this once, within the first few hundred milliseconds, and our
+// detour is the only thing that installs the game-side hooks which capture the
+// Steam interface pointers into g_tempVals. Miss the call and those stay null
+// forever: InitSteamApiWrappers then builds nothing, pSteamApiHelper is never
+// created, and WindowManager::Render returns at its null check on every single
+// frame. The mod loads, initialises, places every hook, logs "Finished
+// initialization" - and never draws. That is the "mod didn't load on cold boot"
+// report, and it is not a load failure at all.
+//
+// Measured across three launches on 2026-09-06, time from "About to place Detours
+// hooks" to this detour landing, against whether SteamAPI_Init was then seen:
+//
+//   04:00:02  +160 ms from thread entry   missed   no overlay
+//   04:00:45  +1992 ms                    missed   no overlay
+//   04:01:19  +18 ms                      caught, by 70 ms   overlay fine
+//
+// The 1992 ms case is placeHooks_detours' own diagnostics - module enumeration
+// with version queries, display adapters, game folder listing - running off a cold
+// disk before it gets to installing anything. Even the good launch only won by
+// 70 ms. Installing here instead moves it to roughly 20 ms after the init thread
+// starts, which is as early as this thread can act.
+//
+// This improves the odds decisively rather than removing the race: if the game
+// calls SteamAPI_Init within the first ~20 ms we still lose. Making the overlay
+// survive a missed capture is a separate job - WindowManager::Render's guard
+// protects roughly 78 dereferences of Steam-dependent managers spread across a
+// dozen overlay files, and that audit does not belong bolted onto a timing fix.
+//
+// Idempotent and safe to fail, exactly like the D3D factory hooks: if
+// steam_api.dll is not loaded yet there is nothing to hook and nothing to miss,
+// and placeHooks_detours installs it at the point it always did.
+bool placeSteamInitHook_detours()
+{
+	static bool s_placed = false;
+	if (s_placed)
+	{
+		return true;
+	}
+
+	HMODULE hM_steam_api = GetModuleHandleA("steam_api.dll");
+	if (!hM_steam_api)
+	{
+		LOG(2, "[HookDiag] Early SteamAPI_Init hook skipped: steam_api.dll is not loaded yet\n");
+		return false;
+	}
+
+	PBYTE pSteamAPI_Init = (PBYTE)GetProcAddress(hM_steam_api, "SteamAPI_Init");
+	if (!pSteamAPI_Init)
+	{
+		LOG(0, "[HookDiag] Early SteamAPI_Init hook skipped: export did not resolve\n");
+		return false;
+	}
+
+	s_placed = true;
+
+	HookOptionalDetour(pSteamAPI_Init, "SteamAPI_Init");
+	orig_SteamAPI_Init = (SteamAPI_Init_t)InstallDetour(pSteamAPI_Init, (LPBYTE)hook_SteamAPI_Init, "SteamAPI_Init");
+	return true;
+}
+
 bool placeHooks_detours()
 {
 	LOG(1, "placeHooks_detours\n");
@@ -1787,7 +1849,11 @@ bool placeHooks_detours()
 
 	orig_D3DXCreateEffect = (D3DXCreateEffect_t)InstallDetour(pD3DXCreateEffect, (LPBYTE)hook_D3DXCreateEffect, "D3DXCreateEffect");
 	orig_D3DXCreateSprite = (D3DXCreateSprite_t)InstallDetour(pD3DXCreateSprite, (LPBYTE)hook_D3DXCreateSprite, "D3DXCreateSprite");
-	orig_SteamAPI_Init = (SteamAPI_Init_t)InstallDetour(pSteamAPI_Init, (LPBYTE)hook_SteamAPI_Init, "SteamAPI_Init");
+	// Normally already installed from the init thread before the BGM step; this is
+	// a no-op then. Still called here so it lands even if steam_api.dll had not been
+	// loaded yet at that point - this is where it always used to be installed.
+	placeSteamInitHook_detours();
+
 	orig_SteamAPI_RunCallbacks = (SteamAPI_RunCallbacks_t)InstallDetour(pSteamAPI_RunCallbacks, (LPBYTE)hook_SteamAPI_RunCallbacks, "SteamAPI_RunCallbacks");
 	orig_SteamAPI_RegisterCallResult = (SteamAPI_RegisterCallResult_t)InstallDetour(pSteamAPI_RegisterCallResult, (LPBYTE)hook_SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult");
 	orig_SteamAPI_UnregisterCallResult = (SteamAPI_UnregisterCallResult_t)InstallDetour(pSteamAPI_UnregisterCallResult, (LPBYTE)hook_SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult");

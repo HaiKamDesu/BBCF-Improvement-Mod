@@ -246,7 +246,10 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	// game's audio init, which is the thing that must not regress. Cheap and idempotent;
 	// placeHooks_detours calls it again where these hooks always used to be installed.
 	placeD3D9FactoryHooks_detours();
-	ForceLog("[Init] D3D9 factory hooks placed before BGM work.\n");
+	// Same reasoning, same deadline problem: the game calls SteamAPI_Init once and
+	// early, and missing it leaves the overlay unable to draw for the whole session.
+	placeSteamInitHook_detours();
+	ForceLog("[Init] D3D9 and SteamAPI_Init hooks placed before BGM work.\n");
 
 	// Saved BGM replacements must be in the filename table BEFORE the game's boot audio
 	// init, not when the overlay comes up at the title screen.
