@@ -116,9 +116,57 @@ HMONITOR APIENTRY Direct3D9ExWrapper::GetAdapterMonitor(UINT Adapter)
 	return Direct3D9Ex->GetAdapterMonitor(Adapter);
 }
 
+// Only CreateDeviceEx below constructs the Direct3DDevice9ExWrapper, and that
+// wrapper is what puts the overlay on screen. This method used to hand the
+// device straight back unwrapped, so a caller that reached us through the
+// legacy Direct3DCreate9 entry point - which calls CreateDevice, never
+// CreateDeviceEx - got a wrapped factory producing an unwrapped device, and
+// still no overlay.
+//
+// Routing through our own CreateDeviceEx keeps a single wrapping site and gives
+// the legacy path the identical treatment the normal path gets: the same
+// logging, the same Settings::applySettingsIni, the same device wrapper.
+// D3D permits this - a device made from an IDirect3D9Ex is an Ex device either
+// way - the only difference being that CreateDeviceEx wants the fullscreen mode
+// spelled out rather than inferred.
+//
+// If Ex creation refuses these particular parameters, the original unwrapped
+// call still runs, so this can lose the overlay but never the device.
 HRESULT APIENTRY Direct3D9ExWrapper::CreateDevice(UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS *pPresentationParameters, IDirect3DDevice9 **ppReturnedDeviceInterface)
 {
 	LOG(1, "CreateDevice\n")
+
+	if (pPresentationParameters != nullptr && ppReturnedDeviceInterface != nullptr)
+	{
+		// Required to be NULL when windowed and non-NULL when not; there is no
+		// third option, which is why this is derived rather than passed along.
+		D3DDISPLAYMODEEX fullscreenMode = {};
+		D3DDISPLAYMODEEX* pFullscreenMode = nullptr;
+		if (!pPresentationParameters->Windowed)
+		{
+			fullscreenMode.Size = sizeof(fullscreenMode);
+			fullscreenMode.Width = pPresentationParameters->BackBufferWidth;
+			fullscreenMode.Height = pPresentationParameters->BackBufferHeight;
+			fullscreenMode.RefreshRate = pPresentationParameters->FullScreen_RefreshRateInHz;
+			fullscreenMode.Format = pPresentationParameters->BackBufferFormat;
+			fullscreenMode.ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
+			pFullscreenMode = &fullscreenMode;
+		}
+
+		IDirect3DDevice9Ex* deviceEx = nullptr;
+		const HRESULT hRetEx = CreateDeviceEx(Adapter, DeviceType, hFocusWindow, BehaviorFlags,
+			pPresentationParameters, pFullscreenMode, &deviceEx);
+		if (SUCCEEDED(hRetEx) && deviceEx != nullptr)
+		{
+			// deviceEx is the Direct3DDevice9ExWrapper by now; handing it back
+			// as IDirect3DDevice9* is a plain upcast.
+			*ppReturnedDeviceInterface = deviceEx;
+			return hRetEx;
+		}
+
+		LOG(1, "CreateDevice: CreateDeviceEx refused these parameters (0x%08X); "
+		       "falling back to an unwrapped legacy device - the overlay will NOT appear\n", hRetEx);
+	}
 
 	HRESULT hRet = Direct3D9Ex->CreateDevice(Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
 

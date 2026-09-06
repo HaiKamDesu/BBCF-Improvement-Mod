@@ -14,9 +14,12 @@
 #include "SteamApiWrapper/steamApiWrappers.h"
 
 #include <detours.h>
+#include <intrin.h>
 #include <sstream>
 #include <tlhelp32.h>
 #include <winver.h>
+
+#pragma intrinsic(_ReturnAddress)
 
 #pragma comment(lib, "detours.lib")
 #pragma comment(lib, "version.lib")
@@ -44,6 +47,13 @@ typedef SteamAPICall_t (__cdecl* SteamAPI_ISteamUserStats_UploadLeaderboardScore
 
 Direct3DCreate9Ex_t orig_Direct3DCreate9Ex;
 Direct3DCreate9_t orig_Direct3DCreate9;
+
+// Set once a Direct3D9ExWrapper exists. The legacy-path promotion in
+// hook_Direct3DCreate9 must never produce a second one: every device wrapper
+// built from a factory wrapper re-runs placeHooks_bbcf / placeHooks_palette /
+// placeHooks_CustomGameModes, and those re-scan for original byte signatures
+// that the first run already overwrote with JMPs. One factory per process.
+LONG g_d3d9ExFactoryWrapped = 0;
 
 // Defined below; the import-table fallback needs its address before that point.
 HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx);
@@ -1005,22 +1015,150 @@ HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 	if (SUCCEEDED(retval) && pD3DEx && *pD3DEx)
 	{
 		Direct3D9ExWrapper* ret = new Direct3D9ExWrapper(&*pD3DEx);
+		InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
 	}
 	return retval;
 }
 
-// Diagnostic only: the mod wraps the D3D9Ex path exclusively. If a machine
-// ends up on the legacy non-Ex entry point instead, nothing downstream ever
-// reaches the wrapper and the overlay never appears. This hook creates no
-// wrapper - it only records that the call happened.
+// The module a return address lies in, or null when it belongs to no loaded
+// module (a heap trampoline, for instance - the exact shape a pre-existing
+// hooker like Optimus's nvd3d9wrap leaves behind).
+static HMODULE ModuleOwningAddress(void* returnAddress)
+{
+	if (returnAddress == nullptr)
+	{
+		return nullptr;
+	}
+
+	HMODULE owner = nullptr;
+	if (!GetModuleHandleExW(
+		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		reinterpret_cast<LPCWSTR>(returnAddress), &owner))
+	{
+		return nullptr;
+	}
+
+	return owner;
+}
+
+// Names a module for a log line. Static buffer: the only callers are the
+// once-per-process D3D factory hooks.
+static const char* ModuleNameForLog(HMODULE module)
+{
+	if (module == nullptr)
+	{
+		return "<no owning module - heap/trampoline>";
+	}
+
+	static char name[MAX_PATH] = {};
+	if (GetModuleFileNameA(module, name, ARRAYSIZE(name)) == 0)
+	{
+		return "<unnamed>";
+	}
+
+	const char* slash = strrchr(name, '\\');
+	return slash ? slash + 1 : name;
+}
+
+// The mod wraps the D3D9Ex path exclusively, so a game that comes in through
+// the legacy entry point used to get no factory wrapper, no device wrapper and
+// no overlay - the mod loaded, hooked everything, and then had nothing to draw
+// on. This hook used to only record that it happened.
+//
+// Measured on a cold boot on 2026-09-06: that launch's DEBUG.txt contains this
+// line, zero Direct3DCreate9Ex calls, and no WindowManager::Shutdown at the end
+// (the overlay was never initialized, so there was nothing to shut down). The
+// very next launch took the Ex path and behaved normally. Which branch of the
+// game's own renderer selection runs is still unexplained; the promotion below
+// does not depend on knowing.
+//
+// So rather than watch it happen, hand the caller an Ex object. That is exactly
+// the configuration the game already runs in on every healthy launch, which is
+// what makes the promotion safe: BBCF renders correctly on an Ex device in
+// every normal session, so it cannot be depending on anything D3D9Ex forbids -
+// D3DPOOL_MANAGED included. The rare cold-boot launch ends up identical to the
+// common one instead of being a second, untested rendering path.
+//
+// Only BBCF.exe's own call is promoted. Other modules ask for legacy D3D9 for
+// their own reasons - both Steam's overlay and Parsec were observed calling
+// this on a perfectly healthy session, after the game had already created its
+// Ex device - and a module that asked for a plain IDirect3D9 still gets one.
 IDirect3D9* __stdcall hook_Direct3DCreate9(UINT sdkVers)
 {
-	LOG(0, "[HookDiag] Direct3DCreate9 (non-Ex) called - the mod only wraps the Ex path\n");
+	void* const caller = _ReturnAddress();
+	const HMODULE callerModule = ModuleOwningAddress(caller);
+
 	if (!orig_Direct3DCreate9)
 	{
 		LOG(0, "[HookDiag] Direct3DCreate9 hook called without original function\n");
 		return nullptr;
 	}
+
+	// Named, not just addressed. If the game ever reaches this export through a
+	// thunk in someone else's module - an Optimus wrapper, say - the promotion
+	// below would silently not apply, and this line is what says so and names
+	// who to add.
+	if (callerModule == nullptr || callerModule != GetModuleHandleW(nullptr))
+	{
+		LOG(0, "[HookDiag] Direct3DCreate9 (non-Ex) called from outside the game module "
+		       "(caller=0x%p module='%s'); passing it through unwrapped\n",
+			caller, ModuleNameForLog(callerModule));
+		IDirect3D9* result = orig_Direct3DCreate9(sdkVers);
+		LOG(0, "[HookDiag] Direct3DCreate9 returned 0x%p\n", result);
+		return result;
+	}
+
+	// The failure this fixes is "the game never called Direct3DCreate9Ex at
+	// all". If it already did, the overlay is attached to that factory's device
+	// and a second wrapper here would be actively harmful, so this stays out of
+	// the way. On every healthy launch on record the Ex call comes first - the
+	// non-Ex call that follows on such a session belongs to some other module -
+	// which makes this branch the one that runs there, unchanged from before.
+	if (InterlockedCompareExchange(&g_d3d9ExFactoryWrapped, 0, 0) != 0)
+	{
+		LOG(0, "[HookDiag] Direct3DCreate9 (non-Ex) called after an Ex factory was already "
+		       "wrapped; passing it through unwrapped\n");
+		IDirect3D9* result = orig_Direct3DCreate9(sdkVers);
+		LOG(0, "[HookDiag] Direct3DCreate9 returned 0x%p\n", result);
+		return result;
+	}
+
+	LOG(0, "[HookDiag] Direct3DCreate9 (non-Ex) called by the game itself (caller=0x%p) - "
+	       "promoting to the Ex path so the overlay still attaches\n", caller);
+
+	// Same chain selection as the Ex hook: prefer the Detours trampoline, which
+	// stays valid even if our export detour is later evicted. Neither value is
+	// our own hook, so this cannot re-enter and double-wrap.
+	Direct3DCreate9Ex_t chain = orig_Direct3DCreate9Ex
+		? orig_Direct3DCreate9Ex
+		: g_iatDisplacedDirect3DCreate9Ex;
+
+	if (chain)
+	{
+		IDirect3D9Ex* d3d9Ex = nullptr;
+		const HRESULT hr = chain(sdkVers, &d3d9Ex);
+		if (SUCCEEDED(hr) && d3d9Ex)
+		{
+			// The constructor swaps d3d9Ex to point at itself, exactly as on
+			// the Ex path. Returning it as IDirect3D9* is a plain upcast:
+			// Direct3D9ExWrapper derives from IDirect3D9Ex, which derives from
+			// IDirect3D9.
+			new Direct3D9ExWrapper(&d3d9Ex);
+			InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
+			LOG(0, "[HookDiag] Direct3DCreate9 promoted to Direct3DCreate9Ex; returning wrapper 0x%p\n",
+				d3d9Ex);
+			return d3d9Ex;
+		}
+
+		LOG(0, "[HookDiag] Direct3DCreate9 promotion failed (hr=0x%08X); falling back to the "
+		       "legacy object - the overlay will NOT appear this launch\n", hr);
+	}
+	else
+	{
+		LOG(0, "[HookDiag] Direct3DCreate9 cannot promote: no Direct3DCreate9Ex chain available - "
+		       "the overlay will NOT appear this launch\n");
+	}
+
 	IDirect3D9* result = orig_Direct3DCreate9(sdkVers);
 	LOG(0, "[HookDiag] Direct3DCreate9 returned 0x%p\n", result);
 	return result;
