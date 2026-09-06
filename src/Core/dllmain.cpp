@@ -201,6 +201,23 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 		Settings::settingsIni.urtReTraceMaxFileMB,
 		Settings::settingsIni.urtReTraceMaxBackups);
 
+	// The D3D9 factory hooks go in before the BGM work below, not after it.
+	//
+	// Both race the game's startup, but against deadlines half a second apart. The game
+	// builds its D3D device within roughly 500 ms of here; it does not touch audio for
+	// another five seconds. Reading and verifying saved BGM replacements off a cold disk
+	// took 506 ms on the launch that had no overlay at all, which pushed the Ex detour to
+	// 530 ms and let the game create its device unhooked - the NVIDIA D3D user-mode driver
+	// was already loaded before we hooked anything. The warm relaunch spent 2 ms there and
+	// was fine.
+	//
+	// So the tight deadline is served first. This costs the BGM step a few milliseconds
+	// against a five-second margin, and it does not move that step later relative to the
+	// game's audio init, which is the thing that must not regress. Cheap and idempotent;
+	// placeHooks_detours calls it again where these hooks always used to be installed.
+	placeD3D9FactoryHooks_detours();
+	ForceLog("[Init] D3D9 factory hooks placed before BGM work.\n");
+
 	// Saved BGM replacements must be in the filename table BEFORE the game's boot audio
 	// init, not when the overlay comes up at the title screen.
 	//

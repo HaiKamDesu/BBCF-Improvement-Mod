@@ -1533,6 +1533,108 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 	return hWnd;
 }
 
+// The two D3D9 factory exports, and nothing else, installed as early as the init
+// thread can manage.
+//
+// The game calls Direct3DCreate9Ex exactly once, very early, and if our detour is
+// not in place by then we never see the call: no factory wrapper, no device
+// wrapper, no overlay, and a mod that looks like it did not load at all.
+//
+// Measured on a cold boot on 2026-09-06, against the warm relaunch that followed:
+//
+//                       BGM init step      Ex detour installed   modules seen
+//   cold (no overlay)   506 ms             530 ms after start    90
+//   warm (fine)           2 ms              28 ms after start    56
+//
+// The cold run already had nvd3dum/nvldumd/nvgpucomp32/nvppe loaded before we
+// hooked anything - the NVIDIA D3D user-mode driver, which loads only once a
+// device exists. The game had already built its device while we were still
+// reading .pac files. The warm run had none of them, and its Ex call arrived
+// 207 ms after our detour landed.
+//
+// The 506 ms is BgmReplacementManager::Initialize reading and verifying every
+// saved replacement from a cold disk. That work has to stay ahead of the game's
+// boot audio init or Character Select's track can never be replaced (dllmain.cpp,
+// commit f98a2a4) - so it is not moved later. It does not have to run *first*,
+// though, and the two deadlines are nowhere near each other: the same cold log
+// has nvd3dum loaded at 17.040 and XACTENGINE/XAUDIO2 only at 22.555, so D3D is
+// due within about half a second while audio is over five seconds out. Hooking
+// here costs the BGM step a few milliseconds against that five-second margin.
+//
+// Kept deliberately cheap for the same reason: no module enumeration, no version
+// queries. InstallDetour's own prologue before/after logging is the evidence that
+// matters, and LogD3DDiagnostics still runs later in placeHooks_detours - it now
+// reports our hook as the owner rather than the pre-hook state, which is expected.
+//
+// Idempotent, and safe to fail: if d3d9.dll is not loaded yet there is nothing to
+// hook and no device to miss, and placeHooks_detours calls this again at the point
+// it always used to install them.
+bool placeD3D9FactoryHooks_detours()
+{
+	static bool s_placed = false;
+	if (s_placed)
+	{
+		return true;
+	}
+
+	HMODULE hM_d3d9 = GetModuleHandleA("d3d9.dll");
+	if (!hM_d3d9)
+	{
+		LOG(2, "[HookDiag] Early D3D9 factory hook skipped: d3d9.dll is not loaded yet\n");
+		return false;
+	}
+
+	PBYTE pDirect3DCreate9Ex = (PBYTE)GetProcAddress(hM_d3d9, "Direct3DCreate9Ex");
+	PBYTE pDirect3DCreate9 = (PBYTE)GetProcAddress(hM_d3d9, "Direct3DCreate9");
+	if (!pDirect3DCreate9Ex && !pDirect3DCreate9)
+	{
+		LOG(0, "[HookDiag] Early D3D9 factory hook skipped: neither factory export resolved\n");
+		return false;
+	}
+
+	s_placed = true;
+
+	HookOptionalDetour(pDirect3DCreate9Ex, "Direct3DCreate9Ex");
+	HookOptionalDetour(pDirect3DCreate9, "Direct3DCreate9");
+
+	// Sampled before our own detour lands, or the answer is always "us".
+	const bool foreignOwnerAtStartup = IsExportForeignOwned(pDirect3DCreate9Ex, hM_d3d9);
+	if (foreignOwnerAtStartup)
+	{
+		LOG(0, "[HookDiag] Direct3DCreate9Ex is already hooked by another module before we install\n");
+	}
+
+	orig_Direct3DCreate9Ex = (Direct3DCreate9Ex_t)InstallDetour(pDirect3DCreate9Ex, (LPBYTE)hook_Direct3DCreate9Ex, "Direct3DCreate9Ex");
+	orig_Direct3DCreate9 = (Direct3DCreate9_t)InstallDetour(pDirect3DCreate9, (LPBYTE)hook_Direct3DCreate9, "Direct3DCreate9");
+	ArmWatchdog(g_watchedD3DCreate9Ex, pDirect3DCreate9Ex, "Direct3DCreate9Ex", true);
+	ArmWatchdog(g_watchedD3DCreate9, pDirect3DCreate9, "Direct3DCreate9");
+
+	// Decide up front whether the export is contested. Waiting for the
+	// watchdog to observe an eviction is a race we can lose - on the reporting
+	// machine nvd3d9wrap re-hooked ~330ms after us, before the Steam callback
+	// pump had even started ticking - so if someone already owned the export
+	// when we got here, install the import-table fallback immediately rather
+	// than hoping to notice in time.
+	//
+	// enum: 0 = Off, 1 = Automatic, 2 = Always (settings.def D3D9IatFallbackHook)
+	const int iatMode = Settings::settingsIni.d3d9IatFallbackHook;
+	if (iatMode == 2)
+	{
+		InstallD3DIatHook("setting = Always");
+	}
+	else if (iatMode == 1 && foreignOwnerAtStartup)
+	{
+		InstallD3DIatHook("export already owned by a foreign module at startup");
+	}
+	else
+	{
+		LOG(2, "[HookDiag][IAT] Fallback not needed at startup (mode=%d, foreignOwner=%d)\n",
+			iatMode, foreignOwnerAtStartup ? 1 : 0);
+	}
+
+	return true;
+}
+
 bool placeHooks_detours()
 {
 	LOG(1, "placeHooks_detours\n");
@@ -1598,40 +1700,11 @@ bool placeHooks_detours()
 		(PBYTE)&SetUnhandledExceptionFilter, (LPBYTE)hook_SetUnhandledExceptionFilter,
 		"SetUnhandledExceptionFilter");
 
-	// Sampled before our own detour lands, or the answer is always "us".
-	const bool foreignOwnerAtStartup = IsExportForeignOwned(pDirect3DCreate9Ex, hM_d3d9);
-	if (foreignOwnerAtStartup)
-	{
-		LOG(0, "[HookDiag] Direct3DCreate9Ex is already hooked by another module before we install\n");
-	}
+	// Normally already done from the init thread before the BGM step, in which case
+	// this is a no-op. Still called here so the hooks land even if d3d9.dll had not
+	// been loaded yet at that point - this is where they always used to be installed.
+	placeD3D9FactoryHooks_detours();
 
-	orig_Direct3DCreate9Ex = (Direct3DCreate9Ex_t)InstallDetour(pDirect3DCreate9Ex, (LPBYTE)hook_Direct3DCreate9Ex, "Direct3DCreate9Ex");
-	orig_Direct3DCreate9 = (Direct3DCreate9_t)InstallDetour(pDirect3DCreate9, (LPBYTE)hook_Direct3DCreate9, "Direct3DCreate9");
-	ArmWatchdog(g_watchedD3DCreate9Ex, pDirect3DCreate9Ex, "Direct3DCreate9Ex", true);
-	ArmWatchdog(g_watchedD3DCreate9, pDirect3DCreate9, "Direct3DCreate9");
-
-	// Decide up front whether the export is contested. Waiting for the
-	// watchdog to observe an eviction is a race we can lose - on the reporting
-	// machine nvd3d9wrap re-hooked ~330ms after us, before the Steam callback
-	// pump had even started ticking - so if someone already owned the export
-	// when we got here, install the import-table fallback immediately rather
-	// than hoping to notice in time.
-	//
-	// enum: 0 = Off, 1 = Automatic, 2 = Always (settings.def D3D9IatFallbackHook)
-	const int iatMode = Settings::settingsIni.d3d9IatFallbackHook;
-	if (iatMode == 2)
-	{
-		InstallD3DIatHook("setting = Always");
-	}
-	else if (iatMode == 1 && foreignOwnerAtStartup)
-	{
-		InstallD3DIatHook("export already owned by a foreign module at startup");
-	}
-	else
-	{
-		LOG(2, "[HookDiag][IAT] Fallback not needed at startup (mode=%d, foreignOwner=%d)\n",
-			iatMode, foreignOwnerAtStartup ? 1 : 0);
-	}
 	orig_D3DXCreateEffect = (D3DXCreateEffect_t)InstallDetour(pD3DXCreateEffect, (LPBYTE)hook_D3DXCreateEffect, "D3DXCreateEffect");
 	orig_D3DXCreateSprite = (D3DXCreateSprite_t)InstallDetour(pD3DXCreateSprite, (LPBYTE)hook_D3DXCreateSprite, "D3DXCreateSprite");
 	orig_SteamAPI_Init = (SteamAPI_Init_t)InstallDetour(pSteamAPI_Init, (LPBYTE)hook_SteamAPI_Init, "SteamAPI_Init");
