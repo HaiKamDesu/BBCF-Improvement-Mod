@@ -837,6 +837,78 @@ namespace
 		CheckWatchdog(g_watchedD3DCreate9);
 	}
 
+	// Captures the failure that has so far left no evidence at all.
+	//
+	// On some cold boots the game comes up with no overlay: our detour is still in
+	// place, nothing crashes, and Direct3DCreate9Ex is simply never called. Nothing
+	// in the log distinguishes that from a launch that had not reached device
+	// creation yet, so every diagnosis of it has been inference from absence - and
+	// two of those have already turned out to be wrong.
+	//
+	// It also finally ticks the eviction watchdogs. They are armed at startup and
+	// were never once checked: CheckD3DWatchdogs had no caller anywhere in the
+	// codebase, so "another module overwrote our detour" could not be detected even
+	// though the code to detect it existed.
+	//
+	// Started when the game window appears. Read-only with respect to game state,
+	// bounded, and reports at most once.
+	DWORD WINAPI D3DDeviceWatchdogThread(LPVOID)
+	{
+		static const DWORD kTickMs = 500;
+		static const ULONGLONG kDeadlineMs = 20000;   // generous: a cold boot took 31s to init
+		static const ULONGLONG kGiveUpMs = 120000;
+
+		const ULONGLONG start = GetTickCount64();
+		bool reported = false;
+
+		for (;;)
+		{
+			Sleep(kTickMs);
+
+			const ULONGLONG elapsed = GetTickCount64() - start;
+			CheckD3DWatchdogs();
+
+			if (g_interfaces.pD3D9ExWrapper != nullptr)
+			{
+				if (reported)
+				{
+					LOG(0, "[HookDiag][NoDevice] Device wrapper finally appeared after %llu ms - "
+					       "the game was slow, not bypassing us.\n", elapsed);
+				}
+				return 0;
+			}
+
+			if (!reported && elapsed >= kDeadlineMs)
+			{
+				reported = true;
+				LOG(0, "[HookDiag][NoDevice] %llu ms after the game window was created there is "
+				       "still no D3D device wrapper. The game has not called Direct3DCreate9Ex "
+				       "through us. Dumping everything that could explain why.\n", elapsed);
+
+				LogLoadedModules("noDeviceWatchdog");
+				LogD3DDiagnostics("noDeviceWatchdog");
+
+				if (g_iatSlotDirect3DCreate9Ex != nullptr)
+				{
+					LOG(0, "[HookDiag][NoDevice] IAT slot at 0x%p currently -> 0x%p\n",
+						g_iatSlotDirect3DCreate9Ex, *g_iatSlotDirect3DCreate9Ex);
+				}
+				else
+				{
+					LOG(0, "[HookDiag][NoDevice] No IAT slot was ever located for "
+					       "Direct3DCreate9Ex (fallback hook not installed).\n");
+				}
+			}
+
+			if (elapsed >= kGiveUpMs)
+			{
+				LOG(0, "[HookDiag][NoDevice] Giving up after %llu ms; no device ever arrived.\n",
+					elapsed);
+				return 0;
+			}
+		}
+	}
+
 	// Installs a detour and reports the outcome honestly: the trampoline
 	// pointer plus a before/after prologue comparison. If the prologue is
 	// unchanged after the call, the hook is not live no matter what
@@ -1527,6 +1599,14 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 			// overwritten by something that hooked after us.
 			LogLoadedModules("gameWindow");
 			LogD3DDiagnostics("gameWindow");
+
+			// From here the game is expected to create its device within a
+			// couple of seconds. If it never does, this is what says so.
+			const HANDLE watchdog = CreateThread(nullptr, 0, D3DDeviceWatchdogThread, nullptr, 0, nullptr);
+			if (watchdog != nullptr)
+			{
+				CloseHandle(watchdog);
+			}
 		}
 	}
 	counter++;

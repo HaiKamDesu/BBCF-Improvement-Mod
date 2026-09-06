@@ -17,6 +17,7 @@
 settingsIni_t Settings::settingsIni = {};
 savedSettings_t Settings::savedSettings = {};
 bool Settings::debugLoggingSettingMissing = false;
+bool Settings::settingsFileLoaded = false;
 
 namespace
 {
@@ -296,6 +297,7 @@ bool Settings::loadSettingsFile()
                 LOG(1, "Settings::loadSettingsFile - SwapControllerPos forced off due to a known startup crash issue.\n");
         }
         settingsIni.swapControllerPos = false;
+	settingsFileLoaded = true;
 	ForceLog("[Init][Settings] loadSettingsFile success\n");
 
         return true;

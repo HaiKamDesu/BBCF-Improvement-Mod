@@ -16,6 +16,8 @@
 
 #include <ShlObj.h>
 
+#include "utils.h" // GamePathW: log paths are absolute, never CWD-relative
+
 namespace
 {
         FILE* g_oFile = nullptr;
@@ -131,14 +133,46 @@ namespace
                 }
         }
 
+        // Every log path is absolute, and has to be.
+        //
+        // These were all relative to the working directory, which is the game folder
+        // only when the game happens to be launched that way. Settings has always
+        // resolved absolutely through GamePathW - see the comment on changeSetting -
+        // so a launch with a different CWD would load settings correctly and then
+        // write DEBUG.txt somewhere else entirely, or nowhere at all. That asymmetry
+        // is how a failing cold boot on 2026-09-06 left no log to diagnose it with:
+        // the mod's own record of what went wrong is the first thing lost, and it is
+        // lost exactly when something unusual is happening.
+        //
+        // Resolved once into function-local statics: GetGameDirectoryW caches too,
+        // and these are called from the logging path, including during crash
+        // handling, where allocating on every call is not wanted.
+        const wchar_t* LogDirPathW()
+        {
+                static const std::wstring path = GamePathW(L"BBCF_IM");
+                return path.c_str();
+        }
+
+        const wchar_t* DebugLogPathW()
+        {
+                static const std::wstring path = GamePathW(L"BBCF_IM\\DEBUG.txt");
+                return path.c_str();
+        }
+
+        const wchar_t* HistoryDirPathW()
+        {
+                static const std::wstring path = GamePathW(L"BBCF_IM\\DebugHistory");
+                return path.c_str();
+        }
+
         void EnsureLogDirectory()
         {
-                SHCreateDirectoryExW(nullptr, L"BBCF_IM", nullptr);
+                SHCreateDirectoryExW(nullptr, LogDirPathW(), nullptr);
         }
 
         std::wstring GetReTraceBasePath()
         {
-                return L"BBCF_IM\\URT_RE_TRACE.log";
+                return GamePathW(L"BBCF_IM\\URT_RE_TRACE.log");
         }
 
         std::wstring GetReTraceBackupPath(int index)
@@ -379,33 +413,42 @@ void ForceLog(const char* message, ...)
 // restoring the old overwrite-every-launch behavior).
 static void RotatePreviousSessionLog()
 {
-    const int keep = Settings::settingsIni.debugLogSessionHistory;
+    // settingsIni is zero-initialised until loadSettingsFile runs, and the log is now
+    // opened before that so the early-startup window is captured. Reading a raw 0 here
+    // would mean "history disabled" and let CREATE_ALWAYS truncate the previous
+    // session's log - destroying exactly the evidence this path exists to preserve.
+    // So before settings are known, use the value settings.def ships as the default.
+    static const int kDefaultSessionHistory = 10; // keep in step with settings.def
+    const int keep = Settings::settingsFileLoaded
+        ? Settings::settingsIni.debugLogSessionHistory
+        : kDefaultSessionHistory;
     if (keep <= 0)
     {
         return;
     }
 
     WIN32_FILE_ATTRIBUTE_DATA attr = {};
-    if (!GetFileAttributesExW(L"BBCF_IM\\DEBUG.txt", GetFileExInfoStandard, &attr))
+    if (!GetFileAttributesExW(DebugLogPathW(), GetFileExInfoStandard, &attr))
     {
         return; // no previous log
     }
 
-    CreateDirectoryW(L"BBCF_IM\\DebugHistory", nullptr);
+    CreateDirectoryW(HistoryDirPathW(), nullptr);
 
     SYSTEMTIME stUtc = {};
     SYSTEMTIME st = {};
     FileTimeToSystemTime(&attr.ftLastWriteTime, &stUtc);
     SystemTimeToTzSpecificLocalTime(nullptr, &stUtc, &st);
     wchar_t dest[MAX_PATH];
-    swprintf_s(dest, L"BBCF_IM\\DebugHistory\\DEBUG_%04u%02u%02u_%02u%02u%02u.txt",
-        st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-    MoveFileExW(L"BBCF_IM\\DEBUG.txt", dest, MOVEFILE_REPLACE_EXISTING);
+    swprintf_s(dest, L"%s\\DEBUG_%04u%02u%02u_%02u%02u%02u.txt",
+        HistoryDirPathW(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    MoveFileExW(DebugLogPathW(), dest, MOVEFILE_REPLACE_EXISTING);
 
     // Prune oldest entries; the timestamped names sort chronologically.
     std::vector<std::wstring> entries;
     WIN32_FIND_DATAW findData = {};
-    const HANDLE hFind = FindFirstFileW(L"BBCF_IM\\DebugHistory\\DEBUG_*.txt", &findData);
+    const std::wstring findPattern = std::wstring(HistoryDirPathW()) + L"\\DEBUG_*.txt";
+    const HANDLE hFind = FindFirstFileW(findPattern.c_str(), &findData);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
@@ -420,7 +463,7 @@ static void RotatePreviousSessionLog()
     {
         for (size_t i = 0; i < entries.size() - keepCount; ++i)
         {
-            std::wstring victim = L"BBCF_IM\\DebugHistory\\" + entries[i];
+            std::wstring victim = std::wstring(HistoryDirPathW()) + L"\\" + entries[i];
             DeleteFileW(victim.c_str());
         }
     }
@@ -439,7 +482,7 @@ void openLogger()
 
     // Use WinAPI to create/overwrite the file safely.
     HANDLE hFile = CreateFileW(
-        L"BBCF_IM\\DEBUG.txt",
+        DebugLogPathW(),
         GENERIC_WRITE,
         FILE_SHARE_READ,                 // allow reading while writing
         nullptr,
@@ -608,6 +651,42 @@ void SetLoggingEnabled(bool enabled)
         else
         {
                 closeLogger();
+        }
+}
+
+// The log is opened before settings are read, so an install with
+// GenerateDebugLogs=0 would otherwise be left holding a stub DEBUG.txt from the
+// early-startup window. Called once the setting is known and says no.
+void DeleteDebugLogFile()
+{
+        closeLogger();
+        DeleteFileW(DebugLogPathW());
+}
+
+// Answers "how was this process actually started", which nothing recorded before.
+//
+// The working directory matters because it used to decide where the log went, and
+// the command line says whether the game was launched by Steam, a shortcut, or
+// something else entirely - a question that came up when two failed launches
+// produced no log and a third-party overlay was crashing alongside them.
+void LogStartupEnvironment()
+{
+        wchar_t cwd[MAX_PATH * 2] = {};
+        const DWORD cwdLen = GetCurrentDirectoryW(ARRAYSIZE(cwd), cwd);
+
+        ForceLog("[Init][Env] gameDir='%ls'\n", GetGameDirectoryW().c_str());
+        ForceLog("[Init][Env] cwd='%ls'%s\n",
+                 cwdLen ? cwd : L"<unavailable>",
+                 (cwdLen && GetGameDirectoryW() == cwd) ? "" : "  <-- DIFFERS FROM GAME DIR");
+        ForceLog("[Init][Env] logPath='%ls'\n", DebugLogPathW());
+
+        const wchar_t* const cmdLine = GetCommandLineW();
+        ForceLog("[Init][Env] commandLine='%ls'\n", cmdLine ? cmdLine : L"<unavailable>");
+
+        wchar_t exePath[MAX_PATH * 2] = {};
+        if (GetModuleFileNameW(nullptr, exePath, ARRAYSIZE(exePath)))
+        {
+                ForceLog("[Init][Env] exe='%ls'\n", exePath);
         }
 }
 

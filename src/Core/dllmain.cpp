@@ -134,7 +134,28 @@ bool LoadOriginalDinputDll()
 
 DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 {
+	// Open the log FIRST, before settings decide whether it should exist.
+	//
+	// Everything from here to SetLoggingEnabled used to go to OutputDebugStringA,
+	// because ForceLog falls back to that while the file is closed - invisible
+	// without a debugger attached. So a launch that failed anywhere in this window
+	// left no trace at all, which is exactly what two failed cold boots on
+	// 2026-09-06 produced: no DEBUG.txt, nothing in WER, nothing to work from.
+	//
+	// That window is not small on a cold boot. It contains settings.ini being read
+	// off a cold disk and the Wine check, and it is the one stretch of startup
+	// whose duration has never once been measured, because measuring it required
+	// the log that was not open yet.
+	//
+	// If settings then turn logging off, SetLoggingEnabled closes it and the file
+	// is removed below, so an install with GenerateDebugLogs=0 still ends up with
+	// no DEBUG.txt. The one case where the file survives against that setting is a
+	// launch that dies before reaching the setting - which is precisely the case
+	// worth keeping evidence for.
+	openLogger();
+
 	ForceLog("[Init] BBCF_IM_Start thread entered");
+	LogStartupEnvironment();
 
 	try
 	{
@@ -185,7 +206,16 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 }
 
 	ForceLog("[Init] Configuring logging");
-	SetLoggingEnabled(Settings::settingsIni.generateDebugLogs);
+	if (Settings::settingsIni.generateDebugLogs)
+	{
+		SetLoggingEnabled(true);
+	}
+	else
+	{
+		// Already open from the top of this function, so closing is not enough:
+		// the early-startup lines are on disk and this install asked for no log.
+		DeleteDebugLogFile();
+	}
 	const bool urtReTraceEnabled = BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER &&
 		Settings::settingsIni.urtReTraceEnabled;
 	ConfigureReTraceLogging(

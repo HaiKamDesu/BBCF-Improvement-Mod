@@ -30,6 +30,12 @@ public:
         static savedSettings_t savedSettings;
         static bool debugLoggingSettingMissing;
 
+        // False until loadSettingsFile has populated settingsIni. The struct is
+        // zero-initialised before that, so a zero read from it means "not known yet",
+        // not "the user chose zero" - a distinction the logger has to make because it
+        // now opens before settings are read.
+        static bool settingsFileLoaded;
+
         static void applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters);
         static void applyRuntimeSettings();
         static bool loadSettingsFile();

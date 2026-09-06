@@ -48,6 +48,15 @@ void ForceLogRaw(const char* line);
 void openLogger();
 void closeLogger();
 void SetLoggingEnabled(bool enabled);
+
+// Removes DEBUG.txt after the fact. The log is opened before settings are read so
+// the early-startup window is captured; this is how an install with
+// GenerateDebugLogs=0 still ends up with no log file.
+void DeleteDebugLogFile();
+
+// One-shot record of how the process was started: game dir, working directory,
+// resolved log path, command line, exe path.
+void LogStartupEnvironment();
 bool IsLoggingEnabled();
 void relog_with_level(int level, const char* message, ...);
 void ConfigureReTraceLogging(bool enabled, int level, int maxFileMb, int maxBackups);
