@@ -8,6 +8,11 @@
 #include "Core/utils.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 #include "Game/SnapshotApparatus/SnapshotApparatus.h"
+// Drawn every frame by WindowManager, not from a section body: a state loaded by hotkey
+// with the mod menu closed still has to show its setup-time countdown, and the bodies only
+// run while the menu is sitting on the page that owns them.
+void DrawSaveStateSetupDelayStandalone();
+
 class ScrWindow : public IWindow
 {
 public:
@@ -30,6 +35,23 @@ public:
 	// happens in RunPendingSaveStateRequests.
 	void TickSaveStateHotkeys();
 
+	// The dummy's own per-frame work: the registered gap/wakeup/tech/on-hit actions, burst
+	// on hit, and the Naoto EN toggle. All of this used to sit at the bottom of
+	// DrawDummyActionsBody, so the dummy simply stopped doing anything the moment the mod
+	// menu was closed or moved off the Training page.
+	void TickDummyActions();
+
+	// Whether anything the dummy does on its own is actually switched on. Used to decide
+	// whether a character swap is worth re-parsing the script for outside the menu.
+	bool DummyFeaturesInUse() const;
+
+	// Drops everything parsed for the previous dummy and, if allowed, re-parses for the
+	// current one. The registers hold scrState* whose addr points into a specific
+	// character's script, so handing one to the game after a swap is a jump into the wrong
+	// script - they have to be dropped the moment the character changes, menu or no menu.
+	// Returns whether the parsed state list is usable afterwards.
+	bool EnsureDummyScriptFresh(bool allowReparse);
+
 	// Runs the latched request, called after the overlay's windows have been drawn.
 	//
 	// Deliberately not done straight from HandleButtons. That runs before ImGui::NewFrame,
@@ -39,6 +61,9 @@ public:
 	// it is not something to invoke from a new phase on a hunch. This keeps the hotkey
 	// reading a fresh press edge while doing the work where the buttons always did it.
 	void RunPendingSaveStateRequests();
+
+	// Remaining/total of the post-load "setup time" pause, for the standalone indicator.
+	bool GetSetupDelayCountdown(float* remaining, float* total) const;
 
 	// Section bodies drawn by the mod menu's Training, Replays and Online pages. Each of
 	// these renders the CONTENT only - the page owns the header and the layout around it.
@@ -83,8 +108,10 @@ private:
 	std::vector<int> onhit_register_delays{};
 	std::vector<scrState*> throwtech_register{};
 	std::vector<int> throwtech_register_delays{};
-	scrState* burst_action;
-	scrState* air_burst_action;
+	// Uninitialised until a script parse finds them, and null for a character whose script
+	// has no burst state, so both the burst logic and every user must null-check.
+	scrState* burst_action = nullptr;
+	scrState* air_burst_action = nullptr;
 
 
 
@@ -126,6 +153,20 @@ private:
 	std::string prev_action;
 
 
+	// Dummy action UI state. These were draw-body statics, which is why the per-frame work
+	// below could not be moved out of the draw pass without them.
+	int dummy_selected_state = 0;
+	bool dummy_action_delays_toggle = false;
+	int dummy_wakeup_delay = 0;
+	int dummy_gap_delay = 0;
+	int dummy_onhit_delay = 0;
+	int dummy_throwtech_delay = 0;
+	bool dummy_burst_onhit_toggle = false;
+	int dummy_burst_onhit_delay = 0;
+	int dummy_burst_onhit_cooldown_frames = 700;
+	bool dummy_naoto_en_specials = false;
+	bool dummy_naoto_en_specials_old = false;
+
 	int32_t wakeup_type = 0;
 	int wakeup_delay_skew = 0;
 	bool wakeup_delay_skew_change_flag = false;
@@ -159,6 +200,7 @@ private:
 	float wait_before_exec_s = 0;
 	float wait_before_exec_s2 = 0;
 	unsigned long long setup_delay_last_tick = 0;
+	float setup_delay_total = 0;
 
 	std::chrono::steady_clock::time_point start_time;
 	float base_time = 0;

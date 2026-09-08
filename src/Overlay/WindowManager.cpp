@@ -804,6 +804,7 @@ void WindowManager::Render()
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
 	DrawUnlimitedPlaybackLoopSetupIndicatorStandalone();
+	DrawSaveStateSetupDelayStandalone();
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
 	DrawUnlimitedReplayTakeoverSetupDelayIndicatorStandalone();
 #endif

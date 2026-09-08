@@ -262,6 +262,7 @@ void ScrWindow::Tick() {
     // every frame. The countdown does belong here: it clears isFrameFrozen, so it has to
     // keep advancing exactly in those cases.
     self->TickSetupDelay();
+    self->TickDummyActions();
 
     TickLocalReplayRedirect();
 }
@@ -304,6 +305,7 @@ void ScrWindow::BeginSetupDelay(float seconds)
     g_gameVals.isFrameFrozen = true;
     is_setup_time_running = true;
     base_time = seconds;
+    setup_delay_total = seconds;
     setup_delay_last_tick = GetTickCount64();
 }
 
@@ -326,6 +328,48 @@ void ScrWindow::TickSetupDelay()
         g_gameVals.isFrameFrozen = false;
         is_setup_time_running = false;
     }
+}
+
+bool ScrWindow::GetSetupDelayCountdown(float* remaining, float* total) const
+{
+    if (!is_setup_time_running || setup_delay_total <= 0) {
+        return false;
+    }
+    if (remaining) { *remaining = base_time; }
+    if (total) { *total = setup_delay_total; }
+    return true;
+}
+
+void DrawSaveStateSetupDelayStandalone()
+{
+    WindowContainer* container = WindowManager::GetInstance().GetWindowContainer();
+    if (!container) {
+        return;
+    }
+    ScrWindow* scr = container->GetWindow<ScrWindow>(WindowType_Scr);
+    if (!scr) {
+        return;
+    }
+
+    float remaining = 0.0f;
+    float total = 0.0f;
+    if (!scr->GetSetupDelayCountdown(&remaining, &total)) {
+        return;
+    }
+
+    // Not a modal. A focused ImGui window sets WantCaptureKeyboard, which freezes the game's
+    // keyboard state, and the whole point of this pause is to get your hands into position.
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.3f),
+        ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    if (ImGui::Begin("##savestate_setup_delay", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::ProgressBar(remaining / total, ImVec2(360.0f, 0.0f));
+        ImGui::Text("%s", FormatText(L("Setup time: %.1fs").c_str(), remaining).c_str());
+    }
+    ImGui::End();
 }
 
 void ScrWindow::SaveTrainingState()
@@ -557,6 +601,295 @@ void ScrWindow::DrawPositionsBody()
     ImGui::ShowHelpMarkerSameLine(L("Always swap coordinates help").c_str());
 }
 
+bool ScrWindow::DummyFeaturesInUse() const
+{
+    return !gap_register.empty() || !wakeup_register.empty()
+        || !onhit_register.empty() || !throwtech_register.empty()
+        || dummy_burst_onhit_toggle;
+}
+
+bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
+{
+    if (p2_old_char_data == (void*)g_interfaces.player2.GetData()) {
+        return true;
+    }
+
+    // The dummy changed (or this is the first look). Everything parsed for the previous one
+    // points into that character's script memory, so drop it all before anything can hand a
+    // stale address to the game.
+    gap_register = {};
+    gap_register_delays = {};
+    wakeup_register = {};
+    wakeup_register_delays = {};
+    onhit_register = {};
+    onhit_register_delays = {};
+    throwtech_register = {};
+    throwtech_register_delays = {};
+    burst_action = nullptr;
+    air_burst_action = nullptr;
+    frame_to_burst_onhit = 0;
+    states_wakeup_frame_to_do_action = 0;
+    states_wakeup_random_pos = 0;
+    states_gap_frame_to_do_action = 0;
+    states_gap_random_pos = 0;
+    states_throwtech_frame_to_do_action = 0;
+    states_throwtech_random_pos = 0;
+    dummy_selected_state = 0;
+
+    if (!allowReparse) {
+        // Left stale deliberately: p2_old_char_data is not updated, so the next caller that
+        // is allowed to parse still sees the change and does the work.
+        return false;
+    }
+
+    std::vector<scrState*> states = parse_scr(GetBbcfBaseAdress(), 2);
+    g_interfaces.player2.SetScrStates(states);
+    g_interfaces.player2.states = states;
+    p2_old_char_data = (void*)g_interfaces.player2.GetData();
+    for (auto& state : states) {
+        if (state->name == "CmnActBurstBegin") {
+            burst_action = state;
+        }
+        if (state->name == "CmnActAirBurstBegin") {
+            air_burst_action = state;
+        }
+    }
+    return true;
+}
+
+// Everything the dummy does on its own each frame. This used to live at the bottom of
+// DrawDummyActionsBody, which means it only ran while the mod menu was open on the
+// Training page - so a registered wakeup or gap action, burst-on-hit and the Naoto EN
+// toggle all silently stopped the moment you closed the menu to actually play.
+void ScrWindow::TickDummyActions()
+{
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        return;
+    }
+    if (g_interfaces.player2.IsCharDataNullPtr() || g_interfaces.player1.IsCharDataNullPtr()) {
+        return;
+    }
+    if (!g_gameVals.pFrameCount) {
+        return;
+    }
+
+    // Cheap when nothing changed. On a swap this drops the stale registers unconditionally,
+    // and only re-parses when the dummy is actually set up to do something - the parse is
+    // the expensive part, and nobody who never opened the menu should pay for it.
+    EnsureDummyScriptFresh(DummyFeaturesInUse());
+
+    // Naoto's EN specials need the flag held down, not toggled, so it is rewritten every
+    // frame while on and cleared once on the way off.
+    if (dummy_naoto_en_specials) {
+        memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
+    }
+    else if (dummy_naoto_en_specials != dummy_naoto_en_specials_old) {
+        memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0, 4);
+    }
+    dummy_naoto_en_specials_old = dummy_naoto_en_specials;
+
+        if (dummy_burst_onhit_toggle) {
+            onhit_register = {};
+            std::string lastAction = g_interfaces.player2.GetData()->lastAction;
+            std::string weird_current_action_q = g_interfaces.player2.GetData()->current_action2;
+            std::string set_action_override_hitstop_q = g_interfaces.player2.GetData()->set_action_override;
+            std::string currentAction = g_interfaces.player2.GetData()->currentAction;
+            std::string hitByWhichAction = g_interfaces.player2.GetData()->hitByWhichAction;
+
+            if (*g_gameVals.pFrameCount <20 || (frame_to_burst_onhit && frame_to_burst_onhit+ dummy_burst_onhit_cooldown_frames < *g_gameVals.pFrameCount)) {
+                frame_to_burst_onhit = 0;
+            }
+            if (!frame_to_burst_onhit) {
+                if (//(set_action_override_hitstop_q.find("CmnActHit") !=  std::string::npos || set_action_override_hitstop_q.find("CmnActFreeze") != std::string::npos)
+                    //&& 
+                    //hitByWhichAction != ""
+                    g_interfaces.player2.GetData()->hitstun > 0
+                    //&&
+                    //lastAction.find("CmnActBurst") == std::string::npos
+                    &&
+                    currentAction.find("CmnActBurst") == std::string::npos
+                    &&
+                    currentAction.find("CmnActUkemi") == std::string::npos
+                    ) {
+                    frame_to_burst_onhit = *g_gameVals.pFrameCount + dummy_burst_onhit_delay;
+
+                }
+            }
+            if (*g_gameVals.pFrameCount == frame_to_burst_onhit
+                && burst_action != nullptr && air_burst_action != nullptr) {
+                if (g_interfaces.player2.GetData()->position_y > 0) {
+                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(air_burst_action->addr), 4);
+                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
+                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(air_burst_action->name[0]), 20);
+                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(air_burst_action->name[0]), 20);*/
+                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(air_burst_action->name[0]), 20);
+                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
+                    //*kding_p2Inputs2 = 0xCCF5;
+                    //memcpy(kding_p2Inputs2, &burst_act,4);
+                }
+                else {
+                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(burst_action->addr), 4);
+                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
+                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(burst_action->name[0]), 20);
+                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(burst_action->name[0]), 20);*/
+                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(burst_action->name[0]), 20);
+                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
+                    //*kding_p2Inputs2 = 0xCCF5;
+                    //memcpy(kding_p2Inputs2, &burst_act,4);
+                  
+                }
+            }
+        }
+
+        static const std::vector<std::tuple<std::string, int>> wakeup_length_pairs{
+            //{"CmnActUkemiLandN",30} ,
+           {"CmnActUkemiLandNLanding",1},
+            {"CmnActUkemiLandF",30 },
+            {"CmnActUkemiLandB",30 },
+            {"CmnActFDown2Stand", 14},
+            {"CmnActBDown2Stand", 14},
+            {"CmnActUkemiStagger",7} }; //this in theory should be an on hit trigger, but its an ukemi so i'll consider it wakeup due to how it works
+        //"CmnActFDown2Stand", 14 seems to be 20 so far
+        //"CmnActFDown2Stand", 14
+        if (!wakeup_register.empty()) {
+
+            for (std::tuple<std::string, int> wakeup_length_pair : wakeup_length_pairs) {
+                auto name = std::get<0>(wakeup_length_pair);
+                auto len = std::get<1>(wakeup_length_pair);
+                if (g_interfaces.player2.GetData()->currentAction == name
+                    &&
+                    g_interfaces.player2.GetData()->actionTime == len
+                    &&
+                    g_interfaces.player2.GetData()->lastAction != name
+                    ) {
+                    states_wakeup_random_pos = std::rand() % wakeup_register.size();
+                    states_wakeup_frame_to_do_action = *g_gameVals.pFrameCount + wakeup_register_delays[states_wakeup_random_pos];
+
+                    
+                }
+                //the hitstun check is necessary to make sure it doesnt trigger once the action is already stopped by a hit before it triggers, in the case of delayed ones
+                // this used to be a check on the histun, but since sometimes the hitstun isn't reset upon knockdown it wouldn't trigger the action in some situations when it should,
+                // so it'll filter out being interrupted by checking if the state itself the character is in is one of hitstun, It doesn't seem like it triggers a 1f delay as I was concerned,
+                // but could be wrong
+                if (states_wakeup_frame_to_do_action && std::string(g_interfaces.player2.GetData()->currentAction).find("CmnActHit") == std::string::npos){
+                    //old_way && (states_wakeup_frame_to_do_action)
+                   // ||
+               //     hitstun_0 && (states_wakeup_frame_to_do_action && g_interfaces.player2.GetData()->hitstun == 0)
+               //     || 
+             //       curr_action_not_ukemi && (states_wakeup_frame_to_do_action && std::string(g_interfaces.player2.GetData()->currentAction).find("CmnActHit") == std::string::npos)
+             //      {
+                 
+
+
+                     if (*g_gameVals.pFrameCount == states_wakeup_frame_to_do_action) {
+                        memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(wakeup_register[states_wakeup_random_pos]->addr), 4);
+                        g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 -1;
+                        //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(wakeup_register[states_wakeup_random_pos]->name[0]), 20);
+                        states_wakeup_frame_to_do_action = 0;
+                        states_wakeup_random_pos = 0;
+                        break;
+                    }
+                    else if (*g_gameVals.pFrameCount > states_wakeup_frame_to_do_action) {
+                        states_wakeup_frame_to_do_action = 0;
+                        states_wakeup_random_pos = 0;
+                        break;
+                    }
+
+                }
+            }
+        }
+
+        if (!throwtech_register.empty()) {
+            auto throwtech_action_trigger_find = std::string(g_interfaces.player2.GetData()->currentAction).find("LockReject");
+
+                
+                if (g_interfaces.player2.GetData()->timeAfterTechIsPerformed == 29 && throwtech_action_trigger_find != std::string::npos){
+                    states_throwtech_random_pos = std::rand() % throwtech_register.size();
+                    states_throwtech_frame_to_do_action = *g_gameVals.pFrameCount + throwtech_register_delays[states_throwtech_random_pos];
+
+
+                }
+               
+                if (*g_gameVals.pFrameCount == states_throwtech_frame_to_do_action) {
+                    memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(throwtech_register[states_throwtech_random_pos]->addr), 4);
+                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
+                    //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(wakeup_register[states_wakeup_random_pos]->name[0]), 20);
+                    states_throwtech_frame_to_do_action = 0;
+                    states_throwtech_random_pos = 0;
+                }
+                else if (*g_gameVals.pFrameCount > states_throwtech_frame_to_do_action && states_throwtech_frame_to_do_action != 0) {
+                    states_throwtech_frame_to_do_action = 0;
+                    states_throwtech_random_pos = 0;
+                };
+
+                }
+            
+        
+        if (!gap_register.empty()) {
+            // Note that you can't rely on "GuardEnd" to be there, it can be skipped if there
+            // is a mash frame 1
+
+            std::string curr_action = g_interfaces.player2.GetData()->currentAction;
+            std::string prev_action = g_interfaces.player2.GetData()->lastAction;
+            int prev_blockstun = g_interfaces.player2.GetData()->blockstun;
+
+            if (
+                // Doing it this way is necessary because otherwise you have a 1f delay, due to GuardEnd being skipped on frame 1 mash
+                // blockstun for now seems to be the most reliable metric
+                (g_interfaces.player2.GetData()->blockstun == 1
+                    &&
+                    curr_action.find("Guard") != std::string::npos
+
+                    )
+
+
+                ) {
+
+
+                states_gap_random_pos = std::rand() % gap_register.size();
+                states_gap_frame_to_do_action = *g_gameVals.pFrameCount + gap_register_delays[states_gap_random_pos];
+
+
+            }
+            //the hitstun check is necessary to make sure it doesnt trigger once the action is already stopped by a hit before it triggers, in the case of delayed ones
+            if (states_gap_frame_to_do_action && g_interfaces.player2.GetData()->hitstun == 0) {
+
+
+
+                if (*g_gameVals.pFrameCount == states_gap_frame_to_do_action) {
+                    memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(gap_register[states_gap_random_pos]->addr), 4);
+                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
+                    //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(gap_register[state_gap_random_pos]->name[0]), 20);
+                    states_gap_frame_to_do_action = 0;
+                    states_gap_random_pos = 0;
+
+                }
+                else if (*g_gameVals.pFrameCount > states_gap_frame_to_do_action) {
+                    states_gap_frame_to_do_action = 0;
+                    states_gap_random_pos = 0;
+                }
+
+            }
+        }
+
+        if (!onhit_register.empty()) {
+            int random_pos = std::rand() % onhit_register.size();
+            static std::vector<std::string>loops_bound{ "Loop" , "Bound", "CmnActBDownCrash", "CmnActBDownDown"};/*necessary to stop the on hit actions from activating in a ukemi situation, once ukemi
+                                                                                              comes into play it becomes a wakeup action.
+                                                                                              Only reason CmdActBDownCrash is being fully specified and not as a substring is because 
+                                                                                              a lot of moves prob have "Crash" in the name*/
+            std::string curr_action = g_interfaces.player2.GetData()->currentAction;
+            
+            if ((g_interfaces.player2.GetData()->hitstun == 1) & !find_substring_in_vector(loops_bound,curr_action)) {
+                memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(onhit_register[random_pos]->addr), 4);
+                memcpy(&(g_interfaces.player2.GetData()->currentAction), &(onhit_register[random_pos]->name[0]), 20);
+            }
+
+
+        }
+    
+}
+
 void ScrWindow::DrawDummyActionsBody()
 {
     if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
@@ -567,38 +900,16 @@ void ScrWindow::DrawDummyActionsBody()
         ImGui::TextWrapped("%s", L("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.").c_str());
         return;
     }
-    static int selected = 0;
-    //Code for auto loading script upon character switch, prob move it to OnMatchInit() or smth
-   if (p2_old_char_data == NULL || p2_old_char_data != (void*)g_interfaces.player2.GetData()){
-        char* bbcf_base_adress = GetBbcfBaseAdress();
-        std::vector<scrState*> states = parse_scr(bbcf_base_adress, 2);
-        g_interfaces.player2.SetScrStates(states);
-        g_interfaces.player2.states = states;
-        p2_old_char_data = (void*)g_interfaces.player2.GetData();
-        for (auto& state : states) {
-            if (state->name == "CmnActBurstBegin") {
-                burst_action = state;
-            }
-            if (state->name == "CmnActAirBurstBegin") {
-                air_burst_action = state;
-            }
-        }
-        frame_to_burst_onhit = 0;
-        gap_register = {};
-        wakeup_register = {};
-        onhit_register = {};
-        selected = 0;
-    }
+    // The list on screen needs the parse, so this one always allows it.
+    EnsureDummyScriptFresh(true);
 
 
     if (ImGui::Button("Force Load P2 Script")) {
-        char* bbcf_base_adress = GetBbcfBaseAdress();
-        std::vector<scrState*> states = parse_scr(bbcf_base_adress, 2);
-        g_interfaces.player2.SetScrStates(states);
-        g_interfaces.player2.states = states;
-        gap_register = {};
-        wakeup_register = {};
-        selected = 0;
+        // Through the same path as a character swap. Re-parsing on its own would leave the
+        // registers pointing into the vector this replaces, and it used to clear only two of
+        // the four.
+        p2_old_char_data = nullptr;
+        EnsureDummyScriptFresh(true);
     }
     ImGui::SameLine();
     ImGui::ShowHelpMarker(Messages.Force_load_p2_script_tooltip());
@@ -620,8 +931,8 @@ void ScrWindow::DrawDummyActionsBody()
                     // State names are not guaranteed unique, so scope the id by index rather
                     // than letting two identically named states collide.
                     ImGui::PushID(i);
-                    if (ImGui::Selectable(g_interfaces.player2.states[i]->name.c_str(), selected == i))
-                        selected = i;
+                    if (ImGui::Selectable(g_interfaces.player2.states[i]->name.c_str(), dummy_selected_state == i))
+                        dummy_selected_state = i;
                     ImGui::PopID();
                 }
             }
@@ -632,26 +943,14 @@ void ScrWindow::DrawDummyActionsBody()
     // Right
     {
         ImGui::BeginGroup();
-        static bool isActive_old;
-        static bool isActive = false;
-        if (ImGui::CheckboxWrapped("Naoto EN specials toggle", &isActive)) {
-            memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
-        }
+        // The write that backs this runs in TickDummyActions, every frame.
+        ImGui::CheckboxWrapped("Naoto EN specials toggle", &dummy_naoto_en_specials);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Naoto_EN_specials_tooltip());
-        if (isActive) {
-            memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
-        }
-        else {
-            if (isActive != isActive_old) {
-                memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0, 4);
-            }
-        }
-        isActive_old = isActive;
         //ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 100)); // Leave room for 1 line below us
         ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 150)); // Leave room for 1 line below us
         if (states.size() > 0) {
-            auto selected_state = states[selected];
+            auto selected_state = states[dummy_selected_state];
             ImGui::Text("%s", selected_state->name.c_str());
             ImGui::Separator();
             ImGui::Text("Addr: 0x%x", selected_state->addr);
@@ -804,112 +1103,55 @@ void ScrWindow::DrawDummyActionsBody()
 
 
         ImGui::Separator();
-        static bool burst_onhit_toggle = false;
-        static int burst_onhit_delay = 0;
-        static int burst_onhit_cooldown_frames = 700;
-        static bool action_delays_toggle = false;
-        static int wakeup_delay = 0;
-        static int gap_delay = 0;
-        static int onhit_delay = 0;
-        static int throwtech_delay = 0;
 
           
-        ImGui::CheckboxWrapped("Burst on hit", &burst_onhit_toggle);
+        ImGui::CheckboxWrapped("Burst on hit", &dummy_burst_onhit_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Burst_on_hit_tooltip());
-        if (burst_onhit_toggle) {
-            onhit_register = {};
-            std::string lastAction = g_interfaces.player2.GetData()->lastAction;
-            std::string weird_current_action_q = g_interfaces.player2.GetData()->current_action2;
-            std::string set_action_override_hitstop_q = g_interfaces.player2.GetData()->set_action_override;
-            std::string currentAction = g_interfaces.player2.GetData()->currentAction;
-            std::string hitByWhichAction = g_interfaces.player2.GetData()->hitByWhichAction;
-
-            if (*g_gameVals.pFrameCount <20 || (frame_to_burst_onhit && frame_to_burst_onhit+ burst_onhit_cooldown_frames < *g_gameVals.pFrameCount)) {
-                frame_to_burst_onhit = 0;
-            }
-            if (!frame_to_burst_onhit) {
-                if (//(set_action_override_hitstop_q.find("CmnActHit") !=  std::string::npos || set_action_override_hitstop_q.find("CmnActFreeze") != std::string::npos)
-                    //&& 
-                    //hitByWhichAction != ""
-                    g_interfaces.player2.GetData()->hitstun > 0
-                    //&&
-                    //lastAction.find("CmnActBurst") == std::string::npos
-                    &&
-                    currentAction.find("CmnActBurst") == std::string::npos
-                    &&
-                    currentAction.find("CmnActUkemi") == std::string::npos
-                    ) {
-                    frame_to_burst_onhit = *g_gameVals.pFrameCount + burst_onhit_delay;
-
-                }
-            }
-            if (*g_gameVals.pFrameCount == frame_to_burst_onhit) {
-                if (g_interfaces.player2.GetData()->position_y > 0) {
-                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(air_burst_action->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
-                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(air_burst_action->name[0]), 20);
-                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(air_burst_action->name[0]), 20);*/
-                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(air_burst_action->name[0]), 20);
-                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
-                    //*kding_p2Inputs2 = 0xCCF5;
-                    //memcpy(kding_p2Inputs2, &burst_act,4);
-                }
-                else {
-                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(burst_action->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
-                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(burst_action->name[0]), 20);
-                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(burst_action->name[0]), 20);*/
-                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(burst_action->name[0]), 20);
-                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
-                    //*kding_p2Inputs2 = 0xCCF5;
-                    //memcpy(kding_p2Inputs2, &burst_act,4);
-                  
-                }
-            }
+        if (dummy_burst_onhit_toggle) {
             ImGui::BeginChild("burst_buttons##states", ImVec2(0, 60));
             ImGui::Text("Burst delay(+hitstop): ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_burst_onhit_delay", &burst_onhit_delay);
+            ImGui::InputInt("##state_burst_onhit_delay", &dummy_burst_onhit_delay);
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Burst_onhit_delay_tooltip());
             ImGui::Text("Burst cooldown: ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_burst_onhit_cooldown_frames", &burst_onhit_cooldown_frames);
+            ImGui::InputInt("##state_burst_onhit_cooldown_frames", &dummy_burst_onhit_cooldown_frames);
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Burst_onhit_cooldown_tooltip());
             ImGui::EndChild();
         }
-        ImGui::CheckboxWrapped("Add delays to actions", &action_delays_toggle);
+        ImGui::CheckboxWrapped("Add delays to actions", &dummy_action_delays_toggle);
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Add_delays_to_actions_tooltip());
-        if (action_delays_toggle) {
+        if (dummy_action_delays_toggle) {
             ImGui::BeginChild("delay_actions##states", ImVec2(0, 60));
             ImGui::Text("Wakeup: ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_wakeup_delay", &wakeup_delay);
+            ImGui::InputInt("##state_wakeup_delay", &dummy_wakeup_delay);
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.State_wakeup_delay_tooltip());
             ImGui::Text("Gap: ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_gap_delay", &gap_delay);
+            ImGui::InputInt("##state_gap_delay", &dummy_gap_delay);
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.State_gap_delay_tooltip());
             ImGui::Text("Tech: ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_throwtech_delay", &throwtech_delay);
+            ImGui::InputInt("##state_throwtech_delay", &dummy_throwtech_delay);
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.State_throwtech_delay_tooltip());
             /*ImGui::Text("On Hit Delay: ");
             ImGui::SameLine();
-            ImGui::InputInt("##state_onhit_delay", &onhit_delay);*/
+            ImGui::InputInt("##state_onhit_delay", &dummy_onhit_delay);*/
             ImGui::EndChild();
         }
         else {
-            wakeup_delay = 0;
-            gap_delay = 0;
-            onhit_delay = 0;
-            throwtech_delay = 0;
+            dummy_wakeup_delay = 0;
+            dummy_gap_delay = 0;
+            dummy_onhit_delay = 0;
+            dummy_throwtech_delay = 0;
         }
 
 
@@ -920,8 +1162,8 @@ void ScrWindow::DrawDummyActionsBody()
             onhit_register = {};
             onhit_register_delays = {};
             states = g_interfaces.player2.states;
-            onhit_register.push_back(states[selected]);
-            onhit_register_delays.push_back(onhit_delay);
+            onhit_register.push_back(states[dummy_selected_state]);
+            onhit_register_delays.push_back(dummy_onhit_delay);
 
         }
         ImGui::SameLine();
@@ -932,8 +1174,8 @@ void ScrWindow::DrawDummyActionsBody()
             wakeup_register_delays = {};
             states_wakeup_random_pos = 0;
             states = g_interfaces.player2.states;
-            wakeup_register.push_back(states[selected]);
-            wakeup_register_delays.push_back(wakeup_delay);
+            wakeup_register.push_back(states[dummy_selected_state]);
+            wakeup_register_delays.push_back(dummy_wakeup_delay);
 
         }
         ImGui::SameLine();
@@ -944,9 +1186,9 @@ void ScrWindow::DrawDummyActionsBody()
             gap_register = {};
             gap_register_delays = {};
             states_gap_random_pos = 0;
-            gap_register.push_back(states[selected]);
-            gap_register_delays.push_back(gap_delay);
-            auto selected_state = states[selected];
+            gap_register.push_back(states[dummy_selected_state]);
+            gap_register_delays.push_back(dummy_gap_delay);
+            auto selected_state = states[dummy_selected_state];
 
         }
         ImGui::SameLine();
@@ -958,16 +1200,16 @@ void ScrWindow::DrawDummyActionsBody()
             throwtech_register = {};
             throwtech_register_delays = {};
             states_throwtech_random_pos = 0;
-            throwtech_register.push_back(states[selected]);
-            throwtech_register_delays.push_back(throwtech_delay);
-            auto selected_state = states[selected];
+            throwtech_register.push_back(states[dummy_selected_state]);
+            throwtech_register_delays.push_back(dummy_throwtech_delay);
+            auto selected_state = states[dummy_selected_state];
 
         }
         ImGui::SameLine();
         ImGui::ShowHelpMarker(Messages.Set_tech_action_tooltip());
         if (ImGui::Button("Use")) {
             states = g_interfaces.player2.states;
-            auto selected_state = states[selected];
+            auto selected_state = states[dummy_selected_state];
             //auto tst = g_interfaces.player2.GetData();
             memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(selected_state->addr), 4);
             g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
@@ -1000,8 +1242,8 @@ void ScrWindow::DrawDummyActionsBody()
             ImGui::Columns(2);
             if (ImGui::Button("Add to wakeup action")) {
                 states = g_interfaces.player2.states;
-                wakeup_register.push_back(states[selected]);
-                wakeup_register_delays.push_back(wakeup_delay);
+                wakeup_register.push_back(states[dummy_selected_state]);
+                wakeup_register_delays.push_back(dummy_wakeup_delay);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Add_wakeup_action_tooltip());
@@ -1013,8 +1255,8 @@ void ScrWindow::DrawDummyActionsBody()
             ImGui::NextColumn();
             if (ImGui::Button("Add to gap action")) {
                 states = g_interfaces.player2.states;
-                gap_register.push_back(states[selected]);
-                gap_register_delays.push_back(gap_delay);
+                gap_register.push_back(states[dummy_selected_state]);
+                gap_register_delays.push_back(dummy_gap_delay);
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Add_gap_action_tooltip());
@@ -1038,164 +1280,12 @@ void ScrWindow::DrawDummyActionsBody()
         //static bool hitstun_0_curr_action_not_ukemi = false;
         //ImGui::CheckboxWrapped("hitstun_0_curr_action_not_ukemi##testchoose", &hitstun_0_curr_action_not_ukemi);
 
-        static std::vector<std::tuple<std::string, int>> wakeup_length_pairs{
-            //{"CmnActUkemiLandN",30} ,
-           {"CmnActUkemiLandNLanding",1},
-            {"CmnActUkemiLandF",30 },
-            {"CmnActUkemiLandB",30 },
-            {"CmnActFDown2Stand", 14},
-            {"CmnActBDown2Stand", 14},
-            {"CmnActUkemiStagger",7} }; //this in theory should be an on hit trigger, but its an ukemi so i'll consider it wakeup due to how it works
-        //"CmnActFDown2Stand", 14 seems to be 20 so far
-        //"CmnActFDown2Stand", 14
-        if (!wakeup_register.empty()) {
-            states = g_interfaces.player2.states;
-
-            for (std::tuple<std::string, int> wakeup_length_pair : wakeup_length_pairs) {
-                auto name = std::get<0>(wakeup_length_pair);
-                auto len = std::get<1>(wakeup_length_pair);
-                if (g_interfaces.player2.GetData()->currentAction == name
-                    &&
-                    g_interfaces.player2.GetData()->actionTime == len
-                    &&
-                    g_interfaces.player2.GetData()->lastAction != name
-                    ) {
-                    states_wakeup_random_pos = std::rand() % wakeup_register.size();
-                    states_wakeup_frame_to_do_action = *g_gameVals.pFrameCount + wakeup_register_delays[states_wakeup_random_pos];
-
-                    
-                }
-                //the hitstun check is necessary to make sure it doesnt trigger once the action is already stopped by a hit before it triggers, in the case of delayed ones
-                // this used to be a check on the histun, but since sometimes the hitstun isn't reset upon knockdown it wouldn't trigger the action in some situations when it should,
-                // so it'll filter out being interrupted by checking if the state itself the character is in is one of hitstun, It doesn't seem like it triggers a 1f delay as I was concerned,
-                // but could be wrong
-                if (states_wakeup_frame_to_do_action && std::string(g_interfaces.player2.GetData()->currentAction).find("CmnActHit") == std::string::npos){
-                    //old_way && (states_wakeup_frame_to_do_action)
-                   // ||
-               //     hitstun_0 && (states_wakeup_frame_to_do_action && g_interfaces.player2.GetData()->hitstun == 0)
-               //     || 
-             //       curr_action_not_ukemi && (states_wakeup_frame_to_do_action && std::string(g_interfaces.player2.GetData()->currentAction).find("CmnActHit") == std::string::npos)
-             //      {
-                 
-
-
-                     if (*g_gameVals.pFrameCount == states_wakeup_frame_to_do_action) {
-                        memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(wakeup_register[states_wakeup_random_pos]->addr), 4);
-                        g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 -1;
-                        //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(wakeup_register[states_wakeup_random_pos]->name[0]), 20);
-                        states_wakeup_frame_to_do_action = 0;
-                        states_wakeup_random_pos = 0;
-                        break;
-                    }
-                    else if (*g_gameVals.pFrameCount > states_wakeup_frame_to_do_action) {
-                        states_wakeup_frame_to_do_action = 0;
-                        states_wakeup_random_pos = 0;
-                        break;
-                    }
-
-                }
-            }
-        }
-
-        if (!throwtech_register.empty()) {
-            states = g_interfaces.player2.states;
-            auto throwtech_action_trigger_find = std::string(g_interfaces.player2.GetData()->currentAction).find("LockReject");
-
-                
-                if (g_interfaces.player2.GetData()->timeAfterTechIsPerformed == 29 && throwtech_action_trigger_find != std::string::npos){
-                    states_throwtech_random_pos = std::rand() % throwtech_register.size();
-                    states_throwtech_frame_to_do_action = *g_gameVals.pFrameCount + throwtech_register_delays[states_throwtech_random_pos];
-
-
-                }
-               
-                if (*g_gameVals.pFrameCount == states_throwtech_frame_to_do_action) {
-                    memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(throwtech_register[states_throwtech_random_pos]->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
-                    //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(wakeup_register[states_wakeup_random_pos]->name[0]), 20);
-                    states_throwtech_frame_to_do_action = 0;
-                    states_throwtech_random_pos = 0;
-                }
-                else if (*g_gameVals.pFrameCount > states_throwtech_frame_to_do_action && states_throwtech_frame_to_do_action != 0) {
-                    states_throwtech_frame_to_do_action = 0;
-                    states_throwtech_random_pos = 0;
-                };
-
-                }
-            
-        
-        if (!gap_register.empty()) {
-            states = g_interfaces.player2.states;
-            //if (!state_gap_random_pos) { state_gap_random_pos = std::rand() % gap_register.size(); }
-            // Note that you can't rely on "GuardEnd"to be there, it can be skipped if there is a mash frame 1
-            auto selected_state = states[selected];
-            std::string substr = "GuardEnd";
-
-            std::string curr_action = g_interfaces.player2.GetData()->currentAction;
-            std::string prev_action = g_interfaces.player2.GetData()->lastAction;
-            int prev_blockstun = g_interfaces.player2.GetData()->blockstun;
-
-            if (
-                // Doing it this way is necessary because otherwise you have a 1f delay, due to GuardEnd being skipped on frame 1 mash
-                // blockstun for now seems to be the most reliable metric
-                (g_interfaces.player2.GetData()->blockstun == 1
-                    &&
-                    curr_action.find("Guard") != std::string::npos
-
-                    )
-
-
-                ) {
-
-
-                states_gap_random_pos = std::rand() % gap_register.size();
-                states_gap_frame_to_do_action = *g_gameVals.pFrameCount + gap_register_delays[states_gap_random_pos];
-
-
-            }
-            //the hitstun check is necessary to make sure it doesnt trigger once the action is already stopped by a hit before it triggers, in the case of delayed ones
-            if (states_gap_frame_to_do_action && g_interfaces.player2.GetData()->hitstun == 0) {
-
-
-
-                if (*g_gameVals.pFrameCount == states_gap_frame_to_do_action) {
-                    memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(gap_register[states_gap_random_pos]->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
-                    //memcpy(&(g_interfaces.player2.GetData()->currentAction), &(gap_register[state_gap_random_pos]->name[0]), 20);
-                    states_gap_frame_to_do_action = 0;
-                    states_gap_random_pos = 0;
-
-                }
-                else if (*g_gameVals.pFrameCount > states_gap_frame_to_do_action) {
-                    states_gap_frame_to_do_action = 0;
-                    states_gap_random_pos = 0;
-                }
-
-            }
-        }
-
-        if (!onhit_register.empty()) {
-            states = g_interfaces.player2.states;
-            int random_pos = std::rand() % onhit_register.size();
-            static std::vector<std::string>loops_bound{ "Loop" , "Bound", "CmnActBDownCrash", "CmnActBDownDown"};/*necessary to stop the on hit actions from activating in a ukemi situation, once ukemi
-                                                                                              comes into play it becomes a wakeup action.
-                                                                                              Only reason CmdActBDownCrash is being fully specified and not as a substring is because 
-                                                                                              a lot of moves prob have "Crash" in the name*/
-            std::string curr_action = g_interfaces.player2.GetData()->currentAction;
-            
-            if ((g_interfaces.player2.GetData()->hitstun == 1) & !find_substring_in_vector(loops_bound,curr_action)) {
-                memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(onhit_register[random_pos]->addr), 4);
-                memcpy(&(g_interfaces.player2.GetData()->currentAction), &(onhit_register[random_pos]->name[0]), 20);
-            }
-
-
-        }
-    
         ImGui::EndGroup(); 
     
     }
 
 };
+
 std::string interpret_move(char move) {
     //auto button_bits = move & ((4 << 1) - 1);
     auto button_bits = move & 0xf0;
@@ -1782,19 +1872,8 @@ void ScrWindow::DrawSaveStatesBody() {
             ImGui::InputFloat("Setup time(s)", &wait_before_exec_s, 0.3f);
             ImGui::SameLine();
             ImGui::ShowHelpMarker("This pauses the game once you load a state for the amount set in order to adjust hand position. Set to 0 if no delay is desired.");
-            if (is_setup_time_running == true) {
-                ImGui::OpenPopup("progress_bar");
-                ImGui::SetNextWindowSize(ImVec2(400, 50));
-                if (ImGui::BeginPopupModal("progress_bar", NULL, ImGuiWindowFlags_NoTitleBar)) {
-
-                    float progress = this->base_time / (wait_before_exec_s);
-                    ImGui::ProgressBar(progress);
-                    if (progress <= 0) {
-                        ImGui::CloseCurrentPopup();
-                    }
-                    ImGui::EndPopup();
-                }
-            }
+            // The countdown indicator is drawn by DrawSaveStateSetupDelayStandalone, so it
+            // shows for a hotkey load with this page nowhere on screen.
         }
         else {
             ImGui::TextWrapped("%s", L("You must be in a mode where state can be saved.").c_str());
@@ -2430,19 +2509,7 @@ void ScrWindow::DrawReplayTakeoverBody() {
         ImGui::InputFloat(L("Setup time (s)").c_str(), &wait_before_exec_s2, 0.3f);
         ImGui::ShowHelpMarkerSameLine(
             L("Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.").c_str());
-        if (is_setup_time_running == true) {
-            ImGui::OpenPopup("progress_bar_replay_takeover");
-            ImGui::SetNextWindowSize(ImVec2(400, 50)); 
-            if (ImGui::BeginPopupModal("progress_bar_replay_takeover", NULL, ImGuiWindowFlags_NoTitleBar)) {
-
-                float progress = this->base_time / (wait_before_exec_s2);
-                ImGui::ProgressBar(progress);
-                if (progress <= 0) {
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
-        }
+        // Countdown indicator: DrawSaveStateSetupDelayStandalone.
         if (*g_gameVals.pGameMode == GameMode_Training) {
             const std::string returnToReplay = L("Return to replay");
             const std::string fixPlayback = L("Fix playback");
