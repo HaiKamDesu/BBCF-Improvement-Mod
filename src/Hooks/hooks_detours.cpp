@@ -1588,10 +1588,15 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 	if (SUCCEEDED(hWnd))
 	{
 		LOG(7, "\tSuccess: 0x%p\n", hWnd);
-		if (counter == 2) // 2nd created window should be the correct one according to process hacker
+		// "The 2nd window the process creates" is a guess, and on a cold boot it is wrong:
+		// the intro movie's DirectShow stack (and the IME/audio/UI machinery that comes with
+		// it) create windows of their own first, so the count lands on one of those. Kept
+		// only as a stand-in until the D3D device says which window it presents to, which
+		// AdoptGameWindow treats as authoritative.
+		if (counter == 2)
 		{
 			LOG(2, "Correct window: 0x%p\n", hWnd);
-			g_gameProc.hWndGameWindow = hWnd;
+			AdoptGameWindow(hWnd, false, "CreateWindowExW #2");
 
 			// Second sweep, now that the game is past early startup: catches a
 			// d3d9/dxgi proxy loaded after placeHooks_detours ran, and shows

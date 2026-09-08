@@ -9,6 +9,60 @@ temps_t g_tempVals = {};
 gameVals_t g_gameVals = {};
 modValues_t g_modVals = {};
 
+namespace
+{
+	bool g_gameWindowFromDevice = false;
+}
+
+void AdoptGameWindow(HWND hwnd, bool fromDevice, const char* source)
+{
+	if (hwnd == nullptr)
+	{
+		return;
+	}
+
+	// A guess never overrides an answer.
+	if (!fromDevice && g_gameWindowFromDevice)
+	{
+		if (hwnd != g_gameProc.hWndGameWindow)
+		{
+			LOG(1, "[GameWindow] ignoring %s guess 0x%p; keeping the D3D device window 0x%p\n",
+				source, hwnd, g_gameProc.hWndGameWindow);
+		}
+		return;
+	}
+
+	const HWND previous = g_gameProc.hWndGameWindow;
+
+	if (fromDevice)
+	{
+		g_gameWindowFromDevice = true;
+	}
+
+	if (previous == hwnd)
+	{
+		return;
+	}
+
+	g_gameProc.hWndGameWindow = hwnd;
+
+	if (previous != nullptr)
+	{
+		// The interesting case. If this ever fires it means something downstream was pointed
+		// at the wrong window until now.
+		LOG(1, "[GameWindow] corrected from 0x%p to 0x%p (source: %s)\n", previous, hwnd, source);
+	}
+	else
+	{
+		LOG(1, "[GameWindow] set to 0x%p (source: %s)\n", hwnd, source);
+	}
+}
+
+bool IsGameWindowFromDevice()
+{
+	return g_gameWindowFromDevice;
+}
+
 void InitManagers()
 {
 	LOG(1, "InitManagers\n");

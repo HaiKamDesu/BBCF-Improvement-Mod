@@ -261,6 +261,11 @@ private:
         std::unordered_map<std::string, std::string> m_knownKeyboardNames;
         std::unordered_map<std::string, KeyboardMapping> m_keyboardMappings;
         bool m_rawKeyboardRegistered = false;
+        // Which window the raw keyboard registration was made against. Raw input is delivered
+        // to one hwndTarget, so if the game window answer changes the registration has to be
+        // redone or WM_INPUT keeps going to the old window and every keyboard state stays
+        // stale. See AdoptGameWindow in Core/interfaces.h.
+        HWND m_rawKeyboardHwnd = nullptr;
         mutable std::mutex m_deviceMutex;
         mutable std::mutex m_keyboardMutex;
 

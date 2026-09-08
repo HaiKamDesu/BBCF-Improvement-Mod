@@ -3176,7 +3176,7 @@ void ControllerOverrideManager::EnsureRawKeyboardRegistration()
                 return;
         }
 
-        if (m_rawKeyboardRegistered)
+        if (m_rawKeyboardRegistered && m_rawKeyboardHwnd == g_gameProc.hWndGameWindow)
         {
                 return;
         }
@@ -3194,7 +3194,12 @@ void ControllerOverrideManager::EnsureRawKeyboardRegistration()
         device.hwndTarget = g_gameProc.hWndGameWindow;
 
         m_rawKeyboardRegistered = RegisterRawInputDevices(&device, 1, sizeof(RAWINPUTDEVICE)) == TRUE;
-        LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - registered=%d hwnd=%p\n", m_rawKeyboardRegistered ? 1 : 0, g_gameProc.hWndGameWindow);
+        const HWND previousTarget = m_rawKeyboardHwnd;
+        m_rawKeyboardHwnd = m_rawKeyboardRegistered ? g_gameProc.hWndGameWindow : nullptr;
+        LOG(1, "ControllerOverrideManager::EnsureRawKeyboardRegistration - registered=%d hwnd=%p%s\n",
+                m_rawKeyboardRegistered ? 1 : 0, g_gameProc.hWndGameWindow,
+                (previousTarget != nullptr && previousTarget != m_rawKeyboardHwnd)
+                        ? " (re-registered after the game window changed)" : "");
 }
 
 bool ControllerOverrideManager::GetFilteredKeyboardState(BYTE* keyStateOut)

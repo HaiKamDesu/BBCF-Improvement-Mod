@@ -157,6 +157,13 @@ UINT APIENTRY Direct3DDevice9ExWrapper::GetNumberOfSwapChains()
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters)
 {
+	// A reset can re-point the device at a different window, and it is the only other place
+	// the game states which window it renders to.
+	if (pPresentationParameters != nullptr)
+	{
+		AdoptGameWindow(pPresentationParameters->hDeviceWindow, true, "Reset");
+	}
+
 	LOG(7, "Reset\n");
 	Settings::applySettingsIni(pPresentationParameters);
 	return m_Direct3DDevice9Ex->Reset(pPresentationParameters);
@@ -1000,6 +1007,11 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::CreateDepthStencilSurfaceEx(UINT Widt
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::ResetEx(D3DPRESENT_PARAMETERS* pPresentationParameters, D3DDISPLAYMODEEX* pFullscreenDisplayMode)
 {
+	if (pPresentationParameters != nullptr)
+	{
+		AdoptGameWindow(pPresentationParameters->hDeviceWindow, true, "ResetEx");
+	}
+
 	LOG(3, "ResetEx\n");
 	logD3DPParams(pPresentationParameters, true);
 	Settings::applySettingsIni(pPresentationParameters);

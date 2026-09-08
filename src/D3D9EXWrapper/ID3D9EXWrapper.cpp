@@ -2,6 +2,7 @@
 
 #include "ID3D9EXWrapper_Device.h"
 
+#include "Core/interfaces.h"
 #include "Core/logger.h"
 
 Direct3D9ExWrapper::Direct3D9ExWrapper(IDirect3D9Ex **ppIDirect3D9Ex)
@@ -132,6 +133,24 @@ HMONITOR APIENTRY Direct3D9ExWrapper::GetAdapterMonitor(UINT Adapter)
 //
 // If Ex creation refuses these particular parameters, the original unwrapped
 // call still runs, so this can lose the overlay but never the device.
+namespace
+{
+	// D3D9 rules: hDeviceWindow is the render target and may be null, in which case
+	// hFocusWindow is used. Either one is authoritative in a way that counting
+	// CreateWindowExW calls never was.
+	void AdoptGameWindowFromPresentParams(HWND hFocusWindow,
+		const D3DPRESENT_PARAMETERS* pPresentationParameters, const char* source)
+	{
+		HWND target = pPresentationParameters != nullptr ? pPresentationParameters->hDeviceWindow : nullptr;
+		if (target == nullptr)
+		{
+			target = hFocusWindow;
+		}
+
+		AdoptGameWindow(target, true, source);
+	}
+}
+
 HRESULT APIENTRY Direct3D9ExWrapper::CreateDevice(UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS *pPresentationParameters, IDirect3DDevice9 **ppReturnedDeviceInterface)
 {
 	LOG(1, "CreateDevice\n")
@@ -172,6 +191,9 @@ HRESULT APIENTRY Direct3D9ExWrapper::CreateDevice(UINT Adapter, D3DDEVTYPE Devic
 
 	if (SUCCEEDED(hRet))
 	{
+		// The unwrapped fallback path: no overlay, but the input hooks still need the right
+		// window.
+		AdoptGameWindowFromPresentParams(hFocusWindow, pPresentationParameters, "CreateDevice");
 		Settings::applySettingsIni(pPresentationParameters);
 	}
 
@@ -206,6 +228,11 @@ HRESULT APIENTRY Direct3D9ExWrapper::CreateDeviceEx(UINT Adapter, D3DDEVTYPE Dev
 	if (SUCCEEDED(hRet))
 	{
 		LOG(1, "CreateDeviceEx created with original PresentationParameters\n");
+
+		// Before the wrapper is built, so the overlay and the input hooks are pointed at the
+		// right window from the first frame rather than at whatever CreateWindowExW counted.
+		AdoptGameWindowFromPresentParams(hFocusWindow, pPresentationParameters, "CreateDeviceEx");
+
 		Settings::applySettingsIni(pPresentationParameters);
 		logD3DPParams(pPresentationParameters, false);
 		Direct3DDevice9ExWrapper *ret = new Direct3DDevice9ExWrapper(ppReturnedDeviceInterface, pPresentationParameters, this);
