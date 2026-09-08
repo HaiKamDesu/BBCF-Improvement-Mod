@@ -232,10 +232,27 @@ SETTING(int, unlimitedPlaybackLoopRestartMode, "UnlimitedPlaybackLoopRestartMode
 // Confirmed end to end 2026-09-05: re-apply held over both of the game's own writes,
 // blobValid=1 at settle, TUS latch never tripped across a 12-minute session.
 //
+// 8.5.4 rewrote how this applies: it writes the avatar SOURCE fields in the save data
+// manager and lets the game derive, seal and announce the profile blob itself, instead of
+// poking the checksummed blob and fighting the game's refresh. That fight was failing the
+// game's own profile-upload step once a second and holding lobby entry for 19-120s per
+// connect on one reporter's machine. See src/Network/LobbyAvatarManager.h.
+//
+// The source write does NOT persist on its own: measured 2026-09-08, a session that wrote
+// the source to accessory 202 was followed by one that read it back as 0/0/0/0 on arrival,
+// with the icon zeroed too. The save data manager's avatar fields start empty every launch
+// and are filled by the game copying the downloaded profile into them. So settings.ini
+// stays the thing that remembers, and the source write exists only to stop the game's own
+// rebuild undoing us inside the session.
+//
+// Opt-in rather than default-on by preference: it is a convenience for people who use the
+// accessory slots the game's equip menu hides, and nobody else should have the mod touching
+// their avatar on every connect.
+//
 // The four values below are written by the mod, not meant to be set by hand; -1 means
 // nothing has been remembered yet, and so does anything outside the Online page's ranges
 // (icon 0-47, colour 0-3, accessories 0-207).
-SETTING(bool, rememberLobbyAvatar, "RememberLobbyAvatar", "1");
+SETTING(bool, rememberLobbyAvatar, "RememberLobbyAvatar", "0");
 SETTING(int, lobbyAvatarIcon, "LobbyAvatarIcon", "-1");
 SETTING(int, lobbyAvatarColor, "LobbyAvatarColor", "-1");
 SETTING(int, lobbyAvatarAccessory1, "LobbyAvatarAccessory1", "-1");

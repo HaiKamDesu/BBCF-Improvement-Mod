@@ -871,6 +871,80 @@ static constexpr uintptr_t OFFSET_AvatarSourceIcon     = 0x6388;     // from the
 static constexpr uintptr_t OFFSET_AvatarSourceColor    = 0x638C;
 
 // ---------------------------------------------------------------------------
+// The avatar SOURCE structs, and why writing them is the only safe way to put
+// a hidden accessory back on (RE'd 2026-09-08, chasing a reporter whose lobby
+// entry took 19-120s per connect with RememberLobbyAvatar on).
+//
+// The "source struct" the two offsets above are relative to is CSaveDataManager,
+// a statically allocated singleton at ADDR_SaveDataManager. FUN_0048DCB0 is its
+// MSVC lazy getter (guard bit 0 at ADDR_SaveDataManagerGuard, ctor FUN_00486F40,
+// returns the fixed address). Confirmed independently: the compiler folded
+// savemgr+0x6388 and savemgr+0x638C into the absolutes ds:[0x00C9E238] and
+// ds:[0x00C9E23C], which appear exactly once each, in the avatar getters at
+// 0x004884CD / 0x0048851F.
+//
+// THE TWO DIRECTIONS
+//   source -> blob   FUN_004924B0 ("rebuild my profile blob from local state"),
+//                    reached only through FUN_00494810(param1 != 0).
+//   blob -> source   FUN_0048F310 per accessory slot; FUN_0048F810 does the whole
+//                    profile. So the blob is not a write-only mirror: it round-trips.
+//
+// THE TWO ACCESSORY SLOTS. FUN_004924B0 calls FUN_004923C0 twice, on savemgr+0x63A0
+// and savemgr+0x7304 -- two objects of stride 0xF64, each holding its equipped id at
+// +0x9A4 and a "which byte do I own" flag at +0xF60 (the object's last dword):
+//
+//   flag == 1 -> clears blob[0x61C5], ORs (id << 8) into the dword at 0x61C4
+//   flag != 1 -> clears blob[0x61C4], ORs  id       into the dword at 0x61C4
+//
+// The flags are set once in the savemgr init: [savemgr+0x7300] = 0 (slot A, so it
+// owns the LOW byte) at 0x0049374B, and [savemgr+0x8264] = 1 (slot B, HIGH byte) at
+// 0x00493770. So the mod's "accessory 1" is slot A and "accessory 2" is slot B, and
+// every refresh rewrites BOTH accessory bytes from those two ids, unvalidated and
+// unclamped -- unlike the icon, which FUN_004924B0 clamps itself against
+// FUN_00510790() == 0x30.
+//
+// WHY POKING THE BLOB ALONE FIGHTS FOREVER. An id the game's own equip menu cannot
+// offer is not in either source, so every refresh puts the old value back and a
+// mod that re-pokes the blob is in an unbounded loop. Worse, the loop is not benign:
+// a blob write landing between the upload path's seal and the upload strategy's
+// re-verify fails the step with no Steam round-trip (see OFFSET_OwnProfileBlob above),
+// and lobby entry is gated behind it. Measured in the reporter's captures as the
+// network state machine looping state1 16 -> 12 at exactly 1 Hz for 120s, each 12
+// transition timestamp-identical to a mod blob write, versus 16 -> 13 (success,
+// advances immediately) in a session whose remembered ids already matched its sources.
+//
+// SO: write the source ids and let the game's own refresh derive, seal and upload the
+// blob. Source writes touch no checksummed buffer and cannot fail the handshake.
+//
+// SAFE RANGE. The id reaches FUN_0073C2C0, which indexes AvtAccPoint.bin as
+// [table + id*4] with NO bounds check. That file (data/ETC/lobby_acc_bin.pac ->
+// accbin.pac -> AvtAccPoint.bin) is 0x4B0 bytes = 300 entries, so ids 0..299 cannot
+// read out of bounds; the slot item-state tables (FUN_004B9700() + 0x50EE8 slot A,
+// + 0x53984 slot B) hold >= 0x140 entries. Art is %04d_avtacc.hip named id + 1000,
+// and lobby_acc.pac tops out at 1207, so 207 is the highest id with art -- which is
+// exactly the mod's existing slider cap. id 0 means "no accessory" and is
+// short-circuited before any table access. An id with no art simply fails a
+// name lookup; there is no index math to overrun. MAX_AvatarAccessoryId below is
+// therefore art-limited, well inside the bounds-limited 299.
+// ---------------------------------------------------------------------------
+static constexpr uintptr_t ADDR_SaveDataManager        = 0x00897EB0; // static obj, base+
+static constexpr uintptr_t ADDR_SaveDataManagerGuard   = 0x008A1ECC; // init guard, bit 0
+static constexpr uintptr_t ADDR_SaveDataManagerGet     = 0x0008DCB0; // FUN_0048DCB0
+static constexpr uintptr_t OFFSET_AvatarAccSlotA       = 0x63A0;     // -> blob 0x61C4
+static constexpr uintptr_t OFFSET_AvatarAccSlotB       = 0x7304;     // -> blob 0x61C5
+static constexpr uintptr_t OFFSET_AccSlotEquippedId    = 0x9A4;      // within a slot
+static constexpr uintptr_t OFFSET_AccSlotTargetsHigh   = 0xF60;      // 1 = high byte
+static constexpr uintptr_t ADDR_ProfileBlobToSource    = 0x0008F310; // FUN_0048F310
+static constexpr uintptr_t ADDR_ProfileApplyToLocal    = 0x0008F810; // FUN_0048F810
+static constexpr uintptr_t ADDR_ProfileBlobRebuild     = 0x000924B0; // FUN_004924B0
+static constexpr uintptr_t ADDR_ProfileRebuildAndStats = 0x00094810; // FUN_00494810
+static constexpr uintptr_t ADDR_AvatarAccessoryDraw    = 0x0033C2C0; // FUN_0073C2C0
+static constexpr int MAX_AvatarIcon                    = 0x2F;       // FUN_00510790 - 1
+static constexpr int MAX_AvatarColor                   = 0x3;
+static constexpr int MAX_AvatarAccessoryId             = 0xCF;       // highest id with art
+static constexpr int COUNT_AvtAccPointEntries          = 300;        // hard bounds limit
+
+// ---------------------------------------------------------------------------
 // Abyss HP numbers (RE'd 2026-09-05).
 //
 // HP NUMBERS. Abyss draws the exact HP over each health bar; nothing else does.
