@@ -115,6 +115,8 @@
     <ClCompile Include="src\Hooks\HookManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Hooks\PatternScan.cpp" />
+    <ClCompile Include="src\Hooks\HookAddrCache.cpp" />
     <ClCompile Include="src\Hooks\hooks_detours.cpp" />
     <ClCompile Include="src\Hooks\hooks_bbcf.cpp" />
     <ClCompile Include="src\D3D9EXWrapper\D3DXMath.cpp">
@@ -351,6 +353,8 @@
     <ClInclude Include="src\Hooks\HookManager.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="src\Hooks\PatternScan.h" />
+    <ClInclude Include="src\Hooks\HookAddrCache.h" />
     <ClInclude Include="src\Hooks\hooks_detours.h" />
     <ClInclude Include="src\Hooks\hooks_bbcf.h" />
     <ClInclude Include="src\Hooks\hooks_system_input.h" />

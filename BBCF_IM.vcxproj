@@ -157,6 +157,8 @@
     <ClCompile Include="src\D3D9EXWrapper\ID3D9Wrapper_Sprite.cpp" />
     <ClCompile Include="src\D3D9EXWrapper\ID3DXWrapper_Effect.cpp" />
     <ClCompile Include="src\Hooks\HookManager.cpp" />
+    <ClCompile Include="src\Hooks\PatternScan.cpp" />
+    <ClCompile Include="src\Hooks\HookAddrCache.cpp" />
     <ClCompile Include="src\Core\logger.cpp" />
     <ClCompile Include="src\Core\dllmain.cpp" />
     <ClCompile Include="src\Core\HotkeyManager.cpp" />
@@ -334,6 +336,8 @@
     <ClInclude Include="src\D3D9EXWrapper\ID3D9Wrapper_Sprite.h" />
     <ClInclude Include="src\D3D9EXWrapper\ID3DXWrapper_Effect.h" />
     <ClInclude Include="src\Hooks\HookManager.h" />
+    <ClInclude Include="src\Hooks\PatternScan.h" />
+    <ClInclude Include="src\Hooks\HookAddrCache.h" />
     <ClInclude Include="src\Palette\impl_format.h" />
     <ClInclude Include="src\Palette\impl_templates.h" />
     <ClInclude Include="src\Core\logger.h" />

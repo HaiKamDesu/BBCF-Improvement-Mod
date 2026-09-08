@@ -5,6 +5,7 @@
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/MatchState.h"
 #include "Hooks/hooks_bbcf.h"
+#include "Hooks/HookManager.h"
 #include "Hooks/hooks_customGameModes.h"
 #include "Hooks/hooks_palette.h"
 #include "Hooks/hooks_system_input.h"
@@ -26,9 +27,14 @@ Direct3DDevice9ExWrapper::Direct3DDevice9ExWrapper(IDirect3DDevice9Ex** ppReturn
 	g_interfaces.pD3D9ExWrapper = *ppReturnedDeviceInterface;
 
 	//place all other hooks that can only be placed after steamDRM unpacks the .exe in memory!!!
+	//
+	// This is on the game's main thread, in front of its first frame, so whatever it costs is
+	// boot time the player waits through. LogScanSummary() reports what the signature scanning
+	// part of it actually took - it was ~1.55s of otherwise unattributed time in one report.
 	placeHooks_bbcf();
 	placeHooks_palette();
 	placeHooks_CustomGameModes();
+	HookManager::LogScanSummary("hook placement");
 }
 
 Direct3DDevice9ExWrapper::~Direct3DDevice9ExWrapper() {}

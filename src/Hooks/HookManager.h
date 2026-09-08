@@ -38,6 +38,14 @@ public:
 	static int GetOriginalBytes(const char* label, int startIndex, int bytesToReturn);
 	static int GetBytesFromAddr(const char* label, int startIndex, int bytesToReturn);
 	static int OverWriteBytes(void* startAddress, void* endAddress, const char* pattern, const char* mask, const char* newBytes);
+	// Writes one [HookScan] line summarising every signature scan so far: how many were
+	// resolved from the cached-address file, how many needed a scan, how long it all took and
+	// which one was worst. Call it once after hook placement - it also flushes the address
+	// cache to disk. Hook placement sits on the game's main thread in front of the first
+	// frame, and it used to be ~1.55s of unexplained boot time; this is how a bug report says
+	// what it actually cost.
+	static void LogScanSummary(const char* phase);
+
 	static void Cleanup(); //empty atm
 private:
 	static std::vector<functionhook_t> hooks; //stores hook structs
@@ -45,5 +53,5 @@ private:
 	static bool SaveOriginalBytes(int hookIndex, void* startAddress, int len);
 	static bool PlaceHook(void* toHook, void* ourFunc, int len);
 	static bool RestoreOriginalBytes(int functionhook_index);
-	static DWORD FindPattern(const char* pattern, const char* mask);
+	static DWORD FindPattern(const char* label, const char* pattern, const char* mask);
 };

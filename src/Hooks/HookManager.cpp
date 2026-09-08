@@ -1,5 +1,8 @@
 #include "HookManager.h"
 
+#include "HookAddrCache.h"
+#include "PatternScan.h"
+
 #include "Core/logger.h"
 
 #include <Psapi.h>
@@ -32,7 +35,7 @@ JMPBACKADDR HookManager::SetHook(const char* label, const char* pattern, const c
 	hooks[index].length = len;
 	hooks[index].newFunc = newFunc;
 
-	DWORD startAddress = FindPattern(pattern, mask);
+	DWORD startAddress = FindPattern(label, pattern, mask);
 	hooks[index].startAddress = startAddress;
 
 	if (!startAddress)
@@ -288,7 +291,7 @@ JMPBACKADDR HookManager::RegisterHook(const char* label, const char* pattern, co
 	hooks[index].length = len;
 	hooks[index].newFunc = 0;
 
-	DWORD startAddress = FindPattern(pattern, mask);
+	DWORD startAddress = FindPattern(label, pattern, mask);
 	hooks[index].startAddress = startAddress;
 
 	if (!startAddress)
@@ -457,45 +460,176 @@ int HookManager::OverWriteBytes(void* startAddress, void* endAddress, const char
 	return overwrittenCount;
 }
 
-DWORD HookManager::FindPattern(const char* pattern, const char* mask)
+namespace
 {
-	////////
-	//Get all module related information
-	//Get process name
-	TCHAR szFileName[MAX_PATH + 1];
-	GetModuleFileName(NULL, szFileName, MAX_PATH + 1);
-
-	MODULEINFO modinfo = { 0 };
-	HMODULE hModule = GetModuleHandle(szFileName);
-	if (hModule == 0)
-		return 0;
-	GetModuleInformation(GetCurrentProcess(), hModule, &modinfo, sizeof(MODULEINFO));
-	////////
-
-	//Assign our base and module size
-	//Having the values right is ESSENTIAL, this makes sure
-	//that we don't scan unwanted memory and leading our game to crash
-	DWORD base = (DWORD)modinfo.lpBaseOfDll;
-	DWORD size = (DWORD)modinfo.SizeOfImage;
-
-	//Get length for our mask, this will allow us to loop through our array
-	DWORD patternLength = (DWORD)strlen(mask);
-
-	for (DWORD i = 0; i < size - patternLength; i++)
+	// Hook placement runs on the game's main thread inside the D3D device wrapper's
+	// constructor, in front of the game's first frame, and it cannot be moved: SteamDRM has to
+	// have unpacked the exe, and the hooks have to be in place before the game runs. So the
+	// only thing that can be done about the ~1.55s it used to cost is to make it cheap.
+	//
+	// Three things do that, in descending order of effect:
+	//  - a verified address cache, so a repeat launch does a pattern-length compare per hook
+	//    instead of sweeping a 23MB image per hook. This is the one that matters on a cold
+	//    boot: it touches the handful of pages holding the hook sites instead of paging in the
+	//    whole exe once per scan.
+	//  - scanning the executable sections instead of the whole mapped image.
+	//  - breaking out of the byte compare on the first mismatch, and using memchr to find
+	//    candidate offsets rather than testing every one.
+	struct HookScanStats
 	{
-		bool found = true;
-		for (DWORD j = 0; j < patternLength; j++)
+		int scans = 0;          // FindPattern calls
+		int cacheHits = 0;      // resolved by a verified cached address
+		int execHits = 0;       // found by scanning the executable sections
+		int fullImageHits = 0;  // only found once the scan widened to the whole image
+		int misses = 0;         // not found at all
+		double totalMs = 0.0;
+		double worstMs = 0.0;
+		std::string worstLabel;
+		unsigned long long bytesSwept = 0;
+	};
+
+	HookScanStats g_scanStats;
+	bool g_cacheInitialised = false;
+	unsigned long long g_moduleKey = 0;
+
+	double QpcToMs(LONGLONG ticks)
+	{
+		static LARGE_INTEGER frequency = {};
+		if (frequency.QuadPart == 0)
 		{
-			//if we have a ? in our mask then we have true by default, 
-			//or if the bytes match then we keep searching until finding it or not
-			found &= mask[j] == '?' || pattern[j] == *(char*)(base + i + j);
+			QueryPerformanceFrequency(&frequency);
 		}
-		//found = true, our entire pattern was found
-		//return the memory addy so we can write to it
-		if (found)
+		return frequency.QuadPart == 0 ? 0.0 : (double)ticks * 1000.0 / (double)frequency.QuadPart;
+	}
+
+	HMODULE GameModule()
+	{
+		TCHAR szFileName[MAX_PATH + 1];
+		if (GetModuleFileName(NULL, szFileName, MAX_PATH + 1) == 0)
+			return nullptr;
+
+		return GetModuleHandle(szFileName);
+	}
+}
+
+DWORD HookManager::FindPattern(const char* label, const char* pattern, const char* mask)
+{
+	const HMODULE hModule = GameModule();
+	if (hModule == nullptr)
+		return 0;
+
+	LARGE_INTEGER start;
+	QueryPerformanceCounter(&start);
+
+	if (!g_cacheInitialised)
+	{
+		g_cacheInitialised = true;
+		g_moduleKey = HookAddrCache_ModuleKey(hModule);
+		HookAddrCache_Load(g_moduleKey);
+	}
+
+	const unsigned char* const base = (const unsigned char*)hModule;
+	const ScanRange whole = PatternScan_WholeImage(hModule);
+	if (whole.base == nullptr || whole.size == 0)
+		return 0;
+
+	g_scanStats.scans++;
+
+	const unsigned char* found = nullptr;
+	bool fromCache = false;
+	bool fromFullImage = false;
+
+	// A cached address is only ever a hint. It is used solely when the signature still matches
+	// at it, which is the same predicate a fresh scan satisfies - so a stale or tampered cache
+	// costs a scan, it can never point a JMP at the wrong instruction.
+	const DWORD cachedRva = HookAddrCache_Get(label);
+	if (cachedRva != 0 && (size_t)cachedRva < whole.size &&
+		PatternScan_MatchesAt(base + cachedRva, pattern, mask))
+	{
+		found = base + cachedRva;
+		fromCache = true;
+	}
+
+	if (found == nullptr)
+	{
+		ScanRange ranges[PATTERN_SCAN_MAX_RANGES];
+		const int rangeCount = PatternScan_ExecutableRanges(hModule, ranges, PATTERN_SCAN_MAX_RANGES);
+
+		for (int i = 0; i < rangeCount && found == nullptr; i++)
 		{
-			return base + i;
+			g_scanStats.bytesSwept += ranges[i].size;
+			found = PatternScan_Find(ranges[i], pattern, mask);
+		}
+
+		// BBCF.exe puts its code first, so a hit in the executable sections is the same first
+		// hit a whole-image sweep would have returned. The widened pass exists for the case
+		// that assumption does not hold - a packer leaving code in a section that is not
+		// marked executable, say - and the summary line reports whenever it was needed.
+		if (found == nullptr)
+		{
+			g_scanStats.bytesSwept += whole.size;
+			found = PatternScan_Find(whole, pattern, mask);
+			fromFullImage = found != nullptr;
 		}
 	}
-	return NULL;
+
+	LARGE_INTEGER end;
+	QueryPerformanceCounter(&end);
+	const double elapsedMs = QpcToMs(end.QuadPart - start.QuadPart);
+
+	g_scanStats.totalMs += elapsedMs;
+	if (elapsedMs > g_scanStats.worstMs)
+	{
+		g_scanStats.worstMs = elapsedMs;
+		g_scanStats.worstLabel = label != nullptr ? label : "?";
+	}
+
+	if (found == nullptr)
+	{
+		g_scanStats.misses++;
+		LOG(2, "[HookScan] %s NOT FOUND after %.1fms\n", label, elapsedMs);
+		return 0;
+	}
+
+	if (fromCache)
+		g_scanStats.cacheHits++;
+	else if (fromFullImage)
+		g_scanStats.fullImageHits++;
+	else
+		g_scanStats.execHits++;
+
+	const DWORD rva = (DWORD)(found - base);
+	HookAddrCache_Put(label, rva);
+
+	LOG(2, "[HookScan] %s rva=0x%06X in %.2fms (%s)\n", label, rva, elapsedMs,
+		fromCache ? "cached" : (fromFullImage ? "full-image scan" : "code scan"));
+
+	// A single scan that runs long is worth seeing at the default log level - it is the shape
+	// of the cold-boot complaint this instrumentation exists to answer.
+	if (elapsedMs >= 10.0)
+	{
+		LOG(1, "[HookScan] slow scan: %s took %.1fms (%s)\n", label, elapsedMs,
+			fromFullImage ? "full-image scan" : "code scan");
+	}
+
+	return (DWORD)(DWORD_PTR)found;
+}
+
+void HookManager::LogScanSummary(const char* phase)
+{
+	LOG(1, "[HookScan] %s: %d signatures in %.1fms (cached %d, code scan %d, full-image %d, missing %d), "
+		"swept %.1fMB, worst %.1fms on '%s'\n",
+		phase != nullptr ? phase : "hook placement",
+		g_scanStats.scans, g_scanStats.totalMs,
+		g_scanStats.cacheHits, g_scanStats.execHits, g_scanStats.fullImageHits, g_scanStats.misses,
+		(double)g_scanStats.bytesSwept / (1024.0 * 1024.0),
+		g_scanStats.worstMs, g_scanStats.worstLabel.empty() ? "-" : g_scanStats.worstLabel.c_str());
+
+	if (g_scanStats.fullImageHits > 0)
+	{
+		LOG(1, "[HookScan] %d signature(s) were only found outside the executable sections; "
+			"the code-section fast path did not cover them\n", g_scanStats.fullImageHits);
+	}
+
+	HookAddrCache_Save(g_moduleKey);
 }

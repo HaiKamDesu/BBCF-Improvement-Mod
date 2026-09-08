@@ -12,6 +12,7 @@
 #include "RuntimePlatform.h"
 #include "WineCheck.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
+#include "Game/FrameStallWatchdog.h"
 
 #include "Hooks/hooks_detours.h"
 #include "Hooks/hooks_battle_input.h"
@@ -307,6 +308,13 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 }
 
 	ForceLog("[Init] Detours hooks placed OK");
+
+	// Before the first frame rather than in WindowManager::Initialize, so the game's own boot
+	// frames are covered. The watchdog thread waits for the first Heartbeat() to learn which
+	// thread to sample, so starting it this early costs nothing and just widens the window it
+	// can report on. No-op unless LogFrameStalls is enabled in settings.ini.
+	FrameStallWatchdog::Start();
+
 	// Install battle input hook (P1/P2 input write site)
 	if (IsControllerHooksRuntimeAllowed() && !Hook_BattleInput())
 	{
