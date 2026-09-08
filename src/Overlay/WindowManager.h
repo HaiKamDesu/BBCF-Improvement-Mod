@@ -4,6 +4,8 @@
 
 #include <d3d9.h>
 
+#include <string>
+
 class WindowManager
 {
 public:
@@ -25,4 +27,8 @@ private:
 	bool m_initialized = false;
 	WindowContainer* m_windowContainer = nullptr;
 	Logger* m_pLogger = nullptr;
+
+	// Last set of window types that asked for the mouse cursor, so the log records the
+	// change rather than one line per frame.
+	std::string m_lastCursorClaimants;
 };

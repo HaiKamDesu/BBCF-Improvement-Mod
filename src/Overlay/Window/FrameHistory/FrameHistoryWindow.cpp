@@ -31,6 +31,11 @@ bool FrameHistoryWindow::hasWorldTimeMoved() {
 	return res;
 }
 
+bool FrameHistoryWindow::WantsMouseCursor() const
+{
+	return m_windowOpen && isFrameHistoryEnabledInCurrentState();
+}
+
 void FrameHistoryWindow::Update()
 {
 	if (!m_windowOpen || !isFrameHistoryEnabledInCurrentState())

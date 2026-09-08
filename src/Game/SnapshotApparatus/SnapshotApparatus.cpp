@@ -2225,6 +2225,9 @@ SnapshotApparatus::SnapshotApparatus() {
 		LOG(1, "[Snapshot] ctor callbacks initialized callbacks_ptr=%p snapshotManager=%p\n", this->callbacks_ptr, snap_manager);
 
 		void* DAT_01292888 = base_addr + 0x612888;
+		void** SCENE_CBattle_probe = (void**)(base_addr + 0x8929B4);
+		LOG(1, "[Snapshot] ctor one-time net init: flag(base+0x612888)=%d SCENE_CBattle=%p\n",
+			*(int*)DAT_01292888, SCENE_CBattle_probe ? *SCENE_CBattle_probe : nullptr);
 		if (*(int*)DAT_01292888 == 0) {
 
 			///PRELUDE
@@ -2252,6 +2255,15 @@ SnapshotApparatus::SnapshotApparatus() {
 			void* maybe_network_stuff_init_ptr = base_addr + 0xe56f0;
 			typedef void (*maybe_network_stuff_init_decl)(void*);
 			maybe_network_stuff_init_decl maybe_network_stuff_init = reinterpret_cast<maybe_network_stuff_init_decl>(maybe_network_stuff_init_ptr);
+			if (*SCENE_CBattle_static_ptr == nullptr) {
+				// Restore the patched bytes before bailing, or the game is left running with
+				// three NOP'd sites for the rest of the session.
+				WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
+				WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);
+				WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, oldmem_3, 6);
+				LOG(1, "[Snapshot] ctor ABORTED one-time net init: SCENE_CBattle is null\n");
+				return;
+			}
 			maybe_network_stuff_init(*SCENE_CBattle_static_ptr);
 			WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
 			WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);

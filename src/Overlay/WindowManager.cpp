@@ -11,6 +11,7 @@
 #include "Window/PaletteEditorWindow.h"
 #include "Window/PalettesConfigWindow.h"
 #include "Window/NetworkSquareColorWindow.h"
+#include "Window/ScrWindow.h"
 #include "Window/Ranked/RankedProgressWindow.h"
 #include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
@@ -768,19 +769,38 @@ void WindowManager::Render()
 	ApplyViewportOverride();
 	ImGui::NewFrame();
 
+	// Each window answers for itself, rather than a skip list of the ones known not to want
+	// a mouse. The overlays that only draw in specific game states answer no while they are
+	// not drawing, which is what stops a cursor sitting on the title screen. The names are
+	// logged so a capture says which window is asking, not just how many.
 	ImGui::GetIO().MouseDrawCursor = false;
 	int openWindowCount = 0;
+	std::string cursorClaimants;
 	for (auto p : m_windowContainer->GetWindows()) {
-		if (p.first == WindowType_HitboxOverlay) continue; // ignore windows that don't need a mouse
 		if (!p.second) continue;
-		if (p.second->IsOpen()) {
+		if (p.second->WantsMouseCursor()) {
 			ImGui::GetIO().MouseDrawCursor = true;
 			++openWindowCount;
+			if (!cursorClaimants.empty()) cursorClaimants += ", ";
+			cursorClaimants += std::to_string(static_cast<int>(p.first));
 		}
+	}
+	if (cursorClaimants != m_lastCursorClaimants) {
+		LOG(1, "[OverlayCursor] windows wanting the cursor: [%s] (was [%s])\n",
+			cursorClaimants.empty() ? "none" : cursorClaimants.c_str(),
+			m_lastCursorClaimants.empty() ? "none" : m_lastCursorClaimants.c_str());
+		m_lastCursorClaimants = cursorClaimants;
 	}
 
 
 	DrawAllWindows();
+
+	// Hotkey-triggered save/load runs here, in the same frame phase the buttons that used to
+	// be its only trigger ran in. See ScrWindow::RunPendingSaveStateRequests.
+	if (ScrWindow* scr = m_windowContainer->GetWindow<ScrWindow>(WindowType_Scr))
+	{
+		scr->RunPendingSaveStateRequests();
+	}
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
 	DrawUnlimitedPlaybackLoopSetupIndicatorStandalone();
@@ -809,6 +829,14 @@ void WindowManager::HandleButtons()
 	// press edges this call computes, so they all agree on what happened this frame.
 	// Gating (window focus, typing into an overlay text field) lives inside it.
 	HotkeyManager::Update();
+
+	// Save states and the replay-takeover load used to read their hotkeys from inside the
+	// buttons that trigger them, on mod-menu pages. That made a bind work only while the
+	// menu was open on the right page. Polled here with everything else instead.
+	if (ScrWindow* scr = m_windowContainer->GetWindow<ScrWindow>(WindowType_Scr))
+	{
+		scr->TickSaveStateHotkeys();
+	}
 
 	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleMainWindow))
 	{

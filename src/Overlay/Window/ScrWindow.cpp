@@ -255,7 +255,171 @@ void ScrWindow::Tick() {
         self->check_wakeup_delay();
     }
 
+    // Only the countdown runs here. The hotkeys are polled from WindowManager::HandleButtons
+    // instead, because WasPressed is an edge computed by HotkeyManager::Update and this
+    // function runs before it - and, worse, keeps running when Render() bails out for the
+    // Steam overlay or a minimized window, which would leave a stale press edge re-firing
+    // every frame. The countdown does belong here: it clears isFrameFrozen, so it has to
+    // keep advancing exactly in those cases.
+    self->TickSetupDelay();
+
     TickLocalReplayRedirect();
+}
+
+// The save-state controls live on a mod-menu page. Binding their hotkeys to the buttons
+// meant a bind only worked while that page was on screen, and the setup-delay countdown -
+// the thing that clears isFrameFrozen - only advanced while it was being drawn, so closing
+// the menu mid-delay left the game frozen. Both now run from Tick() every frame.
+
+SnapshotApparatus* ScrWindow::EnsureTrainingSnapshot()
+{
+    if (snap_apparatus == nullptr) {
+        snap_apparatus = new SnapshotApparatus();
+        snap_apparatus->ReserveSlots("training_states", 1);
+    }
+    else if (!snap_apparatus->check_if_valid(g_interfaces.player1.GetData(),
+        g_interfaces.player2.GetData())) {
+        delete snap_apparatus;
+        snap_apparatus = new SnapshotApparatus();
+        snap_apparatus->ReserveSlots("training_states", 1);
+    }
+    return snap_apparatus;
+}
+
+bool ScrWindow::HasTrainingSnapshot() const
+{
+    return snap_apparatus && snap_apparatus->snapshot_count != 0;
+}
+
+bool ScrWindow::HasReplayTakeoverSnapshot() const
+{
+    return snap_apparatus_takeover && snap_apparatus_takeover->snapshot_count > 0;
+}
+
+void ScrWindow::BeginSetupDelay(float seconds)
+{
+    if (seconds <= 0) {
+        return;
+    }
+    g_gameVals.isFrameFrozen = true;
+    is_setup_time_running = true;
+    base_time = seconds;
+    setup_delay_last_tick = GetTickCount64();
+}
+
+void ScrWindow::TickSetupDelay()
+{
+    if (!is_setup_time_running) {
+        return;
+    }
+
+    // Wall-clock rather than ImGui's frame delta: this runs outside the draw pass, where
+    // DeltaTime belongs to whatever frame ImGui last built. The game is frozen while the
+    // delay runs, so a frame-count clock would not advance either.
+    const unsigned long long now = GetTickCount64();
+    if (setup_delay_last_tick != 0 && now > setup_delay_last_tick) {
+        base_time -= (now - setup_delay_last_tick) / 1000.0f;
+    }
+    setup_delay_last_tick = now;
+
+    if (base_time < 0) {
+        g_gameVals.isFrameFrozen = false;
+        is_setup_time_running = false;
+    }
+}
+
+void ScrWindow::SaveTrainingState()
+{
+    if (*(bbcf_base_adress + 0x8F7758) != 0) {
+        LOG(2, "[SaveState] save refused: searching for a ranked match\n");
+        return;
+    }
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        LOG(2, "[SaveState] save refused: char data not available\n");
+        return;
+    }
+    LOG(2, "[SaveState] saving\n");
+
+    SnapshotApparatus* apparatus = EnsureTrainingSnapshot();
+    if (apparatus) {
+        apparatus->save_snapshot(0);
+    }
+}
+
+void ScrWindow::LoadTrainingState()
+{
+    if (*(bbcf_base_adress + 0x8F7758) != 0) {
+        return;
+    }
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        return;
+    }
+    if (!HasTrainingSnapshot()) {
+        LOG(2, "[SaveState] load refused: nothing saved yet\n");
+        return;
+    }
+
+    LOG(2, "[SaveState] loading\n");
+    SnapshotApparatus* apparatus = EnsureTrainingSnapshot();
+    if (apparatus) {
+        apparatus->load_snapshot(0);
+    }
+    BeginSetupDelay(wait_before_exec_s);
+}
+
+void ScrWindow::LoadReplayTakeoverState()
+{
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        return;
+    }
+    if (!HasReplayTakeoverSnapshot()) {
+        return;
+    }
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        return;
+    }
+
+    snap_apparatus_takeover->load_snapshot(0);
+
+    playback_manager.load_into_slot(replay_action_load, facing_left_replay_takeover, 1);
+    playback_manager.set_active_slot(1);
+    playback_manager.set_playback_type(0); //forces playback type to be "normal" instead of "random"
+    playback_manager.set_playback_position(0); //makes sure the playback is in frame zero
+    playback_manager.set_playback_control(3); //activates the playback
+    BeginSetupDelay(wait_before_exec_s2);
+}
+
+void ScrWindow::TickSaveStateHotkeys()
+{
+    // Latch only. See the header for why the work is not done from here.
+    if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_SaveState)) {
+        pending_save_state = true;
+        LOG(2, "[SaveState] save requested by hotkey\n");
+    }
+    if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadState)) {
+        pending_load_state = true;
+        LOG(2, "[SaveState] load requested by hotkey\n");
+    }
+    if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadReplayState)) {
+        pending_load_replay_state = true;
+        LOG(2, "[SaveState] replay-takeover load requested by hotkey\n");
+    }
+}
+
+void ScrWindow::RunPendingSaveStateRequests()
+{
+    if (pending_save_state) {
+        pending_save_state = false;
+        SaveTrainingState();
+    }
+    if (pending_load_state) {
+        pending_load_state = false;
+        LoadTrainingState();
+    }
+    if (pending_load_replay_state) {
+        pending_load_replay_state = false;
+        LoadReplayTakeoverState();
+    }
 }
 
 bool ScrWindow::s_swapCoordsToggle = false;
@@ -1589,52 +1753,19 @@ void ScrWindow::DrawRecordingSlotsBody() {
 //}
 
 void ScrWindow::DrawSaveStatesBody() {
-    static SnapshotApparatus* snap_apparatus = nullptr;
-
     if (*(bbcf_base_adress + 0x8F7758) == 0) {
         if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
-            auto ensure_snapshot_apparatus = [&]() -> SnapshotApparatus* {
-                if (snap_apparatus == nullptr) {
-                    snap_apparatus = new SnapshotApparatus();
-                    snap_apparatus->ReserveSlots("training_states", 1);
-                }
-                else if (!snap_apparatus->check_if_valid(g_interfaces.player1.GetData(),
-                    g_interfaces.player2.GetData())) {
-                    delete snap_apparatus;
-                    snap_apparatus = new SnapshotApparatus();
-                    snap_apparatus->ReserveSlots("training_states", 1);
-                }
-                return snap_apparatus;
-            };
-            static float wait_before_exec_s = 0;
-
-            if (ImGui::Button("Save snapshot") ||
-                HotkeyManager::WasPressed(HotkeyManager::Hotkey_SaveState)) {
-                SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
-                if (apparatus) {
-                    apparatus->save_snapshot(0);
-                }
+            if (ImGui::Button("Save snapshot")) {
+                SaveTrainingState();
             }
             ImGui::SameLine();
             ImGui::ShowHelpMarker(Messages.Save_snapshot_tooltip());
             ImGui::SameLine();
             ImGui::ShowHelpMarker("You can also use a hotkey for this. Set it under Hotkeys in the mod's Settings window - any key, key combination, or a spare controller button.");
             ImGui::SameLine();
-            const bool has_snapshot = snap_apparatus && snap_apparatus->snapshot_count != 0;
-            if (has_snapshot) {
-                if (ImGui::Button("Load snapshot") ||
-                    HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadState)) {
-                    SnapshotApparatus* apparatus = ensure_snapshot_apparatus();
-                    if (apparatus) {
-                        apparatus->load_snapshot(0);
-                    }
-                    if (wait_before_exec_s > 0) {
-                        g_gameVals.isFrameFrozen = true;
-
-                        this->is_setup_time_running = true;
-                        this->base_time = wait_before_exec_s;
-                    }
-
+            if (HasTrainingSnapshot()) {
+                if (ImGui::Button("Load snapshot")) {
+                    LoadTrainingState();
                 }
             }
             else {
@@ -1652,7 +1783,6 @@ void ScrWindow::DrawSaveStatesBody() {
             ImGui::SameLine();
             ImGui::ShowHelpMarker("This pauses the game once you load a state for the amount set in order to adjust hand position. Set to 0 if no delay is desired.");
             if (is_setup_time_running == true) {
-                this->base_time -= ImGui::GetIO().DeltaTime;
                 ImGui::OpenPopup("progress_bar");
                 ImGui::SetNextWindowSize(ImVec2(400, 50));
                 if (ImGui::BeginPopupModal("progress_bar", NULL, ImGuiWindowFlags_NoTitleBar)) {
@@ -1663,11 +1793,6 @@ void ScrWindow::DrawSaveStatesBody() {
                         ImGui::CloseCurrentPopup();
                     }
                     ImGui::EndPopup();
-                }
-
-                if (this->base_time < 0) {
-                    g_gameVals.isFrameFrozen = false;
-                    this->is_setup_time_running = false;
                 }
             }
         }
@@ -2182,9 +2307,9 @@ void ScrWindow::DrawReplayTakeoverBody() {
     
 
     char* bbcf_base = GetBbcfBaseAdress();
-    static std::vector<char> replay_action_load{};
-    static SnapshotApparatus* snap_apparatus_takeover = nullptr;
-    static int facing_left_replay_takeover = 0;
+
+
+
     auto ensure_snapshot_apparatus_takeover = [&]() -> SnapshotApparatus* {
         if (snap_apparatus_takeover == nullptr) {
             snap_apparatus_takeover = new SnapshotApparatus();
@@ -2206,7 +2331,7 @@ void ScrWindow::DrawReplayTakeoverBody() {
     char* r2p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080;
     char* r3p1_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
     char* r3p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
-    static float wait_before_exec_s2 = 0; //for the little load delay bar
+
 
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
     {
@@ -2295,27 +2420,8 @@ void ScrWindow::DrawReplayTakeoverBody() {
             ImGui::ShowHelpMarkerSameLine(Messages.Takeover_as_p2_tooltip());
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {
-            if ((ImGui::Button(L("Load Replay State").c_str()) ||
-                HotkeyManager::WasPressed(HotkeyManager::Hotkey_LoadReplayState))
-                && snap_apparatus_takeover->snapshot_count > 0) {
-                if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
-                    snap_apparatus_takeover->load_snapshot(0);
-
-                    //snap_apparatus_takeover->load_snapshot(snap_apparatus_takeover->p_snapshot_reseve);
-
-                    playback_manager.load_into_slot(replay_action_load, facing_left_replay_takeover, 1);
-                    playback_manager.set_active_slot(1);
-                    playback_manager.set_playback_type(0); //forces playback type to be "normal" instead of "random"
-                    playback_manager.set_playback_position(0); //makes sure the playback is in frame zero
-                    playback_manager.set_playback_control(3); //activates the playback
-                    if (wait_before_exec_s2 > 0) {
-                        g_gameVals.isFrameFrozen = true;
-
-                        this->is_setup_time_running = true;
-                        this->base_time = wait_before_exec_s2;
-                    }
-
-                }
+            if (ImGui::Button(L("Load Replay State").c_str())) {
+                LoadReplayTakeoverState();
             }
             ImGui::ShowHelpMarkerSameLine(Messages.Load_replay_state_tooltip());
         }
@@ -2325,7 +2431,6 @@ void ScrWindow::DrawReplayTakeoverBody() {
         ImGui::ShowHelpMarkerSameLine(
             L("Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.").c_str());
         if (is_setup_time_running == true) {
-            this->base_time -= ImGui::GetIO().DeltaTime;
             ImGui::OpenPopup("progress_bar_replay_takeover");
             ImGui::SetNextWindowSize(ImVec2(400, 50)); 
             if (ImGui::BeginPopupModal("progress_bar_replay_takeover", NULL, ImGuiWindowFlags_NoTitleBar)) {
@@ -2336,11 +2441,6 @@ void ScrWindow::DrawReplayTakeoverBody() {
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
-            }
-
-            if (this->base_time < 0) {
-                g_gameVals.isFrameFrozen = false;
-                this->is_setup_time_running = false;
             }
         }
         if (*g_gameVals.pGameMode == GameMode_Training) {

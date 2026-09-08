@@ -16,6 +16,16 @@ public:
 	void Close();
 	void ToggleOpen();
 	bool IsOpen() const;
+
+	// Whether this window needs the mod's mouse cursor on screen right now.
+	//
+	// This is deliberately not the same question as IsOpen(). A HUD-style overlay can be
+	// "open" for its whole session and still not want a cursor - either because it never
+	// takes mouse input at all, or because it is open but not currently being drawn. Basing
+	// the cursor on IsOpen() left one on screen on the title screen and the main menu for
+	// anyone whose frame history was enabled, since that window self-opens from settings.ini
+	// and only stops drawing, never closes.
+	virtual bool WantsMouseCursor() const { return m_windowOpen; }
 	void SetWindowFlag(ImGuiWindowFlags flag);
 	void ClearWindowFlag(ImGuiWindowFlags flag);
 protected:

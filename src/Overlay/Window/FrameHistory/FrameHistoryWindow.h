@@ -33,6 +33,12 @@ public:
 		}
 
 	void Update() override;
+
+	// Only while it is genuinely on screen. Update() stops drawing outside a training or
+	// replay match but never closes itself, so IsOpen() stays true for the whole session -
+	// and this window self-opens from settings.ini, so that used to mean a cursor from the
+	// title screen onwards.
+	bool WantsMouseCursor() const override;
 protected:
 	void BeforeDraw() override;
 	void Draw() override;

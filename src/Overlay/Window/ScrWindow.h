@@ -25,6 +25,21 @@ public:
 	// pumped independently or the features would stop the moment you looked elsewhere.
 	static void Tick();
 
+	// Polled from WindowManager::HandleButtons, the mod's single hotkey poll site, so a
+	// save-state bind works with the mod menu closed. It only latches a request: the work
+	// happens in RunPendingSaveStateRequests.
+	void TickSaveStateHotkeys();
+
+	// Runs the latched request, called after the overlay's windows have been drawn.
+	//
+	// Deliberately not done straight from HandleButtons. That runs before ImGui::NewFrame,
+	// which is a frame phase the snapshot code had never been entered from - the buttons
+	// that used to be its only trigger live in the draw pass. SnapshotApparatus's
+	// constructor NOPs three sites in the game's code and calls into its network init, so
+	// it is not something to invoke from a new phase on a hunch. This keeps the hotkey
+	// reading a fresh press edge while doing the work where the buttons always did it.
+	void RunPendingSaveStateRequests();
+
 	// Section bodies drawn by the mod menu's Training, Replays and Online pages. Each of
 	// these renders the CONTENT only - the page owns the header and the layout around it.
 	void DrawPositionsBody();
@@ -117,6 +132,33 @@ private:
 	int wakeup_delay = 0;
 
 
+
+	// Save states, and the "setup time" pause that follows a load. Both used to live entirely
+	// inside the draw bodies, which are only called while the mod menu sits on the page that
+	// owns them: the hotkeys fired only then, and the countdown that clears isFrameFrozen
+	// only advanced while it was on screen, so closing the menu mid-delay froze the game.
+	// The hotkeys are now polled by TickSaveStateHotkeys and the countdown by TickSetupDelay.
+	void SaveTrainingState();
+	void LoadTrainingState();
+	void LoadReplayTakeoverState();
+	bool HasTrainingSnapshot() const;
+	bool HasReplayTakeoverSnapshot() const;
+
+	SnapshotApparatus* EnsureTrainingSnapshot();
+	void BeginSetupDelay(float seconds);
+	void TickSetupDelay();
+
+	bool pending_save_state = false;
+	bool pending_load_state = false;
+	bool pending_load_replay_state = false;
+
+	SnapshotApparatus* snap_apparatus = nullptr;
+	SnapshotApparatus* snap_apparatus_takeover = nullptr;
+	std::vector<char> replay_action_load{};
+	int facing_left_replay_takeover = 0;
+	float wait_before_exec_s = 0;
+	float wait_before_exec_s2 = 0;
+	unsigned long long setup_delay_last_tick = 0;
 
 	std::chrono::steady_clock::time_point start_time;
 	float base_time = 0;

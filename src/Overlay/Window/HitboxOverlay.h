@@ -28,6 +28,9 @@ public:
 	bool HasNullptrInData();
 
 protected:
+	// Draws boxes and takes no mouse input at all.
+	bool WantsMouseCursor() const override { return false; }
+	
 	void BeforeDraw() override;
 	void Draw() override;
 	void AfterDraw() override;

@@ -6,6 +6,28 @@
 #include "Overlay/imgui_utils.h"
 #include "Core/Localization.h"
 
+bool FrameAdvantageWindow::HasMatchToReportOn()
+{
+    return isInMatch()
+        && !g_interfaces.player1.IsCharDataNullPtr()
+        && !g_interfaces.player2.IsCharDataNullPtr();
+}
+
+bool FrameAdvantageWindow::WantsMouseCursor() const
+{
+    return m_windowOpen && HasMatchToReportOn();
+}
+
+void FrameAdvantageWindow::Update()
+{
+    if (!m_windowOpen || !HasMatchToReportOn())
+    {
+        return;
+    }
+
+    IWindow::Update();
+}
+
 void FrameAdvantageWindow::Draw() {
 
 	computeFramedataInteractions();

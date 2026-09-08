@@ -18,8 +18,17 @@ public:
 	}
 
 
+	// Opened by a checkbox on a mod-menu page, which only runs while that page is drawn, so
+	// leaving training never closes this. Both of these gate on there actually being a match
+	// to report on instead.
+	void Update() override;
+	bool WantsMouseCursor() const override;
+
 protected:
 
 	void Draw() override;
+
+private:
+	static bool HasMatchToReportOn();
 
 };

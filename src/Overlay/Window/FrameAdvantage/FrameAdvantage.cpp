@@ -70,7 +70,9 @@ bool hasWorldTimeMoved()
 
 void computeFramedataInteractions()
 {
-    if (!isInMatch && !(*g_gameVals.pGameMode == GameMode_Training || *g_gameVals.pGameMode == GameMode_ReplayTheater))
+    // isInMatch, not isInMatch: without the call this tested the address of the function,
+    // which is never null, so the whole gate was dead and this never returned early.
+    if (!isInMatch() && !(*g_gameVals.pGameMode == GameMode_Training || *g_gameVals.pGameMode == GameMode_ReplayTheater))
         return;
 
     if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr())
