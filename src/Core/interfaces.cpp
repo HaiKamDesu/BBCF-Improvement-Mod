@@ -36,6 +36,16 @@ void AdoptGameWindow(HWND hwnd, bool fromDevice, const char* source)
 
 	if (fromDevice)
 	{
+		// Say so once, even when the guess already had it right. Otherwise a healthy log is
+		// indistinguishable from one where this path never ran, and telling those apart is
+		// the whole reason the window is no longer guessed. Once only: Reset fires on every
+		// resolution change and alt-tab.
+		if (!g_gameWindowFromDevice)
+		{
+			LOG(1, "[GameWindow] D3D reports 0x%p (source: %s)%s\n", hwnd, source,
+				previous == hwnd ? "; the earlier guess already agreed" : "");
+		}
+
 		g_gameWindowFromDevice = true;
 	}
 
