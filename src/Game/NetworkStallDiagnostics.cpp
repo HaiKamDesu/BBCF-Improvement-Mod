@@ -193,24 +193,7 @@ namespace
 
 	void AppendToIncidentFile(const char* message)
 	{
-		const HANDLE hFile = CreateFileW(GamePathW(L"BBCF_IM\\DCodeIncidents.log").c_str(), FILE_APPEND_DATA,
-			FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (hFile == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-		SYSTEMTIME st;
-		GetLocalTime(&st);
-		char line[1200];
-		const int len = sprintf_s(line, "[%04u-%02u-%02u %02u:%02u:%02u.%03u] %s",
-			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
-			message);
-		if (len > 0)
-		{
-			DWORD written = 0;
-			WriteFile(hFile, line, static_cast<DWORD>(len), &written, nullptr);
-		}
-		CloseHandle(hFile);
+		AppendToSessionLog(L"DCodeIncidents.log", message);
 	}
 
 	// Mirrors the message to DEBUG.txt (via LOG) and DCodeIncidents.log.

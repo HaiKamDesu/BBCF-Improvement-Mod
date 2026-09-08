@@ -72,26 +72,10 @@ namespace
 	// Which A/B arm the frames accumulated so far belong to.
 	bool g_rateArmOn = true;
 
+	// Shares FrameStallIncidents.log with the watchdog thread - see AppendToSessionLog.
 	void AppendToIncidentFile(const char* message)
 	{
-		const HANDLE hFile = CreateFileW(GamePathW(L"BBCF_IM\\FrameStallIncidents.log").c_str(), FILE_APPEND_DATA,
-			FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (hFile == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		SYSTEMTIME st;
-		GetLocalTime(&st);
-		char line[512];
-		const int len = sprintf_s(line, "[%04u-%02u-%02u %02u:%02u:%02u.%03u] %s",
-			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
-		if (len > 0)
-		{
-			DWORD written = 0;
-			WriteFile(hFile, line, static_cast<DWORD>(len), &written, nullptr);
-		}
-		CloseHandle(hFile);
+		AppendToSessionLog(L"FrameStallIncidents.log", message);
 	}
 }
 

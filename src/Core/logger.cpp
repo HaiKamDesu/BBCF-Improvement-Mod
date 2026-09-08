@@ -8,6 +8,7 @@
 #include <ctime>
 #include <cstdint>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -407,30 +408,35 @@ void ForceLog(const char* message, ...)
 	AppendCrashLogEntry(0, line, timestamp, threadId);
 }
 
-// Preserve the previous session's DEBUG.txt before CREATE_ALWAYS truncates it.
-// The old log moves to BBCF_IM\DebugHistory\DEBUG_<its last-write time>.txt and
-// the folder is pruned to the newest DebugLogSessionHistory files (0 disables,
-// restoring the old overwrite-every-launch behavior).
-static void RotatePreviousSessionLog()
+// Retires 'logPath' so the caller can start a fresh one, and prunes the history folder.
+// 'stem' is the file's name without its extension ("DEBUG"), 'extension' includes the dot.
+//
+// Note the file is retired even when history is switched off - it is deleted instead of
+// moved. "One file per session" is the lifecycle, independent of how many old ones are kept;
+// an append-only log that is never retired is how FrameStallIncidents.log reached 57MB and
+// 1.1M lines spanning months.
+static void RotateSessionLogFile(const wchar_t* logPath, const wchar_t* stem, const wchar_t* extension)
 {
+    WIN32_FILE_ATTRIBUTE_DATA attr = {};
+    if (!GetFileAttributesExW(logPath, GetFileExInfoStandard, &attr))
+    {
+        return; // no previous log
+    }
+
     // settingsIni is zero-initialised until loadSettingsFile runs, and the log is now
     // opened before that so the early-startup window is captured. Reading a raw 0 here
-    // would mean "history disabled" and let CREATE_ALWAYS truncate the previous
-    // session's log - destroying exactly the evidence this path exists to preserve.
-    // So before settings are known, use the value settings.def ships as the default.
+    // would mean "history disabled" and throw away the previous session's log - destroying
+    // exactly the evidence this path exists to preserve. So before settings are known, use
+    // the value settings.def ships as the default.
     static const int kDefaultSessionHistory = 10; // keep in step with settings.def
     const int keep = Settings::settingsFileLoaded
         ? Settings::settingsIni.debugLogSessionHistory
         : kDefaultSessionHistory;
+
     if (keep <= 0)
     {
+        DeleteFileW(logPath);
         return;
-    }
-
-    WIN32_FILE_ATTRIBUTE_DATA attr = {};
-    if (!GetFileAttributesExW(DebugLogPathW(), GetFileExInfoStandard, &attr))
-    {
-        return; // no previous log
     }
 
     CreateDirectoryW(HistoryDirPathW(), nullptr);
@@ -440,14 +446,22 @@ static void RotatePreviousSessionLog()
     FileTimeToSystemTime(&attr.ftLastWriteTime, &stUtc);
     SystemTimeToTzSpecificLocalTime(nullptr, &stUtc, &st);
     wchar_t dest[MAX_PATH];
-    swprintf_s(dest, L"%s\\DEBUG_%04u%02u%02u_%02u%02u%02u.txt",
-        HistoryDirPathW(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-    MoveFileExW(DebugLogPathW(), dest, MOVEFILE_REPLACE_EXISTING);
+    swprintf_s(dest, L"%s\\%s_%04u%02u%02u_%02u%02u%02u%s",
+        HistoryDirPathW(), stem, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+        extension);
 
-    // Prune oldest entries; the timestamped names sort chronologically.
+    if (!MoveFileExW(logPath, dest, MOVEFILE_REPLACE_EXISTING))
+    {
+        // Better to lose the old copy than to keep appending to it forever.
+        DeleteFileW(logPath);
+    }
+
+    // Prune oldest entries; the timestamped names sort chronologically. Each stem is pruned
+    // to 'keep' on its own, so one noisy log cannot evict another's history.
     std::vector<std::wstring> entries;
     WIN32_FIND_DATAW findData = {};
-    const std::wstring findPattern = std::wstring(HistoryDirPathW()) + L"\\DEBUG_*.txt";
+    const std::wstring findPattern =
+        std::wstring(HistoryDirPathW()) + L"\\" + stem + L"_*" + extension;
     const HANDLE hFind = FindFirstFileW(findPattern.c_str(), &findData);
     if (hFind != INVALID_HANDLE_VALUE)
     {
@@ -467,6 +481,68 @@ static void RotatePreviousSessionLog()
             DeleteFileW(victim.c_str());
         }
     }
+}
+
+// Preserve the previous session's DEBUG.txt before CREATE_ALWAYS truncates it.
+static void RotatePreviousSessionLog()
+{
+    RotateSessionLogFile(DebugLogPathW(), L"DEBUG", L".txt");
+}
+
+void AppendToSessionLog(const wchar_t* fileName, const char* message)
+{
+    if (fileName == nullptr || message == nullptr)
+    {
+        return;
+    }
+
+    // Serialises the writers as well as the rotation. These are low-rate diagnostic lines,
+    // and holding the lock across the append is what stops two threads interleaving halves
+    // of a line into the file.
+    static std::mutex sessionLogMutex;
+    static std::set<std::wstring> rotated;
+
+    const std::lock_guard<std::mutex> lock(sessionLogMutex);
+
+    const std::wstring name(fileName);
+    const std::wstring fullPath = GamePathW(std::wstring(L"BBCF_IM\\") + name);
+
+    if (rotated.insert(name).second)
+    {
+        EnsureLogDirectory();
+
+        const std::wstring::size_type dot = name.rfind(L'.');
+        const std::wstring stem = dot == std::wstring::npos ? name : name.substr(0, dot);
+        const std::wstring extension = dot == std::wstring::npos ? std::wstring() : name.substr(dot);
+
+        RotateSessionLogFile(fullPath.c_str(), stem.c_str(), extension.c_str());
+    }
+
+    const HANDLE hFile = CreateFileW(fullPath.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ,
+        nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+
+    // Big enough for the largest caller (the watchdog's stall block, 2400 bytes) plus the
+    // timestamp, and _TRUNCATE rather than sprintf_s because these messages interpolate
+    // unbounded strings - the per-module breakdowns grow with however many modules a stall
+    // touched. sprintf_s would hand an overlong diagnostic line to the invalid parameter
+    // handler and take the process down; a truncated line loses the tail of one report.
+    char line[2560];
+    const int len = _snprintf_s(line, sizeof(line), _TRUNCATE,
+        "[%04u-%02u-%02u %02u:%02u:%02u.%03u] %s",
+        st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
+    if (len > 0)
+    {
+        DWORD written = 0;
+        WriteFile(hFile, line, static_cast<DWORD>(len), &written, nullptr);
+    }
+    CloseHandle(hFile);
 }
 
 void openLogger()

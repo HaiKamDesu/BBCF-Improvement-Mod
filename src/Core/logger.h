@@ -54,6 +54,18 @@ void SetLoggingEnabled(bool enabled);
 // GenerateDebugLogs=0 still ends up with no log file.
 void DeleteDebugLogFile();
 
+// Appends one line to an append-only diagnostic log in BBCF_IM, giving it the same
+// per-session lifecycle DEBUG.txt has: the first write of a session moves the previous
+// session's file into BBCF_IM\DebugHistory as <name>_<timestamp><ext> and starts a fresh
+// one, and that folder is pruned to DebugLogSessionHistory entries per prefix. The line is
+// prefixed with a local timestamp; 'message' should end in its own newline.
+//
+// Every writer of a given file has to come through here. These logs have more than one
+// writer (the frame-stall watchdog thread and the render thread both write
+// FrameStallIncidents.log), and the rotation is only guaranteed to happen before the first
+// line lands if nobody appends behind its back.
+void AppendToSessionLog(const wchar_t* fileName, const char* message);
+
 // One-shot record of how the process was started: game dir, working directory,
 // resolved log path, command line, exe path.
 void LogStartupEnvironment();

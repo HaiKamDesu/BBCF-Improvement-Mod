@@ -71,26 +71,12 @@ namespace
 			: 0.0;
 	}
 
+	// Both this thread and the render thread (FrameStallDiagnostics) write this file, so the
+	// append and the once-per-session rotation both live in the logger where they can be
+	// serialised across writers.
 	void AppendToIncidentFile(const char* message)
 	{
-		const HANDLE hFile = CreateFileW(GamePathW(L"BBCF_IM\\FrameStallIncidents.log").c_str(), FILE_APPEND_DATA,
-			FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (hFile == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		SYSTEMTIME st;
-		GetLocalTime(&st);
-		char line[1200];
-		const int len = sprintf_s(line, "[%04u-%02u-%02u %02u:%02u:%02u.%03u] %s",
-			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, message);
-		if (len > 0)
-		{
-			DWORD written = 0;
-			WriteFile(hFile, line, static_cast<DWORD>(len), &written, nullptr);
-		}
-		CloseHandle(hFile);
+		AppendToSessionLog(L"FrameStallIncidents.log", message);
 	}
 
 	int CurrentGameState()
@@ -388,8 +374,11 @@ namespace
 		const std::string ipBreakdown = FormatCounts(ipCounts, samples.size());
 		const std::string callerBreakdown = FormatCounts(callerCounts, samples.size());
 
+		// _TRUNCATE: the two breakdown strings grow with the number of distinct modules a
+		// stall touched, so this format has no upper bound. sprintf_s would abort the process
+		// on a stall that touched enough of them.
 		char message[2400];
-		sprintf_s(message,
+		_snprintf_s(message, sizeof(message), _TRUNCATE,
 			"[FrameStallWatchdog] stall ~%.1fms state=%d, %zu samples%s\n"
 			"    blocked in: %s\n"
 			"    called by:  %s\n"
