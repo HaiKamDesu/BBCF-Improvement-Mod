@@ -105,8 +105,13 @@ namespace {
 		{ "UnlimitedPlaybackLoopRestartLabState", "Loop: reload training state", "Unlimited Playback", "Reloads your saved training state every time the loop restarts, so positions and health are identical each repetition." },
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop: restart position", "Unlimited Playback", "Where the characters are put when the loop restarts - middle of the stage, a corner, or your own saved snapshot." },
 		{ "D3D9IatFallbackHook", "Overlay rescue mode", "Graphics", "For the rare PC where the mod loads but no mod window ever appears, usually a dual-graphics laptop where NVIDIA's software gets in the way first. Automatic fixes it on affected PCs and does nothing on all the others - leave it there. Requires a restart." },
-		{ "PlatinumVoiceChoice", "Platinum voice choice", "Other", "Picks whether YOUR Platinum speaks as Sena or Luna instead of the game rolling for it. Offline only (training, versus CPU, replays, local versus) - it is switched off in online matches while a reported desync is investigated. Only affects the Platinum you control." },
-		{ "MusicWaveBankFormat", "Custom music file format", "Other", "How converted custom music is stored. Auto is almost always right: it writes compact WMA on Windows and switches to PCM under Wine/Proton, where Windows supplies no audio encoder and WMA cannot be made at all. PCM files play identically but take about ten times the disk space. Changing this rebuilds every converted track." },
+		{ "PlatinumVoiceChoice", "Platinum voice choice", "Audio", "Picks whether YOUR Platinum speaks as Sena or Luna instead of the game rolling for it. Offline only (training, versus CPU, replays, local versus) - it is switched off in online matches while a reported desync is investigated. Only affects the Platinum you control." },
+		{ "LogFrameStalls", "Log frame stalls", "Debug", "Records every frame that took longer than the threshold below, with a breakdown of how much of the delay was the mod's own code and how much was the game, your graphics driver or Windows. Writes to BBCF_IM\\FrameStallIncidents.log, one file per launch. Leave it off unless someone is looking into stuttering on your PC. Requires a restart." },
+		{ "FrameStallThresholdMs", "Frame stall threshold", "Debug", "How slow a frame has to be, in milliseconds, before it is worth logging as a stall. 33 is about two missed frames at 60fps. Only used while frame stall logging is on." },
+		{ "OverlayAbTestSeconds", "Overlay cost A/B test", "Debug", "Turns the mod's overlay drawing off and on again every this many seconds and logs the framerate for each, so a report can show whether the overlay itself is costing you frames. 0 is off, which is what you want unless you are measuring something. Needs frame stall logging on to be any use." },
+		{ "ReplayLaunchParamPollMs", "Replay link check interval", "Replay Database", "How often, in milliseconds, the mod asks Steam whether it handed the game a replay to open. That only changes when you launch from a replay link, so the default is already far more often than needed. 0 checks every single frame and exists only for testing." },
+		{ "TakeoverInputSlot", "Replay takeover controller", "Replay Takeover", "Which side you control when you take over a replay. Pick the one you actually play on - Player 1 also covers keyboard." },
+		{ "MusicWaveBankFormat", "Custom music file format", "Audio", "How converted custom music is stored. Auto is almost always right: it writes compact WMA on Windows and switches to PCM under Wine/Proton, where Windows supplies no audio encoder and WMA cannot be made at all. PCM files play identically but take about ten times the disk space. Changing this rebuilds every converted track." },
 	};
 
 	// The draft being edited, so a hotkey's bind widget can warn about a collision with
@@ -163,6 +168,7 @@ namespace {
 		"Interface",
 		"Hotkeys",
 		"Graphics",
+		"Audio",
 		"Controller",
 		"Ranked",
 		"Online",
@@ -173,6 +179,7 @@ namespace {
 		"System",
 		"Debug",
 		"Ranked Debug",
+		"Replay Takeover",
 		"Replay Takeover Debug",
 		"Other",
 		nullptr
@@ -399,6 +406,7 @@ namespace {
 			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
 			"SpectatorSyncHooksEnabled",
 			"D3D9IatFallbackHook",
+			"LogFrameStalls",
 			nullptr
 		};
 		for (int i = 0; kRestartKeys[i]; ++i)
@@ -480,10 +488,15 @@ void SettingsIniWindow::BuildRows()
 	m_needsRestart = false;
 	g_draft = &m_settingsDraft;
 
+	// A setting with no kSettingMetadata row still works, it just renders with its raw ini
+	// key, no tooltip, and lands under "Other" - which is easy to ship without noticing.
+	// Five settings had drifted in exactly that way. Say so in the log instead.
 #define SETTING(_type, _var, _inistring, _defaultval) \
 	const SettingMetadata* metadata_##_var = GetSettingMetadata(_inistring); \
 	const HotkeyManager::Action hotkey_##_var = HotkeyManager::ActionFromIniKey(_inistring); \
 	const bool isHotkey_##_var = hotkey_##_var != HotkeyManager::Hotkey_Count; \
+	if (!isHotkey_##_var && metadata_##_var == nullptr) \
+		LOG(1, "[Settings] '%s' has no kSettingMetadata row; it will render as its raw ini key under Other\n", _inistring); \
 	m_settingRows.push_back({ \
 		_inistring, \
 		isHotkey_##_var ? HotkeyManager::DisplayName(hotkey_##_var) \
