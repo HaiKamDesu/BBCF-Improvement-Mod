@@ -69,6 +69,21 @@ PaletteManager::~PaletteManager()
 	ShutdownAsyncPaletteLoad();
 }
 
+namespace
+{
+	// Undoes the worker's background mode. THREAD_MODE_BACKGROUND_END fails harmlessly if the
+	// thread never entered background mode (older Windows, or the fallback path).
+	void LiftWorkerPriority(std::thread& worker)
+	{
+		if (!worker.joinable())
+			return;
+
+		const HANDLE handle = static_cast<HANDLE>(worker.native_handle());
+		SetThreadPriority(handle, THREAD_MODE_BACKGROUND_END);
+		SetThreadPriority(handle, THREAD_PRIORITY_NORMAL);
+	}
+}
+
 void PaletteManager::StartAsyncPaletteLoad()
 {
 	LOG(1, "[PaletteLoad] starting the background palette load\n");
@@ -94,6 +109,23 @@ void PaletteManager::StartAsyncPaletteLoad()
 	m_loadPending.store(true, std::memory_order_release);
 
 	load->worker = std::thread([load]() {
+		// Background mode is the whole point of this thread, and specifically its I/O half.
+		// Neptune's cold boot still froze after the load moved off the render thread, because
+		// moving it changed which thread did the work and not what the work was: 1388 cold
+		// random file opens is seconds of continuous disk traffic on a spinning disk, and the
+		// game's own boot reads - demand-paging BBCF.exe, loading assets - end up queued
+		// behind ours on the same drive. The game was never blocked on a lock of ours, which
+		// is why the frame-stall log showed nothing attributable while the game visibly hung.
+		//
+		// THREAD_MODE_BACKGROUND_BEGIN drops this thread's I/O priority as well as its CPU
+		// priority, so the game's reads win the queue. On the versions of Windows where the
+		// mode is unavailable, fall back to a plain priority drop - that at least helps the
+		// CPU side and costs nothing.
+		if (!SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN))
+		{
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST);
+		}
+
 		PaletteFolderLoader_Run(load->outcome, &load->cancel);
 
 		// Release so the game thread's acquire on 'done' sees the finished outcome.
@@ -147,7 +179,13 @@ void PaletteManager::CollectAsyncPaletteLoadLocked()
 	m_loadPending.store(false, std::memory_order_release);
 
 	if (load->worker.joinable())
+	{
+		// About to block the game thread on this worker, so stop asking Windows to
+		// deprioritise it - a background-priority thread can stay parked behind other disk
+		// traffic, and every millisecond it waits is now a millisecond the game waits too.
+		LiftWorkerPriority(load->worker);
 		load->worker.join();
+	}
 
 	if (load->outcome.cancelled)
 	{
@@ -176,6 +214,10 @@ void PaletteManager::ShutdownAsyncPaletteLoad()
 	}
 
 	load->cancel.store(true, std::memory_order_release);
+
+	// Same reason as in CollectAsyncPaletteLoadLocked: this waits on the worker, so it wants
+	// the worker scheduled, not deprioritised.
+	LiftWorkerPriority(load->worker);
 
 	// This can run from DllMain, where joining a thread that has not finished deadlocks
 	// against the loader lock. The worker polls the cancel flag between files, so a bounded
