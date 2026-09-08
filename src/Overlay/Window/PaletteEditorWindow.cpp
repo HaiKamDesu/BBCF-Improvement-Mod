@@ -237,6 +237,13 @@ void PaletteEditorWindow::RecordGradientChange(GradientChange change)
 
 void PaletteEditorWindow::ShowAllPaletteSelections(const std::string& windowID)
 {
+	// m_customPaletteVector was bound in the constructor, before the background load
+	// started, so this is what makes sure it actually holds the palettes by now.
+	if (g_interfaces.pPaletteManager != nullptr)
+	{
+		g_interfaces.pPaletteManager->EnsurePalettesReady();
+	}
+
 	if (HasNullPointer())
 	{
 		return;
@@ -499,6 +506,13 @@ void PaletteEditorWindow::DrawPaletteSprite(CharIndex charIndex, int palIndex,
 
 void PaletteEditorWindow::ShowReloadAllPalettesButton()
 {
+	// m_customPaletteVector was bound in the constructor, before the background load
+	// started, so this is what makes sure it actually holds the palettes by now.
+	if (g_interfaces.pPaletteManager != nullptr)
+	{
+		g_interfaces.pPaletteManager->EnsurePalettesReady();
+	}
+
 	if (ImGui::Button(Messages.Reload_custom_palettes()))
 	{
 		g_interfaces.pPaletteManager->ReloadAllPalettes();
@@ -532,6 +546,13 @@ void PaletteEditorWindow::OnMatchInit()
 
 void PaletteEditorWindow::Draw()
 {
+	// m_customPaletteVector was bound in the constructor, before the background load
+	// started, so this is what makes sure it actually holds the palettes by now.
+	if (g_interfaces.pPaletteManager != nullptr)
+	{
+		g_interfaces.pPaletteManager->EnsurePalettesReady();
+	}
+
 	if (!isPaletteEditingEnabledInCurrentState() || HasNullPointer())
 	{
 		Close();

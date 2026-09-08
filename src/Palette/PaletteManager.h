@@ -1,11 +1,16 @@
 #pragma once
 #include "impl_format.h"
+#include "PaletteFolderLoader.h"
 
 #include "CharPaletteHandle.h"
 
 #include "Game/characters.h"
 #include "Game/Player.h"
 
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <vector>
 #include <string>
 
@@ -23,6 +28,24 @@ public:
 
 	void LoadAllPalettes();
 	void ReloadAllPalettes();
+
+	// Puts the palette vectors into a usable empty state (every character holding only its
+	// "Default" entry) without touching the disk, then kicks the real load onto a worker
+	// thread. Reading a large palette collection off a cold disk took 14.5s in one report,
+	// and doing that inline at the title screen froze the game for exactly that long.
+	void StartAsyncPaletteLoad();
+
+	// Swaps in a finished background load. Cheap and non-blocking when the load is still
+	// running or already collected; call it once per frame from the game thread.
+	void PumpAsyncPaletteLoad();
+
+	// Blocks until the palette data is actually there. For callers that cached the vector
+	// reference from GetCustomPalettesVector() and so never go back through a guarded getter.
+	void EnsurePalettesReady();
+
+	// Cancels a background load and waits a bounded time for the worker to notice. Called
+	// from the destructor, which can run from DllMain - so it must never block forever.
+	void ShutdownAsyncPaletteLoad();
 
 	int GetOnlinePalsStartIndex(CharIndex charIndex);
 	void OverwriteIMPLDataPalName(std::string fileName, IMPL_data_t& palData);
@@ -78,6 +101,32 @@ public:
 	void OnMatchEnd(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo);
 
 private:
+	// The worker builds into its own PaletteSet and the game thread swaps the result in, so
+	// no reader ever observes a half-populated m_customPalettes and no read path needs a lock.
+	struct AsyncPaletteLoad
+	{
+		std::thread worker;
+		std::atomic<bool> done { false };
+		std::atomic<bool> cancel { false };
+		PaletteLoadOutcome outcome;
+	};
+
+	std::unique_ptr<AsyncPaletteLoad> m_asyncLoad;
+
+	// Every palette consumer runs on the game thread today, so this only guards against a
+	// future caller that does not. Reads take the mutex solely while a load is in flight -
+	// m_loadPending is the fast path, and it is false for the whole rest of the session.
+	mutable std::mutex m_asyncLoadMutex;
+	std::atomic<bool> m_loadPending { false };
+
+	// Blocks until any in-flight background load has been swapped in. Every accessor that
+	// reads palette data calls it, so callers can never see the pre-load placeholder set by
+	// accident; it costs one atomic load once the data is in.
+	void EnsurePalettesLoaded() const;
+	void CollectAsyncPaletteLoad();
+	void CollectAsyncPaletteLoadLocked();
+	void AdoptLoadOutcome(PaletteLoadOutcome& outcome);
+
 	std::vector<std::vector<IMPL_data_t>> m_customPalettes;
 	std::vector<std::vector<std::string>> m_paletteSlots;
 	std::vector<int> m_onlinePalsStartIndex;
@@ -86,10 +135,7 @@ private:
 
 	void CreatePaletteFolders();
 	void InitCustomPaletteVector();
-	void LoadPalettesIntoVector(CharIndex charIndex, std::wstring& wFolderPath);
 	void LoadPalettesFromFolder();
-	void LoadImplFile(const std::string& fullPath, const std::string& fileName, CharIndex charIndex);
-	void LoadHplFile(const std::string& fullPath, const std::string& fileName, CharIndex charIndex);
 	void InitPaletteSlotsVector();
 	void InitOnlinePalsIndexVector();
 	void ApplyDefaultCustomPalette(CharIndex charIndex, CharPaletteHandle& charPalHandle);

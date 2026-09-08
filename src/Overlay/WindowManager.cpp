@@ -591,9 +591,16 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 			HotkeyManager::DisplayString(HotkeyManager::GetBinding(action)).c_str());
 	}
 
-	// Load custom palettes
+	// Load custom palettes.
+	//
+	// Reading them inline used to freeze the title screen for as long as the collection took
+	// to come off a cold disk - 14.5 seconds in one report, with 1388 palette files. The
+	// worker does that work while the game keeps drawing, and anything that needs a palette
+	// before it lands blocks on it individually. palettes.ini stays synchronous: it is a
+	// single file, and character select reads it straight away.
 
-	g_interfaces.pPaletteManager->LoadAllPalettes();
+	g_interfaces.pPaletteManager->StartAsyncPaletteLoad();
+	g_interfaces.pPaletteManager->LoadPaletteSettingsFile();
 
 	MusicManager::GetInstance().Initialize();
 	BgmReplacementManager::GetInstance().Initialize();
