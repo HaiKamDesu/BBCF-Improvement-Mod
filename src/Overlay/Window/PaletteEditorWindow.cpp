@@ -941,21 +941,33 @@ void PaletteEditorWindow::SavePaletteToFile()
 
 void PaletteEditorWindow::ReloadSavedPalette(const char* palName)
 {
-	g_imGuiLogger->EnableLog(false);
-	g_interfaces.pPaletteManager->ReloadAllPalettes();
-	g_imGuiLogger->EnableLog(true);
+	// The reload runs on a worker now, so the selection has to happen when it lands rather
+	// than on the next line. Waiting here is what this change exists to avoid: saving a
+	// palette mid-match would otherwise stall the render thread for the whole re-read.
+	const std::string savedName(palName != nullptr ? palName : "");
+	const CharIndex charIndex = m_selectedCharIndex;
 
-	//find the newly loaded custom pal
-	m_selectedPalIndex = g_interfaces.pPaletteManager->FindCustomPalIndex(m_selectedCharIndex, palName);
+	// quiet: this reload exists only to register the file just written, so it should not
+	// reprint the whole collection into the overlay log.
+	g_interfaces.pPaletteManager->ReloadAllPalettes([this, savedName, charIndex]() {
+		// The user may have moved on while the reload ran; only take over the selection if
+		// they are still on the character they saved for, and there is still a handle.
+		if (m_selectedCharIndex != charIndex || m_selectedCharPalHandle == nullptr)
+		{
+			return;
+		}
 
-	if (m_selectedPalIndex < 0)
-	{
-		g_imGuiLogger->Log("[error] Saved custom palette couldn't be reloaded. Not found.\n");
-		m_selectedPalIndex = 0;
-	}
+		m_selectedPalIndex = g_interfaces.pPaletteManager->FindCustomPalIndex(charIndex, savedName.c_str());
 
-	g_interfaces.pPaletteManager->SwitchPalette(m_selectedCharIndex, *m_selectedCharPalHandle, m_selectedPalIndex);
-	CopyPalFileToEditorArray(m_selectedFile, *m_selectedCharPalHandle);
+		if (m_selectedPalIndex < 0)
+		{
+			g_imGuiLogger->Log("[error] Saved custom palette couldn't be reloaded. Not found.\n");
+			m_selectedPalIndex = 0;
+		}
+
+		g_interfaces.pPaletteManager->SwitchPalette(charIndex, *m_selectedCharPalHandle, m_selectedPalIndex);
+		CopyPalFileToEditorArray(m_selectedFile, *m_selectedCharPalHandle);
+	}, true);
 }
 
 bool PaletteEditorWindow::ShowOverwritePopup(bool* p_open, const wchar_t* wFullPath, const char* filename)
@@ -1076,9 +1088,7 @@ void PaletteEditorWindow::DownloadOnlinePalette(Player& playerHandle, uint16_t m
 			IMPL_FILE_EXTENSION,
 			getCharacterNameByIndexA(charIndex).c_str());
 
-		g_imGuiLogger->EnableLog(false);
-		g_interfaces.pPaletteManager->ReloadAllPalettes();
-		g_imGuiLogger->EnableLog(true);
+		g_interfaces.pPaletteManager->ReloadAllPalettes(std::function<void()>(), true);
 	}
 	else
 	{

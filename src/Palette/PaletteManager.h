@@ -8,6 +8,7 @@
 #include "Game/Player.h"
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -26,8 +27,23 @@ public:
 	bool WritePaletteToFile(CharIndex charIndex, IMPL_data_t *filledPalData);
 	bool WriteDownloadedPaletteToFile(CharIndex charIndex, IMPL_data_t* filledPalData, std::string* savedPalName = nullptr);
 
-	void LoadAllPalettes();
-	void ReloadAllPalettes();
+	// Re-reads every palette file from disk and refreshes palettes.ini, on a worker thread.
+	//
+	// Never blocks the caller, and never makes a later frame block either: the palettes
+	// already loaded stay live and readable for as long as the worker takes, and the new set
+	// replaces them in one swap when it is ready. So this is safe to press mid-match - the
+	// render thread does no file I/O and takes no wait, which is the whole point of it being
+	// a reload rather than the first load.
+	//
+	// 'onComplete' runs on the game thread once the new set is live, for callers that need to
+	// look something up in it (the editor re-selecting the palette you just saved). It is
+	// dropped if the reload is superseded or cancelled.
+	//
+	// 'quiet' keeps the reload out of the overlay log. Callers that reload only to register a
+	// file they just wrote used to wrap the synchronous call in EnableLog(false) for this;
+	// that cannot work once the logging happens on a later frame, so it is a parameter.
+	void ReloadAllPalettes(std::function<void()> onComplete = std::function<void()>(),
+		bool quiet = false);
 
 	// Puts the palette vectors into a usable empty state (every character holding only its
 	// "Default" entry) without touching the disk, then kicks the real load onto a worker
@@ -108,6 +124,9 @@ private:
 		std::thread worker;
 		std::atomic<bool> done { false };
 		std::atomic<bool> cancel { false };
+		bool forceFullReread = false;
+		bool quiet = false;
+		std::function<void()> onComplete;
 		PaletteLoadOutcome outcome;
 	};
 
@@ -119,13 +138,20 @@ private:
 	mutable std::mutex m_asyncLoadMutex;
 	std::atomic<bool> m_loadPending { false };
 
+	// False only until the first load lands. While it is true a pending load is a refresh,
+	// and a refresh never has to be waited for - the set in hand is still valid.
+	std::atomic<bool> m_haveUsableSet { false };
+
 	// Blocks until any in-flight background load has been swapped in. Every accessor that
 	// reads palette data calls it, so callers can never see the pre-load placeholder set by
 	// accident; it costs one atomic load once the data is in.
 	void EnsurePalettesLoaded() const;
 	void CollectAsyncPaletteLoad();
-	void CollectAsyncPaletteLoadLocked();
-	void AdoptLoadOutcome(PaletteLoadOutcome& outcome);
+	// Returns the completion callback to run once the lock is released - running it under the
+	// lock would let a callback that touches palette data deadlock on it.
+	std::function<void()> CollectAsyncPaletteLoadLocked();
+	void BeginAsyncLoad(bool forceFullReread, bool quiet, std::function<void()> onComplete);
+	void AdoptLoadOutcome(PaletteLoadOutcome& outcome, bool quiet);
 
 	std::vector<std::vector<IMPL_data_t>> m_customPalettes;
 	std::vector<std::vector<std::string>> m_paletteSlots;
@@ -135,7 +161,6 @@ private:
 
 	void CreatePaletteFolders();
 	void InitCustomPaletteVector();
-	void LoadPalettesFromFolder();
 	void InitPaletteSlotsVector();
 	void InitOnlinePalsIndexVector();
 	void ApplyDefaultCustomPalette(CharIndex charIndex, CharPaletteHandle& charPalHandle);

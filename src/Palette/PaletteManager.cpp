@@ -99,10 +99,35 @@ void PaletteManager::StartAsyncPaletteLoad()
 
 	g_imGuiLogger->Log("[system] Loading local custom palettes...\n");
 
+	BeginAsyncLoad(false, false, std::function<void()>());
+}
+
+void PaletteManager::ReloadAllPalettes(std::function<void()> onComplete, bool quiet)
+{
+	LOG(2, "ReloadAllPalettes\n");
+
+	if (!quiet)
+	{
+		g_imGuiLogger->LogSeparator();
+		g_imGuiLogger->Log("[system] Reloading custom palettes...\n");
+	}
+
+	// Deliberately does NOT clear m_customPalettes the way the first load does. Whatever is
+	// loaded stays live while the worker runs, so no frame in between has to wait for it, and
+	// EnsurePalettesLoaded lets a refresh pass without blocking.
+	ShutdownAsyncPaletteLoad();
+	BeginAsyncLoad(true, quiet, onComplete);
+}
+
+void PaletteManager::BeginAsyncLoad(bool forceFullReread, bool quiet, std::function<void()> onComplete)
+{
 	const std::lock_guard<std::mutex> lock(m_asyncLoadMutex);
 
 	m_asyncLoad.reset(new AsyncPaletteLoad());
 	AsyncPaletteLoad* const load = m_asyncLoad.get();
+	load->forceFullReread = forceFullReread;
+	load->quiet = quiet;
+	load->onComplete = onComplete;
 
 	// Published before the thread starts so a reader that sees the worker also sees the
 	// pending flag, never the other way round.
@@ -126,7 +151,7 @@ void PaletteManager::StartAsyncPaletteLoad()
 			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST);
 		}
 
-		PaletteFolderLoader_Run(load->outcome, &load->cancel);
+		PaletteFolderLoader_Run(load->outcome, &load->cancel, load->forceFullReread);
 
 		// Release so the game thread's acquire on 'done' sees the finished outcome.
 		load->done.store(true, std::memory_order_release);
@@ -138,19 +163,33 @@ void PaletteManager::PumpAsyncPaletteLoad()
 	if (!m_loadPending.load(std::memory_order_acquire))
 		return;
 
-	const std::lock_guard<std::mutex> lock(m_asyncLoadMutex);
+	std::function<void()> completion;
 
-	// Non-blocking by design: this is the once-per-frame tick, so it only collects a load
-	// that has already finished and leaves one that is still running alone.
-	if (m_asyncLoad == nullptr || !m_asyncLoad->done.load(std::memory_order_acquire))
-		return;
+	{
+		const std::lock_guard<std::mutex> lock(m_asyncLoadMutex);
 
-	CollectAsyncPaletteLoadLocked();
+		// Non-blocking by design: this is the once-per-frame tick, so it only collects a load
+		// that has already finished and leaves one that is still running alone.
+		if (m_asyncLoad == nullptr || !m_asyncLoad->done.load(std::memory_order_acquire))
+			return;
+
+		completion = CollectAsyncPaletteLoadLocked();
+	}
+
+	if (completion)
+		completion();
 }
 
 void PaletteManager::EnsurePalettesLoaded() const
 {
 	if (!m_loadPending.load(std::memory_order_acquire))
+		return;
+
+	// A pending load with a usable set already in hand is a refresh, and a refresh is never
+	// worth waiting for: the palettes the caller is about to read are valid, just about to be
+	// replaced by a newer copy. This is what keeps ReloadAllPalettes off the render thread's
+	// critical path even if a match starts while it is still running.
+	if (m_haveUsableSet.load(std::memory_order_acquire))
 		return;
 
 	// Logically const: which palettes the caller is about to read is already decided, this
@@ -160,18 +199,25 @@ void PaletteManager::EnsurePalettesLoaded() const
 
 void PaletteManager::CollectAsyncPaletteLoad()
 {
-	const std::lock_guard<std::mutex> lock(m_asyncLoadMutex);
-	CollectAsyncPaletteLoadLocked();
+	std::function<void()> completion;
+
+	{
+		const std::lock_guard<std::mutex> lock(m_asyncLoadMutex);
+		completion = CollectAsyncPaletteLoadLocked();
+	}
+
+	if (completion)
+		completion();
 }
 
 // Joins the worker (if it has not finished already) and swaps its result in. Call with
 // m_asyncLoadMutex held.
-void PaletteManager::CollectAsyncPaletteLoadLocked()
+std::function<void()> PaletteManager::CollectAsyncPaletteLoadLocked()
 {
 	if (m_asyncLoad == nullptr)
 	{
 		m_loadPending.store(false, std::memory_order_release);
-		return;
+		return std::function<void()>();
 	}
 
 	std::unique_ptr<AsyncPaletteLoad> load;
@@ -189,11 +235,12 @@ void PaletteManager::CollectAsyncPaletteLoadLocked()
 
 	if (load->outcome.cancelled)
 	{
-		LOG(1, "[PaletteLoad] the background load was cancelled; keeping the placeholder set\n");
-		return;
+		LOG(1, "[PaletteLoad] the background load was cancelled; keeping the current set\n");
+		return std::function<void()>();
 	}
 
-	AdoptLoadOutcome(load->outcome);
+	AdoptLoadOutcome(load->outcome, load->quiet);
+	return load->onComplete;
 }
 
 void PaletteManager::ShutdownAsyncPaletteLoad()
@@ -275,22 +322,9 @@ void PaletteManager::InitCustomPaletteVector()
 	}
 }
 
-void PaletteManager::LoadPalettesFromFolder()
-{
-	// Synchronous load: the same work StartAsyncPaletteLoad() does on a worker thread, run
-	// inline. Used by ReloadAllPalettes(), whose callers read the new data on the very next
-	// line and so cannot tolerate it landing a few frames later.
-	LOG(2, "LoadPaletteFiles\n");
-	g_imGuiLogger->Log("[system] Loading local custom palettes...\n");
-
-	PaletteLoadOutcome outcome;
-	PaletteFolderLoader_Run(outcome, nullptr);
-	AdoptLoadOutcome(outcome);
-}
-
-// Takes a finished load - from either the worker thread or the synchronous path - and makes
-// it the live palette set. Always runs on the game thread.
-void PaletteManager::AdoptLoadOutcome(PaletteLoadOutcome& outcome)
+// Takes a finished load from the worker thread and makes it the live palette set. Always
+// runs on the game thread.
+void PaletteManager::AdoptLoadOutcome(PaletteLoadOutcome& outcome, bool quiet)
 {
 	if ((int)outcome.set.size() != getCharactersCount())
 	{
@@ -308,6 +342,11 @@ void PaletteManager::AdoptLoadOutcome(PaletteLoadOutcome& outcome)
 
 		// The overlay logger is ImGui state and is not thread-safe, so the worker only ever
 		// accumulates its lines; this is where they actually reach the log window.
+		if (quiet)
+		{
+			continue;
+		}
+
 		const std::string& log = outcome.set[i].log;
 		size_t start = 0;
 
@@ -331,8 +370,21 @@ void PaletteManager::AdoptLoadOutcome(PaletteLoadOutcome& outcome)
 
 	InitOnlinePalsIndexVector();
 
-	g_imGuiLogger->Log("[system] Finished loading local custom palettes (%d palettes, %d characters from cache, %d read from disk)\n",
-		outcome.totalPalettes, outcome.charsFromCache, outcome.charsFromDisk);
+	// palettes.ini came off the worker with the palettes. Only overwrite if it was actually
+	// read - a missing file leaves the defaults InitPaletteSlotsVector already set up.
+	if (outcome.slots.read && (int)outcome.slots.slots.size() == getCharactersCount())
+	{
+		m_paletteSlots.swap(outcome.slots.slots);
+		m_loadOnlinePalettes = outcome.slots.loadOnlinePalettes;
+	}
+
+	m_haveUsableSet.store(true, std::memory_order_release);
+
+	if (!quiet)
+	{
+		g_imGuiLogger->Log("[system] Finished loading local custom palettes (%d palettes, %d characters from cache, %d read from disk)\n",
+			outcome.totalPalettes, outcome.charsFromCache, outcome.charsFromDisk);
+	}
 }
 
 void PaletteManager::InitOnlinePalsIndexVector()
@@ -457,46 +509,28 @@ static std::wstring GetPalettesIniFullPath()
 
 void PaletteManager::LoadPaletteSettingsFile()
 {
-	InitPaletteSlotsVector();
-
 	LOG(2, "LoadPaletteSettingsFile\n");
 
-	std::wstring wFullPath = GetPalettesIniFullPath();
+	InitPaletteSlotsVector();
 
-	if (!PathFileExists(wFullPath.c_str()))
+	// Same reader the palette worker uses, so a synchronous read here and an asynchronous one
+	// there can never disagree about what a slot means. MatchState calls this at match start
+	// and needs the answer on the spot, so this path stays synchronous.
+	PaletteSlotsResult result;
+	PaletteFolderLoader_ReadSlots(result);
+
+	if (!result.read)
 	{
-		LOG(2, "\t'palettes.ini' file was not found!\n");
 		g_imGuiLogger->Log("[system] 'palettes.ini' file was not found, using defaults.\n");
 		return;
 	}
 
-	CString strBuffer;
-	GetPrivateProfileString(L"General", L"OnlinePalettes", L"1", strBuffer.GetBuffer(MAX_PATH), MAX_PATH, wFullPath.c_str());
-	strBuffer.ReleaseBuffer();
-	m_loadOnlinePalettes = _ttoi(strBuffer);
-
-	for (int i = 0; i < getCharactersCount(); i++)
+	if ((int)result.slots.size() == getCharactersCount())
 	{
-		for (int iSlot = 1; iSlot <= MAX_NUM_OF_PAL_SLOTS; iSlot++)
-		{
-			GetPrivateProfileString(getCharacterNameByIndexW(i).c_str(), std::to_wstring(iSlot).c_str(), L"",
-				strBuffer.GetBuffer(MAX_PATH), MAX_PATH, wFullPath.c_str());
-
-			strBuffer.ReleaseBuffer();
-			strBuffer.Remove('\"');
-
-			// Delete file extension if found
-			int pos = strBuffer.Find(IMPL_FILE_EXTENSION_W, 0);
-			if(pos >= 0)
-			{ 
-				strBuffer.Delete(pos, strBuffer.StringLength(strBuffer));
-			}
-
-			CT2CA pszConvertedAnsiString(strBuffer);
-			m_paletteSlots[i][iSlot-1] = pszConvertedAnsiString;
-		}
+		m_paletteSlots.swap(result.slots);
 	}
 
+	m_loadOnlinePalettes = result.loadOnlinePalettes;
 }
 
 const IMPL_data_t* PaletteManager::GetCustomPalData(CharIndex charIndex, int palIndex) const
@@ -697,30 +731,6 @@ bool PaletteManager::WriteDownloadedPaletteToFile(CharIndex charIndex, IMPL_data
 	}
 
 	return true;
-}
-
-void PaletteManager::LoadAllPalettes()
-{
-	LOG(2, "LoadAllPalettes\n");
-
-	// A pending background load would overwrite this one when it lands.
-	ShutdownAsyncPaletteLoad();
-
-	InitCustomPaletteVector();
-	LoadPalettesFromFolder();
-	LoadPaletteSettingsFile();
-
-	//if(m_loadOnlinePalettes)
-	//	StartAsyncPaletteArchiveDownload();
-}
-
-void PaletteManager::ReloadAllPalettes()
-{
-	LOG(2, "ReloadAllPalettes\n");
-	g_imGuiLogger->LogSeparator();
-	g_imGuiLogger->Log("[system] Reloading custom palettes...\n");
-
-	LoadAllPalettes();
 }
 
 int PaletteManager::GetOnlinePalsStartIndex(CharIndex charIndex)

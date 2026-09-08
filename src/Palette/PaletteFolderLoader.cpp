@@ -340,7 +340,78 @@ namespace
 	}
 }
 
-void PaletteFolderLoader_Run(PaletteLoadOutcome& outcome, const std::atomic<bool>* cancel)
+// Faithful port of what PaletteManager::LoadPaletteSettingsFile did inline, minus ATL: same
+// keys, same defaults, same quote stripping and the same trailing-extension trim, so a slot
+// value resolves to exactly the palette it always did.
+void PaletteFolderLoader_ReadSlots(PaletteSlotsResult& out)
+{
+	const int charCount = getCharactersCount();
+
+	out.slots.clear();
+	out.slots.resize(charCount);
+	for (int i = 0; i < charCount; i++)
+	{
+		out.slots[i].assign(PALETTE_SLOT_COUNT, std::string());
+	}
+	out.loadOnlinePalettes = true;
+	out.read = false;
+
+	wchar_t exePath[MAX_PATH] = {};
+	if (GetModuleFileNameW(NULL, exePath, MAX_PATH) == 0)
+	{
+		return;
+	}
+
+	std::wstring iniPath(exePath);
+	const std::wstring::size_type slash = iniPath.find_last_of(L'\\');
+	if (slash == std::wstring::npos)
+	{
+		return;
+	}
+	iniPath = iniPath.substr(0, slash) + L"\\palettes.ini";
+
+	if (GetFileAttributesW(iniPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+	{
+		LOG(2, "\t'palettes.ini' file was not found!\n");
+		return;
+	}
+
+	out.read = true;
+
+	wchar_t buffer[MAX_PATH] = {};
+	GetPrivateProfileStringW(L"General", L"OnlinePalettes", L"1", buffer, MAX_PATH, iniPath.c_str());
+	out.loadOnlinePalettes = _wtoi(buffer) != 0;
+
+	for (int i = 0; i < charCount; i++)
+	{
+		const std::wstring section = getCharacterNameByIndexW(i);
+
+		for (int slot = 1; slot <= PALETTE_SLOT_COUNT; slot++)
+		{
+			const std::wstring key = std::to_wstring(slot);
+			GetPrivateProfileStringW(section.c_str(), key.c_str(), L"", buffer, MAX_PATH, iniPath.c_str());
+
+			std::wstring value(buffer);
+
+			// Quotes anywhere, as the CString version did with Remove('"').
+			value.erase(std::remove(value.begin(), value.end(), L'"'), value.end());
+
+			// Everything from the extension onwards, so "Foo.cfpl" becomes "Foo".
+			const std::wstring::size_type ext = value.find(IMPL_FILE_EXTENSION_W);
+			if (ext != std::wstring::npos)
+			{
+				value.erase(ext);
+			}
+
+			out.slots[i][slot - 1] = NarrowLikeBefore(value);
+		}
+	}
+
+	LOG(2, "[PaletteLoad] read palettes.ini (OnlinePalettes=%d)\n", out.loadOnlinePalettes ? 1 : 0);
+}
+
+void PaletteFolderLoader_Run(PaletteLoadOutcome& outcome, const std::atomic<bool>* cancel,
+	bool forceFullReread)
 {
 	const int charCount = getCharactersCount();
 
@@ -350,7 +421,13 @@ void PaletteFolderLoader_Run(PaletteLoadOutcome& outcome, const std::atomic<bool
 	// The cache is advisory: a miss on any character only means that character is read the
 	// slow way, and a completely unreadable cache only means every character is.
 	PaletteSet cached;
-	const bool haveCache = PaletteCache_Read(cached) && (int)cached.size() == charCount;
+	const bool haveCache = !forceFullReread &&
+		PaletteCache_Read(cached) && (int)cached.size() == charCount;
+
+	if (forceFullReread)
+	{
+		LOG(1, "[PaletteLoad] full re-read requested; ignoring the cache\n");
+	}
 
 	bool anyCharRead = false;
 
@@ -425,6 +502,7 @@ void PaletteFolderLoader_Run(PaletteLoadOutcome& outcome, const std::atomic<bool
 		anyCharRead = true;
 	}
 
+	// A forced re-read still refreshes the cache, so the next launch is fast again.
 	if (outcome.totalPalettes < PALETTE_CACHE_MIN_PALETTES)
 	{
 		// Small collection: no cache, so the overwhelming majority of installs never grow a
@@ -438,6 +516,13 @@ void PaletteFolderLoader_Run(PaletteLoadOutcome& outcome, const std::atomic<bool
 	else if (anyCharRead || !haveCache)
 	{
 		outcome.cacheWritten = PaletteCache_Write(outcome.set);
+	}
+
+	// Read here rather than on the game thread: 1080 GetPrivateProfileString calls measured
+	// 134ms on a reporter's machine, which is eight dropped frames if it lands mid-match.
+	if (cancel == nullptr || !cancel->load())
+	{
+		PaletteFolderLoader_ReadSlots(outcome.slots);
 	}
 
 	LOG(1, "[PaletteLoad] %d palettes: %d characters from cache, %d read from disk (%d files), cacheWritten=%d\n",

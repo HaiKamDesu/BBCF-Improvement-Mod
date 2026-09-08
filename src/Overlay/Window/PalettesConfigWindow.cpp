@@ -443,8 +443,7 @@ void PalettesConfigWindow::ImportPaletteFile(const std::string& sourcePath, int 
 
 	// Register the new file. This re-reads palette folders and palettes.ini, but
 	// the modal keeps its own draft, so unsaved assignment edits survive.
-	g_interfaces.pPaletteManager->ReloadAllPalettes();
-	RebuildGroupsFromDraft();
+	g_interfaces.pPaletteManager->ReloadAllPalettes([this]() { RebuildGroupsFromDraft(); });
 }
 
 void PalettesConfigWindow::DeletePalette(int charIndex, const std::string& palName)
@@ -469,8 +468,7 @@ void PalettesConfigWindow::DeletePalette(int charIndex, const std::string& palNa
 				slotValue.clear();
 	}
 
-	g_interfaces.pPaletteManager->ReloadAllPalettes();
-	RebuildGroupsFromDraft();
+	g_interfaces.pPaletteManager->ReloadAllPalettes([this]() { RebuildGroupsFromDraft(); });
 }
 
 void PalettesConfigWindow::DrawDeleteConfirmModal()
