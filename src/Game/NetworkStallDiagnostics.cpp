@@ -121,6 +121,43 @@ namespace
 	constexpr uintptr_t kWebApiPlatformOffset = 0x38;
 	constexpr size_t kWebApiHeaderDumpBytes = 0x40;
 
+	// ---- The pending HTTP request object (phase 31) ----
+	// BBCF statically links libcurl 7.54.1 (FUN_007DF840 == curl_easy_setopt).
+	// FUN_00438890 allocates a 0xE44-byte request descriptor and FUN_00438D20
+	// runs it on its own thread (uei::web::client::HttpRequestThread). The
+	// descriptor is reachable from the WebApi client: slot = client + 0x40 +
+	// type*4, and slot[0] is the descriptor.
+	//
+	// Layout recovered from FUN_00438890 (init), FUN_00438A30 (destroy) and
+	// FUN_00433D90 (parse):
+	//   +0x00  std::string  URL (SSO buffer, length +0x10, capacity +0x14)
+	//   +0x1C  request body copy  -- CONTAINS THE SESSION TOKEN, never logged
+	//   +0x24  response body, std::vector<char> {begin, end, cap}
+	//   +0xE38 completed flag (FUN_00433010 treats != 0 as "finished")
+	//   +0xE3C HTTP-success flag; FUN_00433D90 refuses to parse unless it is 1
+	//
+	// +0xE3C is the field that finally separates the two surviving hypotheses
+	// for the 0xB wedge, which need completely different fixes:
+	//   0 -> the HTTP request itself failed (timeout / refused / reset). The fix
+	//        is transport-side: force a fresh connection or reset the client.
+	//   1 -> the server answered with valid JSON carrying an application error
+	//        code (the same shape as the TL_CREATE_USER_ERR_* codes in
+	//        FUN_004287E0). The fix is then session-side, i.e. phase 30's
+	//        forced re-login, and the response body names the actual reason.
+	// Timing alone cannot tell these apart -- it already misled this
+	// investigation twice -- so read the flag instead of inferring it.
+	constexpr uintptr_t kWebApiPendingSlotsOffset = 0x40;
+	constexpr int kWebApiTypeTusRead = 9;
+	constexpr int kWebApiTypeTusWrite = 10;
+	constexpr uintptr_t kHttpReqUrlOffset = 0x00;
+	constexpr uintptr_t kHttpReqUrlLengthOffset = 0x10;
+	constexpr uintptr_t kHttpReqUrlCapacityOffset = 0x14;
+	constexpr uintptr_t kHttpReqResponseVectorOffset = 0x24;
+	constexpr uintptr_t kHttpReqDoneOffset = 0xE38;
+	constexpr uintptr_t kHttpReqHttpOkOffset = 0xE3C;
+	constexpr size_t kHttpReqSize = 0xE44;
+	constexpr size_t kHttpResponseLogBytes = 400;
+
 	// ---- Work-manager completion codes (DAT_00A5A050+4) ----
 	// The strategy ticks publish their outcome here:
 	//   1 login ok (FUN_0042E660), 4 user created (FUN_004287E0),
@@ -528,6 +565,111 @@ namespace
 		LogBlobHexdump("[DCodeTick] WebApi client (session bytes masked CC)", masked, sizeof(masked));
 	}
 
+	// The server's own answer is the last unknown. Logged with the rotating
+	// session token scrubbed -- the response is what mints the next one, so it
+	// carries a live credential.
+	void ScrubSessionValue(char* text)
+	{
+		static const char kKey[] = "\"session\"";
+		char* at = strstr(text, kKey);
+		if (at == nullptr)
+		{
+			return;
+		}
+		char* p = at + (sizeof(kKey) - 1);
+		while (*p == ':' || *p == ' ')
+		{
+			++p;
+		}
+		if (*p != '"')
+		{
+			return;
+		}
+		for (++p; *p != '\0' && *p != '"'; ++p)
+		{
+			*p = '#';
+		}
+	}
+
+	// Dumps the pending request descriptor for one WebApi request type. Only
+	// called once a failure has been observed, at which point the descriptor is
+	// complete and is only ever freed from this same (game) thread by
+	// FUN_00434750, so reading it here does not race the HttpRequest thread.
+	void LogPendingHttpRequest(uintptr_t moduleBase, int type, const char* label)
+	{
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return;
+		}
+		const uint8_t* const slotPtr = client + kWebApiPendingSlotsOffset + type * 4;
+		if (IsBadReadPtr(slotPtr, sizeof(void*)))
+		{
+			return;
+		}
+		const uint8_t* const* const slot = *reinterpret_cast<const uint8_t* const* const*>(slotPtr);
+		if (slot == nullptr || IsBadReadPtr(slot, sizeof(void*)))
+		{
+			IncidentPrintf("[WebApi] %s: no pending request slot\n", label);
+			return;
+		}
+		const uint8_t* const req = *slot;
+		if (req == nullptr || IsBadReadPtr(req, kHttpReqSize))
+		{
+			IncidentPrintf("[WebApi] %s: request descriptor unreadable\n", label);
+			return;
+		}
+
+		const int32_t done = *reinterpret_cast<const int32_t*>(req + kHttpReqDoneOffset);
+		const int32_t httpOk = *reinterpret_cast<const int32_t*>(req + kHttpReqHttpOkOffset);
+
+		// std::string with SSO: the buffer is inline until capacity exceeds 15.
+		const uint32_t urlLength = *reinterpret_cast<const uint32_t*>(req + kHttpReqUrlLengthOffset);
+		const uint32_t urlCapacity = *reinterpret_cast<const uint32_t*>(req + kHttpReqUrlCapacityOffset);
+		const char* url = reinterpret_cast<const char*>(req + kHttpReqUrlOffset);
+		if (urlCapacity > 15)
+		{
+			url = *reinterpret_cast<const char* const*>(req + kHttpReqUrlOffset);
+		}
+		char urlText[160] = "<unreadable>";
+		if (url != nullptr && urlLength < sizeof(urlText) && !IsBadReadPtr(url, urlLength + 1))
+		{
+			memcpy(urlText, url, urlLength);
+			urlText[urlLength] = '\0';
+		}
+
+		const char* const begin = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset);
+		const char* const end = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset + 4);
+		const ptrdiff_t bodyLength = (begin != nullptr && end >= begin) ? (end - begin) : -1;
+
+		IncidentPrintf("[WebApi] %s: done=%d httpOk=%d url=\"%s\" responseBytes=%d\n",
+			label, done, httpOk, urlText, static_cast<int>(bodyLength));
+
+		if (bodyLength <= 0)
+		{
+			return;
+		}
+		size_t copy = static_cast<size_t>(bodyLength);
+		if (copy > kHttpResponseLogBytes)
+		{
+			copy = kHttpResponseLogBytes;
+		}
+		if (IsBadReadPtr(begin, copy))
+		{
+			return;
+		}
+		char body[kHttpResponseLogBytes + 1];
+		for (size_t i = 0; i < copy; ++i)
+		{
+			const uint8_t c = static_cast<uint8_t>(begin[i]);
+			body[i] = (c >= 0x20 && c < 0x7F) ? static_cast<char>(c) : '.';
+		}
+		body[copy] = '\0';
+		ScrubSessionValue(body);
+		IncidentPrintf("[WebApi] %s response: %s%s\n", label, body,
+			static_cast<size_t>(bodyLength) > copy ? " ...(truncated)" : "");
+	}
+
 	// Records every non-zero outcome the strategy ticks publish, so a capture
 	// says "9" (no TUS data) or "0xB" (HTTP error) outright.
 	void SampleWorkMgrState(uintptr_t moduleBase)
@@ -572,6 +714,15 @@ namespace
 		}
 		IncidentPrintf("[WebApi] work manager result %d (%s) sessionHash=%08X sessionLen=%u\n",
 			state, meaning, sessionHash, static_cast<unsigned>(sessionLength));
+
+		// On a failure outcome, show the server's actual answer. This is the one
+		// observation that decides transport-failure vs application-error, and
+		// therefore which of the two candidate fixes is the right one.
+		if (state == 9 || state == 0xB)
+		{
+			LogPendingHttpRequest(moduleBase, kWebApiTypeTusRead, "tus/read");
+			LogPendingHttpRequest(moduleBase, kWebApiTypeTusWrite, "tus/write");
+		}
 	}
 
 	// ---- TUS latch handling (shared by the 200ms poll and the failure handler) ----

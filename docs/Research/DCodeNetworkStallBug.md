@@ -851,3 +851,158 @@ poking `FUN_00428050` directly, because it is a path the game already takes.
 2. **Can mgr+0x20 ever be 1?** If it can, the re-arm silently no-ops.
 3. **The hypothesis itself is unconfirmed.** No wedge has yet been captured on
    the instrumented build, so "re-login fixes it" is still an inference.
+
+## 2026-09-08: the wedge captured on the instrumented build (vs "lotus", Nine)
+
+Session `DebugHistory/DEBUG_20260908_190723.txt`, started 18:41:48, ended
+19:07:23. Identified by `p1Char=29 p2Char=24` (Nine vs Kokonoe) and eight
+`ApplyDefaultCustomPalette char=Nine` match starts.
+
+### It is result 11, not result 9
+
+Every single failure logs **`work manager result 11 (request refused / HTTP
+error)`** — the `local_108 != 0` branch of `FUN_00428AC0`, error string
+`DAT_00850400` 「TUS読み込み失敗」. Not one `result 9`.
+
+**This invalidates the 2026-09-06 inference.** I had argued from timing that
+~700 ms fast-fails implied state 9 (single attempt) rather than 0xB (three
+attempts). This capture shows 0xB producing the *whole* observed range: the
+first failure of the streak took **9765 ms** and the followers 1563 / 1031 /
+969 / 719 / 718 / 625 / 593 ms. The timing argument was worthless, and the
+2026-09-05 wedge was almost certainly 0xB too. The failure is **transport
+level**, not "200 with an empty body" — so the "no TUS data / empty record"
+reading of that earlier section is wrong.
+
+### The frozen session hash is a consequence, not a discriminator
+
+I predicted this line would decide desync-vs-not. It does not. The token only
+rotates on a *successful* response, so once requests start failing it cannot
+rotate under any hypothesis. Observed: last success 18:42:15 minted
+`854D5452`, and that hash then stayed frozen across 26 consecutive failures
+over 23 minutes. That is exactly what a stuck token and a dead transport both
+look like. The discriminator turned out to be the result code instead.
+
+### The server was NOT down — the client was stuck
+
+The decisive comparison:
+
+| session | start | outcome |
+|---|---|---|
+| 18:38:06 | login 18:41:14 (token `381BF7F0`) | first `tus/read` 18:41:19 → **11**; never a single success; user quit 18:41:40 |
+| **18:41:48** | login 18:42:04 | 3 successes 18:42:06–18:42:15, then **26 consecutive 11s** 18:43:19 → 19:05:17 |
+| 19:09:14 | login 19:09:35 | **3/3 `tus/read ok` within 2 s** |
+| 19:12:42 | login 19:12:58 | healthy all session, 4+ `tus/write ok` |
+
+The wedged process failed 26/26 for 24 minutes. A relaunch **110 seconds
+later** logged in and succeeded immediately. 153.122.81.62 was reachable the
+whole time. So the wedge is **client-side and sticky for the process
+lifetime**, and a restart is what clears it.
+
+### Working model
+
+One transport-level failure poisons the WebApi client for the rest of the
+process:
+
+- 18:38 session — the very first `tus/read` after login fails → poisoned → 100% failure.
+- 18:41 session — three succeed, then a **9765 ms timeout** at 18:43:08 (issued
+  on entering the vs-lotus match, right at `OnEnterCharSelectFuncEntry`) →
+  poisoned → 100% failure for the next 24 min.
+- 19:09 / 19:12 sessions — no initial failure → healthy throughout.
+
+Prime suspect: the **shared object at WebApi client +0x70**. `FUN_00434D30`
+tears it down (`FUN_00427150` then `free`) together with the twelve per-type
+pending slots at +0x40, and nothing recreates it mid-session. The per-request
+objects *are* rebuilt each call (`FUN_00438A30` destroy → `FUN_00438890`
+create), so the stickiness has to live in something shared — +0x70 is the only
+candidate in that object.
+
+### Damage in this session
+
+`tus/write` succeeded exactly once, at 18:42:07, **before any match**. Eight
+matches were then played against lotus (saves at 18:48:01, 18:50:23, 18:52:16,
+18:56:03, 18:59:01, 19:02:44, 19:05:13, 19:07:08). The next session started at
+`rank=32 lp=199656 wins=1269 matches=2946` — **byte-identical to this session's
+start**. The entire 25-minute set was discarded.
+
+Note the P2P netplay worked fine throughout — eight full matches. Only the
+HTTP path to the ArcSys backend was dead. The user's connection was not the
+problem.
+
+### Next RE step
+
+Identify WebApi client +0x70 (`FUN_00427150`, and whoever allocates it) and
+`FUN_00438890`'s HTTP layer. If +0x70 is a reusable connection/session handle,
+recycling it is the repair — and it is a much better candidate than the forced
+re-login from phase 30, because a re-login alone would not rebuild it.
+
+## 2026-09-09 phase 31: the HTTP layer, and why the +0x70 theory is out
+
+`DCodeBug31GhidraReport.txt`.
+
+**BBCF statically links libcurl 7.54.1.** Anchored by their own strings:
+
+| function | is |
+|---|---|
+| `FUN_007DF840` | `curl_easy_setopt` ("CURLOPT_SSL_VERIFYHOST no longer supports 1 as value!") |
+| `FUN_007DE340` | connection-reuse candidate search ("Found pending candidate for reuse") |
+| `FUN_007F32E0` | `curl_easy_strerror` |
+| `FUN_007E6EC0` / `FUN_007E6F70` | recv / send failure sites |
+
+### The request layer
+
+`FUN_00438890` allocates a **0xE44-byte request descriptor**; `FUN_00438D20`
+then runs it on **its own dedicated thread** — it news a `uei::FRunnable`,
+re-vtables it to `uei::web::client::HttpRequestThread`, and hands it to
+`FUN_0042EFF0(runnable, L"HttpRequest", 1, 1, 0, 5)`.
+
+Descriptor layout, from `FUN_00438890` (init), `FUN_00438A30` (destroy) and
+`FUN_00433D90` (parse):
+
+```
++0x000  std::string  URL           (SSO buffer; length +0x10, capacity +0x14)
++0x01C  request body copy          <-- carries the session token
++0x024  response body              std::vector<char> {begin, end, cap}
++0xE38  completed flag             (FUN_00433010 treats != 0 as "finished")
++0xE3C  HTTP-success flag          (FUN_00433D90 refuses to parse unless == 1)
+```
+
+### The +0x70 shared-object theory is dead
+
+Phase 30 guessed +0x70 was a shared CURLM carrying a poisoned connection cache.
+It is not: there is **a thread and a fresh request descriptor per request**, and
+`FUN_00427150` reads as a thread/task-manager teardown (`FUN_0042F0F0` on +0x1C,
+then `FUN_00426F70`/`FUN_00426E60`), not a curl handle. Also worth noting the
+host is a raw IP, so libcurl's DNS cache is irrelevant either way. Scratch it.
+
+### Two hypotheses remain, and one field separates them
+
+`FUN_00433D90` will not parse a response unless `+0xE3C == 1`. So the 0xB branch
+in `FUN_00428AC0` — `iVar2 != 0 && local_108 != 0` — is only *clearly* reachable
+when a response really was parsed and carried a non-zero application error code,
+the same shape as the `TL_CREATE_USER_ERR_NONUNIQUE` / `_LLIMIT` / `_ULIMIT`
+codes visible in `FUN_004287E0`. Whether `FUN_00433FE0` also returns non-zero on
+the unparsed path cannot be settled from the decompile.
+
+So:
+
+- **`+0xE3C == 0`** → the HTTP request itself failed (timeout / refused / reset).
+  Fix is transport-side: force a fresh connection, or reset the client.
+- **`+0xE3C == 1`** → the server answered with valid JSON carrying an error code.
+  Fix is session-side (phase 30's forced re-login), and the response body will
+  name the actual reason.
+
+The 9765 ms first failure hints at the former and the ~600–1500 ms followers at
+the latter, which is exactly the kind of timing argument that has now misled
+this investigation twice (first "state 9 not 0xB", then "the frozen session hash
+is the discriminator"). **Read the field; stop inferring.**
+
+### Instrumentation added
+
+`LogPendingHttpRequest` dumps, on every `result 9` / `result 11`, for both
+`tus/read` and `tus/write`: `done`, **`httpOk`**, the request URL, the response
+length, and up to 400 bytes of the response body — with the rotating `session`
+value scrubbed to `#`, since the response is what mints the next token. Reads
+only, and only after completion, on the same thread that owns the descriptor's
+lifetime.
+
+One line from the next wedge decides which of the two fixes to build.

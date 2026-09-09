@@ -1,0 +1,469 @@
+Program: BBCF.exe
+Image base: 00400000
+
+===== WHO TOUCHES THE WEBAPI CLIENT SINGLETON (DAT_00A5A168) =====
+  READ from 00432e33 in FUN_00432e10
+  WRITE from 00432e69 in FUN_00432e10
+
+===== LIBCURL STRING ANCHORS =====
+  CURLOPT_SSL_VERIFYHOST no longer supports 1 as value!   @ 00998778
+      from 007e00e5 in FUN_007df840
+  Found pending candidate for reuse                       @ 00998990
+      from 007deb6a in FUN_007de340
+  A libcurl function was given a bad argument             @ 0099b294
+      from 007f3407 in FUN_007f32e0
+  An unknown option was passed in to libcurl              @ 0099b30c
+      from 007f341c in FUN_007f32e0
+  Recv failure                                            @ 0099911c
+      from 007e6f3e in FUN_007e6ec0
+  Send failure                                            @ 00999108
+      from 007e6fd4 in FUN_007e6f70
+
+----- DECOMPILE 00438890 (create/start HTTP request -> handle) -----
+
+LPCWSTR FUN_00438890(undefined4 param_1,undefined4 param_2,int param_3,int param_4)
+
+{
+  uint uVar1;
+  LPCWSTR pWVar2;
+  LPCWSTR lpString1;
+  int iVar3;
+  undefined4 uVar4;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00826a7e;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  pWVar2 = (LPCWSTR)operator_new(0xe44);
+  if (pWVar2 == (LPCWSTR)0x0) {
+    pWVar2 = (LPCWSTR)0x0;
+  }
+  else {
+    pWVar2[10] = L'\a';
+    pWVar2[0xb] = L'\0';
+    pWVar2[8] = L'\0';
+    pWVar2[9] = L'\0';
+    *pWVar2 = L'\0';
+    pWVar2[0x12] = L'\0';
+    pWVar2[0x13] = L'\0';
+    pWVar2[0x14] = L'\0';
+    pWVar2[0x15] = L'\0';
+    pWVar2[0x16] = L'\0';
+    pWVar2[0x17] = L'\0';
+  }
+  local_8 = 0xffffffff;
+  if (pWVar2 != (LPCWSTR)0x0) {
+    FUN_0042b130(param_1);
+    lpString1 = pWVar2;
+    if (7 < *(uint *)(pWVar2 + 10)) {
+      lpString1 = *(LPCWSTR *)pWVar2;
+    }
+    iVar3 = lstrcmpW(lpString1,L"https");
+    *(uint *)(pWVar2 + 0x18) = (uint)(iVar3 == 0);
+    pWVar2[0x71a] = L'\0';
+    pWVar2[0x71b] = L'\0';
+    FUN_0079f840(pWVar2 + 0x1a,0,0x100,uVar1);
+    FUN_0079f840(pWVar2 + 0x9a,0,0x100);
+    FUN_0079f840(pWVar2 + 0x11a,0,0x400);
+    FUN_0079f840(pWVar2 + 0x31a,0,0x400);
+    FUN_0079f840(pWVar2 + 0x51a,0,0x400);
+    *(undefined4 *)(pWVar2 + 0xc) = param_2;
+    if (param_3 == 0) {
+      pWVar2[0xe] = L'\0';
+      pWVar2[0xf] = L'\0';
+      pWVar2[0x10] = L'\0';
+      pWVar2[0x11] = L'\0';
+    }
+    else {
+      uVar4 = FUN_00787469(param_4 + 2);
+      *(undefined4 *)(pWVar2 + 0xe) = uVar4;
+      *(int *)(pWVar2 + 0x10) = param_4;
+      FUN_0079ecc0(uVar4,param_3,param_4);
+      *(undefined1 *)(param_4 + *(int *)(pWVar2 + 0xe)) = 0;
+      *(undefined1 *)(*(int *)(pWVar2 + 0xe) + 1 + param_4) = 0;
+    }
+    pWVar2[0x71c] = L'\0';
+    pWVar2[0x71d] = L'\0';
+    pWVar2[0x71e] = L'\0';
+    pWVar2[0x71f] = L'\0';
+  }
+  ExceptionList = local_10;
+  return pWVar2;
+}
+
+
+
+--- callers of 00438890 ---
+  00434750 FUN_00434750
+
+----- DECOMPILE 00438a30 (destroy HTTP request) -----
+
+void FUN_00438a30(void *param_1)
+
+{
+  if (param_1 != (void *)0x0) {
+    if (*(void **)((int)param_1 + 0x1c) != (void *)0x0) {
+      FID_conflict__free(*(void **)((int)param_1 + 0x1c));
+    }
+    FUN_004387e0();
+    FID_conflict__free(param_1);
+  }
+  return;
+}
+
+
+
+--- callers of 00438A30 ---
+  00434750 FUN_00434750
+  00434d30 FUN_00434d30
+
+----- DECOMPILE 00438d20 (kick/advance HTTP request) -----
+
+undefined4 FUN_00438d20(undefined4 param_1)
+
+{
+  undefined4 *puVar1;
+  int iVar2;
+  undefined4 uVar3;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00826ab3;
+  local_10 = ExceptionList;
+  ExceptionList = &local_10;
+  puVar1 = (undefined4 *)operator_new(0x10);
+  if (puVar1 == (undefined4 *)0x0) {
+    puVar1 = (undefined4 *)0x0;
+  }
+  else {
+    *puVar1 = uei::FRunnable::vftable;
+    puVar1[1] = 0;
+    puVar1[2] = 0;
+    *puVar1 = uei::web::client::HttpRequestThread::vftable;
+    puVar1[3] = param_1;
+  }
+  local_8 = 0xffffffff;
+  uVar3 = 0;
+  if (puVar1 != (undefined4 *)0x0) {
+    iVar2 = FUN_0042eff0(puVar1,L"HttpRequest",1,1,0,5);
+    if (iVar2 != 0) {
+      uVar3 = 1;
+    }
+  }
+  ExceptionList = local_10;
+  return uVar3;
+}
+
+
+
+--- callers of 00438D20 ---
+  00434750 FUN_00434750
+
+----- DECOMPILE 00427150 (tears down WebApi client +0x70) -----
+
+void __fastcall FUN_00427150(int *param_1)
+
+{
+  int iVar1;
+  
+  if (*param_1 != 0) {
+    if (param_1[7] != 0) {
+      FUN_0042f0f0(param_1[7]);
+      param_1[7] = 0;
+    }
+    FUN_00426d50();
+    iVar1 = *param_1;
+    FUN_00426f70(iVar1);
+    FUN_00426e60(iVar1);
+    *param_1 = 0;
+    FUN_00426f70();
+    FUN_00426e90();
+    return;
+  }
+  return;
+}
+
+
+
+--- callers of 00427150 ---
+  00434d30 FUN_00434d30
+  004324d0 FUN_004324d0
+  004271a0 FUN_004271a0
+  00427280 FUN_00427280
+  004327d0 FUN_004327d0
+
+----- DECOMPILE 00433d90 (parse response (sets the +0x108 error the 0xB branch reads)) -----
+
+void FUN_00433d90(int *param_1,int *param_2)
+
+{
+  uint uVar1;
+  int iVar2;
+  undefined4 uVar3;
+  int local_11c;
+  int local_118;
+  undefined4 local_114;
+  undefined1 local_110 [252];
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_00825fb6;
+  local_10 = ExceptionList;
+  uVar1 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_14 = uVar1;
+  if ((((param_1 != (int *)0x0) && (iVar2 = *param_1, iVar2 != 0)) && (*(int *)(iVar2 + 0xe3c) == 1)
+      ) && ((param_2 != (int *)0x0 && (iVar2 + 0x24 != 0)))) {
+    local_11c = 0;
+    local_118 = 0;
+    local_114 = 0;
+    local_8 = 1;
+    iVar2 = FUN_00432b70(iVar2 + 0x24,&local_11c);
+    if (iVar2 != 0) {
+      iVar2 = FUN_00403530(local_11c,(local_118 - local_11c) + -1,1,local_110,uVar1);
+      if (iVar2 == 0) {
+        local_8 = 0xffffffff;
+        FUN_004289b0();
+        goto LAB_00433ea3;
+      }
+      uVar3 = (**(code **)(*param_2 + 4))();
+      FUN_00433c00(iVar2,uVar3);
+      uVar3 = FUN_00401020(iVar2,"param");
+      (**(code **)*param_2)(uVar3);
+      FUN_004387b0(iVar2);
+    }
+    local_8 = 0xffffffff;
+    FUN_004289b0();
+  }
+LAB_00433ea3:
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+--- callers of 00433D90 ---
+  00433f20 FUN_00433f20
+  00434060 FUN_00434060
+  00433ee0 FUN_00433ee0
+  00433fa0 FUN_00433fa0
+  00433f60 FUN_00433f60
+  00433fe0 FUN_00433fe0
+  00434020 FUN_00434020
+
+----- DECOMPILE 00434d30 (WebApi client teardown (frees +0x40 slots and +0x70)) -----
+
+undefined4 __fastcall FUN_00434d30(int param_1)
+
+{
+  int *_Memory;
+  void *_Memory_00;
+  int iVar1;
+  undefined4 *puVar2;
+  
+  puVar2 = (undefined4 *)(param_1 + 0x40);
+  iVar1 = 0xc;
+  do {
+    _Memory = (int *)*puVar2;
+    if (_Memory != (int *)0x0) {
+      if (*_Memory != 0) {
+        FUN_00438a30(*_Memory);
+        *_Memory = 0;
+      }
+      FID_conflict__free(_Memory);
+      *puVar2 = 0;
+    }
+    puVar2 = puVar2 + 1;
+    iVar1 = iVar1 + -1;
+  } while (iVar1 != 0);
+  _Memory_00 = *(void **)(param_1 + 0x70);
+  if (_Memory_00 != (void *)0x0) {
+    FUN_00427150();
+    FID_conflict__free(_Memory_00);
+    *(undefined4 *)(param_1 + 0x70) = 0;
+  }
+  return 1;
+}
+
+
+
+--- callers of 00434D30 ---
+  008482f0 FUN_008482f0
+  00432f50 FUN_00432f50
+  00427c40 FUN_00427c40
+
+----- DECOMPILE 00432f50 (?) -----
+
+undefined4 __thiscall
+FUN_00432f50(undefined4 *param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4)
+
+{
+  __time64_t _Var1;
+  
+  FUN_00434d30();
+  FUN_0079f840(param_1,0,0x40);
+  *param_1 = param_2;
+  param_1[1] = param_3;
+  param_1[0xb] = param_4;
+  param_1[0xe] = 2;
+  _Var1 = __time64((__time64_t *)0x0);
+  param_1[0xc] = (int)_Var1;
+  *(undefined2 *)(param_1 + 0x20) = 2;
+  param_1[0xd] = (int)((ulonglong)_Var1 >> 0x20);
+  param_1[0x1d] = 0x46434242;
+  param_1[0x1e] = 1;
+  param_1[0x1f] = 0;
+  _sprintf_s((char *)((int)param_1 + 0x82),0x20,"%lld",param_2,param_3);
+  *(undefined4 *)((int)param_1 + 0xa2) = 0;
+  *(undefined4 *)((int)param_1 + 0xa6) = 0;
+  return 1;
+}
+
+
+
+--- callers of 00432F50 ---
+  00427e40 FUN_00427e40
+
+----- DECOMPILE 00434a30 (?) -----
+
+void __thiscall FUN_00434a30(int param_1,undefined4 param_2)
+
+{
+  *(undefined4 *)(param_1 + 0x2c) = param_2;
+  return;
+}
+
+
+
+--- callers of 00434A30 ---
+  004281e0 FUN_004281e0
+  00427fd0 FUN_00427fd0
+
+----- DECOMPILE 00434a40 (?) -----
+
+/* WARNING: Removing unreachable block (ram,0x00434c6c) */
+/* WARNING: Removing unreachable block (ram,0x00434c92) */
+
+void FUN_00434a40(undefined4 *param_1,char *param_2)
+
+{
+  undefined *puVar1;
+  char cVar2;
+  char *pcVar3;
+  char *pcVar4;
+  uint uVar5;
+  rsize_t _SizeInBytes;
+  int iVar6;
+  byte *pbVar7;
+  int local_50;
+  char *local_40;
+  int local_3c;
+  undefined4 local_38;
+  char *local_34;
+  char *local_30;
+  int local_2c;
+  undefined4 local_28;
+  undefined1 local_24 [16];
+  uint local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_008261e0;
+  local_10 = ExceptionList;
+  local_14 = DAT_00a0e0b8 ^ (uint)&stack0xfffffffc;
+  ExceptionList = &local_10;
+  local_34 = param_2;
+  if ((param_1 != (undefined4 *)0x0) && (param_2 != (char *)0x0)) {
+    local_30 = (char *)0x0;
+    local_2c = 0;
+    local_28 = 0;
+    local_8 = 1;
+    pcVar3 = param_2;
+    do {
+      cVar2 = *pcVar3;
+      pcVar3 = pcVar3 + 1;
+    } while (cVar2 != '\0');
+    pcVar4 = PTR_DAT_009d4c50;
+    do {
+      cVar2 = *pcVar4;
+      pcVar4 = pcVar4 + 1;
+    } while (cVar2 != '\0');
+    FUN_00426b50(pcVar3 + (int)(pcVar4 + ((1 - (int)(param_2 + 1)) - (int)(PTR_DAT_009d4c50 + 1))));
+    _SizeInBytes = local_2c - (int)local_30;
+    _strcpy_s(local_30,_SizeInBytes,param_2);
+    _strcat_s(local_30,_SizeInBytes,PTR_DAT_009d4c50);
+    FUN_004262f0(local_30,_SizeInBytes - 1,local_24);
+    local_8._0_1_ = 3;
+    FUN_00426b50(0x21);
+    FUN_00432ee0(0,0,local_24);
+    pcVar3 = param_2 + 1;
+    do {
+      cVar2 = *param_2;
+      param_2 = param_2 + 1;
+    } while (cVar2 != '\0');
+    iVar6 = (int)param_2 - (int)pcVar3;
+    local_8._0_1_ = 5;
+    FUN_00426b50(iVar6);
+    puVar1 = PTR_DAT_009d4c84 + 1;
+    pcVar3 = PTR_DAT_009d4c84;
+    do {
+      cVar2 = *pcVar3;
+      pcVar3 = pcVar3 + 1;
+    } while (cVar2 != '\0');
+    uVar5 = 0;
+    if (iVar6 != 0) {
+      pbVar7 = (byte *)0x0;
+      local_50 = iVar6;
+      do {
+        *pbVar7 = local_34[(int)pbVar7] ^ PTR_DAT_009d4c84[uVar5];
+        uVar5 = (uVar5 + 1) % (uint)((int)pcVar3 - (int)puVar1);
+        local_50 = local_50 + -1;
+        pbVar7 = pbVar7 + 1;
+      } while (local_50 != 0);
+    }
+    local_40 = (char *)0x0;
+    local_3c = 0;
+    local_38 = 0;
+    local_8._0_1_ = 7;
+    FUN_00426860(0,iVar6,&local_40);
+    FUN_00426b50((local_3c - (int)local_40) + 0x25);
+    _strcpy_s((char *)*param_1,param_1[1] - (int)*param_1,"data=");
+    _strcat_s((char *)*param_1,param_1[1] - (int)*param_1,(char *)0x0);
+    _strcat_s((char *)*param_1,param_1[1] - (int)*param_1,local_40);
+    local_8._0_1_ = 5;
+    if (local_40 != (char *)0x0) {
+      FID_conflict__free(local_40);
+      local_40 = (char *)0x0;
+      local_3c = 0;
+      local_38 = 0;
+    }
+    local_8 = 0xffffffff;
+    if (local_30 != (char *)0x0) {
+      FID_conflict__free(local_30);
+      local_30 = (char *)0x0;
+      local_2c = 0;
+      local_28 = 0;
+    }
+  }
+  ExceptionList = local_10;
+  __security_check_cookie(local_14 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+--- callers of 00434A40 ---
+  00434750 FUN_00434750
+
