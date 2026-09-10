@@ -96,6 +96,62 @@ void PlaybackManager::load_raw_into_slot(const std::vector<char>& raw_playback, 
     memcpy(PlaybackSlot(slot).facing_direction_p, &facingDirection, sizeof(facingDirection));
     this->slots[slot - 1].load_raw_into_slot(raw_playback);
 }
+bool PlaybackManager::save_playback_to_path(const std::string& path,
+    const std::vector<char>& trimmed_playback, char facing_direction) {
+    if (path.empty() || trimmed_playback.empty()) {
+        return false;
+    }
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file.good()) {
+        return false;
+    }
+    file.write(&facing_direction, 1);
+    file.write(trimmed_playback.data(), static_cast<std::streamsize>(trimmed_playback.size()));
+    return file.good();
+}
+
+bool PlaybackManager::load_playback_from_path(const std::string& path,
+    std::vector<char>* out_trimmed, char* out_facing) {
+    if (path.empty() || !out_trimmed || !out_facing) {
+        return false;
+    }
+    std::ifstream file(path, std::ios::binary);
+    if (!file.good()) {
+        return false;
+    }
+    file.seekg(0, std::ios::end);
+    const std::streampos size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    // A facing byte plus at least one frame.
+    if (size < 2) {
+        return false;
+    }
+    std::vector<char> data(static_cast<size_t>(size));
+    file.read(data.data(), size);
+    if (!file.good() && !file.eof()) {
+        return false;
+    }
+
+    *out_facing = data[0];
+    out_trimmed->assign(data.begin() + 1, data.end());
+    // Same cap PlaybackSlot enforces when loading (kMaxPlaybackFramesPerSlot there), so a
+    // long or corrupt file is truncated here rather than at the memcpy.
+    const size_t maxFrames = 1200;
+    if (out_trimmed->size() > maxFrames) {
+        out_trimmed->resize(maxFrames);
+    }
+    return !out_trimmed->empty();
+}
+
+std::vector<char> PlaybackManager::raw_to_trimmed(const std::vector<char>& raw_playback) {
+    std::vector<char> trimmed;
+    trimmed.reserve(raw_playback.size() / 2);
+    for (size_t i = 0; (i + 1) < raw_playback.size(); i += 2) {
+        trimmed.push_back(raw_playback[i]);
+    }
+    return trimmed;
+}
+
 void PlaybackManager::load_from_file_into_slot(char* fname, int slot)
 {
     std::vector<char>loaded_file = this->load_from_file(fname);

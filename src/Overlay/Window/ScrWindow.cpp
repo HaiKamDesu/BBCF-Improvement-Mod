@@ -1,9 +1,13 @@
 #include "ScrWindow.h"
+#include "Game/Scr/ScrStateNames.h"
+#include "Overlay/Window/DummyActionsPanel.h"
+#include "Game/Playbacks/DummyActionManager.h"
 
 #include "Core/HotkeyManager.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/Settings.h"
+#include "Core/NativeFileDialog.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
 #include "Game/ReplayStates/FrameState.h"
@@ -56,10 +60,324 @@ void ScrWindow::DrawComboDataButton() {
     }
     ImGui::ShowHelpMarkerSameLine(Messages.Combo_data_button_tooltip());
 }
+void ScrWindow::DrawReplayPlaybackCaptureBody()
+{
+    static const char* kToken = "ScrWindowReplayCapture";
+    static std::vector<char> s_captured;
+    static char s_capturedFacing = 0;
+    static std::string s_status;
+
+    UnlimitedPlaybackManager& mgr = UnlimitedPlaybackManager::Instance();
+
+    const bool inReplayMatch =
+        g_gameVals.pGameMode && g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_ReplayTheater) &&
+        (*g_gameVals.pGameState == GameState_InMatch);
+    const bool busy = NativeFileDialog::IsOpen();
+
+    if (!mgr.IsReplayRecording())
+    {
+        ImGui::BeginDisabled(!inReplayMatch || busy);
+        if (ImGui::Button(L("Capture playback from replay").c_str()))
+        {
+            ImGui::OpenPopup(L("Capture whose inputs?").c_str());
+        }
+        ImGui::EndDisabled();
+        ImGui::ShowHelpMarkerSameLine(
+            L("Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.").c_str());
+
+        if (!inReplayMatch)
+        {
+            const std::string note = L("(while watching a replay)");
+            ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
+            ImGui::TextDisabled("%s", note.c_str());
+        }
+
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+        if (display.x > 0.0f && display.y > 0.0f)
+        {
+            ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f),
+                ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+        if (ImGui::BeginPopupModal(L("Capture whose inputs?").c_str(), nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::TextUnformatted(
+                L("Recording starts now and runs until you stop it.").c_str());
+            ImGui::VerticalSpacing(6);
+            if (ImGui::Button(L("Player 1").c_str()))
+            {
+                if (mgr.StartReplayRecording(true)) { s_status.clear(); }
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(L("Player 2").c_str()))
+            {
+                if (mgr.StartReplayRecording(false)) { s_status.clear(); }
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(L("Cancel").c_str()))
+            {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (!s_status.empty())
+        {
+            ImGui::TextDisabled("%s", s_status.c_str());
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled(L("Recording %s inputs from frame %d...").c_str(),
+            mgr.IsReplayRecordingAsP1() ? "P1" : "P2",
+            mgr.GetReplayRecordingStartFrame());
+
+        ImGui::BeginDisabled(busy);
+        if (ImGui::Button(L("Stop and Save...").c_str()))
+        {
+            // Stopped here, not after the picker answers: the replay keeps playing while a
+            // dialog is up, so the captured range would grow by however long the user spent
+            // typing a filename.
+            if (mgr.StopReplayRecordingToBuffer(&s_captured, &s_capturedFacing))
+            {
+                NativeFileDialog::Request request;
+                request.save = true;
+                request.title = L("Save the captured playback");
+                request.filters.push_back({ L("Playback file"), "*.playback" });
+                request.defaultExtension = "playback";
+                request.initialPath = "replay_capture.playback";
+                if (!NativeFileDialog::Open(kToken, request))
+                {
+                    s_status = L("Could not open the save dialog. The capture was kept.");
+                }
+            }
+            else
+            {
+                s_status = L("Nothing was captured.");
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button(L("Cancel").c_str()))
+        {
+            mgr.CancelReplayRecording();
+            s_captured.clear();
+        }
+    }
+
+    // The picker answers on a later frame; the capture is already in hand by then.
+    NativeFileDialog::Result result;
+    if (NativeFileDialog::Consume(kToken, &result))
+    {
+        if (result.accepted && !s_captured.empty())
+        {
+            if (PlaybackManager::save_playback_to_path(result.path, s_captured, s_capturedFacing))
+            {
+                s_status = FormatText(L("Saved %u frames.").c_str(),
+                    static_cast<unsigned int>(s_captured.size()));
+                LOG(1, "[ReplayCapture] wrote %u frames to '%s'\n",
+                    static_cast<unsigned int>(s_captured.size()), result.path.c_str());
+            }
+            else
+            {
+                s_status = L("That playback could not be saved.");
+                LOG(2, "[ReplayCapture] failed to write '%s'\n", result.path.c_str());
+            }
+        }
+        else if (!result.accepted)
+        {
+            s_status = L("Save cancelled - the capture was discarded.");
+        }
+        s_captured.clear();
+    }
+}
+
+void ScrWindow::DrawPlaybackTransferButtons()
+{
+    // Owner token for this pair of pickers, so a result here is never confused with the
+    // library window's own dialogs.
+    static const char* kToken = "ScrWindowPlaybackTransfer";
+    // contextId, handed back with the result, says which of the two flows answered.
+    const int kImportPick = 0;
+    const int kExportPick = 1;
+
+    static int s_slot = 1;
+    static bool s_openImportSlot = false;
+    static bool s_openExportSlot = false;
+    static std::vector<char> s_importFrames;
+    static char s_importFacing = 0;
+    static std::string s_importName;
+    static std::string s_status;
+
+    const bool inTraining = g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_Training;
+    const bool busy = NativeFileDialog::IsOpen();
+
+    ImGui::BeginDisabled(!inTraining || busy);
+    if (ImGui::Button(L("Import Playback").c_str()))
+    {
+        NativeFileDialog::Request request;
+        request.title = L("Choose a playback file to import");
+        request.filters.push_back({ L("Playback file"), "*.playback" });
+        request.defaultExtension = "playback";
+        request.contextId = kImportPick;
+        NativeFileDialog::Open(kToken, request);
+    }
+    ImGui::EndDisabled();
+    ImGui::ShowHelpMarkerSameLine(
+        L("Load a playback file into one of the game's four recording slots, so you can play it back from the training menu like anything you recorded yourself.").c_str());
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!inTraining || busy);
+    if (ImGui::Button(L("Export Playback").c_str()))
+    {
+        s_openExportSlot = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::ShowHelpMarkerSameLine(
+        L("Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot.").c_str());
+
+    if (!inTraining)
+    {
+        ImGui::TextDisabled("%s", L("(training mode only)").c_str());
+    }
+    else if (!s_status.empty())
+    {
+        ImGui::TextDisabled("%s", s_status.c_str());
+    }
+
+    // Both pickers answer here, on a later frame, because the dialog runs on its own thread.
+    NativeFileDialog::Result result;
+    if (NativeFileDialog::Consume(kToken, &result) && result.accepted)
+    {
+        if (result.contextId == kImportPick)
+        {
+            // Read and checked BEFORE asking which slot, so an unreadable file is refused
+            // rather than being turned into a slot choice that then fails.
+            if (PlaybackManager::load_playback_from_path(result.path, &s_importFrames, &s_importFacing))
+            {
+                const size_t at = result.path.find_last_of("/\\");
+                s_importName = at == std::string::npos ? result.path : result.path.substr(at + 1);
+                s_openImportSlot = true;
+                s_status.clear();
+            }
+            else
+            {
+                s_status = L("That file could not be read as a playback.");
+                LOG(2, "[PlaybackTransfer] import failed to read '%s'\n", result.path.c_str());
+            }
+        }
+        else if (result.contextId == kExportPick)
+        {
+            std::vector<char> trimmed = playback_manager.slots[s_slot - 1].get_slot_buffer();
+            const char facing = playback_manager.slots[s_slot - 1].get_facing_direction();
+            if (PlaybackManager::save_playback_to_path(result.path, trimmed, facing))
+            {
+                s_status = FormatText(L("Exported slot %d, %u frames.").c_str(),
+                    s_slot, static_cast<unsigned int>(trimmed.size()));
+            }
+            else
+            {
+                s_status = L("That playback could not be saved.");
+                LOG(2, "[PlaybackTransfer] export failed to write '%s'\n", result.path.c_str());
+            }
+        }
+    }
+
+    const auto drawSlotChooser = [](const char* title, const char* prompt, int* slot) -> int {
+        // Returns 1 to go ahead, -1 to cancel, 0 while still open.
+        const ImVec2 display = ImGui::GetIO().DisplaySize;
+        if (display.x > 0.0f && display.y > 0.0f)
+        {
+            ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f),
+                ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+        if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            return 0;
+        }
+        int answer = 0;
+        ImGui::TextUnformatted(prompt);
+        ImGui::VerticalSpacing(4);
+        for (int i = 1; i <= 4; ++i)
+        {
+            if (i > 1) { ImGui::SameLine(); }
+            if (ImGui::RadioButton(FormatText(L("Slot %d").c_str(), i).c_str(), *slot == i))
+            {
+                *slot = i;
+            }
+        }
+        ImGui::VerticalSpacing(6);
+        if (ImGui::Button(L("OK").c_str()))
+        {
+            answer = 1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(L("Cancel").c_str()))
+        {
+            answer = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+        return answer;
+    };
+
+    const std::string importTitle = L("Import into which slot?");
+    if (s_openImportSlot)
+    {
+        ImGui::OpenPopup(importTitle.c_str());
+        s_openImportSlot = false;
+    }
+    const int importAnswer = drawSlotChooser(importTitle.c_str(),
+        s_importName.empty() ? L("Choose a slot.").c_str()
+                             : FormatText(L("Loading '%s'.").c_str(), s_importName.c_str()).c_str(),
+        &s_slot);
+    if (importAnswer == 1)
+    {
+        playback_manager.load_into_slot(s_importFrames, s_importFacing, s_slot);
+        s_status = FormatText(L("Imported '%s' into slot %d, %u frames.").c_str(),
+            s_importName.c_str(), s_slot, static_cast<unsigned int>(s_importFrames.size()));
+        LOG(1, "[PlaybackTransfer] imported '%s' into slot %d (%u frames)\n",
+            s_importName.c_str(), s_slot, static_cast<unsigned int>(s_importFrames.size()));
+        s_importFrames.clear();
+    }
+    else if (importAnswer == -1)
+    {
+        s_importFrames.clear();
+    }
+
+    // Export asks for the slot first, then where to put it.
+    const std::string exportTitle = L("Export which slot?");
+    if (s_openExportSlot)
+    {
+        ImGui::OpenPopup(exportTitle.c_str());
+        s_openExportSlot = false;
+    }
+    if (drawSlotChooser(exportTitle.c_str(), L("Choose a slot to write out.").c_str(), &s_slot) == 1)
+    {
+        NativeFileDialog::Request request;
+        request.save = true;
+        request.title = L("Save the playback file");
+        request.filters.push_back({ L("Playback file"), "*.playback" });
+        request.defaultExtension = "playback";
+        request.initialPath = FormatText("slot%d.playback", s_slot);
+        request.contextId = kExportPick;
+        NativeFileDialog::Open(kToken, request);
+    }
+}
+
 void ScrWindow::DrawTasComboToolButton() {
-    // TasManager::Enter already explains itself when the match is not a training one, so
-    // this stays a plain button rather than growing its own availability check.
     TasManager& tas = TasManager::Instance();
+
+    // Greyed out off training, like everything else on the page. TasManager::Enter does
+    // refuse and explain itself, but a button that looks usable and then tells you off is
+    // worse than one that plainly is not available yet. Exiting stays enabled, so a tool
+    // left running cannot be stranded by walking out of training.
+    const bool inTraining = g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_Training;
+    ImGui::BeginDisabled(!inTraining && !tas.IsActive());
     if (ImGui::Button(tas.IsActive() ? L("Exit TAS Combo tool").c_str()
                                      : L("TAS Combo tool").c_str()))
     {
@@ -77,6 +395,7 @@ void ScrWindow::DrawTasComboToolButton() {
             }
         }
     }
+    ImGui::EndDisabled();
     ImGui::ShowHelpMarkerSameLine(L("Frame-by-frame combo editor: build a combo one input at a time, rewind and re-record any part of it, then play the whole thing back. Training mode only.").c_str());
 
     if (!tas.IsActive() && !tas.GetError().empty())
@@ -538,44 +857,6 @@ void ScrWindow::swap_character_coordinates() {
     p2->position_y = posy1;
     p2->facingLeft = !p2->facingLeft;
 }
-std::string interpret_frame_invuln_enum(FrameInvuln value) {
-    switch (value) {
-    case FrameInvuln::None:
-        return "None";
-    case FrameInvuln::Head:
-        return "Head";
-    case FrameInvuln::Body:
-        return "Body";
-    case FrameInvuln::Foot:
-        return "Foot";
-    case FrameInvuln::Throw:
-        return "Throw";
-    case FrameInvuln::HeadBody:
-        return "HeadBody";
-    case FrameInvuln::HeadFoot:
-        return "HeadFoot";
-    case FrameInvuln::HeadThrow:
-        return "HeadThrow";
-    case FrameInvuln::BodyFoot:
-        return "BodyFoot";
-    case FrameInvuln::BodyThrow:
-        return "BodyThrow";
-    case FrameInvuln::FootThrow:
-        return "FootThrow";
-    case FrameInvuln::HeadBodyFoot:
-        return "HeadBodyFoot";
-    case FrameInvuln::HeadBodyThrow:
-        return "HeadBodyThrow";
-    case FrameInvuln::HeadFootThrow:
-        return "HeadFootThrow";
-    case FrameInvuln::BodyFootThrow:
-        return "BodyFootThrow";
-    case FrameInvuln::All:
-        return "All";
-    default:
-        return "Unknown";
-    }
-}
 bool find_substring_in_vector(std::vector<std::string> string_vector, std::string substr) {
     for (auto& str : string_vector) {
         if (substr.find(str) != std::string::npos) {
@@ -601,11 +882,76 @@ void ScrWindow::DrawPositionsBody()
     ImGui::ShowHelpMarkerSameLine(L("Always swap coordinates help").c_str());
 }
 
+void ScrWindow::SyncAnimationRegistersFromActions()
+{
+    DummyActionManager& actions = DummyActionManager::Instance();
+
+    struct Wiring {
+        DummyActionManager::TriggerType trigger;
+        std::vector<scrState*>* pool;
+        std::vector<int>* delays;
+    };
+    const Wiring wiring[] = {
+        { UnlimitedPlaybackManager::Trigger_Wakeup,    &wakeup_register,    &wakeup_register_delays },
+        { UnlimitedPlaybackManager::Trigger_Gap,       &gap_register,       &gap_register_delays },
+        { UnlimitedPlaybackManager::Trigger_OnHit,     &onhit_register,     &onhit_register_delays },
+        { UnlimitedPlaybackManager::Trigger_ThrowTech, &throwtech_register, &throwtech_register_delays },
+    };
+
+    for (const Wiring& w : wiring) {
+        const DummyActionManager::Action& action = actions.Get(w.trigger);
+        if (action.source != DummyActionManager::Source_Animation) {
+            if (!w.pool->empty()) {
+                w.pool->clear();
+                w.delays->clear();
+            }
+            continue;
+        }
+        if (*w.pool == action.animations) {
+            continue;
+        }
+        *w.pool = action.animations;
+        *w.delays = action.animationDelays;
+    }
+}
+
+void ScrWindow::EnsureDummyScriptLoadedForUi()
+{
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        return;
+    }
+    if (g_interfaces.player2.IsCharDataNullPtr() || g_interfaces.player1.IsCharDataNullPtr()) {
+        return;
+    }
+    WindowContainer* container = WindowManager::GetInstance().GetWindowContainer();
+    if (!container) {
+        return;
+    }
+    ScrWindow* self = container->GetWindow<ScrWindow>(WindowType_Scr);
+    if (!self) {
+        return;
+    }
+    self->EnsureDummyScriptFresh(true);
+}
+
 bool ScrWindow::DummyFeaturesInUse() const
 {
-    return !gap_register.empty() || !wakeup_register.empty()
-        || !onhit_register.empty() || !throwtech_register.empty()
-        || dummy_burst_onhit_toggle;
+    // Whether anything the dummy does needs the dummy's script parsed.
+    //
+    // Animation obviously does - it forces one of those states. So does BURST, which is why
+    // it did nothing at all: it finds CmnActBurstBegin by name in the parsed state list, and
+    // with only a burst armed nothing ever asked for the parse, so the list was empty and
+    // every burst resolved to nothing. The log said so plainly once it was asked:
+    // "Trigger 'On Hit' fired but resolved to nothing: source=5".
+    for (DummyActionManager::TriggerType trigger : DummyActionManager::TriggerOrder()) {
+        const DummyActionManager::Source source =
+            DummyActionManager::Instance().Get(trigger).source;
+        if (source == DummyActionManager::Source_Animation
+            || source == DummyActionManager::Source_Burst) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
@@ -627,14 +973,15 @@ bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
     throwtech_register_delays = {};
     burst_action = nullptr;
     air_burst_action = nullptr;
-    frame_to_burst_onhit = 0;
+    // The dummy-action table holds scrState* of its own for animation actions, pointing into
+    // the same script memory, so it has to be told too.
+    DummyActionsPanel::OnDummyScriptReloaded();
     states_wakeup_frame_to_do_action = 0;
     states_wakeup_random_pos = 0;
     states_gap_frame_to_do_action = 0;
     states_gap_random_pos = 0;
     states_throwtech_frame_to_do_action = 0;
     states_throwtech_random_pos = 0;
-    dummy_selected_state = 0;
 
     if (!allowReparse) {
         // Left stale deliberately: p2_old_char_data is not updated, so the next caller that
@@ -654,6 +1001,10 @@ bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
             air_burst_action = state;
         }
     }
+    // Animation actions hold their moves by name, so they can be pointed at this character's
+    // script now that it is parsed. This is what makes a saved animation action work after a
+    // restart, and survive a character swap.
+    DummyActionManager::Instance().ResolveAnimations(states, p2_old_char_data);
     return true;
 }
 
@@ -678,68 +1029,46 @@ void ScrWindow::TickDummyActions()
     // the expensive part, and nobody who never opened the menu should pay for it.
     EnsureDummyScriptFresh(DummyFeaturesInUse());
 
+    // Actions restored from disk hold their moves by name and arrive after the script was
+    // already parsed, so there is no character swap left for the resolve to ride along with.
+    // Asked every frame, done once per character - including when it matches nothing,
+    // because a character without the saved move must not be retried forever.
+    {
+        DummyActionManager& actions = DummyActionManager::Instance();
+        const void* charData = static_cast<const void*>(g_interfaces.player2.GetData());
+        if (!g_interfaces.player2.states.empty() && actions.NeedsAnimationResolve(charData))
+        {
+            actions.ResolveAnimations(g_interfaces.player2.states, charData);
+        }
+    }
+
+    // Animation actions are no longer mirrored into these registers. They fire through
+    // UnlimitedPlaybackManager's own trigger path now, alongside every other source, which
+    // is what lets them be used on all seven triggers instead of the four this function
+    // knows about. Syncing as well would fire them twice.
+
     // Naoto's EN specials need the flag held down, not toggled, so it is rewritten every
-    // frame while on and cleared once on the way off.
-    if (dummy_naoto_en_specials) {
+    // frame while on and cleared once on the way off. Driven by whichever animation action
+    // asks for it, rather than a loose toggle on a panel that no longer exists.
+    bool wantNaotoEn = false;
+    for (DummyActionManager::TriggerType trigger : DummyActionManager::TriggerOrder()) {
+        const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
+        if (action.source == DummyActionManager::Source_Animation && action.naotoEnSpecials) {
+            wantNaotoEn = true;
+            break;
+        }
+    }
+    if (wantNaotoEn) {
         memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
     }
-    else if (dummy_naoto_en_specials != dummy_naoto_en_specials_old) {
+    else if (wantNaotoEn != dummy_naoto_en_specials_old) {
         memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0, 4);
     }
-    dummy_naoto_en_specials_old = dummy_naoto_en_specials;
+    dummy_naoto_en_specials_old = wantNaotoEn;
 
-        if (dummy_burst_onhit_toggle) {
-            onhit_register = {};
-            std::string lastAction = g_interfaces.player2.GetData()->lastAction;
-            std::string weird_current_action_q = g_interfaces.player2.GetData()->current_action2;
-            std::string set_action_override_hitstop_q = g_interfaces.player2.GetData()->set_action_override;
-            std::string currentAction = g_interfaces.player2.GetData()->currentAction;
-            std::string hitByWhichAction = g_interfaces.player2.GetData()->hitByWhichAction;
-
-            if (*g_gameVals.pFrameCount <20 || (frame_to_burst_onhit && frame_to_burst_onhit+ dummy_burst_onhit_cooldown_frames < *g_gameVals.pFrameCount)) {
-                frame_to_burst_onhit = 0;
-            }
-            if (!frame_to_burst_onhit) {
-                if (//(set_action_override_hitstop_q.find("CmnActHit") !=  std::string::npos || set_action_override_hitstop_q.find("CmnActFreeze") != std::string::npos)
-                    //&& 
-                    //hitByWhichAction != ""
-                    g_interfaces.player2.GetData()->hitstun > 0
-                    //&&
-                    //lastAction.find("CmnActBurst") == std::string::npos
-                    &&
-                    currentAction.find("CmnActBurst") == std::string::npos
-                    &&
-                    currentAction.find("CmnActUkemi") == std::string::npos
-                    ) {
-                    frame_to_burst_onhit = *g_gameVals.pFrameCount + dummy_burst_onhit_delay;
-
-                }
-            }
-            if (*g_gameVals.pFrameCount == frame_to_burst_onhit
-                && burst_action != nullptr && air_burst_action != nullptr) {
-                if (g_interfaces.player2.GetData()->position_y > 0) {
-                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(air_burst_action->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
-                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(air_burst_action->name[0]), 20);
-                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(air_burst_action->name[0]), 20);*/
-                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(air_burst_action->name[0]), 20);
-                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
-                    //*kding_p2Inputs2 = 0xCCF5;
-                    //memcpy(kding_p2Inputs2, &burst_act,4);
-                }
-                else {
-                    /*memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(burst_action->addr), 4);
-                    g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2;
-                    memcpy(&(g_interfaces.player2.GetData()->currentAction), &(burst_action->name[0]), 20);
-                    memcpy(&(g_interfaces.player2.GetData()->weird_current_action_q), &(burst_action->name[0]), 20);*/
-                    memcpy(&(g_interfaces.player2.GetData()->set_action_override), &(burst_action->name[0]), 20);
-                    //uint32_t* kding_p2Inputs2 = (uint32_t*)GetBbcfBaseAdress() + 0xE19888;
-                    //*kding_p2Inputs2 = 0xCCF5;
-                    //memcpy(kding_p2Inputs2, &burst_act,4);
-                  
-                }
-            }
-        }
+    // The old burst-on-hit toggle lived here. It is now a source you can point the On Hit
+    // trigger at ("Burst"), which is the same mechanism - an action override the game acts
+    // on - reached the same way as every other kind of dummy action.
 
         static const std::vector<std::tuple<std::string, int>> wakeup_length_pairs{
             //{"CmnActUkemiLandN",30} ,
@@ -889,402 +1218,6 @@ void ScrWindow::TickDummyActions()
         }
     
 }
-
-void ScrWindow::DrawDummyActionsBody()
-{
-    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
-        ImGui::TextDisabled("%s", L("Load into training mode to use this.").c_str());
-        return;
-    }
-    if (g_interfaces.player2.IsCharDataNullPtr()  || g_interfaces.player2.GetData()->charIndex == g_interfaces.player1.GetData()->charIndex) {
-        ImGui::TextWrapped("%s", L("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.").c_str());
-        return;
-    }
-    // The list on screen needs the parse, so this one always allows it.
-    EnsureDummyScriptFresh(true);
-
-
-    if (ImGui::Button("Force Load P2 Script")) {
-        // Through the same path as a character swap. Re-parsing on its own would leave the
-        // registers pointing into the vector this replaces, and it used to clear only two of
-        // the four.
-        p2_old_char_data = nullptr;
-        EnsureDummyScriptFresh(true);
-    }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Force_load_p2_script_tooltip());
-    auto states = g_interfaces.player2.states;
-    {
-        ImGui::BeginChild("left pane", ImVec2(200, 0), true);
-        {
-            // A character's script state list runs to several hundred entries, and every one of
-            // them was building a std::string and submitting a Selectable each frame even though
-            // only a couple of dozen fit in the pane. The clipper submits just the visible range;
-            // rows are uniform height so it can seek directly.
-            const int stateCount = static_cast<int>(g_interfaces.player2.states.size());
-            ImGuiListClipper clipper;
-            clipper.Begin(stateCount);
-            while (clipper.Step())
-            {
-                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
-                {
-                    // State names are not guaranteed unique, so scope the id by index rather
-                    // than letting two identically named states collide.
-                    ImGui::PushID(i);
-                    if (ImGui::Selectable(g_interfaces.player2.states[i]->name.c_str(), dummy_selected_state == i))
-                        dummy_selected_state = i;
-                    ImGui::PopID();
-                }
-            }
-        }
-        ImGui::EndChild();
-        ImGui::SameLine();
-    }
-    // Right
-    {
-        ImGui::BeginGroup();
-        // The write that backs this runs in TickDummyActions, every frame.
-        ImGui::CheckboxWrapped("Naoto EN specials toggle", &dummy_naoto_en_specials);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Naoto_EN_specials_tooltip());
-        //ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 100)); // Leave room for 1 line below us
-        ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 150)); // Leave room for 1 line below us
-        if (states.size() > 0) {
-            auto selected_state = states[dummy_selected_state];
-            ImGui::Text("%s", selected_state->name.c_str());
-            ImGui::Separator();
-            ImGui::Text("Addr: 0x%x", selected_state->addr);
-            ImGui::Text("Frames: %d", selected_state->frames);
-            ImGui::Text("Damage: %d", selected_state->damage);
-            ImGui::Text("Atk_level: %d", selected_state->atk_level);
-            ImGui::Text("Hitstun: %d", selected_state->hitstun);
-            ImGui::Text("Blockstun: %d", selected_state->blockstun);
-            ImGui::Text("Hitstop: %d", selected_state->hitstop);
-            ImGui::Text("Starter_rating: %d", selected_state->starter_rating);
-            ImGui::Text("Atk_P1: %d", selected_state->attack_p1);
-            ImGui::Text("Atk_P2: %d", selected_state->attack_p2);
-            ImGui::Text("Hit_overhead: %d", selected_state->hit_overhead);
-            ImGui::Text("Hit_low: %d", selected_state->hit_low);
-            ImGui::Text("Hit_air_ublockable: %d", selected_state->hit_air_unblockable);
-            ImGui::Text("fatal_counter: %d", selected_state->fatal_counter);
-            if (ImGui::TreeNode("Frame Breakdown")) {
-                ImGui::ShowHelpMarker("Red numbers are active frames, blue numbers are startup/recovery, black numbers are inactive. \n\nWhite borders are full invul/GP, green borders are partial invul/GP(hover for details). Projectile invul not yet being displayed.\n\n\"Non-deterministic\" frame length means that it is not fixed, landing recovery for example. After a non-deterministic state all values will be +\"n\", representing that would be n frames after the frames in question. They are not wrong, they just can't be statically computed.  \n\nSome are still incorrect, however they should be for the most part pretty obvious, around ~85% are done so far.");
-                auto iter_scr_frames = 1;
-                float window_visible_x2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
-                ImGuiStyle& style = ImGui::GetStyle();
-                int after_non_deterministic = 0;
-                for (auto& frame_activity : selected_state->frame_activity_status) {
-                    if (iter_scr_frames > 500) {//needed to limit the amount of drawn frames to keep it from crashing on way too long states(rp based probably/too many branches prob)
-                        ImGui::Text("+ Too long to show all"); 
-                        break; }
-
-
-                    auto color = IM_COL32(0, 255, 255, 255);
-
-                    if (frame_activity == FrameActivity::Active || frame_activity == FrameActivity::NonDeterministicAcive) {
-                        color = IM_COL32(255, 0, 0, 255);
-                    }
-
-                    ImGui::PushStyleColor(ImGuiCol_Text, color);
-                    //ImGui::PushStyleColor(ImGuiCol_TextBg, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-                    if (frame_activity == FrameActivity::NonDeterministicAcive || frame_activity == FrameActivity::NonDeterministicInactive) {
-                        ImGui::Text("Non Deterministic");// check jin's NmlAtk5B, seems to be wrong, should start hitbox at frame 7 not 8. jn201_03's sprite call says 2 frames, but actually is 3 frames long
-                        after_non_deterministic = 1;
-                    }
-                    else {
-                        if (after_non_deterministic) {
-                            ImGui::Text("+%d", after_non_deterministic);
-                            after_non_deterministic++;
-                        }
-                        else {
-                            ImGui::Text("%d", iter_scr_frames);
-                        }
-                    }
-                    auto invuln_color = IM_COL32(50, 50, 50, 255);
-                    if (selected_state->frame_invuln_status.at(iter_scr_frames - 1) == FrameInvuln::All) {
-                        invuln_color = IM_COL32(200, 200, 200, 255);
-                    }
-                    else if (selected_state->frame_invuln_status.at(iter_scr_frames - 1) != FrameInvuln::None) {//its not none and its not full invuln, this is where the permutations come in
-                        invuln_color = IM_COL32(100, 200, 100, 255);
-                    }
-                    ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetItemRectMin().x - 1.5f, ImGui::GetItemRectMin().y - 1),
-                        ImVec2(ImGui::GetItemRectMax().x + 2, ImGui::GetItemRectMax().y + 1),
-                        invuln_color);//draws the square around representing invuln
-                    ImVec2 mousePos = ImGui::GetMousePos();
-                    if ((mousePos.x >= ImGui::GetItemRectMin().x - 1.5f && mousePos.x <= ImGui::GetItemRectMax().x + 2 &&
-                        mousePos.y >= ImGui::GetItemRectMin().y - 1 && mousePos.y <= ImGui::GetItemRectMax().y + 1))
-                    {
-                        ImGui::BeginTooltip();
-                        ImGui::PushTextWrapPos(450.0f);
-                        ImGui::Text("Invuln/GP: %s", interpret_frame_invuln_enum(selected_state->frame_invuln_status.at(iter_scr_frames - 1)).c_str());
-                        ImGui::PopTextWrapPos();
-                        ImGui::EndTooltip();
-                    }
-                    ImGui::PopStyleColor();
-                    float last_button_x2 = ImGui::GetItemRectMax().x;
-                    float next_button_x2 = last_button_x2 + style.ItemSpacing.x + 10.0f; // Expected position if next button was on same line
-                    if (iter_scr_frames < selected_state->frame_activity_status.size() && next_button_x2 < window_visible_x2)
-                        ImGui::SameLine();
-                    iter_scr_frames++;
-                }
-
-                for (auto& ea_state_pair : selected_state->frame_EA_effect_pairs) {
-                    if (selected_state->frame_EA_effect_pairs.size() > 10) { break;//this is necessary because if you spawn an enourmous amount, the vertices crash. Happened with arakunes "UltimateAntiAirShotOD"
-                    }
-                    iter_scr_frames = 1;
-                    auto frames_before_ptr = &ea_state_pair.first;
-                    std::vector<FrameActivity>* frame_activity_status_ptr = &ea_state_pair.second.frame_activity_status;
-                    //std::string fstring = "A";
-                    if (!std::any_of(frame_activity_status_ptr->begin(), 
-                        frame_activity_status_ptr->end(), 
-                        [](FrameActivity frame_activity) {
-                            return frame_activity == FrameActivity::Active;})
-                        ) {
-                        continue;
-                    }
-                    //if (std::find(frame_activity_status_ptr->begin(), frame_activity_status_ptr->end(), fstring) != frame_activity_status_ptr->end()) {
-                   //     continue;
-                   // }
-                    ImGui::Text("%s", ea_state_pair.second.name.c_str());
-                    //will not draw unless there are active frames on the EA state
-                    
-                    std::vector<FrameActivity> temp_vect = {};
-                    for (int i = 0; i < *frames_before_ptr; i++) {
-                        temp_vect.push_back(FrameActivity::Padding); //adds the padding frames
-                    }
-                    temp_vect.insert(temp_vect.end(), frame_activity_status_ptr->begin(), frame_activity_status_ptr->end());
-                    for (auto& frame_activity : temp_vect) {
-                        auto color = IM_COL32(0, 255, 255, 255);
-                        if (frame_activity == FrameActivity::Active) {
-                            color = IM_COL32(255, 0, 0, 255);
-                        }
-                        else if (frame_activity == FrameActivity::Padding) {
-                            color = IM_COL32(0, 0, 0, 255);
-                        }
-
-                        ImGui::PushStyleColor(ImGuiCol_Text, color);
-                        //ImGui::PushStyleColor(ImGuiCol_TextBg, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-                        ImGui::Text("%d", iter_scr_frames);
-                        ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetItemRectMin().x - 1.5f, ImGui::GetItemRectMin().y - 1),
-                            ImVec2(ImGui::GetItemRectMax().x + 2, ImGui::GetItemRectMax().y + 1),
-                            IM_COL32(50, 50, 50, 255));//draws the square around
-                        ImGui::PopStyleColor();
-                        float last_button_x2 = ImGui::GetItemRectMax().x;
-                        float next_button_x2 = last_button_x2 + style.ItemSpacing.x + 10.0f; // Expected position if next button was on same line
-                        if (iter_scr_frames < temp_vect.size() && next_button_x2 < window_visible_x2)
-                            ImGui::SameLine();
-                        iter_scr_frames++;
-                    }
-                }
-                ImGui::TreePop();
-            }
-            ImGui::Text("%s", " ");
-            ImGui::Text("%s", " ");
-            ImGui::Text("Whiff_cancels:", selected_state->fatal_counter);
-            for (std::string name : selected_state->whiff_cancel) {
-                ImGui::Text("    %s", name.c_str());
-            }
-            ImGui::Text("Hit_or_block_cancels(gatlings):", selected_state->fatal_counter);
-            int item_view_len;
-            if (selected_state->hit_or_block_cancel.size() > 5) {
-                item_view_len = 100;
-            }
-            else {
-                item_view_len = selected_state->hit_or_block_cancel.size() * 20;
-            }
-            ImGui::BeginChild("item view", ImVec2(0, item_view_len));
-            for (std::string name : selected_state->hit_or_block_cancel) {
-                ImGui::Text("    %s", name.c_str());
-            }
-            ImGui::EndChild();
-        }
-        ImGui::EndChild();
-
-
-
-        ImGui::Separator();
-
-          
-        ImGui::CheckboxWrapped("Burst on hit", &dummy_burst_onhit_toggle);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Burst_on_hit_tooltip());
-        if (dummy_burst_onhit_toggle) {
-            ImGui::BeginChild("burst_buttons##states", ImVec2(0, 60));
-            ImGui::Text("Burst delay(+hitstop): ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_burst_onhit_delay", &dummy_burst_onhit_delay);
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Burst_onhit_delay_tooltip());
-            ImGui::Text("Burst cooldown: ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_burst_onhit_cooldown_frames", &dummy_burst_onhit_cooldown_frames);
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Burst_onhit_cooldown_tooltip());
-            ImGui::EndChild();
-        }
-        ImGui::CheckboxWrapped("Add delays to actions", &dummy_action_delays_toggle);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Add_delays_to_actions_tooltip());
-        if (dummy_action_delays_toggle) {
-            ImGui::BeginChild("delay_actions##states", ImVec2(0, 60));
-            ImGui::Text("Wakeup: ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_wakeup_delay", &dummy_wakeup_delay);
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.State_wakeup_delay_tooltip());
-            ImGui::Text("Gap: ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_gap_delay", &dummy_gap_delay);
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.State_gap_delay_tooltip());
-            ImGui::Text("Tech: ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_throwtech_delay", &dummy_throwtech_delay);
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.State_throwtech_delay_tooltip());
-            /*ImGui::Text("On Hit Delay: ");
-            ImGui::SameLine();
-            ImGui::InputInt("##state_onhit_delay", &dummy_onhit_delay);*/
-            ImGui::EndChild();
-        }
-        else {
-            dummy_wakeup_delay = 0;
-            dummy_gap_delay = 0;
-            dummy_onhit_delay = 0;
-            dummy_throwtech_delay = 0;
-        }
-
-
-
-
-         
-        if (ImGui::Button("Set as on hit action")) {
-            onhit_register = {};
-            onhit_register_delays = {};
-            states = g_interfaces.player2.states;
-            onhit_register.push_back(states[dummy_selected_state]);
-            onhit_register_delays.push_back(dummy_onhit_delay);
-
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Set_onhit_action_tooltip());
-        //ImGui::InputInt("Burst delay##slot1", &slot_buffer[0]);
-        if (ImGui::Button("Set as wakeup action")) {
-            wakeup_register = {};
-            wakeup_register_delays = {};
-            states_wakeup_random_pos = 0;
-            states = g_interfaces.player2.states;
-            wakeup_register.push_back(states[dummy_selected_state]);
-            wakeup_register_delays.push_back(dummy_wakeup_delay);
-
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Set_wakeup_action_tooltip());
-        ImGui::SameLine();
-        if (ImGui::Button("Set as gap action")) {
-            states = g_interfaces.player2.states;
-            gap_register = {};
-            gap_register_delays = {};
-            states_gap_random_pos = 0;
-            gap_register.push_back(states[dummy_selected_state]);
-            gap_register_delays.push_back(dummy_gap_delay);
-            auto selected_state = states[dummy_selected_state];
-
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Set_gap_action_tooltip());
-        ImGui::SameLine();
-
-        if (ImGui::Button("Set as tech action")) {
-            states = g_interfaces.player2.states;
-            throwtech_register = {};
-            throwtech_register_delays = {};
-            states_throwtech_random_pos = 0;
-            throwtech_register.push_back(states[dummy_selected_state]);
-            throwtech_register_delays.push_back(dummy_throwtech_delay);
-            auto selected_state = states[dummy_selected_state];
-
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Set_tech_action_tooltip());
-        if (ImGui::Button("Use")) {
-            states = g_interfaces.player2.states;
-            auto selected_state = states[dummy_selected_state];
-            //auto tst = g_interfaces.player2.GetData();
-            memcpy(&(g_interfaces.player2.GetData()->nextScriptLineLocationInMemory), &(selected_state->addr), 4);
-            g_interfaces.player2.GetData()->frameCounterCurrentSprite = g_interfaces.player2.GetData()->frameLengthCurrentSprite2 - 1;
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Use_state_tooltip());
-        ImGui::SameLine();
-        if (ImGui::Button("Reset")) {
-            states = g_interfaces.player2.states;
-            for (auto state : states) {
-                if (state->replaced_state_script[0]) {
-                    memcpy(state->addr + 36, state->replaced_state_script, 36);
-                    state->replaced_state_script[0] = 0;
-                }
-            }
-            gap_register = {};
-            gap_register_delays = {};
-            wakeup_register = {};
-            wakeup_register_delays = {};
-            onhit_register = {};
-            onhit_register_delays = {};
-            throwtech_register = {};
-            throwtech_register_delays = {};
-        }
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Reset_states_tooltip());
-
-
-        if (ImGui::CollapsingHeader("Gap/wakeup random actions")) {
-            ImGui::Columns(2);
-            if (ImGui::Button("Add to wakeup action")) {
-                states = g_interfaces.player2.states;
-                wakeup_register.push_back(states[dummy_selected_state]);
-                wakeup_register_delays.push_back(dummy_wakeup_delay);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Add_wakeup_action_tooltip());
-            ImGui::BeginChild("wakeup_register_display", ImVec2(0, 80));
-            for (auto e : wakeup_register) {
-                ImGui::Text(e->name.c_str());
-            }
-            ImGui::EndChild();
-            ImGui::NextColumn();
-            if (ImGui::Button("Add to gap action")) {
-                states = g_interfaces.player2.states;
-                gap_register.push_back(states[dummy_selected_state]);
-                gap_register_delays.push_back(dummy_gap_delay);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Add_gap_action_tooltip());
-
-            ImGui::BeginChild("gap_register_display", ImVec2(0, 80));
-            for (auto e : gap_register) {
-                ImGui::Text(e->name.c_str());
-            }
-            ImGui::EndChild();
-            ImGui::Columns(1);
-
-
-
-        }
-        //static bool old_way = false;
-        //ImGui::CheckboxWrapped("old_way##testchoose", &old_way);
-        //static bool hitstun_0 = true;
-        //ImGui::CheckboxWrapped("hitstun_0##testchoose", &hitstun_0);
-        //static bool curr_action_not_ukemi = false;
-        //ImGui::CheckboxWrapped("curr_action_not_ukemi##testchoose", &curr_action_not_ukemi);      
-        //static bool hitstun_0_curr_action_not_ukemi = false;
-        //ImGui::CheckboxWrapped("hitstun_0_curr_action_not_ukemi##testchoose", &hitstun_0_curr_action_not_ukemi);
-
-        ImGui::EndGroup(); 
-    
-    }
-
-};
 
 std::string interpret_move(char move) {
     //auto button_bits = move & ((4 << 1) - 1);
@@ -1503,345 +1436,6 @@ void ScrWindow::DrawPlaybackEditor() {
     ImGui::SameLine();
     ImGui::ShowHelpMarker(Messages.Open_playback_editor_tooltip());
 }
-void ScrWindow::DrawRecordingSlotsBody() {
-    char* bbcf_base_adress = GetBbcfBaseAdress();
-    char* active_slot = bbcf_base_adress + 0x902C3C;
-    static bool loop_playback = false;
-    auto& unlimitedPlayback = UnlimitedPlaybackManager::Instance();
-    unlimitedPlayback.InitializeIfNeeded();
-    //ScrWindow::DrawPlaybackEditor();
-    {
-        if (ImGui::Button(L("Unlimited Playback (BETA)").c_str())) {
-            ScrWindow::m_pWindowContainer->GetWindow(WindowType_UnlimitedPlayback)->ToggleOpen();
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", L("Popup is always available. Runtime actions only work in the right context.").c_str());
-        ImGui::TextWrapped("%s", unlimitedPlayback.GetStatusText().c_str());
-
-        ImGui::CheckboxWrapped(L("Loop current playback").c_str(), &loop_playback);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(L("This will continuously loop the current recording slot, subject to absolute positioning.").c_str());
-        ScrWindow::DrawPlaybackEditor();
-        if (ImGui::CollapsingHeader(L("Slot 1").c_str())) {
-            draw_playback_slot_section(1);
-
-        }
-        if (ImGui::CollapsingHeader(L("Slot 2").c_str())) {
-            draw_playback_slot_section(2);
-        }
-        
-        if (ImGui::CollapsingHeader(L("Slot 3").c_str())) {
-            draw_playback_slot_section(3);
-        }
-
-        if (ImGui::CollapsingHeader(L("Slot 4").c_str())) {
-            draw_playback_slot_section(4);
-        }
-        
-
-        //setup for randomized slots
-        static bool random_wakeup_slot_toggle = false;
-        static bool random_gap_slot_toggle = false;
-        ImGui::Columns(2);
-        ImGui::CheckboxWrapped("Gap random slots##gap_random_slots", &random_gap_slot_toggle);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Gap_random_slots_tooltip());
-        if (random_gap_slot_toggle){
-            if (ImGui::CheckboxWrapped("Slot1##gap_random_slots", &random_gap_slot1)) {
-                treat_random_slot_checkbox(random_gap, random_gap_slot1, 1);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
-
-            if(ImGui::CheckboxWrapped("Slot2##gap_random_slots", &random_gap_slot2)) {
-                treat_random_slot_checkbox(random_gap, random_gap_slot2, 2);
-
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
-
-            if(ImGui::CheckboxWrapped("Slot3##gap_random_slots", &random_gap_slot3)) {
-                treat_random_slot_checkbox(random_gap, random_gap_slot3, 3);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
-
-            if (ImGui::CheckboxWrapped("Slot4##gap_random_slots", &random_gap_slot4)) {
-                treat_random_slot_checkbox(random_gap, random_gap_slot4, 4);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Gap_random_slot_include_tooltip());
-
-
-        }
-        ImGui::NextColumn();
-        ImGui::CheckboxWrapped("Wakeup random slots##wakeup_random_slots", &random_wakeup_slot_toggle);
-        ImGui::SameLine();
-        ImGui::ShowHelpMarker(Messages.Wakeup_random_slots_tooltip());
-        if (random_wakeup_slot_toggle) {
-            if (ImGui::CheckboxWrapped("Slot1##wakeup_random_slots", &random_wakeup_slot1)) {
-                treat_random_slot_checkbox(random_wakeup, random_wakeup_slot1, 1);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
-
-            if(ImGui::CheckboxWrapped("Slot2##wakeup_random_slots", &random_wakeup_slot2)) {
-                treat_random_slot_checkbox(random_wakeup, random_wakeup_slot2, 2);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
-
-            if(ImGui::CheckboxWrapped("Slot3##wakeup_random_slots", &random_wakeup_slot3)) {
-                treat_random_slot_checkbox(random_wakeup, random_wakeup_slot3, 3);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
-
-            if(ImGui::CheckboxWrapped("Slot4##wakeup_random_slots", &random_wakeup_slot4)) {
-                treat_random_slot_checkbox(random_wakeup, random_wakeup_slot4, 4);
-            }
-            ImGui::SameLine();
-            ImGui::ShowHelpMarker(Messages.Wakeup_random_slot_include_tooltip());
-
-        }
-        ImGui::Columns(1);
-        if (!g_interfaces.player2.IsCharDataNullPtr()) {
-            //loops the current playback
-            //memcpy(playback_control_ptr, &val_set, 2);
-            if (loop_playback) {
-                playback_manager.set_playback_control(3);
-            }
-
-
-
-
-            //does gap action for recorded slot
-            //can optimize later by checking for same memory address
-            std::string current_action = g_interfaces.player2.GetData()->currentAction;
-            //replace by the action in the manager
-            char* playback_control_ptr = bbcf_base_adress + 0x1392d10 + 0x1ac2c; //set to 3 to start playback without direction adjustment, 0 for dummy, 1 for recording standby, 2 for bugged recording, 3 for playback, 4 for controller, 5 for cpu, 6 for continuous playback
-            int val_set = 3;
-            int slot = 0;
-
-
-
-
-
-
-
-            //checking for gap action
-///std::string substr = "GuardEnd";
-            auto gap_action_trigger_find = current_action.find("Guard");
-            if (random_gap_slot_toggle && !random_gap.empty()
-                && g_interfaces.player2.GetData()->blockstun == 1
-
-                && gap_action_trigger_find != std::string::npos) {
-                //does randomized
-                int rand = std::rand();
-                int random_pos = rand % random_gap.size();
-                slot = random_gap[random_pos] - 1;
-                memcpy(active_slot, &slot, 4);
-                memcpy(playback_control_ptr, &val_set, 2);
-
-            }
-            else if //(slot_gap != 0 && gap_action_trigger_find != std::string::npos
-                (slot_gap != 0 && g_interfaces.player2.GetData()->blockstun == 1
-                    &&
-                    gap_action_trigger_find != std::string::npos) {
-                //does pre-defined
-                slot = slot_gap - 1;
-                memcpy(active_slot, &slot, 4);
-                memcpy(playback_control_ptr, &val_set, 2);
-            }
-
-
-            auto onblock_action_trigger_find = current_action.find("GuardLoop");
-            if (slot_onblock != 0 && onblock_action_trigger_find != std::string::npos) {
-                //does pre-defined
-                slot = slot_onblock - 1;
-                memcpy(active_slot, &slot, 4);
-                memcpy(playback_control_ptr, &val_set, 2);
-            }
-
-            auto onhit_action_trigger_find = [&]()-> size_t {
-                for (auto& el : std::vector<std::string>{ "CmnActHit", "CmnActBDown", "CmnActFDown", "CmnActVDown", "CmnActStaggerLoop", "CmnActSlideAir" , "CmnActSkeleton", "CmnActBlowoff"}) {
-                    if (current_action.find(el) != std::string::npos) {
-                        return current_action.find(el);
-                    }
-                };
-                return std::string::npos;
-            }();
-            //auto onhit_action_trigger_find = current_action.find("CmnActHit");
-            if (slot_onhit != 0 && g_interfaces.player2.GetData()->hitstun > 0 && onhit_action_trigger_find != std::string::npos) {
-                slot = slot_onhit - 1;
-                memcpy(active_slot, &slot, 4);
-                memcpy(playback_control_ptr, &val_set, 2);
-            }
-
-            auto throwtech__action_trigger_find = current_action.find("LockReject");
-            if (slot_throwtech != 0 && g_interfaces.player2.GetData()->timeAfterTechIsPerformed == 29 && throwtech__action_trigger_find != std::string::npos) {
-                slot = slot_throwtech - 1;
-                memcpy(active_slot, &slot, 4);
-                memcpy(playback_control_ptr, &val_set, 2);
-            }
-
-
-
-            //change to const later?
-            //states that happen immediately before CmnActUkemiLandNLanding that I know of, not an exhaustive list
-            //static std::vector<std::tuple<std::string, int>> wakeup_buffer_actions{ {"ActFDownDown", 9} ,  //lasts 9 frames
-            //                {"ActVDownDown", 18}, //lasts 18 frames
-            //                {"ActBDownDown", 20}, //lasts 20 frames
-            //                {"ActWallBoundDown", 15}
-            //}; //lasts 15 frames
-            static std::vector<std::tuple<std::string, int>> wakeup_buffer_actions{
-                {"ActUkemiLandN",30 } ,
-                {"ActUkemiLandF",30 },
-                {"ActUkemiLandB",30 },
-            {"ActFDown2Stand", 14},
-            {"ActBDown2Stand", 14}
-            };
-
-         
-
-            static int base_frame_count_triggered = 0; // hold the pFrameCount a certain action started
-            static int slot_to_run = 0; 
-            static std::vector<int> frame_count_to_activate_vector = { 0,0,0,0 }; // will start the recording when pFrameCount reaches this number for each slot
-            static std::string prev_action;
-            //static std::map<std::string, int> slot_frame_count_to_activate_map = {;
-            //will run buffered for non random wakeup slot
-            if (slot_wakeup != 0 || !random_wakeup.empty()) {// && slot_buffer[slot_wakeup - 1] != 0) {
-                if (prev_action != current_action) {
-                    //sets the internal frame count to trigger shit
-                    //int iter = 0;
-
-                    for (auto pair : wakeup_buffer_actions) {
-                        if (base_frame_count_triggered == 0 && current_action.find(std::get<0>(pair)) != std::string::npos) {
-                            for (int iter = 0; iter < 4; iter++) {
-                              
-                                auto buffer = 0;
-                               
-                                buffer = slot_buffer[iter];
-                                base_frame_count_triggered = *g_gameVals.pFrameCount;
-                             
-                                frame_count_to_activate_vector[iter] = base_frame_count_triggered + std::get<1>(pair) - buffer; //sets the frame count to activate to base + (len of action- buffer)
-                               
-                                if (random_wakeup_slot_toggle && !random_wakeup.empty()) {
-                                    int frame_count_tmp = std::rand() % random_wakeup.size(); //actually the slot that should be used for the next random slot
-                                    slot_to_run = random_wakeup[frame_count_tmp] - 1;
-                                }
-                                else {
-                                    slot_to_run = slot_wakeup-1;
-                                }
-                                
-                            }
-
-
-                        }
-                    }
-                    for (auto& frame_count : frame_count_to_activate_vector) {
-                        if (frame_count < *g_gameVals.pFrameCount || base_frame_count_triggered > *g_gameVals.pFrameCount) { //sanity check
-                            base_frame_count_triggered = 0;
-                            frame_count = 0;
-                        }
-                    }
-
-
-                }
-                //for (auto& frame_count : frame_count_to_activate_vector) {
-                if (random_wakeup_slot_toggle && !random_wakeup.empty()) {
-                    if (frame_count_to_activate_vector.size() >= slot_to_run) {
-                        int frame_count = frame_count_to_activate_vector[slot_to_run];
-
-                        if (frame_count != 0 && *g_gameVals.pFrameCount == frame_count) {
-                            //checks if there is a random slot, for now if its set to random the buffer is not individual to every single random action, still need to implement this.
-                            if (random_wakeup_slot_toggle && !random_wakeup.empty()) {
-
-                          
-                                slot = slot_to_run + 1; //slot_to_run has the value already adjusted for 0 start, need to add 1 so that it becomes 1,2,3,4 as set_active_slot expects.
-                                if (*playback_control_ptr != 3) {
-                                    PlaybackManager().set_active_slot(slot);
-                                    PlaybackManager().set_playback_control(val_set);
-                                    //memcpy(active_slot, &slot, 4);
-                                    //memcpy(playback_control_ptr, &val_set, 2);
-                                    // if not in listed states reset the internal frame counts
-                                    base_frame_count_triggered = 0;
-                                    slot_to_run = 0;
-                                    //frame_count_to_activate = 0;
-                                    frame_count_to_activate_vector[0] = 0;
-                                    frame_count_to_activate_vector[1] = 0;
-                                    frame_count_to_activate_vector[2] = 0;
-                                    frame_count_to_activate_vector[3] = 0;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if (frame_count_to_activate_vector[slot_to_run] != 0 && *g_gameVals.pFrameCount == frame_count_to_activate_vector[slot_to_run]) {
-
-                    slot = slot_to_run+ 1  ; //slot_to_run has the value already adjusted for 0 start, need to add 1 so that it becomes 1,2,3,4 as set_active_slot expects.
-
-              
-                    if (*playback_control_ptr != 3) {
-                        PlaybackManager().set_active_slot(slot);
-                        PlaybackManager().set_playback_control(val_set);
-                        //memcpy(active_slot, &slot, 4);
-                       // memcpy(playback_control_ptr, &val_set, 2);
-                        // if not in listed states reset the internal frame counts
-                        base_frame_count_triggered = 0;
-                        slot_to_run = 0;
-                        //frame_count_to_activate = 0;
-                        frame_count_to_activate_vector[0] = 0;
-                        frame_count_to_activate_vector[1] = 0;
-                        frame_count_to_activate_vector[2] = 0;
-                        frame_count_to_activate_vector[3] = 0;
-                    }
-
-                
-
-                }
-            }
-            
-
-            /* OLD CODE FOR WAKEUP ACTION, JUST LEAVING FOR REFERENCE FOR SOMETHING IM DOING
-            //checking for wakeup action
-            //std::string substr = "CmnActUkemiLandNLanding";
-            // I think I need to change this later to fit the above activation criteria, otherwise it may have ~3 frames gap? needs more testing!
-            //auto wakeup_action_trigger_find = current_action.find("CmnActUkemiLandNLanding");
-            //if (random_wakeup_slot_toggle && !random_wakeup.empty() && wakeup_action_trigger_find != std::string::npos) {
-            //    //does randomized
-            //    int random_pos = std::rand() % random_wakeup.size();
-            //    slot = random_wakeup[random_pos] - 1;
-            //    memcpy(active_slot, &slot, 4);
-            //    memcpy(playback_control_ptr, &val_set, 2);
-
-            //}
-            //else if (slot_wakeup != 0 && wakeup_action_trigger_find != std::string::npos) {
-            //    //does pre-defined
-            //    slot = slot_wakeup - 1;
-            //    memcpy(active_slot, &slot, 4);
-            //    memcpy(playback_control_ptr, &val_set, 2);
-            //}
-
-            */
-            prev_action = current_action;
-            
-        }
-}
-} 
-//void get_files_in_directory(char** items) {
-//    std::string path = "./Save/Replay/locals";
-//    //char items[500] = {};
-//    items = {}; int i = 0;
-//    for (const auto& entry : std::filesystem::directory_iterator(path)) {
-//        if (i >= 500) {
-//            break;
-//        }
-//        //items.push_back(&(entry.path().string())[0]);
-//        items[i] = entry.path().string().data();
-//    }
-//}
-
 void ScrWindow::DrawSaveStatesBody() {
     if (*(bbcf_base_adress + 0x8F7758) == 0) {
         if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {

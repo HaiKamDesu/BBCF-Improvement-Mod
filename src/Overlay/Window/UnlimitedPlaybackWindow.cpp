@@ -14,6 +14,7 @@
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Window/PlaybackEditorWindow.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
+#include "Overlay/WindowManager.h"
 #include "Overlay/WindowContainer/WindowType.h"
 
 #include <Windows.h>
@@ -102,27 +103,6 @@ const char* LoopResetModeLabel(int mode) {
 // Renders the shared rebind control for one hotkey action and persists any change straight
 // away. Unlike the Settings window there is no draft/Cancel here: this panel is a live
 // training tool, so a rebind takes effect the moment it is made.
-void DrawPlaybackHotkeyBind(UnlimitedPlaybackManager& mgr, HotkeyManager::Action action) {
-    HotkeyBinding binding = HotkeyManager::GetBinding(action);
-    const HotkeyManager::Action conflict = HotkeyManager::FindConflict(binding, action);
-    std::string warning;
-    if (conflict != HotkeyManager::Hotkey_Count) {
-        warning = FormatText(L("Already used by \"%s\". Pressing it will do both.").c_str(),
-            HotkeyManager::DisplayName(conflict));
-    } else if (HotkeyManager::IsControllerBinding(binding)) {
-        warning = L("Controller button: this also works during a match, so pick one you never press while playing.");
-    }
-
-    if (ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
-            HotkeyManager::DefaultBindingString(action), warning.c_str())) {
-        HotkeyManager::SetBinding(action, binding);
-        // The playback trigger must not fire on the very press that assigned it.
-        mgr.ForceResetTriggers("");
-        mgr.PushToast(FormatText(L("Mapped bind: %s").c_str(),
-            HotkeyManager::DisplayString(binding).c_str()));
-    }
-}
-
 enum class NativeFileDialogAction {
     None,
     LoadProfile,
@@ -185,8 +165,25 @@ bool DrawContextButton(const char* label, bool enabled) {
     return ImGui::Button(label);
 }
 
+void DrawActivityAndToasts(UnlimitedPlaybackManager& mgr) {
+        const auto& toasts = mgr.GetToasts();
+    if (!toasts.empty()) {
+        ImGui::Separator();
+        ImGui::Text("%s", L("Activity").c_str());
+        ImGui::BeginChild("toast_list", ImVec2(0, 120), true);
+        for (const auto& toast : toasts) {
+            ImGui::TextWrapped("- %s", toast.text.c_str());
+        }
+        ImGui::EndChild();
+    }
+}
+
 void DrawSectionTitle(const char* title) {
     ImGui::Dummy(ImVec2(0.0f, ImGui::GetStyle().ItemSpacing.y * 0.25f));
+    // Taken before the cursor is moved to centre the text. The separator below is drawn from
+    // wherever the cursor is, so using the centred text's own left edge made the rule start
+    // under the first letter and run right - a line hanging off one side of the heading.
+    const float ruleLeftX = ImGui::GetCursorScreenPos().x;
     const ImVec2 textSize = ImGui::CalcTextSize(title);
     const float textX = ImGui::GetCursorPosX() + ((ImGui::GetContentRegionAvail().x - textSize.x) * 0.5f);
     const float textY = ImGui::GetCursorPosY();
@@ -195,7 +192,7 @@ void DrawSectionTitle(const char* title) {
     const ImVec2 baseMin = ImGui::GetItemRectMin();
     ImGui::SetCursorScreenPos(ImVec2(baseMin.x + 0.75f, baseMin.y));
     ImGui::TextUnformatted(title);
-    ImGui::SetCursorScreenPos(ImVec2(baseMin.x, baseMin.y + textSize.y));
+    ImGui::SetCursorScreenPos(ImVec2(ruleLeftX, baseMin.y + textSize.y));
     ImGui::Separator();
 }
 
@@ -369,24 +366,27 @@ void UnlimitedPlaybackWindow::BeforeDraw() {
     ImGui::SetNextWindowSize(ImVec2(980, 680), ImGuiCond_FirstUseEver);
 }
 
-void UnlimitedPlaybackWindow::Draw() {
-    auto& mgr = UnlimitedPlaybackManager::Instance();
-    mgr.InitializeIfNeeded();
-    mgr.PruneExpiredToasts();
+// Opens one of the mod's file pickers on behalf of the library UI. Was a lambda inside
+// UnlimitedPlaybackWindow::Draw(); at file scope so the shared library panel can use it.
+bool beginNativeDialog(NativeFileDialogAction action, const std::string& initialPath,
+    const char* activityText, int contextIndex = -1) {
+    UnlimitedPlaybackManager& mgr = UnlimitedPlaybackManager::Instance();
+    if (NativeFileDialog::IsOpen()) {
+        mgr.PushToast(L("A native file dialog is already open."));
+        return false;
+    }
+    g_pendingExportEntryIndex = contextIndex;
+    if (!NativeFileDialog::Open(kFileDialogOwner, BuildFileDialogRequest(action, initialPath))) {
+        return false;
+    }
+    mgr.PushStickyToast(kNativeFileDialogToastKey, activityText);
+    return true;
+}
 
-    const auto beginNativeDialog = [&mgr](NativeFileDialogAction action, const std::string& initialPath, const char* activityText, int contextIndex = -1) {
-        if (NativeFileDialog::IsOpen()) {
-            mgr.PushToast(L("A native file dialog is already open."));
-            return false;
-        }
-        g_pendingExportEntryIndex = contextIndex;
-        if (!NativeFileDialog::Open(kFileDialogOwner, BuildFileDialogRequest(action, initialPath))) {
-            return false;
-        }
-        mgr.PushStickyToast(kNativeFileDialogToastKey, activityText);
-        return true;
-    };
-
+// Editing state for the library UI. These were function-local statics inside
+// UnlimitedPlaybackWindow::Draw(); they sit here so the library panel can be drawn from the
+// dummy-action rows as well without the two copies drifting apart.
+namespace {
     static std::set<int> selectedEntries;
     static int selectionAnchor = -1;
     static std::vector<int> entriesPendingDelete;
@@ -417,156 +417,78 @@ void UnlimitedPlaybackWindow::Draw() {
     static bool openSetIndexModal = false;
     static bool openDefaultConfirmModal = false;
     static bool openDeleteEntryConfirmModal = false;
+}
+
+// How the library chooses between several eligible entries. Shared, because a trigger
+// drawing from a library needs to say this as much as the library window does.
+//
+// Auto-mirror is deliberately NOT here any more: it moved to the per-trigger settings,
+// since whether to flip an action depends on the action, not on the collection it came from.
+void DrawPlaybackPickingOrder() {
+    UnlimitedPlaybackManager& mgr = UnlimitedPlaybackManager::Instance();
+    int selectionMode = mgr.GetSelectionMode();
+    const char* selectionModes[] = {
+        SelectionModeLabel(UnlimitedPlaybackManager::Selection_Random),
+        SelectionModeLabel(UnlimitedPlaybackManager::Selection_Sequential),
+        SelectionModeLabel(UnlimitedPlaybackManager::Selection_NonRepeatingRandom)
+    };
+    ImGui::TextUnformatted(L("Picking order").c_str());
+    DrawHelpInline(L("How the library chooses the next enabled entry when it is triggered.").c_str());
+    ImGui::PushItemWidth(-1.0f);
+    if (ImGui::Combo("##up_playback_mode", &selectionMode, selectionModes, IM_ARRAYSIZE(selectionModes))) {
+        mgr.SetSelectionMode(selectionMode);
+    }
+    ImGui::PopItemWidth();
+}
+
+// The library itself: the entry list with its context menus, ordering and enable
+// checkboxes, plus the buttons that add to it. Drawn against whichever library the manager
+// is currently pointed at (UnlimitedPlaybackManager::SetEditTarget), so configuring a
+// trigger reuses this instead of a second, lesser copy of it.
+void DrawPlaybackLibraryEntriesAndAdd(float listHeight) {
+    UnlimitedPlaybackManager& mgr = UnlimitedPlaybackManager::Instance();
     const bool inTrainingMatch = TrainingMatchAvailable();
     const bool inReplayMatch =
         g_gameVals.pGameMode && g_gameVals.pGameState &&
         (*g_gameVals.pGameMode == GameMode_ReplayTheater) &&
-        (*g_gameVals.pGameState == GameState_InMatch) &&
-        !g_interfaces.player1.IsCharDataNullPtr() &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        (*g_gameVals.pGameState == GameState_InMatch);
+    (void)inReplayMatch;
 
-    NativeFileDialogAction completedDialogAction = NativeFileDialogAction::None;
-    std::string completedDialogPath;
-    bool completedDialogCanceled = true;
-    const int completedDialogContextIndex = g_pendingExportEntryIndex;
-    NativeFileDialog::Result completedDialogResult;
-    if (NativeFileDialog::Consume(kFileDialogOwner, &completedDialogResult)) {
-        completedDialogAction = static_cast<NativeFileDialogAction>(completedDialogResult.contextId);
-        completedDialogPath = completedDialogResult.path;
-        completedDialogCanceled = !completedDialogResult.accepted;
-        mgr.RemoveStickyToast(kNativeFileDialogToastKey);
-    }
-    if (!completedDialogCanceled && !completedDialogPath.empty()) {
-        if (completedDialogAction == NativeFileDialogAction::LoadProfile) {
-            auto compatibility = mgr.ProbeProfileCompatibility(completedDialogPath);
-            if (compatibility.action == CompatibilityManager::Action_Load) {
-                mgr.LoadProfile(completedDialogPath);
-            } else {
-                std::strncpy(pendingProfilePath, completedDialogPath.c_str(), MAX_PATH - 1);
-                pendingProfilePath[MAX_PATH - 1] = '\0';
-                pendingProfileCompatibility = compatibility;
-                profileCompatibilityCanForce = compatibility.canForce;
-                showProfileCompatibilityPopup = true;
-            }
-        } else if (completedDialogAction == NativeFileDialogAction::SaveProfile) {
-            mgr.SaveProfile(completedDialogPath);
-        } else if (completedDialogAction == NativeFileDialogAction::ImportPlayback) {
-            auto compatibility = mgr.ProbePlaybackCompatibility(completedDialogPath);
-            if (compatibility.action == CompatibilityManager::Action_Load) {
-                mgr.AddPlaybackFile(completedDialogPath, "");
-            } else {
-                std::strncpy(pendingPlaybackPath, completedDialogPath.c_str(), MAX_PATH - 1);
-                pendingPlaybackPath[MAX_PATH - 1] = '\0';
-                pendingPlaybackCompatibility = compatibility;
-                playbackCompatibilityCanForce = compatibility.canForce;
-                showPlaybackCompatibilityPopup = true;
-            }
-        } else if (completedDialogAction == NativeFileDialogAction::ExportEntryPlayback) {
-            if (completedDialogContextIndex >= 0 && completedDialogContextIndex < static_cast<int>(mgr.GetEntries().size())) {
-                mgr.SaveEntryToFile(static_cast<size_t>(completedDialogContextIndex), completedDialogPath);
-            }
-        }
-    }
-
-    if (showProfileCompatibilityPopup) {
-        const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
-        ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-        ImGui::OpenPopup(L("Profile Compatibility").c_str());
-        showProfileCompatibilityPopup = false;
-    }
-    if (ImGui::BeginPopupModal(L("Profile Compatibility").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(
-            L("Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s").c_str(),
-            CompatibilityManager::ToString(pendingProfileCompatibility.detected).c_str(),
-            CompatibilityManager::ToString(pendingProfileCompatibility.current).c_str(),
-            pendingProfileCompatibility.reason.c_str());
-
-        if (profileCompatibilityCanForce) {
-            CenterNextButtonsRow(220.0f + ImGui::GetStyle().ItemSpacing.x);
-            if (ImGui::Button(L("Load Anyway").c_str())) {
-                mgr.LoadProfile(pendingProfilePath, true);
-                pendingProfilePath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(L("Cancel").c_str())) {
-                pendingProfilePath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-        } else {
-            CenterNextButtonsRow(90.0f);
-            if (ImGui::Button(L("OK").c_str())) {
-                pendingProfilePath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-        }
-        ImGui::EndPopup();
-    }
-
-    if (showPlaybackCompatibilityPopup) {
-        const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
-        ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
-        ImGui::OpenPopup(L("Playback Compatibility").c_str());
-        showPlaybackCompatibilityPopup = false;
-    }
-    if (ImGui::BeginPopupModal(L("Playback Compatibility").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped(
-            L("Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s").c_str(),
-            CompatibilityManager::ToString(pendingPlaybackCompatibility.detected).c_str(),
-            CompatibilityManager::ToString(pendingPlaybackCompatibility.current).c_str(),
-            pendingPlaybackCompatibility.reason.c_str());
-
-        if (playbackCompatibilityCanForce) {
-            CenterNextButtonsRow(230.0f + ImGui::GetStyle().ItemSpacing.x);
-            if (ImGui::Button(L("Import Anyway").c_str())) {
-                mgr.AddPlaybackFile(pendingPlaybackPath, "", true);
-                pendingPlaybackPath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(FormatText("%s##playback_compat", L("Cancel").c_str()).c_str())) {
-                pendingPlaybackPath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-        } else {
-            CenterNextButtonsRow(140.0f);
-            if (ImGui::Button(FormatText("%s##playback_compat", L("OK").c_str()).c_str())) {
-                pendingPlaybackPath[0] = '\0';
-                ImGui::CloseCurrentPopup();
-            }
-        }
-        ImGui::EndPopup();
-    }
-
-    ImGui::BeginChild("up_main", ImVec2(0, 0), false);
-    ImGui::Columns(2);
-
-    ImGui::BeginChild("up_left_column", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     const float captureButtonWidth = 128.0f;
+    // "Add from replay" used to be a third button here. Capturing a playback out of a replay
+    // is a replay job, not a dummy-action one, so it is moving to the Replays page as
+    // "Capture playback from replay" and writing a file you can load anywhere. The modal and
+    // recording logic below are deliberately left in place for that move.
     const char* captureButtons[] = {
         L("Add from CF Slot").c_str(),
-        L("Add from file").c_str(),
-        L("Add from replay").c_str()
+        L("Add from file").c_str()
     };
     const char* captureButtonTooltips[] = {
         L("Capture a playback from one of the 4 CF slots").c_str(),
-        L("Import a playback file into the library").c_str(),
-        L("Record a new playback entry from a replay").c_str()
+        L("Import a playback file into the library").c_str()
     };
-    bool capturePressed[3] = {};
-    const int captureButtonsPerRow = ComputeButtonsPerRow(captureButtonWidth, 3);
-    const int captureButtonRows = (3 + captureButtonsPerRow - 1) / captureButtonsPerRow;
+    bool capturePressed[2] = {};
+    const int captureButtonsPerRow = ComputeButtonsPerRow(captureButtonWidth, 2);
+    const int captureButtonRows = (2 + captureButtonsPerRow - 1) / captureButtonsPerRow;
     const float childVerticalPadding = ImGui::GetStyle().WindowPadding.y * 2.0f;
+    // Title + the button rows + the child's own padding, and nothing else. This used to add
+    // a spare GetFrameHeightWithSpacing() and to count a gap after the last row as well as
+    // between rows, which reserved about one row too much - the empty line that sat under
+    // the Add Playback Entry buttons. The child below auto-sizes to its content anyway, so
+    // this only has to be close enough to leave the library list the right amount of room.
     const float captureSectionHeight =
         ComputeSectionTitleHeight() +
         childVerticalPadding +
-        ImGui::GetFrameHeightWithSpacing() +
         (ImGui::GetFrameHeight() * static_cast<float>(captureButtonRows)) +
-        (ImGui::GetStyle().ItemSpacing.y * static_cast<float>((std::max)(1, captureButtonRows)));
+        (ImGui::GetStyle().ItemSpacing.y * static_cast<float>((std::max)(0, captureButtonRows - 1)));
+    // Filling the available height is right in the window, where the panel owns a column.
+    // In a modal it is not: the modal is sized to fit its content, and content that always
+    // grows to whatever it is given has no natural size to fit to - the window would keep
+    // whatever height it happened to open at. So a caller can name the list height instead.
     const float leftColumnAvailableHeight = ImGui::GetContentRegionAvail().y;
-    const float librarySectionHeight = (std::max)(64.0f, leftColumnAvailableHeight - captureSectionHeight - ImGui::GetStyle().ItemSpacing.y);
+    const float librarySectionHeight = listHeight > 0.0f
+        ? listHeight
+        : (std::max)(64.0f, leftColumnAvailableHeight - captureSectionHeight - ImGui::GetStyle().ItemSpacing.y);
     ImGui::BeginChild("up_library", ImVec2(0, librarySectionHeight), true);
     DrawSectionTitle(FormatText(L("Library (%d)").c_str(), static_cast<int>(mgr.GetEntries().size())).c_str());
     if (!mgr.GetActiveProfilePath().empty()) {
@@ -780,11 +702,17 @@ void UnlimitedPlaybackWindow::Draw() {
     }
     ImGui::EndChild();
 
-    ImGui::BeginChild("up_capture", ImVec2(0, captureSectionHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    // Auto-height: the reservation above is an estimate, and any slack in it showed up as
+    // dead space under the buttons. Letting the child size to its contents means the library
+    // list above simply gets whatever is left.
+    ImGui::BeginChild("up_capture", ImVec2(0, 0),
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     DrawSectionTitle(L("Add Playback Entry").c_str());
-    const int captureButtonsPerRowDynamic = ComputeButtonsPerRow(captureButtonWidth, 3);
-    for (int rowStart = 0; rowStart < 3; rowStart += captureButtonsPerRowDynamic) {
-        const int rowCount = (std::min)(captureButtonsPerRowDynamic, 3 - rowStart);
+    const int captureButtonCount = static_cast<int>(IM_ARRAYSIZE(captureButtons));
+    const int captureButtonsPerRowDynamic = ComputeButtonsPerRow(captureButtonWidth, captureButtonCount);
+    for (int rowStart = 0; rowStart < captureButtonCount; rowStart += captureButtonsPerRowDynamic) {
+        const int rowCount = (std::min)(captureButtonsPerRowDynamic, captureButtonCount - rowStart);
         const float rowWidth =
             (captureButtonWidth * static_cast<float>(rowCount)) +
             (ImGui::GetStyle().ItemSpacing.x * static_cast<float>((std::max)(0, rowCount - 1)));
@@ -794,11 +722,8 @@ void UnlimitedPlaybackWindow::Draw() {
             if (rowOffset > 0) {
                 ImGui::SameLine();
             }
-            const bool enabled = (buttonIndex != 2) || inReplayMatch;
-            capturePressed[buttonIndex] = DrawContextButton(captureButtons[buttonIndex], enabled);
-            if (buttonIndex == 2 && !inReplayMatch && ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", L("Add from replay is only available while a replay match is active in Replay Theater.").c_str());
-            } else if (captureButtonTooltips[buttonIndex]) {
+            capturePressed[buttonIndex] = DrawContextButton(captureButtons[buttonIndex], true);
+            if (captureButtonTooltips[buttonIndex]) {
                 DrawButtonTooltip(captureButtonTooltips[buttonIndex]);
             }
         }
@@ -811,9 +736,6 @@ void UnlimitedPlaybackWindow::Draw() {
             NativeFileDialogAction::ImportPlayback,
             UnlimitedPlaybackImportFolder(),
             L("Import playback file dialog open...").c_str());
-    }
-    if (capturePressed[2]) {
-        openReplayCaptureModal = true;
     }
     if (openReplayCaptureModal) {
         const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
@@ -868,206 +790,148 @@ void UnlimitedPlaybackWindow::Draw() {
         ImGui::End();
     }
     ImGui::EndChild();
-    ImGui::EndChild();
 
-    ImGui::NextColumn();
-
-    ImGui::BeginChild("up_settings", ImVec2(0, 0), true);
-    DrawSectionTitle(L("Library Settings").c_str());
-    ImGui::Dummy(ImVec2(0, 2));
-    int selectionMode = mgr.GetSelectionMode();
-    const char* selectionModes[] = {
-        SelectionModeLabel(UnlimitedPlaybackManager::Selection_Random),
-        SelectionModeLabel(UnlimitedPlaybackManager::Selection_Sequential),
-        SelectionModeLabel(UnlimitedPlaybackManager::Selection_NonRepeatingRandom)
-    };
-    ImGui::TextUnformatted(L("Playback Mode").c_str());
-    DrawHelpInline(L("How the library chooses the next enabled entry when playback is triggered.").c_str());
-    ImGui::PushItemWidth(-1.0f);
-    if (ImGui::Combo("##up_playback_mode", &selectionMode, selectionModes, IM_ARRAYSIZE(selectionModes))) {
-        mgr.SetSelectionMode(selectionMode);
-        mgr.PushToast(FormatText(L("Playback mode: %s").c_str(), selectionModes[selectionMode]));
+    // The answers to this panel's own file pickers. This used to live in the window that
+    // hosted the panel, which meant the Load and Save buttons did nothing at all when the
+    // panel was drawn from a dummy-action row: the picker opened and its result was never
+    // claimed. Whoever draws the panel now handles what it asked for.
+    NativeFileDialogAction completedDialogAction = NativeFileDialogAction::None;
+    std::string completedDialogPath;
+    bool completedDialogCanceled = true;
+    const int completedDialogContextIndex = g_pendingExportEntryIndex;
+    NativeFileDialog::Result completedDialogResult;
+    if (NativeFileDialog::Consume(kFileDialogOwner, &completedDialogResult)) {
+        completedDialogAction = static_cast<NativeFileDialogAction>(completedDialogResult.contextId);
+        completedDialogPath = completedDialogResult.path;
+        completedDialogCanceled = !completedDialogResult.accepted;
+        mgr.RemoveStickyToast(kNativeFileDialogToastKey);
     }
-    ImGui::PopItemWidth();
-    ImGui::Dummy(ImVec2(0, 4));
-    bool autoMirrorOnSideSwap = mgr.GetAutoMirrorOnSideSwap();
-    if (ImGui::Checkbox(L("Auto-mirror on side swap").c_str(), &autoMirrorOnSideSwap)) {
-        mgr.SetAutoMirrorOnSideSwap(autoMirrorOnSideSwap);
-    }
-    DrawHelpInline(L("Mirrors directional inputs when the recorded side and current side differ.").c_str());
-
-    for (int i = 0; i < UnlimitedPlaybackManager::Trigger_Count; ++i) {
-        if (mgr.GetTrigger(static_cast<UnlimitedPlaybackManager::TriggerType>(i)).enabled) {
-            selectedTriggerType = i;
-            break;
-        }
-    }
-    ImGui::Dummy(ImVec2(0, 6));
-    ImGui::Separator();
-    ImGui::Dummy(ImVec2(0, 4));
-    const char* triggerNames[] = {
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_Wakeup),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_Gap),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnBlock),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnHit),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_ThrowTech),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_KeyPress),
-        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnLoop)
-    };
-    ImGui::TextUnformatted(L("Playback Trigger Type").c_str());
-    DrawHelpInline(L("Selects the single trigger type that can fire library playback.").c_str());
-    ImGui::PushItemWidth(-1.0f);
-    if (ImGui::Combo("##up_trigger_type", &selectedTriggerType, triggerNames, IM_ARRAYSIZE(triggerNames))) {
-        for (int i = 0; i < UnlimitedPlaybackManager::Trigger_Count; ++i) {
-            mgr.GetTrigger(static_cast<UnlimitedPlaybackManager::TriggerType>(i)).enabled = (i == selectedTriggerType);
-        }
-        mgr.PushToast(FormatText(L("Playback trigger: %s").c_str(), triggerNames[selectedTriggerType]));
-    }
-    ImGui::PopItemWidth();
-
-    ImGui::Dummy(ImVec2(0, 6));
-    ImGui::Separator();
-    ImGui::Dummy(ImVec2(0, 4));
-    ImGui::Text(L("%s Config").c_str(), triggerNames[selectedTriggerType]);
-    auto selectedTrigger = static_cast<UnlimitedPlaybackManager::TriggerType>(selectedTriggerType);
-    auto& triggerConfig = mgr.GetTrigger(selectedTrigger);
-    ImGui::Dummy(ImVec2(0, 2));
-    if (selectedTrigger != UnlimitedPlaybackManager::Trigger_OnLoop) {
-        ImGui::TextUnformatted(L("Cooldown Frames").c_str());
-        DrawHelpInline(L("Blocks the same trigger from firing again for this many frames after it activates.").c_str());
-        ImGui::PushItemWidth(-1.0f);
-        ImGui::InputInt("##up_cooldown_frames", &triggerConfig.cooldownFrames);
-        ImGui::PopItemWidth();
-        if (triggerConfig.cooldownFrames < 1) {
-            triggerConfig.cooldownFrames = 1;
-        }
-    }
-    ImGui::Dummy(ImVec2(0, 4));
-    if (selectedTrigger == UnlimitedPlaybackManager::Trigger_KeyPress) {
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", L("Maps the button or key used by the Key Press trigger.").c_str());
-        }
-        ImGui::SameLine();
-        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackTrigger);
-    }
-    if (selectedTrigger == UnlimitedPlaybackManager::Trigger_OnLoop) {
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", L("Maps the button or key used to start and stop loop playback.").c_str());
-        }
-        ImGui::SameLine();
-        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackLoop);
-        ImGui::SameLine();
-        ImGui::TextColored(mgr.IsLoopActive() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
-            "%s",
-            mgr.IsLoopActive() ? L("Running").c_str() : L("Stopped").c_str());
-
-        float setupSeconds = mgr.GetLoopSetupSeconds();
-        ImGui::TextUnformatted(L("Setup Time (seconds)").c_str());
-        DrawHelpInline(L("Seconds to show a setup countdown after optional snapshot restore before playing the next slot.").c_str());
-        ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputFloat("##up_loop_setup_seconds", &setupSeconds, 0.1f, 0.5f, "%.2f")) {
-            mgr.SetLoopSetupSeconds(setupSeconds);
-            Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds = mgr.GetLoopSetupSeconds();
-            Settings::changeSetting("UnlimitedPlaybackLoopSetupSeconds", std::to_string(mgr.GetLoopSetupSeconds()));
-        }
-        ImGui::PopItemWidth();
-
-        float endingSeconds = mgr.GetLoopEndingSeconds();
-        ImGui::TextUnformatted(L("Ending Time (seconds)").c_str());
-        DrawHelpInline(L("Seconds to wait after both players return to idle before starting the next setup.").c_str());
-        ImGui::PushItemWidth(-1.0f);
-        if (ImGui::InputFloat("##up_loop_ending_seconds", &endingSeconds, 0.1f, 0.5f, "%.2f")) {
-            mgr.SetLoopEndingSeconds(endingSeconds);
-            Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds = mgr.GetLoopEndingSeconds();
-            Settings::changeSetting("UnlimitedPlaybackLoopEndingSeconds", std::to_string(mgr.GetLoopEndingSeconds()));
-        }
-        ImGui::PopItemWidth();
-
-        bool restartLabState = mgr.GetLoopRestartLabState();
-        if (ImGui::Checkbox(L("Restart lab state in-between").c_str(), &restartLabState)) {
-            mgr.SetLoopRestartLabState(restartLabState);
-            Settings::settingsIni.unlimitedPlaybackLoopRestartLabState = restartLabState;
-            Settings::changeSetting("UnlimitedPlaybackLoopRestartLabState", restartLabState ? "1" : "0");
-        }
-        if (restartLabState) {
-            static const int kResetModeOrder[] = {
-                UnlimitedPlaybackManager::LoopReset_Left,
-                UnlimitedPlaybackManager::LoopReset_Middle,
-                UnlimitedPlaybackManager::LoopReset_Right,
-                UnlimitedPlaybackManager::LoopReset_Custom,
-            };
-            const int currentResetMode = mgr.GetLoopRestartMode();
-            ImGui::TextUnformatted(L("Reset Position").c_str());
-            DrawHelpInline(L("Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.").c_str());
-            ImGui::PushItemWidth(-1.0f);
-            if (ImGui::BeginCombo("##up_loop_reset_mode", LoopResetModeLabel(currentResetMode))) {
-                for (int mode : kResetModeOrder) {
-                    const bool selected = (mode == currentResetMode);
-                    if (ImGui::Selectable(LoopResetModeLabel(mode), selected)) {
-                        mgr.SetLoopRestartMode(mode);
-                        Settings::settingsIni.unlimitedPlaybackLoopRestartMode = mgr.GetLoopRestartMode();
-                        Settings::changeSetting("UnlimitedPlaybackLoopRestartMode", std::to_string(mgr.GetLoopRestartMode()));
-                    }
-                    if (selected) {
-                        ImGui::SetItemDefaultFocus();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::PopItemWidth();
-
-            if (currentResetMode == UnlimitedPlaybackManager::LoopReset_Custom) {
-                const bool customReady = mgr.IsLoopSnapshotReadyForMode(UnlimitedPlaybackManager::LoopReset_Custom);
-                ImGui::TextUnformatted(L("Custom Snapshot").c_str());
-                DrawHelpInline(L("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.").c_str());
-                if (ImGui::Button(L("Save").c_str(), ImVec2(-1.0f, 0))) {
-                    mgr.CaptureLoopCustomSnapshot();
-                }
-                DrawButtonTooltip(L("Save current lab state as the loop restart snapshot.").c_str());
-                if (customReady) {
-                    if (ImGui::Button(L("Load").c_str(), ImVec2(-1.0f, 0))) {
-                        mgr.LoadLoopCustomSnapshot();
-                    }
-                    DrawButtonTooltip(L("Restore the saved loop snapshot now for verification.").c_str());
-                }
-                ImGui::TextColored(
-                    customReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
-                    "%s",
-                    customReady ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+    if (!completedDialogCanceled && !completedDialogPath.empty()) {
+        if (completedDialogAction == NativeFileDialogAction::LoadProfile) {
+            auto compatibility = mgr.ProbeProfileCompatibility(completedDialogPath);
+            if (compatibility.action == CompatibilityManager::Action_Load) {
+                mgr.LoadProfile(completedDialogPath);
             } else {
-                const bool positionReady = mgr.IsLoopSnapshotReadyForMode(currentResetMode);
-                ImGui::TextColored(
-                    positionReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
-                    "%s",
-                    positionReady
-                        ? L("Reset position snapshot ready").c_str()
-                        : L("Position set up automatically when the loop starts").c_str());
+                std::strncpy(pendingProfilePath, completedDialogPath.c_str(), MAX_PATH - 1);
+                pendingProfilePath[MAX_PATH - 1] = '\0';
+                pendingProfileCompatibility = compatibility;
+                profileCompatibilityCanForce = compatibility.canForce;
+                showProfileCompatibilityPopup = true;
+            }
+        } else if (completedDialogAction == NativeFileDialogAction::SaveProfile) {
+            mgr.SaveProfile(completedDialogPath);
+        } else if (completedDialogAction == NativeFileDialogAction::ImportPlayback) {
+            auto compatibility = mgr.ProbePlaybackCompatibility(completedDialogPath);
+            if (compatibility.action == CompatibilityManager::Action_Load) {
+                mgr.AddPlaybackFile(completedDialogPath, "");
+            } else {
+                std::strncpy(pendingPlaybackPath, completedDialogPath.c_str(), MAX_PATH - 1);
+                pendingPlaybackPath[MAX_PATH - 1] = '\0';
+                pendingPlaybackCompatibility = compatibility;
+                playbackCompatibilityCanForce = compatibility.canForce;
+                showPlaybackCompatibilityPopup = true;
+            }
+        } else if (completedDialogAction == NativeFileDialogAction::ExportEntryPlayback) {
+            if (completedDialogContextIndex >= 0 && completedDialogContextIndex < static_cast<int>(mgr.GetEntries().size())) {
+                mgr.SaveEntryToFile(static_cast<size_t>(completedDialogContextIndex), completedDialogPath);
             }
         }
     }
-    ImGui::Dummy(ImVec2(0, 8));
-    if (ImGui::Button(L("Fix Triggers").c_str())) {
-        mgr.ForceResetTriggers();
-    }
-    DrawHelpInline(L("Use this after Training reset if triggers temporarily stop firing. It clears trigger cooldown and edge state.").c_str());
 
-    const auto& toasts = mgr.GetToasts();
-    if (!toasts.empty()) {
-        ImGui::Separator();
-        ImGui::Text("%s", L("Activity").c_str());
-        ImGui::BeginChild("toast_list", ImVec2(0, 120), true);
-        for (const auto& toast : toasts) {
-            ImGui::TextWrapped("- %s", toast.text.c_str());
+    // The version-mismatch confirmations for the loads above. These have to sit with the
+    // code that raises them: left in the host window, a library loaded from a dummy-action
+    // row would set the flag and never show the prompt, so the load just silently did not
+    // happen.
+    if (showProfileCompatibilityPopup) {
+        const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+        ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
+        ImGui::OpenPopup(L("Profile Compatibility").c_str());
+        showProfileCompatibilityPopup = false;
+    }
+    if (ImGui::BeginPopupModal(L("Profile Compatibility").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped(
+            L("Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s").c_str(),
+            CompatibilityManager::ToString(pendingProfileCompatibility.detected).c_str(),
+            CompatibilityManager::ToString(pendingProfileCompatibility.current).c_str(),
+            pendingProfileCompatibility.reason.c_str());
+
+        if (profileCompatibilityCanForce) {
+            CenterNextButtonsRow(220.0f + ImGui::GetStyle().ItemSpacing.x);
+            if (ImGui::Button(L("Load Anyway").c_str())) {
+                mgr.LoadProfile(pendingProfilePath, true);
+                pendingProfilePath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(L("Cancel").c_str())) {
+                pendingProfilePath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+        } else {
+            CenterNextButtonsRow(90.0f);
+            if (ImGui::Button(L("OK").c_str())) {
+                pendingProfilePath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
         }
-        ImGui::EndChild();
+        ImGui::EndPopup();
     }
 
-    ImGui::EndChild();
+    if (showPlaybackCompatibilityPopup) {
+        const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+        ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
+        ImGui::OpenPopup(L("Playback Compatibility").c_str());
+        showPlaybackCompatibilityPopup = false;
+    }
+    if (ImGui::BeginPopupModal(L("Playback Compatibility").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped(
+            L("Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s").c_str(),
+            CompatibilityManager::ToString(pendingPlaybackCompatibility.detected).c_str(),
+            CompatibilityManager::ToString(pendingPlaybackCompatibility.current).c_str(),
+            pendingPlaybackCompatibility.reason.c_str());
 
-    ImGui::Columns(1);
-    ImGui::EndChild();
+        if (playbackCompatibilityCanForce) {
+            CenterNextButtonsRow(230.0f + ImGui::GetStyle().ItemSpacing.x);
+            if (ImGui::Button(L("Import Anyway").c_str())) {
+                mgr.AddPlaybackFile(pendingPlaybackPath, "", true);
+                pendingPlaybackPath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(FormatText("%s##playback_compat", L("Cancel").c_str()).c_str())) {
+                pendingPlaybackPath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+        } else {
+            CenterNextButtonsRow(140.0f);
+            if (ImGui::Button(FormatText("%s##playback_compat", L("OK").c_str()).c_str())) {
+                pendingPlaybackPath[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+}
+
+// Every popup the library panel raises: Default, delete, set index, add from CF slot,
+// edit an entry, its playback editor, and send to slot.
+//
+// These are drawn wherever the panel is, not in the window that used to host it. Left
+// behind in UnlimitedPlaybackWindow::Draw(), the buttons in a trigger's library modal set
+// their flag and nothing ever acted on it - Load, Save, Default, add, edit and delete all
+// looked dead from there. They are also deliberately NOT inside the panel's scrolling
+// body: a popup has to be begun in the same window scope its flag is raised for, and a
+// nested modal has to sit at the parent modal's level to be interactive at all.
+void DrawPlaybackLibraryPopups() {
+    UnlimitedPlaybackManager& mgr = UnlimitedPlaybackManager::Instance();
+    const bool inTrainingMatch = TrainingMatchAvailable();
+    (void)inTrainingMatch;
+
+    // Asked for rather than held, since this is no longer a member of the window that owns
+    // a container pointer - it is drawn from a dummy-action row too.
+    WindowContainer* m_pWindowContainer = WindowManager::GetInstance().GetWindowContainer();
 
     if (openDefaultConfirmModal) {
         const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
@@ -1301,6 +1165,223 @@ void UnlimitedPlaybackWindow::Draw() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+}
+
+void UnlimitedPlaybackWindow::Draw() {
+    auto& mgr = UnlimitedPlaybackManager::Instance();
+    mgr.InitializeIfNeeded();
+    mgr.PruneExpiredToasts();
+
+
+    const bool inTrainingMatch = TrainingMatchAvailable();
+    const bool inReplayMatch =
+        g_gameVals.pGameMode && g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_ReplayTheater) &&
+        (*g_gameVals.pGameState == GameState_InMatch) &&
+        !g_interfaces.player1.IsCharDataNullPtr() &&
+        !g_interfaces.player2.IsCharDataNullPtr();
+
+
+
+    ImGui::BeginChild("up_main", ImVec2(0, 0), false);
+    ImGui::Columns(2);
+
+    ImGui::BeginChild("up_left_column", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    DrawPlaybackLibraryEntriesAndAdd();
+    ImGui::EndChild();
+
+    ImGui::NextColumn();
+
+    ImGui::BeginChild("up_settings", ImVec2(0, 0), true);
+    DrawSectionTitle(L("Library Settings").c_str());
+    ImGui::Dummy(ImVec2(0, 2));
+    DrawPlaybackPickingOrder();
+
+    // The trigger type selector that used to live here is gone. It wrote
+    // GetTrigger(i).enabled = (i == selected) across every trigger, which is what limited
+    // library playback to one trigger at a time - and would now fight
+    // DummyActionManager::SyncLibraryTriggers, which owns those flags. Which triggers draw
+    // from a library is decided on the Training page, one row per trigger.
+    //
+    // What is left below is the settings that belong to a trigger rather than to a library:
+    // cooldown, and the loop's own setup. They apply to whichever trigger is showing, which
+    // is the first one currently pointed at a library.
+    const char* triggerNames[] = {
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_Wakeup),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_Gap),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnBlock),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnHit),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_ThrowTech),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_KeyPress),
+        TriggerLabel(UnlimitedPlaybackManager::Trigger_OnLoop)
+    };
+    selectedTriggerType = -1;
+    for (int i = 0; i < UnlimitedPlaybackManager::Trigger_Count; ++i) {
+        if (mgr.GetTrigger(static_cast<UnlimitedPlaybackManager::TriggerType>(i)).enabled) {
+            selectedTriggerType = i;
+            break;
+        }
+    }
+    ImGui::Dummy(ImVec2(0, 6));
+    ImGui::Separator();
+    ImGui::Dummy(ImVec2(0, 4));
+    if (selectedTriggerType < 0) {
+        ImGui::TextWrapped("%s", L("No trigger is drawing from a library yet. Add an action on the Training page and point it at one.").c_str());
+        DrawActivityAndToasts(mgr);
+        return;
+    }
+    ImGui::Text(L("%s Config").c_str(), triggerNames[selectedTriggerType]);
+    auto selectedTrigger = static_cast<UnlimitedPlaybackManager::TriggerType>(selectedTriggerType);
+    auto& triggerConfig = mgr.GetTrigger(selectedTrigger);
+    ImGui::Dummy(ImVec2(0, 2));
+    if (selectedTrigger != UnlimitedPlaybackManager::Trigger_OnLoop) {
+        ImGui::TextUnformatted(L("Cooldown Frames").c_str());
+        DrawHelpInline(L("Blocks the same trigger from firing again for this many frames after it activates.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        ImGui::InputInt("##up_cooldown_frames", &triggerConfig.cooldownFrames);
+        ImGui::PopItemWidth();
+        if (triggerConfig.cooldownFrames < 1) {
+            triggerConfig.cooldownFrames = 1;
+        }
+    }
+    ImGui::Dummy(ImVec2(0, 4));
+    if (selectedTrigger == UnlimitedPlaybackManager::Trigger_KeyPress) {
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", L("Maps the button or key used by the Key Press trigger.").c_str());
+        }
+        ImGui::SameLine();
+        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackTrigger);
+    }
+    if (selectedTrigger == UnlimitedPlaybackManager::Trigger_OnLoop) {
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", L("Maps the button or key used to start and stop loop playback.").c_str());
+        }
+        ImGui::SameLine();
+        DrawPlaybackHotkeyBind(mgr, HotkeyManager::Hotkey_UnlimitedPlaybackLoop);
+        ImGui::SameLine();
+        ImGui::TextColored(mgr.IsLoopActive() ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
+            "%s",
+            mgr.IsLoopActive() ? L("Running").c_str() : L("Stopped").c_str());
+
+        float setupSeconds = mgr.GetLoopSetupSeconds();
+        ImGui::TextUnformatted(L("Setup Time (seconds)").c_str());
+        DrawHelpInline(L("Seconds to show a setup countdown after optional snapshot restore before playing the next slot.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        if (ImGui::InputFloat("##up_loop_setup_seconds", &setupSeconds, 0.1f, 0.5f, "%.2f")) {
+            mgr.SetLoopSetupSeconds(setupSeconds);
+            Settings::settingsIni.unlimitedPlaybackLoopSetupSeconds = mgr.GetLoopSetupSeconds();
+            Settings::changeSetting("UnlimitedPlaybackLoopSetupSeconds", std::to_string(mgr.GetLoopSetupSeconds()));
+        }
+        ImGui::PopItemWidth();
+
+        float endingSeconds = mgr.GetLoopEndingSeconds();
+        ImGui::TextUnformatted(L("Ending Time (seconds)").c_str());
+        DrawHelpInline(L("Seconds to wait after both players return to idle before starting the next setup.").c_str());
+        ImGui::PushItemWidth(-1.0f);
+        if (ImGui::InputFloat("##up_loop_ending_seconds", &endingSeconds, 0.1f, 0.5f, "%.2f")) {
+            mgr.SetLoopEndingSeconds(endingSeconds);
+            Settings::settingsIni.unlimitedPlaybackLoopEndingSeconds = mgr.GetLoopEndingSeconds();
+            Settings::changeSetting("UnlimitedPlaybackLoopEndingSeconds", std::to_string(mgr.GetLoopEndingSeconds()));
+        }
+        ImGui::PopItemWidth();
+
+        bool restartLabState = mgr.GetLoopRestartLabState();
+        if (ImGui::Checkbox(L("Restart lab state in-between").c_str(), &restartLabState)) {
+            mgr.SetLoopRestartLabState(restartLabState);
+            Settings::settingsIni.unlimitedPlaybackLoopRestartLabState = restartLabState;
+            Settings::changeSetting("UnlimitedPlaybackLoopRestartLabState", restartLabState ? "1" : "0");
+        }
+        if (restartLabState) {
+            static const int kResetModeOrder[] = {
+                UnlimitedPlaybackManager::LoopReset_Left,
+                UnlimitedPlaybackManager::LoopReset_Middle,
+                UnlimitedPlaybackManager::LoopReset_Right,
+                UnlimitedPlaybackManager::LoopReset_Custom,
+            };
+            const int currentResetMode = mgr.GetLoopRestartMode();
+            ImGui::TextUnformatted(L("Reset Position").c_str());
+            DrawHelpInline(L("Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.").c_str());
+            ImGui::PushItemWidth(-1.0f);
+            if (ImGui::BeginCombo("##up_loop_reset_mode", LoopResetModeLabel(currentResetMode))) {
+                for (int mode : kResetModeOrder) {
+                    const bool selected = (mode == currentResetMode);
+                    if (ImGui::Selectable(LoopResetModeLabel(mode), selected)) {
+                        mgr.SetLoopRestartMode(mode);
+                        Settings::settingsIni.unlimitedPlaybackLoopRestartMode = mgr.GetLoopRestartMode();
+                        Settings::changeSetting("UnlimitedPlaybackLoopRestartMode", std::to_string(mgr.GetLoopRestartMode()));
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+
+            if (currentResetMode == UnlimitedPlaybackManager::LoopReset_Custom) {
+                const bool customReady = mgr.IsLoopSnapshotReadyForMode(UnlimitedPlaybackManager::LoopReset_Custom);
+                ImGui::TextUnformatted(L("Custom Snapshot").c_str());
+                DrawHelpInline(L("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.").c_str());
+                if (ImGui::Button(L("Save").c_str(), ImVec2(-1.0f, 0))) {
+                    mgr.CaptureLoopCustomSnapshot();
+                }
+                DrawButtonTooltip(L("Save current lab state as the loop restart snapshot.").c_str());
+                if (customReady) {
+                    if (ImGui::Button(L("Load").c_str(), ImVec2(-1.0f, 0))) {
+                        mgr.LoadLoopCustomSnapshot();
+                    }
+                    DrawButtonTooltip(L("Restore the saved loop snapshot now for verification.").c_str());
+                }
+                ImGui::TextColored(
+                    customReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.55f, 0.35f, 1.0f),
+                    "%s",
+                    customReady ? L("Snapshot loaded").c_str() : L("No snapshot loaded").c_str());
+            } else {
+                const bool positionReady = mgr.IsLoopSnapshotReadyForMode(currentResetMode);
+                ImGui::TextColored(
+                    positionReady ? ImVec4(0.25f, 0.9f, 0.45f, 1.0f) : ImVec4(0.65f, 0.65f, 0.65f, 1.0f),
+                    "%s",
+                    positionReady
+                        ? L("Reset position snapshot ready").c_str()
+                        : L("Position set up automatically when the loop starts").c_str());
+            }
+        }
+    }
+
+    DrawActivityAndToasts(mgr);
+
+
+    ImGui::EndChild();
+
+    ImGui::Columns(1);
+    ImGui::EndChild();
+
+    DrawPlaybackLibraryPopups();
+}
+
+
+// Shared with the dummy-action rows, which bind the same hotkeys.
+void DrawPlaybackHotkeyBind(UnlimitedPlaybackManager& mgr, HotkeyManager::Action action) {
+    HotkeyBinding binding = HotkeyManager::GetBinding(action);
+    const HotkeyManager::Action conflict = HotkeyManager::FindConflict(binding, action);
+    std::string warning;
+    if (conflict != HotkeyManager::Hotkey_Count) {
+        warning = FormatText(L("Already used by \"%s\". Pressing it will do both.").c_str(),
+            HotkeyManager::DisplayName(conflict));
+    } else if (HotkeyManager::IsControllerBinding(binding)) {
+        warning = L("Controller button: this also works during a match, so pick one you never press while playing.");
+    }
+
+    if (ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
+            HotkeyManager::DefaultBindingString(action), warning.c_str())) {
+        HotkeyManager::SetBinding(action, binding);
+        // The playback trigger must not fire on the very press that assigned it.
+        mgr.ForceResetTriggers("");
+        mgr.PushToast(FormatText(L("Mapped bind: %s").c_str(),
+            HotkeyManager::DisplayString(binding).c_str()));
     }
 }
 

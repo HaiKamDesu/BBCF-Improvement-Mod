@@ -41,6 +41,13 @@ namespace MainMenu
 				scr->DrawLocalReplaysBody();
 		}
 
+		if (BeginSection(Replays_Capture, inTheater))
+		{
+			Hint(L("Turn a stretch of a replay into a playback file, which you can then load into a recording slot, a playback library, or straight onto a dummy action."));
+			if (scr)
+				scr->DrawReplayPlaybackCaptureBody();
+		}
+
 		if (BeginSection(Replays_Takeover, inTheater))
 		{
 			Hint(FormatText(L("Jump into a replay and play it out yourself from a moment you saved. Hotkey: %s loads that moment.").c_str(),

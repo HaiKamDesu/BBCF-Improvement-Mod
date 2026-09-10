@@ -105,7 +105,7 @@ WindowContainer::WindowContainer()
         		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_UnlimitedPlayback,
-                new UnlimitedPlaybackWindow(L("Unlimited Playback (BETA)").c_str(), true, *this));
+                new UnlimitedPlaybackWindow(L("Playback Library").c_str(), true, *this));
 
         AddWindow(WindowType_NetworkSquareColor,
                 new NetworkSquareColorWindow((L("Network Square Color") + "###NetworkSquareColor").c_str(), true,

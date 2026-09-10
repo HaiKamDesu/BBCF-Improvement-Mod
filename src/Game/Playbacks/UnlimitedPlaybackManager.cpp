@@ -1,5 +1,7 @@
 #include "UnlimitedPlaybackManager.h"
 
+#include "Game/Playbacks/DummyActionManager.h"
+
 #include "Core/Localization.h"
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
@@ -436,6 +438,46 @@ UnlimitedPlaybackManager::TriggerType ParseTriggerKey(const std::string& s, bool
 }
 }
 
+UnlimitedPlaybackManager::PlaybackLibrary& UnlimitedPlaybackManager::EditTarget() {
+    return m_editTarget ? *m_editTarget : m_library;
+}
+
+const UnlimitedPlaybackManager::PlaybackLibrary& UnlimitedPlaybackManager::EditTarget() const {
+    return m_editTarget ? *m_editTarget : m_library;
+}
+
+void UnlimitedPlaybackManager::SetEditTarget(PlaybackLibrary* library) {
+    m_editTarget = library;
+}
+
+UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::GetEditTarget() {
+    return &EditTarget();
+}
+
+UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::MutableLibraryForTrigger(
+    TriggerType trigger) {
+    // Loads the assignment if needed, then hands back this trigger's own slot so the editor
+    // works on exactly the object the trigger fires from.
+    LibraryForTrigger(trigger);
+    return &m_triggerLibraries[trigger];
+}
+
+void UnlimitedPlaybackManager::ResetTriggerLibrary(TriggerType trigger) {
+    m_triggerLibraries[trigger] = PlaybackLibrary{};
+    // The picking bookkeeping is per trigger too, and a sequential index or a
+    // no-repeat pool left pointing into the old entry list is meaningless now.
+    m_sequentialIndex[trigger] = 0;
+    m_nonRepeatPools[trigger].clear();
+    // Nothing has been edited in this slot yet, so the editor must not still be aimed at it.
+    if (GetEditTarget() == &m_triggerLibraries[trigger]) {
+        SetEditTarget(nullptr);
+    }
+}
+
+bool UnlimitedPlaybackManager::TriggerLibraryHasEntries(TriggerType trigger) const {
+    return !m_triggerLibraries[trigger].entries.empty();
+}
+
 UnlimitedPlaybackManager& UnlimitedPlaybackManager::Instance() {
     static UnlimitedPlaybackManager instance;
     return instance;
@@ -454,7 +496,7 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
         return;
     }
 
-    m_activeProfilePath.clear();
+    EditTarget().path.clear();
     m_lastLoadedProfileFolder.clear();
     // The playback and loop keybinds live in HotkeyManager (settings.ini, rebindable from the
     // Settings window like every other hotkey), not in profiles and not here.
@@ -482,7 +524,21 @@ void UnlimitedPlaybackManager::InitializeIfNeeded() {
 // condition checks in Tick() do depend on real-time state that may not be updated yet at this
 // earlier point in the frame; they keep their existing (correct, already-tested) detection timing
 // and so still have the same one-tick-late start as before - a known follow-up, not fixed by this.
+namespace {
+    // Sets a flag for as long as it is in scope, so a function with many early returns can
+    // mark the whole of itself as "running inside the game's frame update".
+    struct HookPhaseGuard {
+        bool& flag;
+        explicit HookPhaseGuard(bool& f) : flag(f) { flag = true; }
+        ~HookPhaseGuard() { flag = false; }
+    };
+}
+
 void UnlimitedPlaybackManager::RunPreTick() {
+    // The other hook entry point, and the same rule applies: this runs from inside the
+    // game's own frame update, so nothing reached from here may build a SnapshotApparatus.
+    HookPhaseGuard hookPhase(m_inHookTick);
+
     static bool loggedAlive = false;
     if (!loggedAlive) {
         LOG(7, "[UP][diag] RunPreTick hook is alive (first call).\n");
@@ -492,6 +548,11 @@ void UnlimitedPlaybackManager::RunPreTick() {
 }
 
 void UnlimitedPlaybackManager::Tick() {
+    // Marks everything below as running inside the game's frame update, so nothing reached
+    // from here builds a SnapshotApparatus. RAII because Tick has a dozen early returns.
+    // See CanBuildSnapshotApparatusHere.
+    HookPhaseGuard hookPhase(m_inHookTick);
+
     InitializeIfNeeded();
     PruneExpiredToasts();
 
@@ -555,9 +616,55 @@ void UnlimitedPlaybackManager::Tick() {
     }
     m_lastObservedFrame = frame;
 
+    // Every frame, not on edit. The dummy-action table is what says which triggers are
+    // armed, and a modal finishing its configuration changes that answer - hanging the
+    // update off the UI would mean actions only worked while their menu was open.
+    DummyActionManager::Instance().SyncTriggerEnable();
+
+    // What the two sides think is armed, logged only when it changes. The point is to make a
+    // trigger that does nothing say which link is broken - the action, the enable flag, or
+    // the firing condition - rather than being silent about all three.
+    {
+        DummyActionManager& actions = DummyActionManager::Instance();
+        char state[Trigger_Count * 24 + 1] = {};
+        int used = 0;
+        for (int i = 0; i < Trigger_Count; ++i) {
+            const DummyActionManager::Action& action =
+                actions.Get(static_cast<TriggerType>(i));
+            used += sprintf_s(state + used, sizeof(state) - used, "%s%d:src%d/run%d/en%d",
+                i ? " " : "",
+                i,
+                static_cast<int>(action.source),
+                actions.IsRunnable(static_cast<TriggerType>(i)) ? 1 : 0,
+                m_triggers[i].enabled ? 1 : 0);
+        }
+        static std::string lastState;
+        if (lastState != state) {
+            lastState = state;
+            LOG(1, "[UP][ACTIONS] %s\n", state);
+        }
+    }
+
+    ProcessPendingTriggerDelays(frame);
+
+    // The loop used to be gated on Trigger_OnLoop being *armed* and then returned, so
+    // merely having a loop action configured silently disabled all six other triggers -
+    // which is why a wakeup or on-hit action stopped working as soon as a loop was set up.
+    // Triggers are meant to be independent, so the loop is now just another one of them.
+    // Polled whenever a loop is configured, running or not.
     if (m_triggers[Trigger_OnLoop].enabled) {
+        ProcessLoopHotkey(frame);
+    }
+
+    if (m_loopActive) {
         ProcessLoopTick(frame);
-        return;
+
+        // The one exception: while the loop is physically resetting the lab it overrides
+        // inputs and moves the characters, so letting another trigger fire into that would
+        // fight it for the CF slot and land the action somewhere meaningless.
+        if (m_loopPhase == LoopPhase_PositionSetup || m_loopPhase == LoopPhase_Ending) {
+            return;
+        }
     }
 
     TryFireTrigger(Trigger_KeyPress, frame);
@@ -597,13 +704,16 @@ void UnlimitedPlaybackManager::ResetTriggerRuntimeState(bool enableRuntime) {
         m_profileRuntimeSuppressedUntilReset ? 1 : 0,
         m_keyPressTriggerArmed ? 1 : 0,
         m_lastObservedFrame,
-        static_cast<unsigned int>(m_entries.size()),
-        static_cast<unsigned int>(m_cache.size()),
+        static_cast<unsigned int>(EditTarget().entries.size()),
+        static_cast<unsigned int>(EditTarget().cache.size()),
         m_mode);
     m_triggerRuntimeEnabled = enableRuntime;
     m_lastObservedFrame = -1;
     for (int i = 0; i < Trigger_Count; ++i) {
         m_triggers[i].lastTriggeredFrame = -999999;
+        // A countdown left over from before the reset would fire into a match that has
+        // moved on, so it goes with the rest of the runtime state.
+        m_triggers[i].pendingFireFrame = -1;
     }
 
     m_prevWakeupCondition = false;
@@ -629,23 +739,23 @@ void UnlimitedPlaybackManager::LogRuntimeGateState(const char* tag) const {
         frame,
         gameMode,
         gameState,
-        static_cast<unsigned int>(m_entries.size()),
-        static_cast<unsigned int>(m_cache.size()),
-        m_activeProfilePath.c_str());
+        static_cast<unsigned int>(EditTarget().entries.size()),
+        static_cast<unsigned int>(EditTarget().cache.size()),
+        EditTarget().path.c_str());
 }
 
 void UnlimitedPlaybackManager::LogEntryCacheSummary(const char* tag) const {
     LOG(1,
         "[UP][DATA] %s entries=%u cache=%u activeProfile='%s'\n",
         tag ? tag : "(null)",
-        static_cast<unsigned int>(m_entries.size()),
-        static_cast<unsigned int>(m_cache.size()),
-        m_activeProfilePath.c_str());
+        static_cast<unsigned int>(EditTarget().entries.size()),
+        static_cast<unsigned int>(EditTarget().cache.size()),
+        EditTarget().path.c_str());
 
-    for (size_t i = 0; i < m_entries.size(); ++i) {
-        const auto& entry = m_entries[i];
-        const auto cacheIt = m_cache.find(entry.id);
-        const bool cacheLoaded = cacheIt != m_cache.end() && cacheIt->second.loaded;
+    for (size_t i = 0; i < EditTarget().entries.size(); ++i) {
+        const auto& entry = EditTarget().entries[i];
+        const auto cacheIt = EditTarget().cache.find(entry.id);
+        const bool cacheLoaded = cacheIt != EditTarget().cache.end() && cacheIt->second.loaded;
         const unsigned int frameBytes = cacheLoaded ? static_cast<unsigned int>(cacheIt->second.frames.size()) : 0U;
         const int facing = cacheLoaded ? (cacheIt->second.facingLeft ? 1 : 0) : -1;
         LOG(1,
@@ -732,14 +842,14 @@ void UnlimitedPlaybackManager::SetMode(int mode) {
 }
 
 int UnlimitedPlaybackManager::GetSelectionMode() const {
-    return m_selectionMode;
+    return EditTarget().selectionMode;
 }
 
 void UnlimitedPlaybackManager::SetSelectionMode(int mode) {
     if (mode < Selection_Random || mode > Selection_NonRepeatingRandom) {
         mode = Selection_Random;
     }
-    m_selectionMode = mode;
+    EditTarget().selectionMode = mode;
     for (int i = 0; i < Trigger_Count; ++i) {
         m_sequentialIndex[i] = 0;
         m_nonRepeatPools[i].clear();
@@ -832,11 +942,11 @@ bool UnlimitedPlaybackManager::IsLoopPositionSetupActive() const {
 }
 
 const std::vector<UnlimitedPlaybackManager::PlaybackEntry>& UnlimitedPlaybackManager::GetEntries() const {
-    return m_entries;
+    return EditTarget().entries;
 }
 
 std::vector<UnlimitedPlaybackManager::PlaybackEntry>& UnlimitedPlaybackManager::GetEntriesMutable() {
-    return m_entries;
+    return EditTarget().entries;
 }
 
 UnlimitedPlaybackManager::TriggerConfig& UnlimitedPlaybackManager::GetTrigger(TriggerType type) {
@@ -893,8 +1003,8 @@ bool UnlimitedPlaybackManager::AddPlaybackFile(const std::string& sourcePath, co
     entry.relativePath = BuildUniqueRelativePath(entry.name);
     entry.enabled = true;
     entry.weight = 1.0f;
-    m_entries.push_back(entry);
-    m_cache[entry.id] = playback;
+    EditTarget().entries.push_back(entry);
+    EditTarget().cache[entry.id] = playback;
 
     PushToast(L("Playback imported."));
     return true;
@@ -929,12 +1039,12 @@ bool UnlimitedPlaybackManager::CaptureSlotToLibrary(int slot, const std::string&
     entry.relativePath = BuildUniqueRelativePath(baseName);
     entry.enabled = true;
     entry.weight = 1.0f;
-    m_entries.push_back(entry);
+    EditTarget().entries.push_back(entry);
     CachedPlayback playback;
     playback.loaded = true;
     playback.facingLeft = facingLeft;
     playback.frames = frames;
-    m_cache[entry.id] = playback;
+    EditTarget().cache[entry.id] = playback;
 
     PushToast(L("Captured slot to library."));
     return true;
@@ -954,6 +1064,55 @@ bool UnlimitedPlaybackManager::StartReplayRecording(bool recordP1) {
     m_replayRecordingRound = static_cast<int>(*(GetBbcfBaseAdress() + 0x11C034C));
     PushToast(FormatLocalized("Replay recording started: %s.", recordP1 ? "P1" : "P2"));
     return true;
+}
+
+bool UnlimitedPlaybackManager::StopReplayRecordingToBuffer(
+    std::vector<char>* outTrimmed, char* outFacing) {
+    InitializeIfNeeded();
+
+    if (!outTrimmed || !outFacing) {
+        return false;
+    }
+    if (!m_replayRecordingActive) {
+        PushToast(L("No replay recording in progress."));
+        return false;
+    }
+    if (!IsReplayMatchActive()) {
+        CancelReplayRecording(L("Replay recording cancelled (left replay match).").c_str());
+        return false;
+    }
+
+    const int endFrame = g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0;
+    if (endFrame <= m_replayRecordingStartFrame) {
+        CancelReplayRecording(L("Replay recording cancelled (too short).").c_str());
+        return false;
+    }
+
+    const int recordedPlayer = m_replayRecordingAsP1 ? 0 : 1;
+    std::vector<char> frames;
+    if (!BuildPlaybackFramesFromReplayRange(m_replayRecordingRound,
+            m_replayRecordingStartFrame, endFrame, recordedPlayer, &frames)) {
+        CancelReplayRecording(L("Replay recording cancelled (failed reading replay frames).").c_str());
+        return false;
+    }
+
+    const bool facingLeft = m_replayRecordingAsP1
+        ? (g_interfaces.player1.GetData() && g_interfaces.player1.GetData()->facingLeft2 != 0)
+        : (g_interfaces.player2.GetData() && g_interfaces.player2.GetData()->facingLeft2 != 0);
+
+    // Frames come back in the slot's raw two-bytes-per-frame layout; a playback file holds
+    // one byte per frame after its facing byte.
+    *outTrimmed = PlaybackManager::raw_to_trimmed(frames);
+    *outFacing = facingLeft ? 1 : 0;
+
+    m_replayRecordingActive = false;
+    m_replayRecordingAsP1 = true;
+    m_replayRecordingRound = 0;
+    m_replayRecordingStartFrame = 0;
+
+    LOG(1, "[UP] Replay capture stopped: %u frames, facing %d\n",
+        static_cast<unsigned int>(outTrimmed->size()), static_cast<int>(*outFacing));
+    return !outTrimmed->empty();
 }
 
 bool UnlimitedPlaybackManager::StopReplayRecordingAndSave(const std::string& displayName) {
@@ -999,12 +1158,12 @@ bool UnlimitedPlaybackManager::StopReplayRecordingAndSave(const std::string& dis
     entry.relativePath = BuildUniqueRelativePath(baseName);
     entry.enabled = true;
     entry.weight = 1.0f;
-    m_entries.push_back(entry);
+    EditTarget().entries.push_back(entry);
     CachedPlayback playback;
     playback.loaded = true;
     playback.facingLeft = facingLeft;
     playback.frames = frames;
-    m_cache[entry.id] = playback;
+    EditTarget().cache[entry.id] = playback;
 
     m_replayRecordingActive = false;
     m_replayRecordingAsP1 = true;
@@ -1040,12 +1199,12 @@ int UnlimitedPlaybackManager::GetReplayRecordingStartFrame() const {
 bool UnlimitedPlaybackManager::RemoveEntryByIndex(size_t idx) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size()) {
+    if (idx >= EditTarget().entries.size()) {
         return false;
     }
 
-    m_cache.erase(m_entries[idx].id);
-    m_entries.erase(m_entries.begin() + idx);
+    EditTarget().cache.erase(EditTarget().entries[idx].id);
+    EditTarget().entries.erase(EditTarget().entries.begin() + idx);
     for (int i = 0; i < Trigger_Count; ++i) {
         m_sequentialIndex[i] = 0;
         m_nonRepeatPools[i].clear();
@@ -1063,11 +1222,11 @@ int UnlimitedPlaybackManager::RemoveEntriesByIndices(const std::vector<size_t>& 
     int removedCount = 0;
     for (auto it = sortedIndices.rbegin(); it != sortedIndices.rend(); ++it) {
         const size_t idx = *it;
-        if (idx >= m_entries.size()) {
+        if (idx >= EditTarget().entries.size()) {
             continue;
         }
-        m_cache.erase(m_entries[idx].id);
-        m_entries.erase(m_entries.begin() + static_cast<std::ptrdiff_t>(idx));
+        EditTarget().cache.erase(EditTarget().entries[idx].id);
+        EditTarget().entries.erase(EditTarget().entries.begin() + static_cast<std::ptrdiff_t>(idx));
         ++removedCount;
     }
     if (removedCount > 0) {
@@ -1083,13 +1242,13 @@ int UnlimitedPlaybackManager::RemoveEntriesByIndices(const std::vector<size_t>& 
 bool UnlimitedPlaybackManager::MoveEntry(size_t fromIdx, size_t toIdx) {
     InitializeIfNeeded();
 
-    if (fromIdx >= m_entries.size() || toIdx >= m_entries.size() || fromIdx == toIdx) {
+    if (fromIdx >= EditTarget().entries.size() || toIdx >= EditTarget().entries.size() || fromIdx == toIdx) {
         return false;
     }
 
-    PlaybackEntry entry = std::move(m_entries[fromIdx]);
-    m_entries.erase(m_entries.begin() + static_cast<std::ptrdiff_t>(fromIdx));
-    m_entries.insert(m_entries.begin() + static_cast<std::ptrdiff_t>(toIdx), std::move(entry));
+    PlaybackEntry entry = std::move(EditTarget().entries[fromIdx]);
+    EditTarget().entries.erase(EditTarget().entries.begin() + static_cast<std::ptrdiff_t>(fromIdx));
+    EditTarget().entries.insert(EditTarget().entries.begin() + static_cast<std::ptrdiff_t>(toIdx), std::move(entry));
     for (int i = 0; i < Trigger_Count; ++i) {
         m_sequentialIndex[i] = 0;
         m_nonRepeatPools[i].clear();
@@ -1101,16 +1260,16 @@ bool UnlimitedPlaybackManager::MoveEntry(size_t fromIdx, size_t toIdx) {
 bool UnlimitedPlaybackManager::MoveEntries(const std::vector<size_t>& fromIndicesSorted, size_t insertionIndex, size_t* outInsertedAt) {
     InitializeIfNeeded();
 
-    if (fromIndicesSorted.empty() || insertionIndex > m_entries.size()) {
+    if (fromIndicesSorted.empty() || insertionIndex > EditTarget().entries.size()) {
         return false;
     }
     for (size_t idx : fromIndicesSorted) {
-        if (idx >= m_entries.size()) {
+        if (idx >= EditTarget().entries.size()) {
             return false;
         }
     }
 
-    std::vector<bool> isMoved(m_entries.size(), false);
+    std::vector<bool> isMoved(EditTarget().entries.size(), false);
     for (size_t idx : fromIndicesSorted) {
         isMoved[idx] = true;
     }
@@ -1125,12 +1284,12 @@ bool UnlimitedPlaybackManager::MoveEntries(const std::vector<size_t>& fromIndice
     std::vector<PlaybackEntry> moved;
     moved.reserve(fromIndicesSorted.size());
     std::vector<PlaybackEntry> remaining;
-    remaining.reserve(m_entries.size() - fromIndicesSorted.size());
-    for (size_t i = 0; i < m_entries.size(); ++i) {
+    remaining.reserve(EditTarget().entries.size() - fromIndicesSorted.size());
+    for (size_t i = 0; i < EditTarget().entries.size(); ++i) {
         if (isMoved[i]) {
-            moved.push_back(std::move(m_entries[i]));
+            moved.push_back(std::move(EditTarget().entries[i]));
         } else {
-            remaining.push_back(std::move(m_entries[i]));
+            remaining.push_back(std::move(EditTarget().entries[i]));
         }
     }
 
@@ -1143,7 +1302,7 @@ bool UnlimitedPlaybackManager::MoveEntries(const std::vector<size_t>& fromIndice
         remaining.begin() + static_cast<std::ptrdiff_t>(insertAt),
         std::make_move_iterator(moved.begin()),
         std::make_move_iterator(moved.end()));
-    m_entries = std::move(remaining);
+    EditTarget().entries = std::move(remaining);
 
     for (int i = 0; i < Trigger_Count; ++i) {
         m_sequentialIndex[i] = 0;
@@ -1160,8 +1319,8 @@ void UnlimitedPlaybackManager::SetEntriesEnabled(const std::vector<size_t>& indi
     InitializeIfNeeded();
 
     for (size_t idx : indices) {
-        if (idx < m_entries.size()) {
-            m_entries[idx].enabled = enabled;
+        if (idx < EditTarget().entries.size()) {
+            EditTarget().entries[idx].enabled = enabled;
         }
     }
     for (int i = 0; i < Trigger_Count; ++i) {
@@ -1173,7 +1332,7 @@ void UnlimitedPlaybackManager::SetEntriesEnabled(const std::vector<size_t>& indi
 void UnlimitedPlaybackManager::SetAllEntriesEnabled(bool enabled) {
     InitializeIfNeeded();
 
-    for (auto& entry : m_entries) {
+    for (auto& entry : EditTarget().entries) {
         entry.enabled = enabled;
     }
     for (int i = 0; i < Trigger_Count; ++i) {
@@ -1184,11 +1343,11 @@ void UnlimitedPlaybackManager::SetAllEntriesEnabled(bool enabled) {
 }
 
 bool UnlimitedPlaybackManager::RenameEntry(size_t idx, const std::string& newName) {
-    if (idx >= m_entries.size() || newName.empty()) {
+    if (idx >= EditTarget().entries.size() || newName.empty()) {
         return false;
     }
 
-    m_entries[idx].name = newName;
+    EditTarget().entries[idx].name = newName;
     PushToast(L("Entry renamed."));
     return true;
 }
@@ -1196,7 +1355,7 @@ bool UnlimitedPlaybackManager::RenameEntry(size_t idx, const std::string& newNam
 bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size() || slot < 1 || slot > 4) {
+    if (idx >= EditTarget().entries.size() || slot < 1 || slot > 4) {
         return false;
     }
 
@@ -1212,9 +1371,9 @@ bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
         return false;
     }
 
-    const auto& entry = m_entries[idx];
-    auto it = m_cache.find(entry.id);
-    if (it == m_cache.end() || !it->second.loaded) {
+    const auto& entry = EditTarget().entries[idx];
+    auto it = EditTarget().cache.find(entry.id);
+    if (it == EditTarget().cache.end() || !it->second.loaded) {
         PushToast(L("Failed loading entry."));
         return false;
     }
@@ -1239,7 +1398,7 @@ bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
 bool UnlimitedPlaybackManager::SaveEntryFromSlot(size_t idx, int slot) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size() || slot < 1 || slot > 4) {
+    if (idx >= EditTarget().entries.size() || slot < 1 || slot > 4) {
         return false;
     }
 
@@ -1262,7 +1421,7 @@ bool UnlimitedPlaybackManager::SaveEntryFromSlot(size_t idx, int slot) {
     playback.loaded = true;
     playback.facingLeft = facingLeft;
     playback.frames = frames;
-    m_cache[m_entries[idx].id] = playback;
+    EditTarget().cache[EditTarget().entries[idx].id] = playback;
     PushToast(L("Entry overwritten from slot."));
     return true;
 }
@@ -1270,13 +1429,13 @@ bool UnlimitedPlaybackManager::SaveEntryFromSlot(size_t idx, int slot) {
 bool UnlimitedPlaybackManager::ReadEntryPlayback(size_t idx, bool* outFacingLeft, std::vector<char>* outFrames) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size() || !outFacingLeft || !outFrames) {
+    if (idx >= EditTarget().entries.size() || !outFacingLeft || !outFrames) {
         return false;
     }
 
-    const auto& entry = m_entries[idx];
-    auto it = m_cache.find(entry.id);
-    if (it == m_cache.end() || !it->second.loaded) {
+    const auto& entry = EditTarget().entries[idx];
+    auto it = EditTarget().cache.find(entry.id);
+    if (it == EditTarget().cache.end() || !it->second.loaded) {
         return false;
     }
 
@@ -1288,7 +1447,7 @@ bool UnlimitedPlaybackManager::ReadEntryPlayback(size_t idx, bool* outFacingLeft
 bool UnlimitedPlaybackManager::WriteEntryPlayback(size_t idx, bool facingLeft, const std::vector<char>& frames) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size()) {
+    if (idx >= EditTarget().entries.size()) {
         return false;
     }
 
@@ -1303,7 +1462,7 @@ bool UnlimitedPlaybackManager::WriteEntryPlayback(size_t idx, bool facingLeft, c
     playback.loaded = true;
     playback.facingLeft = facingLeft;
     playback.frames = ExpandPlaybackBytes(clampedFrames);
-    m_cache[m_entries[idx].id] = playback;
+    EditTarget().cache[EditTarget().entries[idx].id] = playback;
     PushToast(L("Entry saved."));
     return true;
 }
@@ -1311,13 +1470,13 @@ bool UnlimitedPlaybackManager::WriteEntryPlayback(size_t idx, bool facingLeft, c
 bool UnlimitedPlaybackManager::SaveEntryToFile(size_t idx, const std::string& outputPath) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size() || outputPath.empty()) {
+    if (idx >= EditTarget().entries.size() || outputPath.empty()) {
         return false;
     }
 
-    const auto& entry = m_entries[idx];
-    const auto it = m_cache.find(entry.id);
-    if (it == m_cache.end() || !it->second.loaded) {
+    const auto& entry = EditTarget().entries[idx];
+    const auto it = EditTarget().cache.find(entry.id);
+    if (it == EditTarget().cache.end() || !it->second.loaded) {
         PushToast(L("Failed saving entry to file."));
         return false;
     }
@@ -1377,7 +1536,7 @@ bool UnlimitedPlaybackManager::BuildPlaybackFramesFromReplayRange(
 bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
     InitializeIfNeeded();
 
-    if (idx >= m_entries.size()) {
+    if (idx >= EditTarget().entries.size()) {
         return false;
     }
 
@@ -1393,9 +1552,9 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
         return false;
     }
 
-    const auto& entry = m_entries[idx];
-    auto it = m_cache.find(entry.id);
-    if (it == m_cache.end() || !it->second.loaded) {
+    const auto& entry = EditTarget().entries[idx];
+    auto it = EditTarget().cache.find(entry.id);
+    if (it == EditTarget().cache.end() || !it->second.loaded) {
         PushToast(L("Failed loading entry."));
         return false;
     }
@@ -1419,15 +1578,15 @@ void UnlimitedPlaybackManager::ExecutePendingPlayNow() {
     m_pendingPlayNowRequested = false;
 
     const size_t idx = m_pendingPlayNowIndex;
-    if (idx >= m_entries.size()) {
+    if (idx >= EditTarget().entries.size()) {
         LOG(7, "[UP][diag] ExecutePendingPlayNow: idx out of range (entries=%u)\n",
-            static_cast<unsigned int>(m_entries.size()));
+            static_cast<unsigned int>(EditTarget().entries.size()));
         return;
     }
 
-    const auto& entry = m_entries[idx];
-    auto it = m_cache.find(entry.id);
-    if (it == m_cache.end() || !it->second.loaded) {
+    const auto& entry = EditTarget().entries[idx];
+    auto it = EditTarget().cache.find(entry.id);
+    if (it == EditTarget().cache.end() || !it->second.loaded) {
         LOG(7, "[UP][diag] ExecutePendingPlayNow: cache miss/not loaded for entry '%s'\n", entry.name.c_str());
         PushToast(L("Failed loading entry."));
         return;
@@ -1537,8 +1696,8 @@ void UnlimitedPlaybackManager::ClearAll() {
     CancelReplayRecording(nullptr);
     m_triggerRuntimeEnabled = false;
     m_mode = Mode_Unlimited;
-    m_entries.clear();
-    m_cache.clear();
+    EditTarget().entries.clear();
+    EditTarget().cache.clear();
     for (int i = 0; i < Trigger_Count; ++i) {
         m_triggers[i].enabled = (i != Trigger_KeyPress && i != Trigger_OnLoop);
         m_triggers[i].cooldownFrames = 1;
@@ -1570,7 +1729,7 @@ bool UnlimitedPlaybackManager::SaveProfile(const std::string& profilePath) {
     out << kProfileFormatVersionKey << "=" << CompatibilityManager::ToString(CompatibilityManager::CurrentProfileVersion()) << "\n";
     out << "version=1\n";
     out << "mode=" << m_mode << "\n";
-    out << "selection_mode=" << m_selectionMode << "\n";
+    out << "selection_mode=" << EditTarget().selectionMode << "\n";
     out << "auto_mirror_side_swap=" << (m_autoMirrorOnSideSwap ? 1 : 0) << "\n";
     for (int i = 0; i < Trigger_Count; ++i) {
         out << "trigger." << TriggerKeyName(static_cast<TriggerType>(i)) << ".enabled=" << (m_triggers[i].enabled ? 1 : 0) << "\n";
@@ -1578,7 +1737,7 @@ bool UnlimitedPlaybackManager::SaveProfile(const std::string& profilePath) {
         // keyCode is stored in settings.ini, not in profile files.
     }
 
-    for (const auto& e : m_entries) {
+    for (const auto& e : EditTarget().entries) {
         out << "entry="
             << e.id << "|"
             << e.name << "|"
@@ -1592,8 +1751,8 @@ bool UnlimitedPlaybackManager::SaveProfile(const std::string& profilePath) {
 
         CachedPlayback playback;
         bool havePlayback = false;
-        const auto cacheIt = m_cache.find(e.id);
-        if (cacheIt != m_cache.end() && cacheIt->second.loaded) {
+        const auto cacheIt = EditTarget().cache.find(e.id);
+        if (cacheIt != EditTarget().cache.end() && cacheIt->second.loaded) {
             playback = cacheIt->second;
             havePlayback = true;
         }
@@ -1610,7 +1769,7 @@ bool UnlimitedPlaybackManager::SaveProfile(const std::string& profilePath) {
     }
 
     out.close();
-    m_activeProfilePath = p;
+    EditTarget().path = p;
     PushToast(L("Profile saved."));
     return true;
 }
@@ -1636,18 +1795,19 @@ CompatibilityManager::Result UnlimitedPlaybackManager::ProbeProfileCompatibility
     return CompatibilityManager::EvaluateProfile(detected);
 }
 
-bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool forceLoadIncompatible) {
-    std::string p = profilePath;
-    if (!IsAbsolutePath(p)) {
-        p = JoinPath(GetProfileFolder(), profilePath);
-    }
-
-    if (!PathExists(p)) {
+// Reads a library file into `out`, touching no manager state, so a library can be loaded
+// for one trigger without disturbing the one the window is editing.
+//
+// Per-trigger flags a file may carry are handed back through `extras` rather than applied:
+// which entries a trigger may use is decided by which library is assigned to it, not by
+// flags stored inside the file. Only LoadProfile, which still restores a whole working set,
+// has any use for them.
+bool UnlimitedPlaybackManager::ParseLibraryFile(const std::string& resolvedPath,
+    bool forceLoadIncompatible, PlaybackLibrary* out, LibraryFileExtras* extras) {
+    if (!out || !PathExists(resolvedPath)) {
         return false;
     }
-
-    LOG(1, "[UP][STATE] LoadProfile begin path='%s' force=%d\n", p.c_str(), forceLoadIncompatible ? 1 : 0);
-    DebugLogState("LoadProfile begin");
+    const std::string& p = resolvedPath;
 
     std::ifstream in(p, std::ios::binary);
     if (!in.good()) {
@@ -1673,7 +1833,7 @@ bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool 
     std::vector<PlaybackEntry> parsedEntries;
     std::unordered_map<std::string, std::string> embeddedEntryDataHex;
     std::array<TriggerConfig, Trigger_Count> parsedTriggers = m_triggers;
-    int parsedSelectionMode = m_selectionMode;
+    int parsedSelectionMode = EditTarget().selectionMode;
     bool parsedAutoMirror = m_autoMirrorOnSideSwap;
 
     std::string line;
@@ -1800,11 +1960,44 @@ bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool 
         }
     }
 
-    m_entries = parsedEntries;
-    m_triggers = parsedTriggers;
+    out->entries = std::move(parsedEntries);
+    out->cache = std::move(parsedCache);
+    out->selectionMode = parsedSelectionMode;
+    out->path = p;
+    if (extras) {
+        extras->triggers = parsedTriggers;
+        extras->autoMirror = parsedAutoMirror;
+        extras->valid = true;
+    }
+    return true;
+}
+
+bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool forceLoadIncompatible) {
+    std::string p = profilePath;
+    if (!IsAbsolutePath(p)) {
+        p = JoinPath(GetProfileFolder(), profilePath);
+    }
+
+    if (!PathExists(p)) {
+        return false;
+    }
+
+    LOG(1, "[UP][STATE] LoadProfile begin path='%s' force=%d\n", p.c_str(), forceLoadIncompatible ? 1 : 0);
+    DebugLogState("LoadProfile begin");
+
+    PlaybackLibrary parsed;
+    LibraryFileExtras extras;
+    if (!ParseLibraryFile(p, forceLoadIncompatible, &parsed, &extras)) {
+        return false;
+    }
+
+    EditTarget() = std::move(parsed);
+    if (extras.valid) {
+        m_triggers = extras.triggers;
+    }
     SetMode(Mode_Unlimited);
-    SetSelectionMode(parsedSelectionMode);
-    SetAutoMirrorOnSideSwap(parsedAutoMirror);
+    SetSelectionMode(EditTarget().selectionMode);
+    SetAutoMirrorOnSideSwap(extras.autoMirror);
     const size_t slash = p.find_last_of("/\\");
     if (slash != std::string::npos) {
         m_lastLoadedProfileFolder = p.substr(0, slash);
@@ -1812,22 +2005,63 @@ bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool 
         m_lastLoadedProfileFolder.clear();
     }
 
-    m_cache.clear();
-    m_cache = std::move(parsedCache);
 
     ResetRuntimePlaybackState(true);
     ForceResetTriggers(L("Profile loaded. Trigger runtime synced.").c_str());
-    m_activeProfilePath = p;
     DebugLogState("LoadProfile end");
     return true;
 }
 
+const UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::LibraryForTrigger(
+    TriggerType trigger) {
+    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
+    if (action.source != DummyActionManager::Source_Library || action.libraryPath.empty()) {
+        return nullptr;
+    }
+
+    PlaybackLibrary& slot = m_triggerLibraries[trigger];
+
+    // Load only when the assignment names a file this slot is not already holding. Editing
+    // the slot without saving leaves the path alone, so an unchecked entry or a reorder is
+    // not undone by a reload on the next shot.
+    if (slot.path != action.libraryPath) {
+        PlaybackLibrary loaded;
+        if (!ParseLibraryFile(action.libraryPath, true, &loaded, nullptr)) {
+            LOG(1, "[UP] Library for trigger '%s' failed to load: '%s'\n",
+                TriggerDisplayName(trigger), action.libraryPath.c_str());
+            return nullptr;
+        }
+        LOG(1, "[UP] Loaded library '%s' for trigger '%s' (%u entries)\n",
+            loaded.path.c_str(), TriggerDisplayName(trigger),
+            static_cast<unsigned int>(loaded.entries.size()));
+        slot = std::move(loaded);
+        // The action's picking order wins over whatever the file was saved with: it is what
+        // the user last chose for THIS trigger, and it is the value the firing code reads.
+        // Without this the modal would show the file's mode while the trigger used another.
+        slot.selectionMode = action.selectionMode;
+    }
+    return &slot;
+}
+
+void UnlimitedPlaybackManager::PruneUnusedLibraries() {
+    // A trigger that no longer draws from a library has no use for the entries it was
+    // holding, and they would otherwise come back if it were pointed at a library again.
+    const DummyActionManager& actions = DummyActionManager::Instance();
+    for (int i = 0; i < Trigger_Count; ++i) {
+        const DummyActionManager::Action& action = actions.Get(static_cast<TriggerType>(i));
+        if (action.source != DummyActionManager::Source_Library
+            && !m_triggerLibraries[i].entries.empty()) {
+            m_triggerLibraries[i] = PlaybackLibrary{};
+        }
+    }
+}
+
 std::string UnlimitedPlaybackManager::GetActiveProfilePath() const {
-    return m_activeProfilePath;
+    return EditTarget().path;
 }
 
 void UnlimitedPlaybackManager::SetActiveProfilePath(const std::string& path) {
-    m_activeProfilePath = path;
+    EditTarget().path = path;
 }
 
 std::string UnlimitedPlaybackManager::GetStatusText() const {
@@ -1952,8 +2186,8 @@ std::string UnlimitedPlaybackManager::BuildUniqueRelativePath(const std::string&
         }
         candidate += ".playback";
         bool exists = false;
-        for (size_t i = 0; i < m_entries.size(); ++i) {
-            if (m_entries[i].relativePath == candidate) {
+        for (size_t i = 0; i < EditTarget().entries.size(); ++i) {
+            if (EditTarget().entries[i].relativePath == candidate) {
                 exists = true;
                 break;
             }
@@ -1966,13 +2200,13 @@ std::string UnlimitedPlaybackManager::BuildUniqueRelativePath(const std::string&
 }
 
 std::string UnlimitedPlaybackManager::EnsureEntryLibraryRelativePath(size_t idx) {
-    if (idx >= m_entries.size()) {
+    if (idx >= EditTarget().entries.size()) {
         return "";
     }
-    if (m_entries[idx].relativePath.empty() || IsAbsolutePath(m_entries[idx].relativePath)) {
-        m_entries[idx].relativePath = BuildUniqueRelativePath(m_entries[idx].name.empty() ? "playback" : m_entries[idx].name);
+    if (EditTarget().entries[idx].relativePath.empty() || IsAbsolutePath(EditTarget().entries[idx].relativePath)) {
+        EditTarget().entries[idx].relativePath = BuildUniqueRelativePath(EditTarget().entries[idx].name.empty() ? "playback" : EditTarget().entries[idx].name);
     }
-    return m_entries[idx].relativePath;
+    return EditTarget().entries[idx].relativePath;
 }
 
 bool UnlimitedPlaybackManager::ReadPlaybackFile(const std::string& fullPath, CachedPlayback* out, bool forceLoadIncompatible) {
@@ -2022,14 +2256,15 @@ bool UnlimitedPlaybackManager::WritePlaybackFile(const std::string& fullPath, bo
     return out.good();
 }
 
-bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger, size_t* outIndex) {
-    std::vector<size_t> candidates = BuildCandidatesForTrigger(trigger);
+bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger,
+    const PlaybackLibrary& library, int selectionMode, size_t* outIndex) {
+    std::vector<size_t> candidates = BuildCandidates(library);
     if (candidates.empty()) {
         return false;
     }
     static std::mt19937 rng(static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
 
-    if (m_selectionMode == Selection_Sequential) {
+    if (selectionMode == Selection_Sequential) {
         const size_t pos = m_sequentialIndex[trigger] % candidates.size();
         *outIndex = candidates[pos];
         m_sequentialIndex[trigger] = (m_sequentialIndex[trigger] + 1) % candidates.size();
@@ -2039,7 +2274,7 @@ bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger, siz
     auto weightedPick = [&](const std::vector<size_t>& source, size_t* picked) -> bool {
         double totalWeight = 0.0;
         for (size_t idx : source) {
-            totalWeight += (double)m_entries[idx].weight;
+            totalWeight += (double)library.entries[idx].weight;
         }
         if (totalWeight <= 0.0) {
             return false;
@@ -2048,7 +2283,7 @@ bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger, siz
         const double roll = dist(rng);
         double acc = 0.0;
         for (size_t idx : source) {
-            acc += (double)m_entries[idx].weight;
+            acc += (double)library.entries[idx].weight;
             if (roll <= acc) {
                 *picked = idx;
                 return true;
@@ -2058,7 +2293,7 @@ bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger, siz
         return true;
     };
 
-    if (m_selectionMode == Selection_NonRepeatingRandom) {
+    if (selectionMode == Selection_NonRepeatingRandom) {
         auto& pool = m_nonRepeatPools[trigger];
         if (pool.empty()) {
             pool = candidates;
@@ -2089,15 +2324,24 @@ bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger, siz
 
 bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFrame) {
     auto& config = m_triggers[trigger];
+
+    // Why a trigger did not fire, logged only when the reason changes. Every one of these
+    // was previously a silent return, which is why a dead trigger gave nothing to go on.
+    const char* reject = nullptr;
     if (!config.enabled) {
-        return false;
+        reject = "not armed";
+    } else if ((currentFrame - config.lastTriggeredFrame) < (std::max)(1, config.cooldownFrames)) {
+        reject = "cooling down";
+    } else if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
+        reject = "a CF slot is still borrowed";
     }
-
-    if ((currentFrame - config.lastTriggeredFrame) < (std::max)(1, config.cooldownFrames)) {
-        return false;
+    static const char* lastReject[Trigger_Count] = {};
+    if (lastReject[trigger] != reject) {
+        lastReject[trigger] = reject;
+        LOG(1, "[UP][GATE] %s: %s\n", TriggerDisplayName(trigger),
+            reject ? reject : "clear, waiting on its condition");
     }
-
-    if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
+    if (reject) {
         return false;
     }
 
@@ -2119,48 +2363,300 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
         return false;
     }
 
+    LOG(1, "[UP] Trigger condition met: %s\n", TriggerDisplayName(trigger));
     PushToast(FormatLocalized("Trigger detected: %s", TriggerDisplayName(trigger)));
 
-    size_t chosen = 0;
-    if (!PickEntryIndexForTrigger(trigger, &chosen)) {
-        PushToast(L("No eligible playback in current trigger selection."));
+    // A delay means the condition has been met but the action is deliberately late, so the
+    // cooldown starts now: the trigger must not re-detect while it is counting down.
+    if (config.delayFrames > 0) {
+        config.pendingFireFrame = currentFrame + config.delayFrames;
+        config.lastTriggeredFrame = currentFrame;
+        // Stamped at detection, so the row lights up when the condition happened rather
+        // than after the delay, which is what tells you the trigger saw it at all.
+        config.lastFiredMs = GetTickCount64();
+        return true;
+    }
+
+    return StartResolvedAction(trigger, currentFrame);
+}
+
+void UnlimitedPlaybackManager::ProcessPendingTriggerDelays(int currentFrame) {
+    for (int i = 0; i < Trigger_Count; ++i) {
+        TriggerConfig& config = m_triggers[i];
+        if (config.pendingFireFrame < 0) {
+            continue;
+        }
+        // Disarmed or reconfigured mid-countdown: drop it rather than fire something the
+        // trigger is no longer set to.
+        if (!config.enabled) {
+            config.pendingFireFrame = -1;
+            continue;
+        }
+        if (currentFrame < config.pendingFireFrame) {
+            continue;
+        }
+        config.pendingFireFrame = -1;
+        StartResolvedAction(static_cast<TriggerType>(i), currentFrame);
+    }
+}
+
+bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int currentFrame) {
+    TriggerConfig& config = m_triggers[trigger];
+
+    ResolvedAction resolved;
+    if (!ResolveTriggerAction(trigger, &resolved)) {
+        LOG(1, "[UP] Trigger '%s' fired but resolved to nothing: source=%d\n",
+            TriggerDisplayName(trigger),
+            static_cast<int>(DummyActionManager::Instance().Get(trigger).source));
+        PushToast(L("Nothing to play for this trigger."));
+        return false;
+    }
+    // Only the playback sources have frames. An animation or a burst carries a script state
+    // instead, so checking for frames before the animation branch below rejected every one
+    // of them - which is what made animations and burst look completely broken.
+    if (!resolved.animation && resolved.frames.empty()) {
+        LOG(1, "[UP] Trigger '%s' resolved to an empty frame buffer (source=%d)\n",
+            TriggerDisplayName(trigger),
+            static_cast<int>(DummyActionManager::Instance().Get(trigger).source));
         return false;
     }
 
-    const auto& entry = m_entries[chosen];
-    const auto cacheIt = m_cache.find(entry.id);
-    if (cacheIt == m_cache.end() || !cacheIt->second.loaded) {
-        PushToast(L("Selected playback cache missing."));
+    // An animation is not inputs: it forces the dummy's script straight to a state, so it
+    // borrows no CF slot and needs no mirroring - a script state has no handedness.
+    if (resolved.animation) {
+        if (g_interfaces.player2.IsCharDataNullPtr()) {
+            return false;
+        }
+        auto* p2 = g_interfaces.player2.GetData();
+        if (resolved.viaActionOverride) {
+            // The game reads this and performs the action itself, which is what makes a
+            // burst come out of hitstun rather than being cut short by it.
+            memcpy(&(p2->set_action_override), &(resolved.animation->name[0]), 20);
+        }
+        else {
+            memcpy(&(p2->nextScriptLineLocationInMemory), &(resolved.animation->addr), 4);
+            p2->frameCounterCurrentSprite = p2->frameLengthCurrentSprite2 - 1;
+        }
+        config.lastTriggeredFrame = currentFrame;
+        config.lastFiredMs = GetTickCount64();
+        LOG(1, "[UP] Trigger forced animation '%s' trigger='%s'\n",
+            resolved.name.c_str(), TriggerDisplayName(trigger));
+        PushToast(FormatLocalized("Triggered [%s]: %s",
+            TriggerDisplayName(trigger), resolved.name.c_str()));
+        return true;
+    }
+
+    // Only the playback sources borrow a slot, so the check belongs here rather than
+    // blocking an animation that needs no slot at all.
+    if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
         return false;
     }
 
-    std::vector<char> frames = cacheIt->second.frames;
-    int facingToLoad = cacheIt->second.facingLeft ? 1 : 0;
+    // Mirroring is the game's own: it flips a buffer whose stored facing differs from the
+    // side being played on. So "mirror" means leave the stored facing alone, and "do not
+    // mirror" means overwrite it with the current side so it plays literally.
+    int facingToLoad = resolved.facingLeft ? 1 : 0;
     bool mirrored = false;
     bool currentFacingLeft = false;
-    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != cacheIt->second.facingLeft) {
-        mirrored = m_autoMirrorOnSideSwap;
-        if (!m_autoMirrorOnSideSwap) {
+    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != resolved.facingLeft) {
+        mirrored = config.autoMirror;
+        if (!config.autoMirror) {
             facingToLoad = currentFacingLeft ? 1 : 0;
         }
     }
 
     BackupRuntimeSlotIfNeeded();
-    StartRuntimePlayback(frames, facingToLoad);
+    StartRuntimePlayback(resolved.frames, facingToLoad);
     m_runtimeSlotRestorePending = true;
-    LOG(1, "[UP] Trigger started entry='%s' trigger='%s' frames=%u facing=%d mirrored=%d\n",
-        entry.name.c_str(),
+    config.lastFiredMs = GetTickCount64();
+    LOG(1, "[UP] Trigger started source='%s' name='%s' trigger='%s' frames=%u facing=%d mirrored=%d\n",
+        resolved.sourceLabel,
+        resolved.name.c_str(),
         TriggerDisplayName(trigger),
-        static_cast<unsigned int>(frames.size()),
+        static_cast<unsigned int>(resolved.frames.size()),
         facingToLoad,
         mirrored ? 1 : 0);
 
     config.lastTriggeredFrame = currentFrame;
     PushToast(FormatLocalized("Triggered [%s]: %s%s",
         TriggerDisplayName(trigger),
-        entry.name.c_str(),
+        resolved.name.c_str(),
         mirrored ? L(" (mirrored)").c_str() : ""));
     return true;
+}
+
+// Turns whatever a trigger is set to into frames the runtime can play.
+//
+// This is the point of folding the three old systems together: a recorded playback, a typed
+// notation, a file and a CF slot all end up as the same thing - a frame buffer handed to
+// StartRuntimePlayback - so only one of them needs to know anything about triggers. Animation
+// is the exception and does not come through here at all: it forces a script state rather
+// than feeding inputs, so it stays with the dummy-action tick that already knows how.
+bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, ResolvedAction* out) {
+    if (!out) {
+        return false;
+    }
+    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
+
+    switch (action.source) {
+    case DummyActionManager::Source_Library:
+    {
+        const PlaybackLibrary* library = LibraryForTrigger(trigger);
+        if (!library) {
+            return false;
+        }
+        size_t chosen = 0;
+        if (!PickEntryIndexForTrigger(trigger, *library, action.selectionMode, &chosen)) {
+            return false;
+        }
+        const PlaybackEntry& entry = library->entries[chosen];
+        const auto cacheIt = library->cache.find(entry.id);
+        if (cacheIt == library->cache.end() || !cacheIt->second.loaded) {
+            return false;
+        }
+        out->frames = cacheIt->second.frames;
+        out->facingLeft = cacheIt->second.facingLeft;
+        out->name = entry.name;
+        out->sourceLabel = "library";
+        return true;
+    }
+
+    case DummyActionManager::Source_Notation:
+    {
+        if (action.notationFrames.empty()) {
+            return false;
+        }
+        out->frames = action.notationFrames;
+        // Notation is authored as if facing RIGHT, so "6" is toward the opponent. Reporting
+        // it as facing-right is what lets the existing mirror path do its job: the game
+        // flips a buffer whose recorded facing differs from the current one, which is how
+        // recorded playbacks work on either side.
+        //
+        // Reporting the dummy's own facing here instead - which this did at first - meant
+        // the facings never differed, so nothing was ever mirrored and the motion came out
+        // reversed for a left-facing dummy.
+        out->facingLeft = false;
+        out->name = action.notation;
+        out->sourceLabel = "notation";
+        return true;
+    }
+
+    case DummyActionManager::Source_File:
+    {
+        if (action.filePath.empty()) {
+            return false;
+        }
+        CachedPlayback playback;
+        // Forced: a trigger firing mid-lab is the wrong moment to refuse over a version
+        // mismatch the user already accepted when they picked the file.
+        if (!ReadPlaybackFile(action.filePath, &playback, true) || !playback.loaded) {
+            return false;
+        }
+        out->frames = playback.frames;
+        out->facingLeft = playback.facingLeft;
+        out->name = action.fileName;
+        out->sourceLabel = "file";
+        return true;
+    }
+
+    case DummyActionManager::Source_Burst:
+    {
+        // Replaces the old "Burst on hit" toggle. Ground and air bursts are separate states,
+        // picked the same way that code picked them.
+        if (g_interfaces.player2.IsCharDataNullPtr()) {
+            return false;
+        }
+        if (g_interfaces.player2.states.empty()) {
+            // Nothing has parsed the dummy's script yet. ScrWindow::DummyFeaturesInUse
+            // reports burst as needing it, so this is a frame or two at match start rather
+            // than a permanent state - say so once instead of silently doing nothing.
+            static bool warned = false;
+            if (!warned) {
+                warned = true;
+                LOG(1, "[UP] Burst is armed but the dummy's script is not parsed yet.\n");
+            }
+            return false;
+        }
+        const bool airborne = g_interfaces.player2.GetData()->position_y > 0;
+        const char* wanted = airborne ? "CmnActAirBurstBegin" : "CmnActBurstBegin";
+        for (scrState* state : g_interfaces.player2.states) {
+            if (state && state->name == wanted) {
+                out->animation = state;
+                out->viaActionOverride = true;
+                out->name = state->name;
+                out->sourceLabel = "burst";
+                return true;
+            }
+        }
+        return false;
+    }
+
+    case DummyActionManager::Source_Animation:
+    {
+        if (action.animations.empty()) {
+            return false;
+        }
+        // More than one and the dummy picks at random, which is what the old panel did for
+        // the four triggers it supported.
+        const size_t pick = action.animations.size() == 1
+            ? 0 : (static_cast<size_t>(std::rand()) % action.animations.size());
+        scrState* state = action.animations[pick];
+        if (!state) {
+            return false;
+        }
+        out->animation = state;
+        out->animationDelayFrames = pick < action.animationDelays.size()
+            ? action.animationDelays[pick] : 0;
+        out->name = state->name;
+        out->sourceLabel = "animation";
+        return true;
+    }
+
+    case DummyActionManager::Source_CfSlot:
+    {
+        if (action.cfSlot < 1 || action.cfSlot > 4) {
+            return false;
+        }
+        std::vector<char> frames;
+        bool facingLeft = false;
+        // While the runtime has a slot borrowed it holds our own temporary playback, not
+        // whatever the user recorded, so ask for the backup first - same order as
+        // CaptureSlotToLibrary.
+        if (!TryReadBorrowedSlot(action.cfSlot, &frames, &facingLeft)) {
+            PlaybackSlot pslot(action.cfSlot);
+            frames = pslot.get_slot_buffer_raw();
+            facingLeft = pslot.get_facing_direction() != 0;
+        }
+        if (frames.empty()) {
+            return false;
+        }
+        out->frames = std::move(frames);
+        out->facingLeft = facingLeft;
+        out->name = FormatLocalized("CF slot %d", action.cfSlot);
+        out->sourceLabel = "cf slot";
+        return true;
+    }
+
+    default:
+        break;
+    }
+    return false;
+}
+
+// The loop's start/stop key. Deliberately separate from ProcessLoopTick: this has to be
+// polled while the loop is NOT running, which is the whole point of a start key. It used to
+// sit at the top of ProcessLoopTick, and once that was gated on the loop actually running -
+// so a configured loop would stop hijacking every other trigger - the loop could no longer
+// be started at all.
+void UnlimitedPlaybackManager::ProcessLoopHotkey(int currentFrame) {
+    if (!HotkeyManager::ConsumePress(HotkeyManager::Hotkey_UnlimitedPlaybackLoop)) {
+        return;
+    }
+    if (m_loopActive) {
+        StopLoop(L("Playback loop stopped.").c_str());
+    } else {
+        StartLoop(currentFrame);
+    }
 }
 
 void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
@@ -2174,15 +2670,6 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
         // Reset combo released; give the game time to finish the training reset (which can
         // also roll the frame counter back) before auto-capturing the position snapshot.
         m_loopPositionSetupSettleTicksLeft = kLoopNativeResetSettleFrames;
-    }
-
-    if (HotkeyManager::ConsumePress(HotkeyManager::Hotkey_UnlimitedPlaybackLoop)) {
-        if (m_loopActive) {
-            StopLoop(L("Playback loop stopped.").c_str());
-        } else {
-            StartLoop(currentFrame);
-        }
-        return;
     }
 
     if (!m_loopActive) {
@@ -2237,8 +2724,50 @@ void UnlimitedPlaybackManager::ProcessLoopTick(int currentFrame) {
     }
 }
 
+bool UnlimitedPlaybackManager::CanBuildSnapshotApparatusHere() const {
+    // See RunDeferredSetup. Building one while we are inside the game's frame update is
+    // what crashed the loop; every other caller (the overlay's own draw pass, and
+    // RunDeferredSetup) is fine.
+    if (m_inHookTick) {
+        m_loopSnapshotPrepareRequested = true;
+        return false;
+    }
+    return true;
+}
+
+void UnlimitedPlaybackManager::RunDeferredSetup() {
+    // Read from disk here rather than at construction: this is the overlay's phase, so file
+    // IO is fine, and it happens before anything can fire.
+    DummyActionManager::Instance().EnsureLoaded();
+
+    const bool inTrainingMatch =
+        g_gameVals.pGameMode && g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_Training) &&
+        (*g_gameVals.pGameState == GameState_InMatch) &&
+        !g_interfaces.player1.IsCharDataNullPtr() &&
+        !g_interfaces.player2.IsCharDataNullPtr();
+
+    if (!inTrainingMatch) {
+        // Nothing to prepare, and a request must not survive to fire a loop at some
+        // unrelated later moment.
+        m_loopSnapshotPrepareRequested = false;
+        m_loopStartRequested = false;
+        return;
+    }
+
+    if (m_loopSnapshotPrepareRequested) {
+        m_loopSnapshotPrepareRequested = false;
+        EnsureLoopSnapshotApparatus(true);
+    }
+
+    if (m_loopStartRequested && m_loopSnapshotApparatus) {
+        m_loopStartRequested = false;
+        StartLoop(g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0);
+    }
+}
+
 void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
-    if (BuildCandidatesForTrigger(Trigger_OnLoop).empty()) {
+    if (!TriggerHasSomethingToPlay(Trigger_OnLoop)) {
         PushToast(L("Playback loop not started: no eligible playback."));
         return;
     }
@@ -2246,6 +2775,20 @@ void UnlimitedPlaybackManager::StartLoop(int currentFrame) {
         m_loopRestartMode == LoopReset_Custom &&
         !IsLoopSnapshotReadyForMode(LoopReset_Custom)) {
         PushToast(L("Playback loop not started: custom snapshot missing."));
+        return;
+    }
+
+    // The snapshot apparatus cannot be built from here. Its constructor NOPs three sites in
+    // the game and calls the game's own network init, and Tick() - which is where a loop
+    // hotkey arrives - runs from inside the naked asm hook GetFrameCounter(), between its
+    // pushad and popad, mid-frame. Calling that init from there killed the game twice.
+    //
+    // So ask for it and start once it exists: RunDeferredSetup builds it from the overlay,
+    // after the windows are drawn, which is the phase the training save states use and the
+    // only one this has ever been safely entered from.
+    if (m_loopRestartLabState && !EnsureLoopSnapshotApparatus(true)) {
+        m_loopStartRequested = true;
+        PushToast(L("Preparing the lab snapshot for the loop..."));
         return;
     }
 
@@ -2301,6 +2844,8 @@ void UnlimitedPlaybackManager::ProcessLoopPositionSetup(int currentFrame) {
 }
 
 void UnlimitedPlaybackManager::StopLoop(const char* reason) {
+    // A start still waiting for its snapshot must not fire after the user has stopped.
+    m_loopStartRequested = false;
     const bool wasActive = m_loopActive;
     const bool inTrainingMatch =
         g_gameVals.pGameMode &&
@@ -2326,23 +2871,17 @@ void UnlimitedPlaybackManager::StopLoop(const char* reason) {
 }
 
 bool UnlimitedPlaybackManager::TryStartLoopPlayback() {
-    size_t chosen = 0;
-    if (!PickEntryIndexForTrigger(Trigger_OnLoop, &chosen)) {
+    // On Loop is a trigger like any other, so it resolves through the same path: whatever
+    // the loop is set to - a library, a notation, a file, a slot - arrives here as frames.
+    ResolvedAction resolved;
+    if (!ResolveTriggerAction(Trigger_OnLoop, &resolved)) {
         return false;
     }
 
-    const auto& entry = m_entries[chosen];
-    const auto cacheIt = m_cache.find(entry.id);
-    if (cacheIt == m_cache.end() || !cacheIt->second.loaded) {
-        PushToast(L("Selected playback cache missing."));
-        return false;
-    }
-
-    std::vector<char> frames = cacheIt->second.frames;
-    int facingToLoad = cacheIt->second.facingLeft ? 1 : 0;
+    int facingToLoad = resolved.facingLeft ? 1 : 0;
     bool mirrored = false;
     bool currentFacingLeft = false;
-    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != cacheIt->second.facingLeft) {
+    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != resolved.facingLeft) {
         mirrored = m_autoMirrorOnSideSwap;
         if (!m_autoMirrorOnSideSwap) {
             facingToLoad = currentFacingLeft ? 1 : 0;
@@ -2350,13 +2889,25 @@ bool UnlimitedPlaybackManager::TryStartLoopPlayback() {
     }
 
     BackupRuntimeSlotIfNeeded();
-    StartRuntimePlayback(frames, facingToLoad);
+    StartRuntimePlayback(resolved.frames, facingToLoad);
     m_runtimeSlotRestorePending = true;
     ResetLoopPlaybackCompletionState();
     PushToast(FormatLocalized("Loop played: %s%s",
-        entry.name.c_str(),
+        resolved.name.c_str(),
         mirrored ? L(" (mirrored)").c_str() : ""));
     return true;
+}
+
+// Cheap pre-check for "is this trigger going to be able to play anything", without doing the
+// work of actually resolving it. Used before starting a loop, which is a lot of setup to go
+// through only to find there was nothing to play.
+bool UnlimitedPlaybackManager::TriggerHasSomethingToPlay(TriggerType trigger) {
+    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
+    if (action.source != DummyActionManager::Source_Library) {
+        return DummyActionManager::Instance().IsRunnable(trigger);
+    }
+    const PlaybackLibrary* library = LibraryForTrigger(trigger);
+    return library && !BuildCandidates(*library).empty();
 }
 
 void UnlimitedPlaybackManager::ResetLoopPlaybackCompletionState() {
@@ -2448,12 +2999,18 @@ bool UnlimitedPlaybackManager::EnsureLoopSnapshotApparatus(bool preserveCustomSn
     }
 
     if (!m_loopSnapshotApparatus) {
+        if (!CanBuildSnapshotApparatusHere()) {
+            return false;
+        }
         m_loopSnapshotApparatus = new SnapshotApparatus();
         m_loopSnapshotApparatus->ReserveSlots("playback_loop", 1);
         return m_loopSnapshotApparatus != nullptr;
     }
 
     if (!m_loopSnapshotApparatus->check_if_valid(g_interfaces.player1.GetData(), g_interfaces.player2.GetData())) {
+        if (!CanBuildSnapshotApparatusHere()) {
+            return false;
+        }
         delete m_loopSnapshotApparatus;
         m_loopSnapshotApparatus = new SnapshotApparatus();
         m_loopSnapshotApparatus->ReserveSlots("playback_loop", 1);
@@ -2840,12 +3397,31 @@ void UnlimitedPlaybackManager::StartRuntimePlayback(const std::vector<char>& fra
     if (m_runtimePlaybackManager.bbcf_base_adress) {
         beforePosition = *reinterpret_cast<int*>(m_runtimePlaybackManager.bbcf_base_adress + 0x13AD940);
     }
-    LOG(1, "[UP] StartRuntimePlayback before: pbCtrl=%d activeSlot=%d pbPos=%d facing=%d frames=%u\n",
+    // Bytes and frames both, because they are not the same number and confusing the two is
+    // exactly what made a notation action play for a single frame: the slot layout is two
+    // bytes per frame, so load_raw_into_slot takes the count as size() / 2.
+    LOG(1, "[UP] StartRuntimePlayback before: pbCtrl=%d activeSlot=%d pbPos=%d facing=%d bytes=%u frames=%u\n",
         beforeControl,
         beforeActiveSlot,
         beforePosition,
         facingToLoad,
-        static_cast<unsigned int>(frames.size()));
+        static_cast<unsigned int>(frames.size()),
+        static_cast<unsigned int>(frames.size() / 2));
+
+    // The buffer itself, so a playback that comes out wrong can be checked against what the
+    // notation or recording was supposed to be, rather than inferred from the result.
+    {
+        std::string preview;
+        const size_t shown = frames.size() < 40 ? frames.size() : 40;
+        for (size_t i = 0; (i + 1) < shown; i += 2) {
+            char one[16];
+            sprintf_s(one, "%s%u", preview.empty() ? "" : " ",
+                static_cast<unsigned int>(static_cast<unsigned char>(frames[i])));
+            preview += one;
+        }
+        LOG(1, "[UP] StartRuntimePlayback inputs: %s%s\n", preview.c_str(),
+            frames.size() > shown ? " ..." : "");
+    }
 
     m_runtimePlaybackManager.set_playback_control(0);
     m_runtimePlaybackManager.load_raw_into_slot(frames, facingToLoad, m_runtimeSlotNumber);
@@ -2925,18 +3501,18 @@ void UnlimitedPlaybackManager::MirrorPlaybackInputsInPlace(std::vector<char>& fr
     }
 }
 
-std::vector<size_t> UnlimitedPlaybackManager::BuildCandidatesForTrigger(TriggerType trigger) {
+std::vector<size_t> UnlimitedPlaybackManager::BuildCandidates(const PlaybackLibrary& library) {
+    // PlaybackEntry::triggerEnabled is deliberately not consulted. Which entries a trigger
+    // may use is now decided by which library it names, so filtering again by a flag inside
+    // the entry would silently hide entries from a library that was picked on purpose.
     std::vector<size_t> candidates;
-    for (size_t i = 0; i < m_entries.size(); ++i) {
-        const auto& e = m_entries[i];
+    for (size_t i = 0; i < library.entries.size(); ++i) {
+        const auto& e = library.entries[i];
         if (!e.enabled || e.weight <= 0.0f) {
             continue;
         }
-        if (!e.triggerEnabled[static_cast<size_t>(trigger)]) {
-            continue;
-        }
-        auto cacheIt = m_cache.find(e.id);
-        if (cacheIt == m_cache.end() || !cacheIt->second.loaded) {
+        auto cacheIt = library.cache.find(e.id);
+        if (cacheIt == library.cache.end() || !cacheIt->second.loaded) {
             continue;
         }
         candidates.push_back(i);
@@ -2949,20 +3525,42 @@ bool UnlimitedPlaybackManager::ShouldTriggerWakeup() {
         return false;
     }
 
-    const std::string currentAction = g_interfaces.player2.GetData()->currentAction;
-    const int actionTime = g_interfaces.player2.GetData()->actionTime;
+    const auto* p2 = g_interfaces.player2.GetData();
+    const std::string currentAction = p2->currentAction;
+    const std::string lastAction = p2->lastAction;
+    const int actionTime = p2->actionTime;
 
-    static const std::array<std::pair<const char*, int>, 5> wakeupStates = {
-        std::make_pair("ActUkemiLandN", 30),
-        std::make_pair("ActUkemiLandF", 30),
-        std::make_pair("ActUkemiLandB", 30),
-        std::make_pair("ActFDown2Stand", 14),
-        std::make_pair("ActBDown2Stand", 14),
+    // Taken verbatim from the old dummy-actions panel, including its notes: these frame
+    // numbers were arrived at by testing, and CmnActUkemiLandN is deliberately absent in
+    // favour of its Landing state.
+    static const std::array<std::pair<const char*, int>, 6> wakeupStates = {
+        std::make_pair("CmnActUkemiLandNLanding", 1),
+        std::make_pair("CmnActUkemiLandF", 30),
+        std::make_pair("CmnActUkemiLandB", 30),
+        std::make_pair("CmnActFDown2Stand", 14),
+        std::make_pair("CmnActBDown2Stand", 14),
+        // Really an on-hit case, but it behaves like a wakeup, so it lived here.
+        std::make_pair("CmnActUkemiStagger", 7),
     };
+
+    // actionTime counts UP to the frame the state becomes actionable, so firing early means
+    // a SMALLER value - the same trick the block gap and throw tech use. A 623C needs its
+    // motion delivered before the dummy can act or the reversal comes out a few frames late.
+    // Clamped at 1 because some of these states become actionable on frame 1 already, and
+    // there is nothing earlier than that to ask for.
+    const int lead = (std::max)(0, -m_triggers[Trigger_Wakeup].delayFrames);
 
     bool cond = false;
     for (const auto& ws : wakeupStates) {
-        if (currentAction.find(ws.first) != std::string::npos && actionTime == ws.second) {
+        // Exact equality, and lastAction must differ from the state we matched.
+        //
+        // That last test is not decoration: forcing an animation moves the script pointer
+        // without changing currentAction, so actionTime restarts and walks past the same
+        // number again - and the trigger fired over and over, "permanently triggering on
+        // loop" after the move came out. Substring matching made it worse by matching
+        // several states at once. Both were mine; the panel this replaced had it right.
+        const int wantTime = (std::max)(1, ws.second - lead);
+        if (currentAction == ws.first && actionTime == wantTime && lastAction != ws.first) {
             cond = true;
             break;
         }
@@ -2978,9 +3576,18 @@ bool UnlimitedPlaybackManager::ShouldTriggerGap() {
         return false;
     }
 
+    // The moment blocking ENDS. blockstun counts down, so 1 is its last frame - acting on
+    // that frame is what comes out on the first actionable one. Waiting for it to reach 0
+    // costs a frame, because the guard state can skip its own end state on a frame-1 mash.
+    //
+    // A negative delay pulls that earlier still: a reversal needs its motion delivered
+    // BEFORE the gap so the button lands on the first actionable frame rather than several
+    // after it. Only possible because blockstun is a countdown, i.e. the gap is knowable in
+    // advance - which is why a negative delay means nothing on the other triggers.
     const auto* p2 = g_interfaces.player2.GetData();
     const std::string currentAction = p2->currentAction;
-    const bool cond = (p2->blockstun == 1 && currentAction.find("Guard") != std::string::npos);
+    const int lead = (std::max)(0, -m_triggers[Trigger_Gap].delayFrames);
+    const bool cond = (p2->blockstun == 1 + lead && currentAction.find("Guard") != std::string::npos);
 
     const bool edge = (cond && !m_prevGapCondition);
     m_prevGapCondition = cond;
@@ -2992,11 +3599,15 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnBlock() {
         return false;
     }
 
-    // Fire on the first frame after blockstun ends so the dummy can act immediately.
+    // The moment the dummy STARTS blocking - the rising edge of blockstun.
+    //
+    // This used to fire on the falling edge, i.e. as blockstun ended, which is the gap
+    // trigger's job: the two were a frame apart and did the same thing, and the comment
+    // here described gap behaviour. "On Block" now means what it says.
     const auto* p2 = g_interfaces.player2.GetData();
     const bool cond = p2->blockstun > 0;
 
-    const bool edge = (!cond && m_prevOnBlockCondition);
+    const bool edge = (cond && !m_prevOnBlockCondition);
     m_prevOnBlockCondition = cond;
     return edge;
 }
@@ -3006,13 +3617,43 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnHit() {
         return false;
     }
 
-    // Fire on the first frame after hitstun ends so the dummy can act immediately.
     const auto* p2 = g_interfaces.player2.GetData();
     const bool cond = p2->hitstun > 0;
 
-    const bool edge = (!cond && m_prevOnHitCondition);
+    // Which edge depends on how the action is delivered, and getting this wrong is what made
+    // "burst on hit" fire at the end of a combo instead of straight away.
+    //
+    // A burst is an action override: the game is handed the state name and comes out with it
+    // as soon as bursting is legal, so it wants the moment the dummy is FIRST hit - the
+    // rising edge - exactly as the old burst-on-hit toggle did. That is what makes it break
+    // the combo rather than wait politely for the end of it.
+    //
+    // Input playback is the opposite: inputs fed during hitstun are simply eaten, so it has
+    // to wait for hitstun to end (the falling edge) to come out at all.
+    // "On Hit" means the moment the dummy IS hit, for every source - not once the combo is
+    // over. Typing an overdrive into it is asking for the same thing a burst is, and the
+    // reversal it lets you lab is the one that comes out of hitstun, which needs the inputs
+    // delivered while the dummy is still in it so the game buffers them.
+    //
+    // This is the shape the old burst-on-hit toggle used, and it is a LEVEL test with a
+    // latch rather than an edge: a hit landing on a dummy that is already in hitstun still
+    // arms the action, which an edge test would miss entirely.
+    const std::string currentAction = p2->currentAction;
+    const bool alreadyBursting = currentAction.find("CmnActBurst") != std::string::npos;
+    const bool teching = currentAction.find("CmnActUkemi") != std::string::npos;
+
+    if (!cond) {
+        // Out of hitstun: re-arm for the next combo. The original used a 700-frame cooldown,
+        // which both allowed a second go inside one long combo and blocked the next combo.
+        m_onHitBurstLatched = false;
+    }
     m_prevOnHitCondition = cond;
-    return edge;
+
+    if (!cond || alreadyBursting || teching || m_onHitBurstLatched) {
+        return false;
+    }
+    m_onHitBurstLatched = true;
+    return true;
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerThrowTech() {
@@ -3020,9 +3661,16 @@ bool UnlimitedPlaybackManager::ShouldTriggerThrowTech() {
         return false;
     }
 
+    // timeAfterTechIsPerformed counts up from the tech, and 29 is the frame acting on it
+    // comes out. A negative delay therefore means a SMALLER value: same idea as the block
+    // gap, so a reversal's motion can be delivered before the dummy is actionable instead
+    // of a couple of frames into it.
     const auto* p2 = g_interfaces.player2.GetData();
     const std::string currentAction = p2->currentAction;
-    const bool cond = (p2->timeAfterTechIsPerformed == 29 && currentAction.find("LockReject") != std::string::npos);
+    const int lead = (std::max)(0, -m_triggers[Trigger_ThrowTech].delayFrames);
+    const int wantTime = (std::max)(1, 29 - lead);
+    const bool cond = (p2->timeAfterTechIsPerformed == wantTime
+        && currentAction.find("LockReject") != std::string::npos);
 
     const bool edge = (cond && !m_prevThrowTechCondition);
     m_prevThrowTechCondition = cond;

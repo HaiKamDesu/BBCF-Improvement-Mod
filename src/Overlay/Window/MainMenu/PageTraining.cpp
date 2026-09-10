@@ -7,6 +7,7 @@
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
+#include "Overlay/Window/DummyActionsPanel.h"
 #include "Overlay/Window/ScrWindow.h"
 
 #include "imgui.h"
@@ -26,33 +27,35 @@ namespace MainMenu
 			ImGui::VerticalSpacing(6);
 		}
 
-		// Two checkboxes; a category of its own would be all frame and no picture.
-		Anchor(Training_Positions);
-		scr->DrawPositionsBody();
-
-		ImGui::VerticalSpacing(8);
-
+		// Dummy actions come first: it is what the page is for. One row per trigger the dummy
+		// is set to react to, and every kind of input the mod can feed it lives here now -
+		// recorded playbacks, typed notation, a file, a CF slot, or one of the dummy's own
+		// animations. The old "Recording slots" section is gone because it was the same
+		// feature reached a different way. See docs/DummyActionsRework.md.
+		// Collapsible, the same as the Replays page: this page has four sections now and the
+		// dummy-action list grows a row at a time, so being able to fold what you are not
+		// using is the difference between a page and a wall.
 		if (BeginSection(Training_Dummy, inTraining))
 		{
-			Hint(L("Pick one of the dummy's own moves and tell it when to use that move: after waking up, in a gap in your pressure, when it gets hit, or when it techs a throw."));
-			scr->DrawDummyActionsBody();
+			Hint(L("Tell the dummy what to do and when. Add an action, pick the trigger, then pick where its inputs come from."));
+			DummyActionsPanel::Draw();
 		}
 
-		if (BeginSection(Training_Slots, inTraining))
+		if (BeginSection(Training_Positions, inTraining))
 		{
-			Hint(L("Record what you do into a slot, then have the dummy replay it. Four classic slots, plus the longer Unlimited Playback recorder."));
-			scr->DrawRecordingSlotsBody();
+			Hint(L("Where the two of you stand, and how long the dummy takes to get up."));
+			scr->DrawPositionsBody();
+			ImGui::VerticalSpacing(4);
+			scr->DrawWakeupBody();
 		}
 
-		GroupLabel(Training_SaveStates, inTraining);
-		Hint(FormatText(L("Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load.").c_str(),
-			HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_SaveState)).c_str(),
-			HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_LoadState)).c_str()));
-		scr->DrawSaveStatesBody();
-
-		ImGui::VerticalSpacing(4);
-		GroupLabel(Training_Wakeup, inTraining);
-		scr->DrawWakeupBody();
+		if (BeginSection(Training_SaveStates, inTraining))
+		{
+			Hint(FormatText(L("Save the exact moment you are in and jump back to it later. Hotkeys: %s to save, %s to load.").c_str(),
+				HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_SaveState)).c_str(),
+				HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_LoadState)).c_str()));
+			scr->DrawSaveStatesBody();
+		}
 
 		ImGui::VerticalSpacing(8);
 		ImGui::Separator();
@@ -60,5 +63,7 @@ namespace MainMenu
 
 		Anchor(Training_Tas);
 		scr->DrawTasComboToolButton();
+		ImGui::VerticalSpacing(4);
+		scr->DrawPlaybackTransferButtons();
 	}
 }

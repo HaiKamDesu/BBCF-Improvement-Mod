@@ -30,6 +30,11 @@ public:
 	// pumped independently or the features would stop the moment you looked elsewhere.
 	static void Tick();
 
+	// Parses the dummy's script if it has not been read for the character now loaded, so a
+	// UI that needs the move list can ask for it instead of depending on some other panel
+	// having been drawn first. Safe to call every frame: it is a no-op once loaded.
+	static void EnsureDummyScriptLoadedForUi();
+
 	// Polled from WindowManager::HandleButtons, the mod's single hotkey poll site, so a
 	// save-state bind works with the mod menu closed. It only latches a request: the work
 	// happens in RunPendingSaveStateRequests.
@@ -44,6 +49,10 @@ public:
 	// Whether anything the dummy does on its own is actually switched on. Used to decide
 	// whether a character swap is worth re-parsing the script for outside the menu.
 	bool DummyFeaturesInUse() const;
+
+	// Copies the animation pools out of the dummy-action table into the registers the
+	// firing conditions below read.
+	void SyncAnimationRegistersFromActions();
 
 	// Drops everything parsed for the previous dummy and, if allowed, re-parses for the
 	// current one. The registers hold scrState* whose addr points into a specific
@@ -68,16 +77,22 @@ public:
 	// Section bodies drawn by the mod menu's Training, Replays and Online pages. Each of
 	// these renders the CONTENT only - the page owns the header and the layout around it.
 	void DrawPositionsBody();
-	void DrawDummyActionsBody();
 	void DrawWakeupBody();
-	void DrawRecordingSlotsBody();
 	void DrawSaveStatesBody();
 	void DrawLocalReplaysBody();
 	void DrawReplayTakeoverBody();
+	// Capture a stretch of the replay you are watching as a playback file. Lives on the
+	// Replays page rather than in the playback library, because it is a replay job: the
+	// file it writes can then be imported into a slot, a library, or a dummy action.
+	void DrawReplayPlaybackCaptureBody();
 	void DrawRoomSettingsBody();
 	void DrawInputBufferButton();
 	void DrawComboDataButton();
 	void DrawTasComboToolButton();
+	// Import a playback file into one of the game's four recording slots, or write a slot
+	// back out to a file. The pair that lets everything else here exchange playbacks: a
+	// file exported from a replay capture or a library can be loaded straight into a slot.
+	void DrawPlaybackTransferButtons();
 
 protected:
 	void Draw() override;
@@ -153,18 +168,9 @@ private:
 	std::string prev_action;
 
 
-	// Dummy action UI state. These were draw-body statics, which is why the per-frame work
-	// below could not be moved out of the draw pass without them.
-	int dummy_selected_state = 0;
-	bool dummy_action_delays_toggle = false;
-	int dummy_wakeup_delay = 0;
-	int dummy_gap_delay = 0;
-	int dummy_onhit_delay = 0;
-	int dummy_throwtech_delay = 0;
-	bool dummy_burst_onhit_toggle = false;
-	int dummy_burst_onhit_delay = 0;
-	int dummy_burst_onhit_cooldown_frames = 700;
-	bool dummy_naoto_en_specials = false;
+	// Whether the Naoto EN flag was held last frame, so it is cleared exactly once when the
+	// action that wanted it goes away. Everything else about dummy actions now lives in
+	// DummyActionManager; these were draw-body statics of a panel that no longer exists.
 	bool dummy_naoto_en_specials_old = false;
 
 	int32_t wakeup_type = 0;

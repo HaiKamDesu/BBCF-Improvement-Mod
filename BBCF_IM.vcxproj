@@ -55,6 +55,7 @@
     <ClCompile Include="src\Game\Playbacks\PlaybackSlot.cpp" />
     <ClCompile Include="src\Game\Playbacks\CompatibilityManager.cpp" />
     <ClCompile Include="src\Game\Playbacks\UnlimitedPlaybackManager.cpp" />
+    <ClCompile Include="src\Game\Playbacks\DummyActionManager.cpp" />
     <ClCompile Include="src\Game\Playbacks\PlaybackManager.cpp" />
     <ClCompile Include="src\CustomGameMode\customGameMode.cpp" />
     <ClCompile Include="src\CustomGameMode\GameModeManager.cpp" />
@@ -62,6 +63,7 @@
     <ClCompile Include="src\Game\ReplayFiles\ReplayFileManager.cpp" />
     <ClCompile Include="src\Game\ReplayStates\FrameState.cpp" />
     <ClCompile Include="src\Game\Scr\ScrStateReader.cpp" />
+    <ClCompile Include="src\Game\Scr\ScrStateNames.cpp" />
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\FrameAdvantage.cpp" />
     <ClCompile Include="src\Game\stages.cpp" />
     <ClCompile Include="src\Network\OnlineGameModeManager.cpp" />
@@ -121,6 +123,7 @@
     <ClCompile Include="src\Overlay\WindowContainer\WindowContainer.cpp" />
     <ClCompile Include="src\Overlay\WindowManager.cpp" />
     <ClCompile Include="src\Overlay\Window\DebugWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\DummyActionsPanel.cpp" />
     <ClCompile Include="src\Overlay\Window\HitboxOverlay.cpp" />
     <ClCompile Include="src\Overlay\Window\LogWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\MainWindow.cpp" />
@@ -230,6 +233,7 @@
     <ClInclude Include="src\Game\Playbacks\CompatibilityManager.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackManager.h" />
     <ClInclude Include="src\Game\Playbacks\UnlimitedPlaybackManager.h" />
+    <ClInclude Include="src\Game\Playbacks\DummyActionManager.h" />
     <ClInclude Include="src\Core\info.h" />
     <ClInclude Include="src\CustomGameMode\customGameMode.h" />
     <ClInclude Include="src\CustomGameMode\GameModeManager.h" />
@@ -241,6 +245,7 @@
     <ClInclude Include="src\Game\Scr\CmdList.h" />
     <ClInclude Include="src\Game\Scr\ScrStateEntry.h" />
     <ClInclude Include="src\Game\Scr\ScrStateReader.h" />
+    <ClInclude Include="src\Game\Scr\ScrStateNames.h" />
     <ClInclude Include="src\Game\stages.h" />
     <ClInclude Include="src\Game\EntityData.h" />
     <ClInclude Include="src\Network\OnlineGameModeManager.h" />
@@ -307,6 +312,7 @@
     <ClInclude Include="src\Overlay\WindowContainer\WindowType.h" />
     <ClInclude Include="src\Overlay\WindowManager.h" />
     <ClInclude Include="src\Overlay\Window\DebugWindow.h" />
+    <ClInclude Include="src\Overlay\Window\DummyActionsPanel.h" />
     <ClInclude Include="src\Overlay\Window\HitboxOverlay.h" />
     <ClInclude Include="src\Overlay\Window\LogWindow.h" />
     <ClInclude Include="src\Overlay\Window\MainWindow.h" />

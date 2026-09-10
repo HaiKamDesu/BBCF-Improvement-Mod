@@ -1248,6 +1248,9 @@ struct LocalizationKeysAccessor
         // Unlimited Playback (BETA)
         inline const char* Unlimited_Playback_BETA() const { return Get("Unlimited Playback (BETA)"); }
 
+        // Playback Library
+        inline const char* Playback_Library() const { return Get("Playback Library"); }
+
         // Popup is always available. Runtime actions only work in the right context.
         inline const char* Popup_is_always_available_Runtime_actions_only_work_in_the_right_context() const { return Get("Popup is always available. Runtime actions only work in the right context."); }
 

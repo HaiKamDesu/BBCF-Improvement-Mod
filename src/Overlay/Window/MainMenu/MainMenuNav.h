@@ -46,11 +46,9 @@ namespace MainMenu
 		Game_Stage,
 		Game_Hud,
 
-		Training_Positions,
 		Training_Dummy,
-		Training_Slots,
+		Training_Positions,
 		Training_SaveStates,
-		Training_Wakeup,
 		Training_Tas,
 
 		Overlays_Hitboxes,
@@ -69,6 +67,7 @@ namespace MainMenu
 
 		Replays_Rewind,
 		Replays_Files,
+		Replays_Capture,
 		Replays_Takeover,
 		Replays_Database,
 

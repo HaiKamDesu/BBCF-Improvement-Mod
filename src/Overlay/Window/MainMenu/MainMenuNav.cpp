@@ -28,11 +28,9 @@ namespace MainMenu
 			{ Page_Game, Item_Loose,   "Stage",                 "background level stage select" },
 			{ Page_Game, Item_Loose,   "Hide the game HUD",     "hud health bar timer meter clean screenshot recording" },
 
-			{ Page_Training, Item_Loose,   "Character positions", "swap coordinates sides corner switch position" },
-			{ Page_Training, Item_Section, "Dummy actions",       "states scr script reversal wakeup gap on hit throw tech ai action" },
-			{ Page_Training, Item_Section, "Recording slots",     "playback slot record loop unlimited playback editor" },
+			{ Page_Training, Item_Group,   "Dummy actions",       "states scr script reversal wakeup gap on hit throw tech ai action notation playback slot library loop hotkey animation" },
+			{ Page_Training, Item_Group,   "Positions & timings", "swap coordinates sides corner switch position wakeup delay emergency tech roll okizeme knockdown" },
 			{ Page_Training, Item_Group,   "Save states",         "snapshot save load state situation reset drill" },
-			{ Page_Training, Item_Group,   "Wake-up timing",      "wakeup delay emergency tech roll okizeme knockdown" },
 			{ Page_Training, Item_Loose,   "TAS combo editor",    "tas frame by frame combo editor rewind record movie" },
 
 			{ Page_Overlays, Item_Section, "Hitboxes",            "hitbox hurtbox collision throw range origin box overlay" },
@@ -51,6 +49,7 @@ namespace MainMenu
 
 			{ Page_Replays, Item_Loose,   "Rewind",           "rewind replay theater scrub back" },
 			{ Page_Replays, Item_Section, "Replay files",     "local replays load archive replay theater database download" },
+			{ Page_Replays, Item_Section, "Capture playback", "capture playback from replay export file record inputs p1 p2" },
 			{ Page_Replays, Item_Section, "Replay takeover",  "takeover urt unlimited replay state p1 p2" },
 			{ Page_Replays, Item_Loose,   "Replay database",  "upload replay db website share" },
 

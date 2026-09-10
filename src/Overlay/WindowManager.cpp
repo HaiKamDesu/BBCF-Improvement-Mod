@@ -801,6 +801,9 @@ void WindowManager::Render()
 	{
 		scr->RunPendingSaveStateRequests();
 	}
+	// Same reason as the line above: UnlimitedPlaybackManager::Tick() runs from a naked asm
+	// hook mid-frame, and the playback loop's snapshot must not be built from there.
+	UnlimitedPlaybackManager::Instance().RunDeferredSetup();
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
 	DrawUnlimitedPlaybackLoopSetupIndicatorStandalone();
