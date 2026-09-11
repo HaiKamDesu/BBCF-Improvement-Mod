@@ -6,7 +6,9 @@
 
 #include "Core/logger.h"
 #include "Core/utils.h"
+#include "Core/interfaces.h"
 #include "Game/characters.h"
+#include "Game/gamestates.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "impl_templates.cpp"
 
@@ -901,9 +903,50 @@ void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 	P1.UnlockUpdate();
 	P2.UnlockUpdate();
 
+	RestoreNativePalIndexOnMatchExit(P1, P2);
+
 	// Once-per-frame game-thread tick, which is where a finished background palette load
 	// gets swapped in. Nothing above this reads palette data, so the order does not matter.
 	PumpAsyncPaletteLoad();
+}
+
+// Undoes UpdatePalette()'s index toggle on the frame the game stops being in a match, whatever
+// took it out of one.
+//
+// OnCharacterSelect covers the ordinary route (match -> character select -> pick -> versus ->
+// match init), but it only covers routes that actually pass through character select. Training's
+// in-game menu can put you back into a new match without one - change the matchup from Kokonoe vs
+// Ragna to Kokonoe vs Jin and the next OnMatchInit reads a colour byte still holding our toggle,
+// so it looks up the palettes.ini slot next to the one the player picked and Kokonoe comes back
+// wearing a different palette. That is Okammunist's original report; the character-select restore
+// never covered this path, which is why it is still reproducible on 8.4.
+//
+// Leaving the match is the earliest moment that is unambiguously after the match and before any
+// new pick, so restoring here is strictly earlier than every existing restore point and cannot
+// overwrite a pick - by the time character select runs the index already equals m_origPalIndex
+// and RestoreNativePalIndex no-ops. It is also NOT a per-frame correction: it fires only on the
+// in-match -> not-in-match edge, so the toggle stays untouched for the whole match and the
+// engine's redraw still sees it. Both of those are the traps described in
+// docs/Research/TaokakaPaletteRefreshInvestigation.md; read it before moving this.
+//
+// A game state we cannot read leaves the edge state alone rather than counting as "left the
+// match" - guessing there would restore mid-match, which is exactly what broke the redraw in v8.2.
+void PaletteManager::RestoreNativePalIndexOnMatchExit(CharPaletteHandle& P1, CharPaletteHandle& P2)
+{
+	if (g_gameVals.pGameState == nullptr)
+		return;
+
+	const bool inMatch = *g_gameVals.pGameState == GameState_InMatch;
+
+	if (m_wasInMatch && !inMatch)
+	{
+		LOG(1, "PaletteManager::RestoreNativePalIndexOnMatchExit left the match into game state %d\n",
+			*g_gameVals.pGameState);
+		P1.RestoreNativePalIndex("MatchExit");
+		P2.RestoreNativePalIndex("MatchExit");
+	}
+
+	m_wasInMatch = inMatch;
 }
 
 // Platinum's drive lets her hold an item, and while she does, her script runs the PT_LinkColor

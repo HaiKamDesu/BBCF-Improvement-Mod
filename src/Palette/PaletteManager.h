@@ -159,6 +159,12 @@ private:
 	bool m_loadOnlinePalettes = false;
 	bool m_PaletteArchiveDownloaded = false;
 
+	// Undoes UpdatePalette()'s index toggle on the in-match -> not-in-match edge, so paths that
+	// re-enter a match without passing through character select (training's matchup change) do
+	// not read our toggle as the player's colour pick. See the definition.
+	void RestoreNativePalIndexOnMatchExit(CharPaletteHandle& P1, CharPaletteHandle& P2);
+	bool m_wasInMatch = false;
+
 	void CreatePaletteFolders();
 	void InitCustomPaletteVector();
 	void InitPaletteSlotsVector();
