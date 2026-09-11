@@ -321,6 +321,7 @@
     <ClInclude Include="src\Overlay\Window\PalettesConfigWindow.h" />
     <ClInclude Include="src\Overlay\Window\SettingsIniWindow.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />
+    <ClInclude Include="src\Overlay\Window\Ranked\RankLeaderboardCodes.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedListFilterWindow.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedMainMenuSection.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedModalWindow.h" />

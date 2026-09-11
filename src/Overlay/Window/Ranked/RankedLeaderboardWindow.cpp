@@ -1,5 +1,7 @@
 #include "RankedLeaderboardWindow.h"
 
+#include "RankLeaderboardCodes.h"
+
 #include "RankedProgressWindow.h" // FormatVisibleRankLabel / GetVisibleRankColor / ComputeTotalLpFromPackedScore
 
 #include "Core/interfaces.h"      // g_interfaces + (transitively) the Steamworks headers
@@ -19,34 +21,14 @@
 
 namespace
 {
-	// Character-id sentinel for the overall "RANK_ALL" board. Mirrors
-	// kRankAllCharacterId in RankedProgressWindow.cpp.
-	constexpr uint32_t kAllCharacterId = 64u;
-	constexpr int kNumRankedCharacters = 36; // entries in the RANK_<code> table
-
-	// Per-character 2-letter Steam leaderboard codes, indexed by BBCF character id.
-	// Kept in sync with GetRankLeaderboardCode() in RankedProgressWindow.cpp.
-	const char* LeaderboardCode(uint32_t characterId)
-	{
-		static const char* kCodes[] =
-		{
-			"RG", "JN", "NL", "RC", "TK", "TG",
-			"LI", "AR", "BG", "CA", "HK", "NU",
-			"TB", "HZ", "MU", "MK", "VN", "PL",
-			"RL", "IY", "AM", "BL", "AZ", "KG",
-			"KK", "TM", "CE", "LA", "HB", "NI",
-			"NT", "IZ", "SU", "ES", "MA", "JB",
-		};
-		if (characterId < (sizeof(kCodes) / sizeof(kCodes[0])))
-			return kCodes[characterId];
-		if (characterId == kAllCharacterId)
-			return "ALL";
-		return nullptr;
-	}
+	// Both mirror the shared table in RankLeaderboardCodes.h - see that header before
+	// touching any code, the names come out of BBCF.exe and several are unintuitive.
+	constexpr uint32_t kAllCharacterId = RankLeaderboard::kAllCharacterId;
+	constexpr int kNumRankedCharacters = RankLeaderboard::kNumCharacters;
 
 	std::string LeaderboardName(uint32_t characterId)
 	{
-		const char* code = LeaderboardCode(characterId);
+		const char* code = RankLeaderboard::Code(characterId);
 		return code ? (std::string("RANK_") + code) : std::string();
 	}
 

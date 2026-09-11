@@ -457,6 +457,7 @@
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
     <ClInclude Include="src\Overlay\Widget\UpdateProgressWidget.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />
+    <ClInclude Include="src\Overlay\Window\Ranked\RankLeaderboardCodes.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackSlot.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackManager.h" />
     <ClInclude Include="src\Game\Playbacks\UnlimitedPlaybackManager.h" />

@@ -2,6 +2,7 @@
 
 #include "RankedMainMenuSection.h"
 #include "RankedModalWindow.h"
+#include "RankLeaderboardCodes.h"
 
 #include "Core/Settings.h"
 #include "Core/logger.h"
@@ -45,7 +46,7 @@ namespace
 	constexpr uint32_t kInvalidRankedCharacterId = 0xFFFFFFFFu;
 	// Special character ID for RANK_ALL. Prediction lookup deliberately rejects this value
 	// so unknown confirmation-screen characters fail visibly instead of overestimating strength.
-	constexpr uint32_t kRankAllCharacterId = 64u;
+	constexpr uint32_t kRankAllCharacterId = RankLeaderboard::kAllCharacterId;
 	constexpr int32_t kRankedLpBase = 0x7FFF;
 	constexpr float kRankedPromotionCounterLowerMultiplier = 0.67f;
 	constexpr float kRankedPromotionCounterMidHigherMultiplier = 2.0f;
@@ -2102,23 +2103,11 @@ namespace
 		ImGui::EndPopup();
 	}
 
+	// See RankLeaderboardCodes.h - the table is BBCF's own, and the codes are not all
+	// guessable from the character's name.
 	const char* GetRankLeaderboardCode(uint32_t characterId)
 	{
-		static const char* kCodes[] =
-		{
-			"RG", "JN", "NL", "RC", "TK", "TG",
-			"LI", "AR", "BG", "CA", "HK", "NU",
-			"TB", "HZ", "MU", "MK", "VN", "PL",
-			"RL", "IY", "AM", "BL", "AZ", "KG",
-			"KK", "TM", "CE", "LA", "HB", "NI",
-			"NT", "IZ", "SU", "ES", "MA", "JB",
-		};
-
-		if (characterId < (sizeof(kCodes) / sizeof(kCodes[0])))
-			return kCodes[characterId];
-		if (characterId == kRankAllCharacterId)
-			return "ALL";
-		return nullptr;
+		return RankLeaderboard::Code(characterId);
 	}
 
 	// All data extractable from a single RANK_ALL leaderboard entry.
