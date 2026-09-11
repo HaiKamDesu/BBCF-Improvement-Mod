@@ -716,6 +716,26 @@ void WindowManager::Render()
 
 	if (!g_interfaces.pSteamApiHelper)
 	{
+		// This guard is the whole of the "the mod didn't load" report: everything
+		// initialises, "Finished initialization" is logged, and then nothing is ever
+		// drawn because the Steam interface pointers were never captured. See the
+		// comment on placeSteamInitHook_detours - if the game calls SteamAPI_Init
+		// before our detour lands, g_tempVals stays null, InitSteamApiWrappers builds
+		// nothing, and this returns on every frame for the rest of the session.
+		//
+		// Say so, once. Diagnosing it otherwise means noticing that a line which is
+		// only written when the detour fires ("SteamAPI_Init") is absent, which is not
+		// something a reader finds by searching for what went wrong.
+		static bool s_warned = false;
+		if (!s_warned)
+		{
+			s_warned = true;
+			LOG(0, "[Overlay] pSteamApiHelper is null, so the overlay will not draw for the rest "
+			       "of this session. The Steam interface pointers were never captured - our "
+			       "SteamAPI_Init detour was installed after the game had already called it. "
+			       "This is a startup race, not a failed install: the DLL loaded and hooked "
+			       "everything else. Restarting the game usually wins the race.\n");
+		}
 		return;
 	}
 
