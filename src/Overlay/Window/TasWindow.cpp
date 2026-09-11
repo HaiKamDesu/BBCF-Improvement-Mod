@@ -227,14 +227,18 @@ void TasWindow::Draw() {
     DrawTimeline(manager);
     ImGui::EndDisabled();
     DrawComposer(manager);
+    // The overwrite popup commits the edit during this draw pass. Process it before drawing
+    // sections so labels removed by the commit disappear immediately instead of after the next
+    // frame or after clicking another timeline row.
+    DrawInsertWarningPopup(manager);
     ImGui::BeginDisabled(recording);
+    DrawSections(manager);
     DrawPlaybackSection(manager);
     ImGui::EndDisabled();
     ImGui::EndDisabled();
 
     DrawFooter(manager);
 
-    DrawInsertWarningPopup(manager);
     DrawMovieFilePopup(manager);
     DrawHelpPopup();
 }
@@ -432,6 +436,55 @@ void TasWindow::DrawTimeline(TasManager& manager) {
 
     TextDisabledWrapped(L("Moving around never deletes anything. Frames are only replaced when you commit new input."));
     FlowHelpMarker(L("Seeking reloads a savestate and replays the stored input from there. Keyframes are taken every 60 frames so a nearby jump only replays a little; jumping far back replays from the start, which takes about a second per 60 frames."));
+}
+
+void TasWindow::DrawSections(TasManager& manager) {
+    SectionHeader(L("Sections"));
+
+    const auto& sections = manager.GetSections();
+    const size_t current = manager.GetCursor();
+    const int active = manager.FindSectionAtOrBefore(current);
+    ImGui::Text("%s", active >= 0 ? sections[static_cast<size_t>(active)].name.c_str() : L("No section").c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%u/%u)", static_cast<unsigned int>(current), static_cast<unsigned int>(manager.GetFrameCount()));
+
+    ImGui::SetNextItemWidth(220.0f);
+    ImGui::InputTextWithHint("##tas_section_name", L("section name").c_str(), m_sectionName, sizeof(m_sectionName));
+    ImGui::SameLine();
+    const size_t cursor = manager.GetCursor();
+    ImGui::BeginDisabled(manager.IsPlaybackRunning() || manager.IsLiveRecording() || cursor == 0 || m_sectionName[0] == '\0');
+    if (ImGui::Button(L("Add section").c_str())) {
+        // The cursor points at the next frame to be edited. A marker belongs to the frame
+        // immediately before it: after completing frame 70, the cursor is already at 71.
+        if (manager.AddSection(cursor - 1, m_sectionName)) {
+            m_sectionName[0] = '\0';
+        }
+    }
+    ImGui::EndDisabled();
+
+    for (size_t i = 0; i < sections.size(); ++i) {
+        const TasSection& section = sections[i];
+        ImGui::PushID(static_cast<int>(i));
+        char label[160];
+        std::snprintf(label, sizeof(label), "%u  %s", static_cast<unsigned int>(section.frame), section.name.c_str());
+        ImGui::BeginDisabled(manager.IsPlaybackRunning() || manager.IsLiveRecording());
+        if (ImGui::Button(label)) {
+            // The marker belongs to the completed frame; resume editing at the next frame.
+            manager.SeekToFrame((std::min)(section.frame + 1, manager.GetFrameCount()));
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            manager.RemoveSection(i);
+            ImGui::EndDisabled();
+            ImGui::PopID();
+            break;
+        }
+        ImGui::EndDisabled();
+        ImGui::PopID();
+    }
+    if (sections.empty()) {
+        TextDisabledWrapped(L("Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie."));
+    }
 }
 
 void TasWindow::DrawComposer(TasManager& manager) {

@@ -11,6 +11,11 @@ struct TasFrameInput {
     uint16_t p2 = 5;
 };
 
+struct TasSection {
+    size_t frame = 0;
+    std::string name;
+};
+
 enum class TasRunState {
     Idle,
     PausedAtMovieFrame,
@@ -150,6 +155,11 @@ public:
     size_t GetCursor() const { return m_playhead; }
     size_t GetFrameCount() const { return m_movie.size(); }
 
+    const std::vector<TasSection>& GetSections() const { return m_sections; }
+    bool AddSection(size_t frame, const std::string& name);
+    bool RemoveSection(size_t index);
+    int FindSectionAtOrBefore(size_t frame) const;
+
 private:
     TasManager() = default;
     ~TasManager();
@@ -174,6 +184,7 @@ private:
     void ClearKeyframes();
     void CaptureKeyframeIfDue();
     void InvalidateKeyframesAfter(size_t frame);
+    void InvalidateSectionCheckpointsBefore(size_t frame);
     // Best starting point for a seek: the latest keyframe at or before the target.
     // Returns -1 when the base state is the best we have.
     int FindKeyframeFor(size_t targetFrame) const;
@@ -202,6 +213,8 @@ private:
     struct Keyframe {
         size_t movieFrame = 0;
         bool valid = false;
+        // Cache metadata only; the section itself remains a frame-attached timeline marker.
+        bool sectionCheckpoint = false;
     };
     std::vector<Keyframe> m_keyframes;
     size_t m_nextKeyframeSlot = 0;
@@ -212,10 +225,12 @@ private:
 
     TasRunState m_runState = TasRunState::Idle;
     std::vector<TasFrameInput> m_movie;
+    std::vector<TasSection> m_sections;
 
     // A movie is a few bytes a frame, so undo just keeps whole copies rather than a diff.
     struct MovieState {
         std::vector<TasFrameInput> movie;
+        std::vector<TasSection> sections;
         size_t playhead = 0;
     };
     std::vector<MovieState> m_undoStack;

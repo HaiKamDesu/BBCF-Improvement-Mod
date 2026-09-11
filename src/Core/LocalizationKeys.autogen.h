@@ -2403,6 +2403,9 @@ struct LocalizationKeysAccessor
         // The V2 TAS file contains no frame data.
         inline const char* The_V2_TAS_file_contains_no_frame_data() const { return Get("The V2 TAS file contains no frame data."); }
 
+        // The V2 TAS file contains duplicate sections.
+        inline const char* The_V2_TAS_file_contains_duplicate_sections() const { return Get("The V2 TAS file contains duplicate sections."); }
+
         // The TAS file has an unknown format.
         inline const char* The_TAS_file_has_an_unknown_format() const { return Get("The TAS file has an unknown format."); }
 
@@ -3587,6 +3590,21 @@ struct LocalizationKeysAccessor
 
         // The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.
         inline const char* The_game_only_loads_this_one_while_it_starts_up_so_restart_the_game_to_hear_it_The_swap_itself_is_saved_and_done() const { return Get("The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done."); }
+
+        // Sections
+        inline const char* Sections() const { return Get("Sections"); }
+
+        // No section
+        inline const char* No_section() const { return Get("No section"); }
+
+        // section name
+        inline const char* section_name() const { return Get("section name"); }
+
+        // Add section
+        inline const char* Add_section() const { return Get("Add section"); }
+
+        // Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.
+        inline const char* Add_markers_at_important_points_in_a_long_combo_Clicking_one_jumps_straight_to_that_frame_without_changing_the_movie() const { return Get("Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie."); }
 };
 
 

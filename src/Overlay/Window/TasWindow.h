@@ -31,6 +31,7 @@ private:
     void DrawStatusStrip(TasManager& manager) const;
     void DrawBaseStateSection(TasManager& manager);
     void DrawTimeline(TasManager& manager);
+    void DrawSections(TasManager& manager);
     void DrawComposer(TasManager& manager);
     // One player's row: label, notation field, Record/Stop, frame-count badge. Returns the
     // frame count the field currently parses to, or -1 if the notation is invalid.
@@ -70,6 +71,7 @@ private:
     int m_scrubTarget = 0;
     bool m_scrubActive = false;
     int m_pendingCommitFrames = 0;
+    char m_sectionName[128] = "";
 
     // Drives the timeline's follow-the-playhead scrolling: only scroll when the playhead
     // actually moved, so the user can scrub the strip by hand without it snapping back.

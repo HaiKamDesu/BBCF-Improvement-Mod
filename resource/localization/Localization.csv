@@ -977,6 +977,7 @@ The V2 TAS file contains an invalid frame.,The V2 TAS file contains an invalid f
 The V2 TAS file contains an invalid frame index.,The V2 TAS file contains an invalid frame index.,El archivo TAS V2 contiene un índice de frame no válido.
 The V2 TAS file contains an invalid input.,The V2 TAS file contains an invalid input.,El archivo TAS V2 contiene una entrada no válida.
 The V2 TAS file contains no frame data.,The V2 TAS file contains no frame data.,El archivo TAS V2 no contiene datos de frames.
+The V2 TAS file contains duplicate sections.,The V2 TAS file contains duplicate sections.,El archivo TAS V2 contiene secciones duplicadas.
 The TAS file has an unknown format.,The TAS file has an unknown format.,El archivo TAS tiene un formato desconocido.
 The V1 TAS file contains an invalid frame.,The V1 TAS file contains an invalid frame.,El archivo TAS V1 contiene un frame no válido.
 Imported %s. Save a matching base state before playback.,Imported %s. Save a matching base state before playback.,Se importó %s. Guarda el estado base correspondiente antes de reproducir.
@@ -1373,3 +1374,9 @@ Loads each time this screen comes up.,Loads each time this screen comes up.,Se c
 Starts playing the next time this screen's music loads.,Starts playing the next time this screen's music loads.,Empieza a sonar la próxima vez que se cargue la música de esta pantalla.
 "The game loads this one at startup, so it is already in use.","The game loads this one at startup, so it is already in use.","El juego carga esta al iniciarse, así que ya está en uso."
 "The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.","The game only loads this one while it starts up, so restart the game to hear it. The swap itself is saved and done.","El juego solo carga esta mientras arranca, así que reinicia el juego para oírla. El cambio ya está guardado y hecho."
+
+Sections,Sections,Secciones
+No section,No section,Sin sección
+section name,section name,nombre de sección
+Add section,Add section,Añadir sección
+"Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.","Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.","Añade marcadores en puntos importantes de un combo largo. Al hacer clic, saltas directamente a ese frame sin cambiar el movie."
