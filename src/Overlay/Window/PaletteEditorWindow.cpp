@@ -1019,57 +1019,70 @@ void PaletteEditorWindow::CheckSelectedPalOutOfBound()
 	}
 }
 
+// The opponent's half of the in-match palette section: what they are wearing, plus reset and
+// download.
+//
+// This used to be a single horizontal strip - "X | Download | Player 2 | <name>" - which was
+// fine while the section was two full-width rows of names. Since the section became two
+// half-width cells the strip no longer fits in one, and ImGui clips the overflow: the palette
+// name, the one thing this half exists to tell you, ran off the right edge of a child with
+// scrolling deliberately turned off, so online the opponent's palette simply stopped being
+// visible. It is now the same cell as the local player's, so both halves read the same way.
+//
+// The preview comes from the live palette bytes rather than an index into our own collection,
+// because the opponent's palette is whatever their mod sent us and may be a file we do not
+// have. Passing index 0 is what makes PaletteThumbKey hash those bytes into the cache key, so
+// the thumbnail follows their palette instead of sticking on the first one seen.
 void PaletteEditorWindow::ShowOnlinePaletteResetButton(Player& playerHandle, uint16_t matchPlayerIndex, const char* btnText)
 {
 	CharPaletteHandle& charPalHandle = playerHandle.GetPalHandle();
 	CharIndex charIndex = (CharIndex)playerHandle.GetData()->charIndex;
 
-	char buf[32];
-	sprintf_s(buf, " X ##%s", btnText);
+	ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+	ImGui::PushFont(NULL, ImGui::GetFontSize() * 0.85f);
+	CenteredText(btnText);
+	ImGui::PopFont();
+	ImGui::PopStyleColor();
+	ImGui::HoverTooltip(getCharacterNameByIndexA(charIndex).c_str());
 
-	if (ImGui::Button(buf))
+	const IMPL_info_t& palInfo = g_interfaces.pPaletteManager->GetCurrentPalInfo(charPalHandle);
+	const IMPL_data_t& palData = g_interfaces.pPaletteManager->GetCurrentPalData(charPalHandle);
+
+	ImGui::BeginGroup();
+	WrappedCenteredText(palInfo.palName);
+	DrawPaletteSprite(charIndex, 0, palData.file0, kPaletteSpriteHeight);
+	ImGui::EndGroup();
+	ShowHoveredPaletteInfoToolTip(palInfo, charIndex, 0);
+
+	char resetButtonId[80];
+	sprintf_s(resetButtonId, "%s##reset%s", Messages.Reset_palette(), btnText);
+	if (ImGui::Button(resetButtonId, ImVec2(-1.0f, 0.0f)))
 	{
 		g_interfaces.pPaletteManager->RestoreOrigPal(charPalHandle);
 	}
 
-	ImGui::HoverTooltip(Messages.Reset_palette());
-
 	const OnlinePaletteManager::PaletteDownloadPermission downloadPermission =
 		g_interfaces.pOnlinePaletteManager->GetDownloadPermission(matchPlayerIndex);
-	char downloadButtonId[48];
-	sprintf_s(downloadButtonId, " Download ##download%s", btnText);
-	ImGui::SameLine();
+	char downloadButtonId[80];
+	sprintf_s(downloadButtonId, "%s##download%s", Messages.Download_palette(), btnText);
+
 	if (downloadPermission == OnlinePaletteManager::PaletteDownloadPermission::Granted)
 	{
-		if (ImGui::Button(downloadButtonId))
+		if (ImGui::Button(downloadButtonId, ImVec2(-1.0f, 0.0f)))
 		{
 			DownloadOnlinePalette(playerHandle, matchPlayerIndex);
 		}
-		ImGui::HoverTooltip(Messages.Download_palette());
 	}
 	else
 	{
 		// Greyed out but not item-disabled, so the explanatory tooltip still shows.
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-		ImGui::Button(downloadButtonId);
+		ImGui::Button(downloadButtonId, ImVec2(-1.0f, 0.0f));
 		ImGui::PopStyleVar();
 		ImGui::HoverTooltip(downloadPermission == OnlinePaletteManager::PaletteDownloadPermission::Denied
 			? Messages.Palette_download_denied_tooltip()
 			: Messages.Palette_download_unsupported_tooltip());
 	}
-
-	// Dummy button
-	ImGui::SameLine();
-	ImGui::Button(btnText);
-
-	ImGui::HoverTooltip(getCharacterNameByIndexA(charIndex).c_str());
-
-	ImGui::SameLine();
-
-	const IMPL_info_t& palInfo = g_interfaces.pPaletteManager->GetCurrentPalInfo(charPalHandle);
-	ImGui::TextUnformatted(palInfo.palName);
-
-	ShowHoveredPaletteInfoToolTip(palInfo, charIndex, 0);
 }
 
 void PaletteEditorWindow::DownloadOnlinePalette(Player& playerHandle, uint16_t matchPlayerIndex)
