@@ -33,74 +33,113 @@ bool IsSettingMissingInIni(LPCWSTR key, LPCWSTR filename)
 struct EmbeddedIni
 {
         const wchar_t* resourceName;
-        const char* iniPath;      // game-folder-relative, created only when absent
-        const char* defaultPath;  // updater's merge baseline, rewritten every launch
+        const wchar_t* iniPath;      // game-folder-relative, created only when absent
+        const wchar_t* defaultPath;  // updater's merge baseline, rewritten every launch
 };
 
 const EmbeddedIni kEmbeddedInis[] = {
-        { L"settings.ini", "settings.ini", "BBCF_IM\\Updater\\defaults\\settings.ini.default" },
-        { L"palettes.ini", "palettes.ini", "BBCF_IM\\Updater\\defaults\\palettes.ini.default" },
+        { L"settings.ini", L"settings.ini", L"BBCF_IM\\Updater\\defaults\\settings.ini.default" },
+        { L"palettes.ini", L"palettes.ini", L"BBCF_IM\\Updater\\defaults\\palettes.ini.default" },
 };
+
+// Everything below is wide, deliberately, and must stay that way.
+//
+// This was the one part of settings that went through the narrow GamePath(). That string is
+// the game directory in the ANSI code page (see the comment on ResolveGameDirectory), so any
+// install whose path the code page cannot represent - a Cyrillic or accented Windows user
+// name, Proton's Z:\home\<user>\... - arrives here mangled. GetFileAttributesA then reports
+// the ini as missing, CreateDirectoryA/ofstream cannot create it either, and the launch ends
+// with no settings.ini and no palettes.ini on a perfectly clean install. Reading them was
+// never affected: loadSettingsFile resolves through GamePathW, and so does the logger, which
+// is why such a report arrives with a DEBUG.txt in it and no config files beside it.
+std::string NarrowForLog(const std::wstring& wide)
+{
+        const int needed = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), NULL, 0, NULL, NULL);
+        if (needed <= 0)
+                return std::string();
+
+        std::string out;
+        out.resize(needed);
+        WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), (int)wide.size(), &out[0], needed, NULL, NULL);
+        return out;
+}
 
 // Creates every missing directory along `absolutePath`'s parent chain. Win32 rather
 // than std::filesystem: this project builds on the toolset's default language standard,
 // which predates <filesystem>.
-void CreateParentDirectories(const std::string& absolutePath)
+void CreateParentDirectories(const std::wstring& absolutePath)
 {
-        const size_t lastSlash = absolutePath.find_last_of("\\/");
-        if (lastSlash == std::string::npos)
+        const size_t lastSlash = absolutePath.find_last_of(L"\\/");
+        if (lastSlash == std::wstring::npos)
                 return;
 
-        const std::string parent = absolutePath.substr(0, lastSlash);
+        const std::wstring parent = absolutePath.substr(0, lastSlash);
         for (size_t i = 0; i < parent.size(); ++i)
         {
-                if (parent[i] != '\\' && parent[i] != '/')
+                if (parent[i] != L'\\' && parent[i] != L'/')
                         continue;
                 // Skip the root itself ("C:\") so we never call CreateDirectory on a drive.
-                if (i > 0 && parent[i - 1] != ':')
-                        CreateDirectoryA(parent.substr(0, i).c_str(), NULL);
+                if (i > 0 && parent[i - 1] != L':')
+                        CreateDirectoryW(parent.substr(0, i).c_str(), NULL);
         }
-        CreateDirectoryA(parent.c_str(), NULL);
+        CreateDirectoryW(parent.c_str(), NULL);
 }
 
-bool WriteTextFile(const std::string& absolutePath, const std::string& contents)
+// Returns the Windows error on failure, 0 on success. The reason matters: "no settings.ini"
+// reads the same in a report whether the path was unrepresentable or the folder was read-only,
+// and those need opposite answers.
+DWORD WriteTextFile(const std::wstring& absolutePath, const std::string& contents)
 {
         CreateParentDirectories(absolutePath);
 
-        std::ofstream out(absolutePath.c_str(), std::ios::binary | std::ios::trunc);
-        if (!out)
-                return false;
+        const HANDLE file = CreateFileW(absolutePath.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (file == INVALID_HANDLE_VALUE)
+                return GetLastError() ? GetLastError() : ERROR_OPEN_FAILED;
 
-        out.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-        return out.good();
+        DWORD written = 0;
+        const BOOL ok = WriteFile(file, contents.data(), (DWORD)contents.size(), &written, NULL);
+        const DWORD error = ok ? ERROR_SUCCESS : (GetLastError() ? GetLastError() : ERROR_WRITE_FAULT);
+        CloseHandle(file);
+
+        if (error == ERROR_SUCCESS && written != contents.size())
+                return ERROR_WRITE_FAULT;
+
+        return error;
 }
 
 void WriteEmbeddedConfigFiles()
 {
         for (const EmbeddedIni& ini : kEmbeddedInis)
         {
+                const std::string iniPathForLog = NarrowForLog(ini.iniPath);
+
                 std::string contents;
                 if (!LoadEmbeddedResource(ini.resourceName, contents) || contents.empty())
                 {
-                        ForceLog("[Init][Settings] embedded template '%s' not found in the DLL\n", ini.iniPath);
+                        ForceLog("[Init][Settings] embedded template '%s' not found in the DLL\n", iniPathForLog.c_str());
                         continue;
                 }
 
                 // First run: no ini on disk yet, so lay down the template before anything reads it.
-                const std::string iniPath = GamePath(ini.iniPath);
-                if (GetFileAttributesA(iniPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+                const std::wstring iniPath = GamePathW(ini.iniPath);
+                if (GetFileAttributesW(iniPath.c_str()) == INVALID_FILE_ATTRIBUTES)
                 {
-                        ForceLog("[Init][Settings] creating missing '%s' (ok=%d)\n",
-                                ini.iniPath, WriteTextFile(iniPath, contents) ? 1 : 0);
+                        const DWORD error = WriteTextFile(iniPath, contents);
+                        ForceLog("[Init][Settings] creating missing '%s' at '%s' (ok=%d err=%lu)\n",
+                                iniPathForLog.c_str(), NarrowForLog(iniPath).c_str(),
+                                error == ERROR_SUCCESS ? 1 : 0, error);
                 }
 
                 // The updater's three-way merge wants an "old default" that matches the build
                 // actually running, so rewrite it unconditionally instead of shipping a copy
                 // that can drift out of sync with the DLL.
-                const std::string defaultPath = GamePath(ini.defaultPath);
-                if (!WriteTextFile(defaultPath, contents))
+                const std::wstring defaultPath = GamePathW(ini.defaultPath);
+                const DWORD defaultError = WriteTextFile(defaultPath, contents);
+                if (defaultError != ERROR_SUCCESS)
                 {
-                        ForceLog("[Init][Settings] failed to write '%s'\n", ini.defaultPath);
+                        ForceLog("[Init][Settings] failed to write '%s' (err=%lu)\n",
+                                NarrowForLog(ini.defaultPath).c_str(), defaultError);
                 }
         }
 }
@@ -219,11 +258,13 @@ bool Settings::loadSettingsFile()
 
 	// Anchored to the game folder, never the working directory - the shell can move the
 	// CWD out from under us while a file dialog is open (see GamePath in utils.h).
-	CString strINIPath(GamePathW(L"settings.ini").c_str());
-	{
-		CT2CA iniPathAnsi(strINIPath);
-		ForceLog("[Init][Settings] resolved path='%s'\n", iniPathAnsi.m_psz ? iniPathAnsi.m_psz : "<null>");
-	}
+	const std::wstring iniPathWide = GamePathW(L"settings.ini");
+	CString strINIPath(iniPathWide.c_str());
+	// UTF-8, not CT2CA. The ANSI conversion turned every character the code page cannot
+	// represent into '?', so the one line a report is read for showed a path that was not
+	// the path - and it looked like the mangling this file was just fixed for, on an
+	// install where nothing was wrong.
+	ForceLog("[Init][Settings] resolved path='%s'\n", NarrowForLog(iniPathWide).c_str());
 
         if (GetFileAttributes(strINIPath) == 0xFFFFFFFF)
         {
