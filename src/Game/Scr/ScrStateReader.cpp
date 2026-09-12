@@ -69,17 +69,13 @@ and reach the start of the states definitions you need to do (36 * total n of st
 std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 	CharData* p1 = g_interfaces.player1.GetData();
 	CharData* p2 = g_interfaces.player2.GetData();
-	if (p1 && p2) {
-		if (p1->charIndex == p2->charIndex) {
-			// Mirror match. Nothing is parsed, so frame history has no script to classify against
-			// and shows only Idle/Special for both players for the whole match. Say so rather than
-			// leaving it to look like the parse merely produced nothing interesting.
-			LOG(2, "[Scr] P%d parse skipped: mirror match (both players charIndex %d, %s). "
-			       "No state data will be available to frame history this match.\n",
-				player_num, p1->charIndex, getCharacterNameByIndexA(p1->charIndex).c_str());
-			return std::vector<scrState*>{};
-		}
-	}
+
+	// There used to be a bail here returning nothing when both players had the same charIndex.
+	// It defeated its own caller: loadCharData already handles a mirror by asking for player 1's
+	// script twice, so the bail turned every mirror match into two empty maps, leaving frame
+	// history with no script to classify against and nothing but Idle/Special on both rows for
+	// the whole match. Player 1's slot is populated in a mirror like any other, so parsing it is
+	// no more dangerous than parsing it in a non-mirror.
 
 	const auto parseStartTime = std::chrono::steady_clock::now();
 	g_scrStats = ScrParseStats();

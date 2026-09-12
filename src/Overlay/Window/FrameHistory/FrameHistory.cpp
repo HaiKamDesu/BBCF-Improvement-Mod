@@ -2,6 +2,7 @@
 #include "Overlay/Window/FrameAdvantage/PlayerExtendedData.h"
 #include <cstddef>
 #include "Core/logger.h"
+#include "Game/characters.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 #define MAX(a,b)            (((a) > (b)) ? (a) : (b))
 
@@ -367,21 +368,46 @@ void FrameHistory::loadCharData() {
 
     char* bbcf_base_adress = GetBbcfBaseAdress();
 
+    // The previous character's states are about to be replaced. They used to be neither freed nor
+    // unmapped, so each character change leaked a script's worth of states and left names unique to
+    // the old character still resolvable - a state could be classified against the wrong script.
+    // p1_State/p2_State point into these maps, so they have to let go first.
+    p1_State = nullptr;
+    p2_State = nullptr;
+    p1_StateMap.clear();
+    p2_StateMap.clear();
+    p1_OwnedStates.clear();
+    p2_OwnedStates.clear();
+
+    const bool isMirrorMatch = p1_charIndex == p2_charIndex;
+
     std::vector<scrState*> states_p1 = parse_scr(bbcf_base_adress, 1);
-    std::vector<scrState*> states_p2;
-    if (p1_charIndex == p2_charIndex) {
-        states_p2 = parse_scr(bbcf_base_adress, 1);
-    } else {
-        states_p2 = parse_scr(bbcf_base_adress, 2);
+
+    // In a mirror both players run the same script, so player 1's slot is parsed a second time
+    // rather than reading player 2's. The two passes are kept separate on purpose: each player's
+    // map owns its own scrState objects, so neither can free the other's out from under it.
+    if (isMirrorMatch) {
+        LOG(2, "[Scr] Mirror match (%s on both sides): parsing player 1's script a second time "
+               "for player 2's state map.\n",
+            getCharacterNameByIndexA(p1_charIndex).c_str());
     }
 
-    for (size_t i1 = 0; i1 < states_p1.size(); i1++) {
-        p1_StateMap[states_p1[i1]->name] = states_p1[i1];
+    std::vector<scrState*> states_p2 = parse_scr(bbcf_base_adress, isMirrorMatch ? 1 : 2);
+
+    // Take ownership as well as mapping them. A duplicate state name overwrites the map entry but
+    // both objects stay owned exactly once, so nothing is freed twice.
+    for (scrState* state : states_p1) {
+        p1_StateMap[state->name] = state;
+        p1_OwnedStates.emplace_back(state);
     }
 
-    for (size_t i2 = 0; i2 < states_p2.size(); i2++) {
-        p2_StateMap[states_p2[i2]->name] = states_p2[i2];
+    for (scrState* state : states_p2) {
+        p2_StateMap[state->name] = state;
+        p2_OwnedStates.emplace_back(state);
     }
+
+    LOG(2, "[Scr] Frame history state maps loaded: P1 %zu states, P2 %zu states.\n",
+        p1_StateMap.size(), p2_StateMap.size());
 }
 
 void FrameHistory::clear() { queue.clear(); }

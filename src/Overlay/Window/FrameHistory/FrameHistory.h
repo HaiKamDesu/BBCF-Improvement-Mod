@@ -9,6 +9,8 @@
 #include <array>
 #include <cstddef>
 #include <deque>
+#include <memory>
+#include <vector>
 
 // default maximum number of frames — overridden at runtime by window width
 const int HISTORY_DEPTH_DEFAULT = 500;
@@ -145,6 +147,13 @@ private:
 
     std::map<std::string, scrState*> p1_StateMap = {};
     std::map<std::string, scrState*> p2_StateMap = {};
+
+    // parse_scr hands back raw scrState pointers it has allocated and no longer tracks. Nothing
+    // used to own them: the maps were never cleared and nothing was ever deleted, so every
+    // character change leaked a full script's worth of states and left the previous character's
+    // uniquely-named states reachable in the map.
+    std::vector<std::unique_ptr<scrState>> p1_OwnedStates;
+    std::vector<std::unique_ptr<scrState>> p2_OwnedStates;
 
     BackedUpCharData p1_old_data;
     BackedUpCharData p2_old_data;

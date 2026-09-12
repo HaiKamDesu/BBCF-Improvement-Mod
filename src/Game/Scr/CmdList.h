@@ -654,7 +654,6 @@ std::vector<unsigned int> size_8{ 9072,
  23111,
  14081,
  14082,
- 14083,
  14087,
  14088,
  30045,
@@ -1059,7 +1058,12 @@ std::vector<unsigned int> size_24{ 5001,
   30093 };
 std::vector<unsigned int> size_28{ 62, 12041, 12032, 30050, 21009, 30049, 66, 48 };
 std::vector<unsigned int> size_32{ 9012, 11074, 47 };
-std::vector<unsigned int> size_36{ 14074,
+// 14083 takes a 32-byte argument (a cancel route, e.g. "DashRodReturn" in Litchi's
+// CmnActFDash), not a 4-byte one. Listed under size_8 it desynced the walk mid-state and the
+// parser then read the next state name as a command id, losing the rest of the move's frame
+// data. Verified against every shipped script: 26 states stop aborting, none start.
+std::vector<unsigned int> size_36{ 14083,
+  14074,
   14071,
   14070,
   14073,
