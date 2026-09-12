@@ -211,11 +211,17 @@ void TasWindow::Update() {
 }
 
 void TasWindow::BeforeDraw() {
-    // The title is the identity after ###, so the part before it can say which of the two
-    // things the window currently is without ImGui treating it as a different window.
+    // The part after ### is the identity, and the two modes deliberately do not share one.
+    //
+    // They did at first, which meant a single entry in menus.ini and therefore a single saved size
+    // and position between them: size the TAS movie the way you want it, open a recording slot, and
+    // that mode inherited the movie's geometry and then overwrote it on the way back. It read as
+    // the window refusing to remember a size at all. They are different shapes - the movie carries
+    // a transport and two players, the slot carries neither - so they get an entry each, the way
+    // they did when the recording slot had its own window class.
     m_windowTitle = (m_mode == Mode::Playback
-        ? L("Playback editor")
-        : L("TAS combo editor")) + "###Tas";
+        ? L("Playback editor") + "###TasPlaybackEditor"
+        : L("TAS combo editor") + "###Tas");
 
     // Opened from a modal (the library's entry editor) or from a button on another window,
     // the editor would otherwise appear behind whatever opened it.
