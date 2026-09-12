@@ -59,6 +59,17 @@ bool ParseHumanInput(const std::string& text, uint16_t* result) {
     if (!result) return false;
     uint16_t value = 0;
     bool sawDirection = false;
+
+    // Same implied neutral as the command parser: a frame written with no direction is 5. The
+    // format always writes one, but the file's own header tells a human they can leave it out, so
+    // reading it back has to accept what that invites them to type.
+    const auto implyNeutralDirection = [&]() {
+        if (!sawDirection) {
+            value = 5;
+            sawDirection = true;
+        }
+    };
+
     for (size_t i = 0; i < text.size(); ) {
         const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(text[i])));
         if (ch >= '1' && ch <= '9') {
@@ -70,11 +81,13 @@ bool ParseHumanInput(const std::string& text, uint16_t* result) {
                    static_cast<char>(std::toupper(static_cast<unsigned char>(text[i + 1]))) == 'P') {
             // "ap" = taunt button. Checked before the single 'A' branch so 5ap does not
             // get parsed as "5A" followed by an invalid 'p'.
-            if (!sawDirection || (value & kInputButtonTaunt)) return false;
+            if (value & kInputButtonTaunt) return false;
+            implyNeutralDirection();
             value = static_cast<uint16_t>(value + kInputButtonTaunt);
             i += 2;
         } else if (ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D') {
-            if (!sawDirection || (value & ButtonValue(ch))) return false;
+            if (value & ButtonValue(ch)) return false;
+            implyNeutralDirection();
             value = static_cast<uint16_t>(value + ButtonValue(ch));
             ++i;
         } else if (ch != ' ' && ch != '\t') {
@@ -1181,6 +1194,7 @@ bool TasManager::ExportMovie(const std::string& path, bool includeInitialConditi
         output << "end_sections\n";
     }
     output << "# Inputs use numpad notation: 7 8 9 / 4 5 6 / 1 2 3; suffixes A B C D are buttons, ap is the taunt button.\n";
+    output << "# A frame with no direction written is neutral, so \"D\" means the same as \"5D\".\n";
     for (size_t i = 0; i < m_movie.size(); ++i) {
         output << i << " | P1=" << HumanInput(m_movie[i].p1)
                << " | P2=" << HumanInput(m_movie[i].p2) << '\n';
@@ -1344,6 +1358,18 @@ bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>*
     out->clear();
     uint16_t pendingButtons = 0;
     bool sawDirection = false;
+
+    // A command that opens with a button has no direction written in front of it, which is how
+    // people actually write a button-only frame: "D", "ABCD", "ap" for the taunt. Neutral is what
+    // the game reads when no direction is held, so an implied 5 is both the obvious reading and
+    // the correct one. Without this the parser rejected the whole command.
+    const auto startImpliedNeutralFrame = [&]() {
+        if (!sawDirection || out->empty()) {
+            out->push_back(5);
+            sawDirection = true;
+        }
+    };
+
     for (size_t i = 0; i < text.size(); ) {
         const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(text[i])));
         if (ch >= '1' && ch <= '9') {
@@ -1358,15 +1384,14 @@ bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>*
                    static_cast<char>(std::toupper(static_cast<unsigned char>(text[i + 1]))) == 'P') {
             // "ap" = taunt button attached to the current frame. Checked before the single
             // 'A' branch so 5ap does not get parsed as "5A" followed by an invalid 'p'.
-            if (!sawDirection || out->empty() || (pendingButtons & kInputButtonTaunt)) {
+            if (pendingButtons & kInputButtonTaunt) {
                 return false;
             }
+            startImpliedNeutralFrame();
             pendingButtons = static_cast<uint16_t>(pendingButtons + kInputButtonTaunt);
             i += 2;
         } else if (ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D') {
-            if (!sawDirection || out->empty()) {
-                return false;
-            }
+            startImpliedNeutralFrame();
             pendingButtons = static_cast<uint16_t>(pendingButtons + ButtonValue(ch));
             ++i;
         } else if (ch != ' ' && ch != ',' && ch != '-') {
@@ -1385,11 +1410,11 @@ bool TasManager::ParseInputs() {
     std::vector<uint16_t> p1;
     std::vector<uint16_t> p2;
     if (!TryParseCommand(m_p1Text, &p1)) {
-        SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.").c_str());
+        SetError(L("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.").c_str());
         return false;
     }
     if (!TryParseCommand(m_p2Text, &p2)) {
-        SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.").c_str());
+        SetError(L("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.").c_str());
         return false;
     }
 

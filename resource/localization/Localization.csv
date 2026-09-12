@@ -979,8 +979,8 @@ The V2 TAS file contains duplicate sections.,The V2 TAS file contains duplicate 
 The TAS file has an unknown format.,The TAS file has an unknown format.,El archivo TAS tiene un formato desconocido.
 The V1 TAS file contains an invalid frame.,The V1 TAS file contains an invalid frame.,El archivo TAS V1 contiene un frame no válido.
 Imported %s. Save a matching base state before playback.,Imported %s. Save a matching base state before playback.,Se importó %s. Guarda el estado base correspondiente antes de reproducir.
-"Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.","Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.","Entrada de P1 no válida. Usa ejemplos como 5C, 28D, 623C, 656 o 5ap."
-"Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.","Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.","Entrada de P2 no válida. Usa ejemplos como 5C, 28D, 623C, 656 o 5ap."
+"Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.","Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.","Entrada de P1 no válida. Usa ejemplos como 5C, 28D, 623C, 656, 5ap o D por sí solo."
+"Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.","Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.","Entrada de P2 no válida. Usa ejemplos como 5C, 28D, 623C, 656, 5ap o D por sí solo."
 Frame %u,Frame %u,Frame %u
 %u frames,%u frames,%u frames
 1 frame,1 frame,1 frame

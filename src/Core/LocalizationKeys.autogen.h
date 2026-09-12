@@ -2409,11 +2409,11 @@ struct LocalizationKeysAccessor
         // Imported %s. Save a matching base state before playback.
         inline const char* Imported_s_Save_a_matching_base_state_before_playback() const { return Get("Imported %s. Save a matching base state before playback."); }
 
-        // Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.
-        inline const char* Invalid_P1_input_Use_examples_such_as_5C_28D_623C_656_or_5ap() const { return Get("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, or 5ap."); }
+        // Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.
+        inline const char* Invalid_P1_input_Use_examples_such_as_5C_28D_623C_656_5ap_or_D_on_its_own() const { return Get("Invalid P1 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own."); }
 
-        // Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap.
-        inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_656_or_5ap() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, or 5ap."); }
+        // Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own.
+        inline const char* Invalid_P2_input_Use_examples_such_as_5C_28D_623C_656_5ap_or_D_on_its_own() const { return Get("Invalid P2 input. Use examples such as 5C, 28D, 623C, 656, 5ap, or D on its own."); }
 
         // Frame %u
         inline const char* Frame_u() const { return Get("Frame %u"); }
