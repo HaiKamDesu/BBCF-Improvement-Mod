@@ -1,11 +1,55 @@
 #pragma once
 #include "ScrStateReader.h"
 #include "Core/interfaces.h"
+#include "Core/logger.h"
+#include "Game/characters.h"
 #include "CmdList.h"
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 
+
+// Per-parse telemetry, summarised into DEBUG.txt at the end of every parse_scr. These are the
+// numbers that say whether a script walk was healthy:
+//
+//  - a state that aborts on an unknown command stops contributing frame data from that point on,
+//    so frame history silently mis-classifies the rest of the move;
+//  - widestRetroSpan is the widest range one of the retroactive commands (22007/22019/2002/23027)
+//    actually rewrote. It must stay within the frame vector. It reaching 4294967295 on Litchi's
+//    RodEventDown is what froze the game for billions of iterations the first time frame history
+//    was opened, so it is logged every time rather than left to be rediscovered;
+//  - elapsed ms is the direct regression check: this is a one-shot cost paid on the render thread.
+struct ScrParseStats
+{
+	int statesParsed = 0;
+	int statesAborted = 0;
+	unsigned long firstUnknownCmd = 0;
+	std::string firstUnknownState;
+	unsigned int spriteCmds = 0;
+	unsigned int heldSprites = 0;
+	unsigned int frameEntries = 0;
+	unsigned int longestState = 0;
+	unsigned int widestRetroSpan = 0;
+};
+
+static ScrParseStats g_scrStats;
+
+// Records how wide one of the retroactive rewrites actually ran. Compared against the longest state
+// at the end of the parse; if it ever exceeds it, the loop bound and the vector have drifted apart.
+static void RecordRetroSpan(unsigned int prev_frames, size_t vectorSize)
+{
+	const unsigned int span = (vectorSize > prev_frames) ? (unsigned int)(vectorSize - prev_frames) : 0;
+	if (span > g_scrStats.widestRetroSpan)
+	{
+		g_scrStats.widestRetroSpan = span;
+	}
+}
+
+// Longest sprite duration still treated as a real animation length. Anything past this is the
+// script holding a sprite rather than playing one, and is recorded as a single non-deterministic
+// frame instead of being expanded.
+constexpr uint32_t SPRITE_FRAME_CAP = 1000;
 
 constexpr auto OFFSET_FROM_FPAC = 0x60;
 //constexpr auto EA_PTR_OFFSET_FROM_FPAC = 0x54; //differently from OFFSET_FROM_FPAC, this is an offset to an adress which holds the actual offset, and this offset is from the beginning of the pre_inint, so +0x60 needs to be added to it
@@ -27,9 +71,19 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 	CharData* p2 = g_interfaces.player2.GetData();
 	if (p1 && p2) {
 		if (p1->charIndex == p2->charIndex) {
+			// Mirror match. Nothing is parsed, so frame history has no script to classify against
+			// and shows only Idle/Special for both players for the whole match. Say so rather than
+			// leaving it to look like the parse merely produced nothing interesting.
+			LOG(2, "[Scr] P%d parse skipped: mirror match (both players charIndex %d, %s). "
+			       "No state data will be available to frame history this match.\n",
+				player_num, p1->charIndex, getCharacterNameByIndexA(p1->charIndex).c_str());
 			return std::vector<scrState*>{};
 		}
 	}
+
+	const auto parseStartTime = std::chrono::steady_clock::now();
+	g_scrStats = ScrParseStats();
+
 	char** fpac_load = NULL;
 	char* scr_index = NULL;
 	char** scr_preinit_offset = NULL;
@@ -84,6 +138,9 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 		ea_func_num += 1;
 	}
 
+	//snapshot so the EA and main passes can be reported separately - Litchi's staff lives in the EA
+	const ScrParseStats eaStats = g_scrStats;
+
 	//builds ea_state_map to reference in the main state parsing.
 	for (auto& state : ea_states_parsed) {
 		ea_state_map[state->name] =  state ;
@@ -96,7 +153,6 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 		int i = 0;
 		memcpy(&n_funcs, scr_index, 4);
 		i += 4;
-		std::cout << "base_adress: " << &scr_index[0] << std::endl;
 		while (func_num < n_funcs - 1) {
 			char name_index[32];
 			int pos_before_offset;
@@ -113,7 +169,51 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 
 
 	//states_parsed.insert(states_parsed.end(), ea_states_parsed.begin(), ea_states_parsed.end());
-		
+
+	{
+		const long long elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - parseStartTime).count();
+
+		CharData* parsed = (player_num == 2) ? p2 : p1;
+		const int charIndex = parsed ? parsed->charIndex : -1;
+
+		LOG(2, "[Scr] P%d %s (charIndex %d) parsed in %lld ms | main %d states (%d aborted) | "
+		       "EA %d states (%d aborted) | %u sprite cmds, %u held | %u frame entries, "
+		       "longest state %u | widest retro span %u | %zu jonbins\n",
+			player_num,
+			charIndex >= 0 ? getCharacterNameByIndexA(charIndex).c_str() : "?",
+			charIndex,
+			elapsedMs,
+			g_scrStats.statesParsed - eaStats.statesParsed,
+			g_scrStats.statesAborted - eaStats.statesAborted,
+			eaStats.statesParsed,
+			eaStats.statesAborted,
+			g_scrStats.spriteCmds,
+			g_scrStats.heldSprites,
+			g_scrStats.frameEntries,
+			g_scrStats.longestState,
+			g_scrStats.widestRetroSpan,
+			jonbin_map.size());
+
+		// A retro span wider than the longest state means the bound and the vector have drifted
+		// apart again, which is the exact shape of the freeze. Shout about it, do not bury it in
+		// the summary above.
+		if (g_scrStats.widestRetroSpan > g_scrStats.longestState)
+		{
+			LOG(0, "[Scr] WARNING: widest retroactive span (%u) exceeds the longest state's frame "
+			       "vector (%u). The retroactive loops are indexing past their data again.\n",
+				g_scrStats.widestRetroSpan, g_scrStats.longestState);
+		}
+
+		if (g_scrStats.statesAborted > 0)
+		{
+			LOG(2, "[Scr] P%d: %d state(s) stopped early on an unrecognised command; first was "
+			       "cmd %lu in state '%s'. Frame data past that point in those states is missing.\n",
+				player_num, g_scrStats.statesAborted,
+				g_scrStats.firstUnknownCmd, g_scrStats.firstUnknownState.c_str());
+		}
+	}
+
 	return states_parsed;
 }
 bool is_sprite_active_frame(char* name_addr, std::map<std::string, JonbDBEntry>* jonbin_map) {
@@ -161,29 +261,38 @@ int parse_state(char* addr,
 			//}
 			bool is_active = is_sprite_active_frame(addr + offset, jonbin_map);//there's some weirdness on some moves, such as izayoi's "CmdActFDash", showing hitboxes when there shouldn't be
 			offset += 32;
-			//unsigned int frames;
+			// The duration is a 32 bit field. This used to be read as `*(addr + offset)`, a single
+			// signed byte, which truncated every sprite longer than 127 frames and turned the
+			// engine's 32767 "hold this sprite" sentinel into 0xFFFFFFFF.
 			uint32_t frames;
-			char* address = (addr + offset);
-			/////memcpy(&frames, addr + offset, 4);
-			frames = *(addr + offset);
+			memcpy(&frames, addr + offset, 4);
 			FrameActivity activity_status = is_active? FrameActivity::Active: FrameActivity::Inactive;
 			offset += 4;
-			prev_frames = s->frames;
-			s->frames += frames;
-			for (int i = 0; i < frames;  i++) {
-				//if (frames == 32767){
-				if (frames == 0xffffffff || frames == 32767 || frames == (uint32_t)"keep") {
-					s->frame_activity_status.push_back((FrameActivity)(0x10 | (uint16_t)activity_status));
-					s->frame_invuln_status.push_back(invuln);
-					break;
-				}
-				s->frame_activity_status.push_back(activity_status);
-				//sets the invuln
+
+			prev_frames = (unsigned int)s->frame_activity_status.size();
+			g_scrStats.spriteCmds++;
+
+			// A sprite that is held indefinitely (32767 / -1), or one long enough that its length is
+			// clearly not a real animation, contributes a single frame flagged non-deterministic.
+			if (frames == 0xffffffff || frames == 32767 || frames > SPRITE_FRAME_CAP) {
+				g_scrStats.heldSprites++;
+				s->frame_activity_status.push_back((FrameActivity)(0x10 | (uint16_t)activity_status));
 				s->frame_invuln_status.push_back(invuln);
-				if (i > 100) {/*I still don't know why some sprites have absurdly long durations(well, actually is -1), such as jin's and izayoi's 6B, don't think its a parsing issue tbh*/
-					break;
+			}
+			else {
+				for (uint32_t i = 0; i < frames; i++) {
+					s->frame_activity_status.push_back(activity_status);
+					//sets the invuln
+					s->frame_invuln_status.push_back(invuln);
 				}
 			}
+
+			// s->frames must stay equal to the number of entries actually pushed - the retroactive
+			// loops below (22007/22019/2002/23027) use it as a vector index. When it ran ahead of the
+			// vectors it took the parser with it: Litchi's RodEventDown holds `vrrod_000` for 32767
+			// frames and is followed immediately by 23027, so s->frames reached 0xFFFFFFFF and that
+			// loop spun 4.29 billion times on the render thread the first time frame history opened.
+			s->frames = (unsigned int)s->frame_activity_status.size();
 		}
 		else if (CMD == 4000) {
 			//EA state call(string[32],char); name of EA state and position
@@ -202,20 +311,13 @@ int parse_state(char* addr,
 		else if (CMD == 22007) {
 			//setInvincible call(char); 0 if not set invincible, 1 if set. If CMD 22019 doesnt appear later assume full invincibility
 			uint32_t argument = *(uint32_t*)(addr + offset);
-			if (argument == 1) {//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
-				invuln = FrameInvuln::All;
-				for (int i = prev_frames; i < s->frames; i++) {
-					s->frame_invuln_status.at(i) = invuln;
-				}
+			invuln = (argument == 1) ? FrameInvuln::All : FrameInvuln::None;
+			RecordRetroSpan(prev_frames, s->frame_invuln_status.size());
+			//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
+			for (size_t i = prev_frames; i < s->frame_invuln_status.size(); i++) {
+				s->frame_invuln_status[i] = invuln;
 			}
-			else {
-				//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
-				invuln = FrameInvuln::None;
-				for (int i = prev_frames; i < s->frames; i++) {
-					s->frame_invuln_status.at(i) = invuln;
-				}
-			}
-			
+
 			offset += 4;
 		}
 		else if (CMD == 22019) {
@@ -231,8 +333,9 @@ int parse_state(char* addr,
 			uint16_t thro = *(uint32_t*)(addr + offset) * (uint16_t)FrameInvuln::Throw; //thro is throw, throw is a reserved word
 			offset += 4;
 			invuln = (FrameInvuln)(head | body | leg  | thro);// note the missing projectile assumed "approach" since its not implemented yet
-			for (int i = prev_frames; i < s->frames; i++) {//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
-				s->frame_invuln_status.at(i) = invuln;
+			RecordRetroSpan(prev_frames, s->frame_invuln_status.size());
+			for (size_t i = prev_frames; i < s->frame_invuln_status.size(); i++) {//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
+				s->frame_invuln_status[i] = invuln;
 			}
 
 		}
@@ -240,13 +343,11 @@ int parse_state(char* addr,
 			//refreshMultihit(more like disableHitbox)  call() 2002
 			//DisableAttackRestOfMove() call() 23027
 			//this will disable the hitbox of the last sprite, its listed by dantation as startMultihit but its more akin to disablehitbox.
-			for (int i = prev_frames; i < s->frames; i++) {//when hitbox is disabled I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
-				if (i < s->frame_activity_status.size()) {//need to check due to edge cases where sprites last absurdly long(or are -1)
-				s->frame_activity_status.at(i) = FrameActivity::Inactive;
-			}
-				//else {
-				//	auto tst = 1;
-				//}
+			RecordRetroSpan(prev_frames, s->frame_activity_status.size());
+			for (size_t i = prev_frames; i < s->frame_activity_status.size(); i++) {//when hitbox is disabled I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
+				//keep the non-deterministic bit, only clear the activity itself
+				const uint16_t nonDeterministic = (uint16_t)s->frame_activity_status[i] & 0x10;
+				s->frame_activity_status[i] = (FrameActivity)(nonDeterministic | (uint16_t)FrameActivity::Inactive);
 			}
 		}
 		//still need to get the guard point CMD
@@ -447,11 +548,17 @@ int parse_state(char* addr,
 			offset += 4 * 16;
 		}
 		else {
-			///if (CMD != 7) { 
-
-			std::cout << s->name << ":  offset: " << offset << " |  b10:  " << CMD << "| hex:" << std::hex << CMD << std::endl;
+			// Unrecognised command. Its argument size is unknown, so the walk cannot continue past
+			// it and everything after this point in the state is lost. This used to go to std::cout,
+			// which nothing in a windowed game ever reads; it is counted and reported by parse_scr
+			// instead.
+			g_scrStats.statesAborted++;
+			if (g_scrStats.firstUnknownState.empty())
+			{
+				g_scrStats.firstUnknownCmd = CMD;
+				g_scrStats.firstUnknownState = s->name;
+			}
 			break;
-			//}; 
 		};
 
 		memcpy(&CMD, addr + offset, sizeof(CMD));
@@ -459,6 +566,14 @@ int parse_state(char* addr,
 		offset += 4;
 
 	}
+
+	g_scrStats.statesParsed++;
+	g_scrStats.frameEntries += (unsigned int)s->frame_activity_status.size();
+	if (s->frame_activity_status.size() > g_scrStats.longestState)
+	{
+		g_scrStats.longestState = (unsigned int)s->frame_activity_status.size();
+	}
+
 	states_parsed.push_back(s);
 	return 0;
 }

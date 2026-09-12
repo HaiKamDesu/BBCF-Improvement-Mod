@@ -1,4 +1,4 @@
-#include "WindowManager.h"
+﻿#include "WindowManager.h"
 
 #include "Branding.h"
 #include "Palette/PaletteThumbnails.h"
@@ -17,6 +17,7 @@
 #include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
 
+#include "Game/EntityDiagnostics.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
 #include "Network/LobbyAvatarManager.h"
@@ -745,6 +746,10 @@ void WindowManager::Render()
 	// render-phase UI buffer, so the Jukebox has to sample it from here.
 	GetMusicManager().PollDialogRenderPhase();
 	GetBgmReplacements().Update();
+
+	// Sampled here rather than from the hitbox overlay so the entity catalogue is produced whether
+	// or not that window happens to be open.
+	EntityDiagnostics::Update();
 
 	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
 	{

@@ -47,19 +47,29 @@ void HitboxOverlay::Draw()
 	for (int i = 0; i < g_gameVals.entityCount; i++)
 	{
 		CharData* pEntity = (CharData*)g_gameVals.pEntityList[i];
+
+		// The status read below happened before this check, so an empty slot was dereferenced
+		// every frame on the chance the list is ever sparse.
+		if (!pEntity)
+		{
+			continue;
+		}
+
 		const bool isCharacter = i < 2;
 		const bool isEntityActive = pEntity->unknownStatus1 == 1 && pEntity->pJonbEntryBegin;
 
-		if (isCharacter || isEntityActive)
+		if (!isCharacter && !isEntityActive)
 		{
-			if (!IsOwnerEnabled(pEntity->ownerEntity))
-			{
-				continue;
-			}
-
-			const ImVec2 entityWorldPos = CalculateObjWorldPosition(pEntity);
-			DrawCollisionAreas(pEntity, entityWorldPos);
+			continue;
 		}
+
+		if (!IsOwnerEnabled(pEntity->ownerEntity))
+		{
+			continue;
+		}
+
+		const ImVec2 entityWorldPos = CalculateObjWorldPosition(pEntity);
+		DrawCollisionAreas(pEntity, entityWorldPos);
 	}
 }
 
@@ -71,12 +81,34 @@ ImGui::PopStyleVar(2);
 
 bool HitboxOverlay::IsOwnerEnabled(CharData* ownerCharInfo)
 {
-	for (int i = 0; i < 2; i++)
+	// ownerEntity turns out to hold the ROOT player, not the immediate parent: measured over a
+	// Kokonoe/Ragna and a Kokonoe/Litchi session, all 194 distinct entity situations reported by
+	// EntityDiagnostics sat at depth 0, Litchi's staff and her Lcef effect entities included. So
+	// the climb below is currently a no-op and one extra pointer compare.
+	//
+	// It is kept because it is free and because the one-level test was only ever correct by
+	// accident - nothing guarantees that flattening for every character, and Carl, Relius, Arakune
+	// and Nu have not been sampled. The self-owner break is not hypothetical: a player's own
+	// ownerEntity points at itself, which the log confirms.
+	const int maxOwnerDepth = 16;
+
+	for (int depth = 0; ownerCharInfo && depth < maxOwnerDepth; depth++)
 	{
-		if (ownerCharInfo == (CharData*)g_gameVals.pEntityList[i])
+		for (int i = 0; i < 2; i++)
 		{
-			return drawCharacterHitbox[i];
+			if (ownerCharInfo == (CharData*)g_gameVals.pEntityList[i])
+			{
+				return drawCharacterHitbox[i];
+			}
 		}
+
+		CharData* nextOwner = ownerCharInfo->ownerEntity;
+		if (nextOwner == ownerCharInfo)
+		{
+			break;
+		}
+
+		ownerCharInfo = nextOwner;
 	}
 
 	return false;
@@ -298,6 +330,14 @@ void HitboxOverlay::DrawRangeCheckBoxes(ImVec2 worldPos, float rotationRad, cons
 }
 void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 playerWorldPos)
 {
+	// Rotation describes the entity, not a single box, so it is the same for every entry below.
+	float entityRotationDeg = charObj->rotationDegrees / 1000.0f;
+	if (!charObj->facingLeft && entityRotationDeg)
+	{
+		entityRotationDeg = 360.0f - entityRotationDeg;
+	}
+	const float entityRotationRad = D3DXToRadian(entityRotationDeg);
+
 	std::vector<JonbEntry> entries = JonbReader::getJonbEntries(charObj);
 
 	for (const JonbEntry& entry : entries)
@@ -323,16 +363,10 @@ void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 pla
 		float width =    floor(entry.width * m_scale * scaleX);
 		float height =  -floor(entry.height * m_scale * scaleY);
 
-		float rotationDeg = charObj->rotationDegrees / 1000.0f;
-
 		if (!charObj->facingLeft)
 		{
 			offsetX = -offsetX;
 			width = -width;
-			if (rotationDeg)
-			{
-				rotationDeg = 360.0f - rotationDeg;
-			}
 		}
 
 		ImVec2 pointA(playerWorldPos.x + offsetX, playerWorldPos.y + offsetY);
@@ -340,12 +374,10 @@ void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 pla
 		ImVec2 pointC(playerWorldPos.x + offsetX + width, playerWorldPos.y + offsetY + height);
 		ImVec2 pointD(playerWorldPos.x + offsetX, playerWorldPos.y + offsetY + height);
 
-		float rotationRad = D3DXToRadian(rotationDeg);
-
-		pointA = RotatePoint(playerWorldPos, rotationRad, pointA);
-		pointB = RotatePoint(playerWorldPos, rotationRad, pointB);
-		pointC = RotatePoint(playerWorldPos, rotationRad, pointC);
-		pointD = RotatePoint(playerWorldPos, rotationRad, pointD);
+		pointA = RotatePoint(playerWorldPos, entityRotationRad, pointA);
+		pointB = RotatePoint(playerWorldPos, entityRotationRad, pointB);
+		pointC = RotatePoint(playerWorldPos, entityRotationRad, pointC);
+		pointD = RotatePoint(playerWorldPos, entityRotationRad, pointD);
 		
 		pointA = CalculateScreenPosition(pointA);
 		pointB = CalculateScreenPosition(pointB);
@@ -372,20 +404,22 @@ void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 pla
 			RenderRectFilled(pointA, pointB, pointC, pointD, rectFillColor);
 		}
 		
-		if (this->drawCollisionBoxes) {
-			DrawCollisionBoxes(playerWorldPos, rotationRad, charObj);
-		}
-		
-		if (this->drawRangeCheckBoxes) {
-			DrawRangeCheckBoxes(playerWorldPos, rotationRad, charObj);
+	}
 
-		}
-		if (this->drawOriginLine)
-		{
-			DrawOriginLine(playerWorldPos, rotationRad);
+	// Collision box, throw range and origin describe the entity itself, not one of its boxes. They
+	// used to be drawn inside the loop above, which redrew them once per box and skipped them
+	// entirely for an entity that currently has none - an idle Litchi staff being exactly that case.
+	if (this->drawCollisionBoxes) {
+		DrawCollisionBoxes(playerWorldPos, entityRotationRad, charObj);
+	}
 
-		}
-	
+	if (this->drawRangeCheckBoxes) {
+		DrawRangeCheckBoxes(playerWorldPos, entityRotationRad, charObj);
+	}
+
+	if (this->drawOriginLine)
+	{
+		DrawOriginLine(playerWorldPos, entityRotationRad);
 	}
 }
 

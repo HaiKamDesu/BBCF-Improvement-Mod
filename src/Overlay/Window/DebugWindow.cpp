@@ -634,6 +634,83 @@ void DebugWindow::DrawGameValuesSection()
 
 		ImGui::TreePop();
 	}
+
+	DrawEntityTreeSection();
+}
+
+// Lists every live entity with the depth of its owner chain up to a player. The hitbox overlay only
+// draws an entity it can trace back to P1 or P2, so "depth" is the column that says whether an
+// entity is reachable at all - anything showing "-" is invisible to the overlay no matter what the
+// per-box settings are. Meant for working out which characters spawn entities from other entities
+// (Litchi's staff, Carl's Nirvana, Relius' Ignis, Arakune's clouds).
+void DebugWindow::DrawEntityTreeSection()
+{
+	if (!ImGui::TreeNode("Entity tree"))
+		return;
+
+	if (!g_gameVals.pEntityList)
+	{
+		ImGui::TextUnformatted("No entity list (not in a match).");
+		ImGui::TreePop();
+		return;
+	}
+
+	static bool hideEmptySlots = true;
+	ImGui::Checkbox("Hide inactive slots", &hideEmptySlots);
+
+	ImGui::Text("slot  entity     owner      depth  status  hurt/hit  action");
+
+	int shown = 0;
+	for (int i = 0; i < g_gameVals.entityCount; i++)
+	{
+		CharData* pEntity = (CharData*)g_gameVals.pEntityList[i];
+		if (!pEntity)
+			continue;
+
+		const bool isCharacter = i < 2;
+		const bool isActive = pEntity->unknownStatus1 == 1 && pEntity->pJonbEntryBegin;
+		if (hideEmptySlots && !isCharacter && !isActive)
+			continue;
+
+		// Same climb the overlay does, reported as a number instead of a yes/no.
+		int depth = -1;
+		CharData* owner = pEntity->ownerEntity;
+		for (int d = 0; owner && d < 16; d++)
+		{
+			if (owner == (CharData*)g_gameVals.pEntityList[0] || owner == (CharData*)g_gameVals.pEntityList[1])
+			{
+				depth = d;
+				break;
+			}
+
+			if (owner->ownerEntity == owner)
+				break;
+
+			owner = owner->ownerEntity;
+		}
+
+		char depthText[8];
+		if (depth < 0)
+			strcpy_s(depthText, "-");
+		else
+			sprintf_s(depthText, "%d", depth);
+
+		ImGui::Text("%4d  0x%08X 0x%08X %5s  %6d  %3u/%-3u  %.20s",
+			i,
+			(unsigned int)pEntity,
+			(unsigned int)pEntity->ownerEntity,
+			depthText,
+			pEntity->unknownStatus1,
+			pEntity->hurtboxCount,
+			pEntity->hitboxCount,
+			pEntity->currentAction);
+
+		shown++;
+	}
+
+	ImGui::Text("%d entities shown of %d slots", shown, g_gameVals.entityCount);
+
+	ImGui::TreePop();
 }
 
 // Fault-injection panel for the spectator desync theory. Only meaningful
