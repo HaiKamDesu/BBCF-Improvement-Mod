@@ -40,7 +40,13 @@ private:
 	void DrawOriginLine(ImVec2 worldPos, float rotationRad);
 	void DrawRangeCheckBoxes(ImVec2 worldPos, float rotationRad, const CharData* charObj);
 	void DrawCollisionBoxes(ImVec2 worldPos, float rotationRad, const CharData* charObj);
-	void DrawCollisionAreas(const CharData* charObj, const ImVec2 playerWorldPos);
+	void DrawCollisionAreas(const CharData* charObj, const ImVec2 playerWorldPos,
+		bool drawHitboxes, bool drawHurtboxes, bool drawEntityOverlays);
+
+	// Reimplements the engine's own active-hitbox test (BBCF.exe+0x18C3E0).
+	static bool CanEntityHit(const CharData* entity);
+	// The second entity an attack's hitbox geometry can live on - Litchi's staff for her 5C.
+	static CharData* GetLinkedBoxProvider(const CharData* entity);
 
 	bool IsOwnerEnabled(CharData* ownerCharInfo);
 	bool WorldToScreen(LPDIRECT3DDEVICE9 pDevice, D3DXMATRIX* view, D3DXMATRIX* proj, D3DXVECTOR3* pos, D3DXVECTOR3* out);

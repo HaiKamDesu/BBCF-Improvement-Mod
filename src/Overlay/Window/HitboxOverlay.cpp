@@ -42,6 +42,95 @@ void HitboxOverlay::BeforeDraw()
 	ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y));
 }
 
+
+// Fields the engine's own "can this entity hit right now" routine reads, but that the mod's
+// CharData does not name (they sit inside its pad regions). Rather than restructure that struct and
+// risk shifting every offset after them, they are read here by byte offset.
+//
+// The routine is at BBCF.exe+0x18C3E0, and the hit-detection sweep at +0x1594DD calls it to decide
+// which entities are worth testing for collisions - so it is ground truth for "are these boxes
+// live". It was found by tracing every access to the state-property bitfield at +0x25C; this is the
+// only place the engine reads the 0x200/0x400 suppression bits the overlay used to key on.
+namespace
+{
+	const unsigned int kOffsetExemptFlag      = 0x4BC;
+	const unsigned int kOffsetExemptMask      = 0x150;
+	const unsigned int kOffsetHitsUsed        = 0x480;
+	const unsigned int kOffsetHitsAllowed     = 0x484;
+	const unsigned int kOffsetAttackEnabled   = 0x254;
+	const unsigned int kOffsetLinkedProvider  = 0x224;
+
+	template <typename T>
+	T ReadField(const CharData* entity, unsigned int offset)
+	{
+		return *(const T*)((const char*)entity + offset);
+	}
+}
+
+// Reimplements BBCF.exe+0x18C3E0. The Astral branch it ends with is deliberately not reproduced:
+// it needs a game call, and only applies to Astral Heats, where over-drawing a box is harmless.
+bool HitboxOverlay::CanEntityHit(const CharData* entity)
+{
+	if (ReadField<unsigned char>(entity, kOffsetExemptFlag) != 0
+		&& (ReadField<unsigned int>(entity, kOffsetExemptMask) & 0x4000000) != 0)
+	{
+		return false;
+	}
+
+	// Hits used against the cap for this attack. Equal means the attack is spent.
+	if (ReadField<int>(entity, kOffsetHitsUsed) >= ReadField<int>(entity, kOffsetHitsAllowed))
+	{
+		return false;
+	}
+
+	// A positively set "attack enabled" bit, cleared by the same script handler that sets the
+	// 0x200 suppression bit. The overlay never looked at it, which is why Litchi's staff - which
+	// never has it set - could not be told apart from an entity that was genuinely attacking.
+	if ((ReadField<unsigned int>(entity, kOffsetAttackEnabled) & 0x100) == 0)
+	{
+		return false;
+	}
+
+	const unsigned int stateFlags = entity->bitflags_for_curr_state_properties_or_smth;
+
+	// 0x200 attack-off, 0x400 multihit gap, 0x4000000. The overlay used to test
+	// (flags & 0xF00) == 0x200 || == 0x400, which is a different shape to the engine's test.
+	if ((stateFlags & 0x4000600) != 0 || (stateFlags & 0x80) != 0)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+// Some attacks keep their hitbox geometry on a second entity. The engine's box enumerator at
+// +0x18BBD0 sums an entity's own boxes with those of the object this handle resolves to, which is
+// how Litchi's 5C works: the attack belongs to Litchi, the rectangles live on her staff, and
+// neither entity carries both. Evaluated in isolation the staff fails the gate above and Litchi has
+// no boxes of her own, so 5C drew nothing at all.
+//
+// The engine resolves this through a handle-deref helper. Reading it directly could in principle
+// hand back a stale pointer, so the result is only trusted when it is an entity the game currently
+// has in its list.
+CharData* HitboxOverlay::GetLinkedBoxProvider(const CharData* entity)
+{
+	CharData* linked = ReadField<CharData*>(entity, kOffsetLinkedProvider);
+	if (!linked || linked == entity)
+	{
+		return nullptr;
+	}
+
+	for (int i = 0; i < g_gameVals.entityCount; i++)
+	{
+		if (linked == (CharData*)g_gameVals.pEntityList[i])
+		{
+			return linked;
+		}
+	}
+
+	return nullptr;
+}
+
 void HitboxOverlay::Draw()
 {
 	for (int i = 0; i < g_gameVals.entityCount; i++)
@@ -68,8 +157,26 @@ void HitboxOverlay::Draw()
 			continue;
 		}
 
+		// Hitboxes are drawn only for an entity the engine says can currently hit. Hurtboxes and
+		// the per-entity overlays are unconditional, as before.
+		const bool canHit = CanEntityHit(pEntity);
+
 		const ImVec2 entityWorldPos = CalculateObjWorldPosition(pEntity);
-		DrawCollisionAreas(pEntity, entityWorldPos);
+		DrawCollisionAreas(pEntity, entityWorldPos, canHit, true, true);
+
+		if (!canHit)
+		{
+			continue;
+		}
+
+		// Draw the attack's boxes wherever they actually live. They are rendered with the
+		// provider's own transform - they are its geometry - but they belong to this attack, so
+		// they appear under this entity's owner's toggle and disappear when its attack ends.
+		CharData* linked = GetLinkedBoxProvider(pEntity);
+		if (linked && !CanEntityHit(linked))
+		{
+			DrawCollisionAreas(linked, CalculateObjWorldPosition(linked), true, false, false);
+		}
 	}
 }
 
@@ -328,7 +435,8 @@ void HitboxOverlay::DrawRangeCheckBoxes(ImVec2 worldPos, float rotationRad, cons
 		int a = 0;
 	}
 }
-void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 playerWorldPos)
+void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 playerWorldPos,
+	bool drawHitboxes, bool drawHurtboxes, bool drawEntityOverlays)
 {
 	// Rotation describes the entity, not a single box, so it is the same for every entry below.
 	float entityRotationDeg = charObj->rotationDegrees / 1000.0f;
@@ -342,17 +450,16 @@ void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 pla
 
 	for (const JonbEntry& entry : entries)
 	{
-		//this will skip the drawing of an inactive hitbox due to multihit/NoAttackDuringSprite(ID 2002) and AttackOff(ID 23027) bbscript commands.
+		// Whether a hitbox is live is decided once per entity by CanEntityHit, which reimplements
+		// the engine's own test. This used to be guessed here from the state-property bitfield
+		// alone, which cannot tell an idle Litchi staff from a swinging one - both read 0x200.
+		if (entry.type == JonbChunkType_Hitbox && !drawHitboxes)
+		{
+			continue;
+		}
 
-		if (entry.type == JonbChunkType_Hitbox
-			&&
-			(
-				(charObj->bitflags_for_curr_state_properties_or_smth & 0xF00) == 0x400
-				||
-				(charObj->bitflags_for_curr_state_properties_or_smth & 0xF00) == 0x200
-			)
-		)
-{
+		if (entry.type == JonbChunkType_Hurtbox && !drawHurtboxes)
+		{
 			continue;
 		}
 
@@ -409,6 +516,13 @@ void HitboxOverlay::DrawCollisionAreas(const CharData* charObj, const ImVec2 pla
 	// Collision box, throw range and origin describe the entity itself, not one of its boxes. They
 	// used to be drawn inside the loop above, which redrew them once per box and skipped them
 	// entirely for an entity that currently has none - an idle Litchi staff being exactly that case.
+	// Skipped when this entity is only lending its geometry to somebody else's attack; it gets them
+	// drawn on its own pass through the entity list.
+	if (!drawEntityOverlays)
+	{
+		return;
+	}
+
 	if (this->drawCollisionBoxes) {
 		DrawCollisionBoxes(playerWorldPos, entityRotationRad, charObj);
 	}

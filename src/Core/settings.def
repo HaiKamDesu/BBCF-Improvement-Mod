@@ -34,6 +34,11 @@ SETTING(int, menusize, "MenuSize", "2");
 SETTING(bool, notifications, "Notifications", "1");
 SETTING(bool, checkupdates, "CheckUpdates", "1");
 SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
+// Diagnostic only. Calls the game's own "does this entity have active hitboxes" routine
+// (BBCF.exe+0x18C3E0) once per entity per frame and writes its answer, and the six fields it
+// reads, to DEBUG.txt. Used to work out why some hitboxes never draw. Off by default: it calls
+// into game code from the render thread, which is not something to leave running.
+SETTING(bool, entityHitboxProbeEnabled, "EntityHitboxProbeEnabled", "0");
 // How much memory a crash dump captures. Full memory was the old behaviour and made every
 // dump ~500 MB, which is why CrashReports folders reached 14 GB and reporter bundles had to
 // be split across several archives to be sent at all. Medium keeps everything the crash
