@@ -8,6 +8,7 @@
 #include "Window/LogWindow.h"
 #include "Window/MainWindow.h"
 #include "Window/MainMenu/MainMenuNav.h"
+#include "Window/ReplayExtrasWindow.h"
 #include "Window/PaletteEditorWindow.h"
 #include "Window/PalettesConfigWindow.h"
 #include "Window/NetworkSquareColorWindow.h"
@@ -479,6 +480,7 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	PalettesConfigWindow::RegisterLayoutSettings();
 	PaletteEditorWindow::RegisterLayoutSettings();
 	MainMenu::RegisterLayoutSettings();
+	ReplayExtras::RegisterLayoutSettings();
 
 	m_initialized = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
 	if (!m_initialized)

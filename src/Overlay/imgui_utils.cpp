@@ -152,6 +152,17 @@ void ImGui::HoverTooltip(const char* text)
 	}
 }
 
+void ImGui::HoverTooltipEvenDisabled(const char* text)
+{
+	if (IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay |
+		ImGuiHoveredFlags_AllowWhenDisabled))
+	{
+		BeginTooltip();
+		TextUnformatted(text);
+		EndTooltip();
+	}
+}
+
 bool ImGui::ButtonUrl(const std::string& label, const wchar_t* url, const ImVec2& btnSize)
 {
 	if (Button(label.c_str(), btnSize))

@@ -10,7 +10,7 @@
 #include "Network/RankedListConnectionFilter.h"
 #include "Overlay/Window/PaletteEditorWindow.h"
 #include "Overlay/Window/Ranked/RankedListFilterWindow.h"
-#include "Overlay/Window/ReplayRewindWindow.h"
+#include "Overlay/Window/ReplayExtrasWindow.h"
 #include "Overlay/WindowContainer/WindowType.h"
 #include "Overlay/WindowManager.h"
 
@@ -266,7 +266,7 @@ void MatchState::OnIntroPlaying()
 {
 	LOG(7, "MatchState::OnIntroPlaying\n");
 
-	if (*g_gameVals.pGameMode == GameMode_ReplayTheater) {
-		WindowManager::GetInstance().GetWindowContainer()->GetWindow<ReplayRewindWindow>(WindowType_ReplayRewind)->Open();
-	}
+	// Nothing to do here any more: ReplayExtrasWindow::Update decides for itself whether it
+	// applies, from the game mode and the user's own show/hide choice. Opening it from here
+	// used to override a user who had closed it.
 }

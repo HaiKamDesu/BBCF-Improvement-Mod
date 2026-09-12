@@ -129,7 +129,34 @@ int TasWindow::ParsedFrameCount(const char* text) {
 }
 
 
+bool TasWindow::OpenPlaybackSlot(int cfSlot) {
+    if (!m_playbackEditor.OpenCfSlot(cfSlot)) {
+        return false;
+    }
+    m_mode = Mode::Playback;
+    m_focusRequested = true;
+    Open();
+    return true;
+}
+
+void TasWindow::LeavePlaybackMode() {
+    m_playbackEditor.Close();
+    m_mode = Mode::Tas;
+}
+
 void TasWindow::Update() {
+    if (m_mode == Mode::Playback) {
+        // Nothing here is tied to a match: no TAS mode to keep alive, no playback to watch,
+        // no hotkeys that would move a movie that is not loaded. Closing the window leaves
+        // playback mode, so the next open is the ordinary TAS editor again.
+        if (!IsOpen()) {
+            LeavePlaybackMode();
+            return;
+        }
+        IWindow::Update();
+        return;
+    }
+
     TasManager& manager = TasManager::Instance();
     if (!manager.IsActive()) {
         if (IsOpen()) {
@@ -184,13 +211,38 @@ void TasWindow::Update() {
 }
 
 void TasWindow::BeforeDraw() {
+    // The title is the identity after ###, so the part before it can say which of the two
+    // things the window currently is without ImGui treating it as a different window.
+    m_windowTitle = (m_mode == Mode::Playback
+        ? L("Playback editor")
+        : L("TAS combo editor")) + "###Tas";
+
+    // Opened from a modal (the library's entry editor) or from a button on another window,
+    // the editor would otherwise appear behind whatever opened it.
+    if (m_focusRequested) {
+        ImGui::SetNextWindowFocus();
+        m_focusRequested = false;
+    }
+
     // Wide enough for a useful run of timeline cells without the window resizing itself
     // every time the movie grows.
     ImGui::SetNextWindowSize(ImVec2(620.0f, 0.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+
+    if (m_mode == Mode::Playback) {
+        // Playback mode is a list, and a list in a window that auto-fits its content has no
+        // height to fill. A floor keeps it a usable size whatever the TAS editor left behind.
+        ImGui::SetNextWindowSizeConstraints(ImVec2(360.0f, 420.0f), ImVec2(FLT_MAX, FLT_MAX));
+    } else {
+        ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+    }
 }
 
 void TasWindow::Draw() {
+    if (m_mode == Mode::Playback) {
+        DrawPlaybackMode();
+        return;
+    }
+
     TasManager& manager = TasManager::Instance();
 
     // The picker outlives the click that opened it, and the popup it was opened from may
@@ -849,4 +901,25 @@ void TasWindow::DrawHelpPopup() const {
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
+}
+
+// --- playback mode -------------------------------------------------------------------
+//
+// A recording slot edited with the same list as a TAS movie. There is no match involved, so
+// there is no transport, no base state and no second player; everything else is the shared
+// editor view, which the playback library hosts too.
+
+void TasWindow::DrawPlaybackMode() {
+    switch (m_playbackEditor.Draw()) {
+    case TasPlaybackEditorView::Outcome::Closed:
+        LeavePlaybackMode();
+        Close();
+        break;
+    case TasPlaybackEditorView::Outcome::Saved:
+        // A slot write lands immediately; there is nothing above this to hand it to, so the
+        // editor simply stays open on what was just saved.
+        break;
+    default:
+        break;
+    }
 }

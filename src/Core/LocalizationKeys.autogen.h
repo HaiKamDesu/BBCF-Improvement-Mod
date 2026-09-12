@@ -3605,6 +3605,426 @@ struct LocalizationKeysAccessor
 
         // Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.
         inline const char* Add_markers_at_important_points_in_a_long_combo_Clicking_one_jumps_straight_to_that_frame_without_changing_the_movie() const { return Get("Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie."); }
+
+        // (library entry)
+        inline const char* library_entry() const { return Get("(library entry)"); }
+
+        // (training mode only)
+        inline const char* training_mode_only() const { return Get("(training mode only)"); }
+
+        // A small window that appears over a replay with these same rewind, takeover and capture controls, so you do not have to open this menu while watching.
+        inline const char* A_small_window_that_appears_over_a_replay_with_these_same_rewind_takeover_and_capture_controls_so_you_do_not_have_to_open_this_menu_while_watching() const { return Get("A small window that appears over a replay with these same rewind, takeover and capture controls, so you do not have to open this menu while watching."); }
+
+        // Capture playback
+        inline const char* Capture_playback() const { return Get("Capture playback"); }
+
+        // Capture playback from replay
+        inline const char* Capture_playback_from_replay() const { return Get("Capture playback from replay"); }
+
+        // Capture whose inputs?
+        inline const char* Capture_whose_inputs() const { return Get("Capture whose inputs?"); }
+
+        // Choose a playback file to import
+        inline const char* Choose_a_playback_file_to_import() const { return Get("Choose a playback file to import"); }
+
+        // Choose a slot to edit.
+        inline const char* Choose_a_slot_to_edit() const { return Get("Choose a slot to edit."); }
+
+        // Choose a slot to write out.
+        inline const char* Choose_a_slot_to_write_out() const { return Get("Choose a slot to write out."); }
+
+        // Choose a slot.
+        inline const char* Choose_a_slot() const { return Get("Choose a slot."); }
+
+        // Close Replay Extras?
+        inline const char* Close_Replay_Extras() const { return Get("Close Replay Extras?"); }
+
+        // Close it
+        inline const char* Close_it() const { return Get("Close it"); }
+
+        // Close the Replay Extras window? Rewind, takeover and capture all live in here.
+        inline const char* Close_the_Replay_Extras_window_Rewind_takeover_and_capture_all_live_in_here() const { return Get("Close the Replay Extras window? Rewind, takeover and capture all live in here."); }
+
+        // Could not open the save dialog. The capture was kept.
+        inline const char* Could_not_open_the_save_dialog_The_capture_was_kept() const { return Get("Could not open the save dialog. The capture was kept."); }
+
+        // Could not read that library entry.
+        inline const char* Could_not_read_that_library_entry() const { return Get("Could not read that library entry."); }
+
+        // Could not read that recording slot.
+        inline const char* Could_not_read_that_recording_slot() const { return Get("Could not read that recording slot."); }
+
+        // Discard and close
+        inline const char* Discard_and_close() const { return Get("Discard and close"); }
+
+        // Drops the idle frames off the end of the recording. Undoable like any other edit.
+        inline const char* Drops_the_idle_frames_off_the_end_of_the_recording_Undoable_like_any_other_edit() const { return Get("Drops the idle frames off the end of the recording. Undoable like any other edit."); }
+
+        // Edit which slot?
+        inline const char* Edit_which_slot() const { return Get("Edit which slot?"); }
+
+        // Editing slot %d.
+        inline const char* Editing_slot_d() const { return Get("Editing slot %d."); }
+
+        // Export Playback
+        inline const char* Export_Playback() const { return Get("Export Playback"); }
+
+        // Export which slot?
+        inline const char* Export_which_slot() const { return Get("Export which slot?"); }
+
+        // Exported slot %d, %u frames.
+        inline const char* Exported_slot_d_u_frames() const { return Get("Exported slot %d, %u frames."); }
+
+        // Import Playback
+        inline const char* Import_Playback() const { return Get("Import Playback"); }
+
+        // Import into which slot?
+        inline const char* Import_into_which_slot() const { return Get("Import into which slot?"); }
+
+        // Imported '%s' into slot %d, %u frames.
+        inline const char* Imported_s_into_slot_d_u_frames() const { return Get("Imported '%s' into slot %d, %u frames."); }
+
+        // Input
+        inline const char* Input() const { return Get("Input"); }
+
+        // Keep it open
+        inline const char* Keep_it_open() const { return Get("Keep it open"); }
+
+        // Keeps the list scrolled to the current frame. Turn it off to read through the list while it plays.
+        inline const char* Keeps_the_list_scrolled_to_the_current_frame_Turn_it_off_to_read_through_the_list_while_it_plays() const { return Get("Keeps the list scrolled to the current frame. Turn it off to read through the list while it plays."); }
+
+        // Left
+        inline const char* Left() const { return Get("Left"); }
+
+        // Load a playback file into one of the game's four recording slots, so you can play it back from the training menu like anything you recorded yourself.
+        inline const char* Load_a_playback_file_into_one_of_the_game_s_four_recording_slots_so_you_can_play_it_back_from_the_training_menu_like_anything_you_recorded_yourself() const { return Get("Load a playback file into one of the game's four recording slots, so you can play it back from the training menu like anything you recorded yourself."); }
+
+        // Loading '%s'.
+        inline const char* Loading_s() const { return Get("Loading '%s'."); }
+
+        // Mirror the recorded inputs (diagnostic)
+        inline const char* Mirror_the_recorded_inputs_diagnostic() const { return Get("Mirror the recorded inputs (diagnostic)"); }
+
+        // No frames yet.
+        inline const char* No_frames_yet() const { return Get("No frames yet."); }
+
+        // Nothing is open for editing.
+        inline const char* Nothing_is_open_for_editing() const { return Get("Nothing is open for editing."); }
+
+        // Nothing was captured.
+        inline const char* Nothing_was_captured() const { return Get("Nothing was captured."); }
+
+        // Open a replay and press "Takeover from here".
+        inline const char* Open_a_replay_and_press_Takeover_from_here() const { return Get("Open a replay and press \"Takeover from here\"."); }
+
+        // Open one of the four recording slots in the frame editor, where you can retype, insert, delete and reorder single frames. Saving there writes straight back into the slot.
+        inline const char* Open_one_of_the_four_recording_slots_in_the_frame_editor_where_you_can_retype_insert_delete_and_reorder_single_frames_Saving_there_writes_straight_back_into_the_slot() const { return Get("Open one of the four recording slots in the frame editor, where you can retype, insert, delete and reorder single frames. Saving there writes straight back into the slot."); }
+
+        // Overwrite
+        inline const char* Overwrite() const { return Get("Overwrite"); }
+
+        // Play as
+        inline const char* Play_as() const { return Get("Play as"); }
+
+        // Playback editor
+        inline const char* Playback_editor() const { return Get("Playback editor"); }
+
+        // Playback file
+        inline const char* Playback_file() const { return Get("Playback file"); }
+
+        // Puts everything back to the moment you took over and starts the recorded side again. Hotkey: %s. This also happens by itself whenever a round ends, so a KO never kicks you out to character select.
+        inline const char* Puts_everything_back_to_the_moment_you_took_over_and_starts_the_recorded_side_again_Hotkey_s_This_also_happens_by_itself_whenever_a_round_ends_so_a_KO_never_kicks_you_out_to_character_select() const { return Get("Puts everything back to the moment you took over and starts the recorded side again. Hotkey: %s. This also happens by itself whenever a round ends, so a KO never kicks you out to character select."); }
+
+        // Re-read from the game.
+        inline const char* Re_read_from_the_game() const { return Get("Re-read from the game."); }
+
+        // Recorded facing: %s
+        inline const char* Recorded_facing_s() const { return Get("Recorded facing: %s"); }
+
+        // Recording %s inputs from frame %d...
+        inline const char* Recording_s_inputs_from_frame_d() const { return Get("Recording %s inputs from frame %d..."); }
+
+        // Recording slot
+        inline const char* Recording_slot() const { return Get("Recording slot"); }
+
+        // Recording slot %d
+        inline const char* Recording_slot_d() const { return Get("Recording slot %d"); }
+
+        // Recording starts now and runs until you stop it.
+        inline const char* Recording_starts_now_and_runs_until_you_stop_it() const { return Get("Recording starts now and runs until you stop it."); }
+
+        // Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.
+        inline const char* Records_one_player_s_inputs_from_the_replay_as_it_plays_then_saves_them_as_a_playback_file_Start_it_where_you_want_the_capture_to_begin_and_stop_it_where_you_want_it_to_end() const { return Get("Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end."); }
+
+        // Replay Extras
+        inline const char* Replay_Extras() const { return Get("Replay Extras"); }
+
+        // Replay rewind
+        inline const char* Replay_rewind_2() const { return Get("Replay rewind"); }
+
+        // Restart from takeover point
+        inline const char* Restart_from_takeover_point() const { return Get("Restart from takeover point"); }
+
+        // Right
+        inline const char* Right() const { return Get("Right"); }
+
+        // Save cancelled - the capture was discarded.
+        inline const char* Save_cancelled_the_capture_was_discarded() const { return Get("Save cancelled - the capture was discarded."); }
+
+        // Save the captured playback
+        inline const char* Save_the_captured_playback() const { return Get("Save the captured playback"); }
+
+        // Save the playback file
+        inline const char* Save_the_playback_file() const { return Get("Save the playback file"); }
+
+        // Saved %u frames.
+        inline const char* Saved_u_frames() const { return Get("Saved %u frames."); }
+
+        // Saved.
+        inline const char* Saved() const { return Get("Saved."); }
+
+        // Saving that library entry failed.
+        inline const char* Saving_that_library_entry_failed() const { return Get("Saving that library entry failed."); }
+
+        // Setup time: %.1fs
+        inline const char* Setup_time_1fs() const { return Get("Setup time: %.1fs"); }
+
+        // Show replay extras window
+        inline const char* Show_replay_extras_window() const { return Get("Show replay extras window"); }
+
+        // Slot %d is on loan to the playback library right now. It holds runtime data, not what you recorded - editing and saving still apply to the contents that get put back.
+        inline const char* Slot_d_is_on_loan_to_the_playback_library_right_now_It_holds_runtime_data_not_what_you_recorded_editing_and_saving_still_apply_to_the_contents_that_get_put_back() const { return Get("Slot %d is on loan to the playback library right now. It holds runtime data, not what you recorded - editing and saving still apply to the contents that get put back."); }
+
+        // Step a replay backwards instead of restarting it. The mod keeps checkpoints as the replay plays; rewinding jumps to the nearest one.
+        inline const char* Step_a_replay_backwards_instead_of_restarting_it_The_mod_keeps_checkpoints_as_the_replay_plays_rewinding_jumps_to_the_nearest_one() const { return Get("Step a replay backwards instead of restarting it. The mod keeps checkpoints as the replay plays; rewinding jumps to the nearest one."); }
+
+        // Stop a replay where it is and play it out yourself, against everything the other side actually did. Hotkey: %s puts you back at the moment you took over.
+        inline const char* Stop_a_replay_where_it_is_and_play_it_out_yourself_against_everything_the_other_side_actually_did_Hotkey_s_puts_you_back_at_the_moment_you_took_over() const { return Get("Stop a replay where it is and play it out yourself, against everything the other side actually did. Hotkey: %s puts you back at the moment you took over."); }
+
+        // Stop and Save...
+        inline const char* Stop_and_Save_2() const { return Get("Stop and Save..."); }
+
+        // Stops the replay at this exact moment and hands you one of the two players. The other side keeps doing everything it did in the replay.
+        inline const char* Stops_the_replay_at_this_exact_moment_and_hands_you_one_of_the_two_players_The_other_side_keeps_doing_everything_it_did_in_the_replay() const { return Get("Stops the replay at this exact moment and hands you one of the two players. The other side keeps doing everything it did in the replay."); }
+
+        // Take over
+        inline const char* Take_over() const { return Get("Take over"); }
+
+        // Take over this replay
+        inline const char* Take_over_this_replay() const { return Get("Take over this replay"); }
+
+        // Takeover from here
+        inline const char* Takeover_from_here() const { return Get("Takeover from here"); }
+
+        // That file could not be read as a playback.
+        inline const char* That_file_could_not_be_read_as_a_playback() const { return Get("That file could not be read as a playback."); }
+
+        // That playback could not be saved.
+        inline const char* That_playback_could_not_be_saved() const { return Get("That playback could not be saved."); }
+
+        // That slot could not be opened for editing.
+        inline const char* That_slot_could_not_be_opened_for_editing() const { return Get("That slot could not be opened for editing."); }
+
+        // The game freezes for this long once you are in, so you can get your hands into position. 0 starts immediately.
+        inline const char* The_game_freezes_for_this_long_once_you_are_in_so_you_can_get_your_hands_into_position_0_starts_immediately() const { return Get("The game freezes for this long once you are in, so you can get your hands into position. 0 starts immediately."); }
+
+        // Throws away unsaved edits and reads the recording again.
+        inline const char* Throws_away_unsaved_edits_and_reads_the_recording_again() const { return Get("Throws away unsaved edits and reads the recording again."); }
+
+        // Trailing idle frames removed.
+        inline const char* Trailing_idle_frames_removed() const { return Get("Trailing idle frames removed."); }
+
+        // Trim
+        inline const char* Trim() const { return Get("Trim"); }
+
+        // Trimmed.
+        inline const char* Trimmed() const { return Get("Trimmed."); }
+
+        // Turn a stretch of a replay into a playback file, which you can then load into a recording slot, a playback library, or straight onto a dummy action.
+        inline const char* Turn_a_stretch_of_a_replay_into_a_playback_file_which_you_can_then_load_into_a_recording_slot_a_playback_library_or_straight_onto_a_dummy_action() const { return Get("Turn a stretch of a replay into a playback file, which you can then load into a recording slot, a playback library, or straight onto a dummy action."); }
+
+        // Unsaved changes to the previous slot were discarded.
+        inline const char* Unsaved_changes_to_the_previous_slot_were_discarded() const { return Get("Unsaved changes to the previous slot were discarded."); }
+
+        // Unsaved changes.
+        inline const char* Unsaved_changes() const { return Get("Unsaved changes."); }
+
+        // Use this when a recording plays back mirrored: it was made on the other side of the screen.
+        inline const char* Use_this_when_a_recording_plays_back_mirrored_it_was_made_on_the_other_side_of_the_screen() const { return Get("Use this when a recording plays back mirrored: it was made on the other side of the screen."); }
+
+        // Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot.
+        inline const char* Write_one_of_the_four_recording_slots_out_to_a_playback_file_which_can_then_be_imported_anywhere_else_a_dummy_action_a_library_or_another_slot() const { return Get("Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot."); }
+
+        // Writes these frames back into the library entry's file.
+        inline const char* Writes_these_frames_back_into_the_library_entry_s_file() const { return Get("Writes these frames back into the library entry's file."); }
+
+        // Writes these frames back into the recording slot.
+        inline const char* Writes_these_frames_back_into_the_recording_slot() const { return Get("Writes these frames back into the recording slot."); }
+
+        // You are playing as Player 1. Player 2 is replaying the recorded match.
+        inline const char* You_are_playing_as_Player_1_Player_2_is_replaying_the_recorded_match() const { return Get("You are playing as Player 1. Player 2 is replaying the recorded match."); }
+
+        // You are playing as Player 2. Player 1 is replaying the recorded match.
+        inline const char* You_are_playing_as_Player_2_Player_1_is_replaying_the_recorded_match() const { return Get("You are playing as Player 2. Player 1 is replaying the recorded match."); }
+
+        // You can bring it back from the mod menu's Replays page, where the same controls also live.
+        inline const char* You_can_bring_it_back_from_the_mod_menu_s_Replays_page_where_the_same_controls_also_live() const { return Get("You can bring it back from the mod menu's Replays page, where the same controls also live."); }
+
+        // Edited frames are waiting on Save.
+        inline const char* Edited_frames_are_waiting_on_Save() const { return Get("Edited frames are waiting on Save."); }
+
+        // Keeps these frames for the dialog that opened this editor. Nothing is written until you save there too.
+        inline const char* Keeps_these_frames_for_the_dialog_that_opened_this_editor_Nothing_is_written_until_you_save_there_too() const { return Get("Keeps these frames for the dialog that opened this editor. Nothing is written until you save there too."); }
+
+        // Open a replay to capture a stretch of it.
+        inline const char* Open_a_replay_to_capture_a_stretch_of_it() const { return Get("Open a replay to capture a stretch of it."); }
+
+        // Open a replay to take one over from where it is.
+        inline const char* Open_a_replay_to_take_one_over_from_where_it_is() const { return Get("Open a replay to take one over from where it is."); }
+
+        // Opens this entry's frames in the editor. Saving there comes back here; nothing reaches the library until you save this dialog too.
+        inline const char* Opens_this_entry_s_frames_in_the_editor_Saving_there_comes_back_here_nothing_reaches_the_library_until_you_save_this_dialog_too() const { return Get("Opens this entry's frames in the editor. Saving there comes back here; nothing reaches the library until you save this dialog too."); }
+
+        // Throws away every edit made since this editor was opened.
+        inline const char* Throws_away_every_edit_made_since_this_editor_was_opened() const { return Get("Throws away every edit made since this editor was opened."); }
+
+        // %.1f seconds
+        inline const char* _1f_seconds() const { return Get("%.1f seconds"); }
+
+        // %s, from frame %d
+        inline const char* s_from_frame_d() const { return Get("%s, from frame %d"); }
+
+        // - you are Player 1
+        inline const char* you_are_Player_1() const { return Get("- you are Player 1"); }
+
+        // - you are Player 2
+        inline const char* you_are_Player_2() const { return Get("- you are Player 2"); }
+
+        // Apply
+        inline const char* Apply() const { return Get("Apply"); }
+
+        // Back to replay
+        inline const char* Back_to_replay() const { return Get("Back to replay"); }
+
+        // Capturing
+        inline const char* Capturing() const { return Get("Capturing"); }
+
+        // Change which side you play, the setup time, or the hotkey - and take the same moment over again with the new settings.
+        inline const char* Change_which_side_you_play_the_setup_time_or_the_hotkey_and_take_the_same_moment_over_again_with_the_new_settings() const { return Get("Change which side you play, the setup time, or the hotkey - and take the same moment over again with the new settings."); }
+
+        // Custom Snapshot
+        inline const char* Custom_Snapshot() const { return Get("Custom Snapshot"); }
+
+        // Ending Time (seconds)
+        inline const char* Ending_Time_seconds() const { return Get("Ending Time (seconds)"); }
+
+        // Gap
+        inline const char* Gap_2() const { return Get("Gap"); }
+
+        // How the library chooses the next enabled entry when it is triggered.
+        inline const char* How_the_library_chooses_the_next_enabled_entry_when_it_is_triggered() const { return Get("How the library chooses the next enabled entry when it is triggered."); }
+
+        // Inputs are temporarily overridden; this happens once per lab session.
+        inline const char* Inputs_are_temporarily_overridden_this_happens_once_per_lab_session() const { return Get("Inputs are temporarily overridden; this happens once per lab session."); }
+
+        // Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.
+        inline const char* Lab_state_restored_before_each_loop_Left_Middle_Right_briefly_take_control_the_first_time_the_loop_starts_to_reset_there_and_auto_save_a_snapshot_Custom_Snapshot_uses_a_snapshot_you_save_manually() const { return Get("Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually."); }
+
+        // Loop Setup Countdown
+        inline const char* Loop_Setup_Countdown() const { return Get("Loop Setup Countdown"); }
+
+        // Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.
+        inline const char* Loop_restart_restores_this_session_only_snapshot_before_each_slot_It_is_cleared_when_leaving_lab() const { return Get("Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab."); }
+
+        // Maps the button or key used to start and stop loop playback.
+        inline const char* Maps_the_button_or_key_used_to_start_and_stop_loop_playback() const { return Get("Maps the button or key used to start and stop loop playback."); }
+
+        // Middle
+        inline const char* Middle() const { return Get("Middle"); }
+
+        // No snapshot loaded
+        inline const char* No_snapshot_loaded() const { return Get("No snapshot loaded"); }
+
+        // No trigger is drawing from a library yet. Add an action on the Training page and point it at one.
+        inline const char* No_trigger_is_drawing_from_a_library_yet_Add_an_action_on_the_Training_page_and_point_it_at_one() const { return Get("No trigger is drawing from a library yet. Add an action on the Training page and point it at one."); }
+
+        // On loop
+        inline const char* On_loop() const { return Get("On loop"); }
+
+        // Picking order
+        inline const char* Picking_order() const { return Get("Picking order"); }
+
+        // Position set up automatically when the loop starts
+        inline const char* Position_set_up_automatically_when_the_loop_starts() const { return Get("Position set up automatically when the loop starts"); }
+
+        // Replay Recording
+        inline const char* Replay_Recording() const { return Get("Replay Recording"); }
+
+        // Replay recording is already running. Use the non-modal recording window to stop or cancel.
+        inline const char* Replay_recording_is_already_running_Use_the_non_modal_recording_window_to_stop_or_cancel() const { return Get("Replay recording is already running. Use the non-modal recording window to stop or cancel."); }
+
+        // Reset Position
+        inline const char* Reset_Position() const { return Get("Reset Position"); }
+
+        // Reset position snapshot ready
+        inline const char* Reset_position_snapshot_ready() const { return Get("Reset position snapshot ready"); }
+
+        // Restart
+        inline const char* Restart() const { return Get("Restart"); }
+
+        // Restart hotkey: %s
+        inline const char* Restart_hotkey_s() const { return Get("Restart hotkey: %s"); }
+
+        // Restart lab state in-between
+        inline const char* Restart_lab_state_in_between() const { return Get("Restart lab state in-between"); }
+
+        // Restore the saved loop snapshot now for verification.
+        inline const char* Restore_the_saved_loop_snapshot_now_for_verification() const { return Get("Restore the saved loop snapshot now for verification."); }
+
+        // Running
+        inline const char* Running() const { return Get("Running"); }
+
+        // Save current lab state as the loop restart snapshot.
+        inline const char* Save_current_lab_state_as_the_loop_restart_snapshot() const { return Get("Save current lab state as the loop restart snapshot."); }
+
+        // Seconds to show a setup countdown after optional snapshot restore before playing the next slot.
+        inline const char* Seconds_to_show_a_setup_countdown_after_optional_snapshot_restore_before_playing_the_next_slot() const { return Get("Seconds to show a setup countdown after optional snapshot restore before playing the next slot."); }
+
+        // Seconds to wait after both players return to idle before starting the next setup.
+        inline const char* Seconds_to_wait_after_both_players_return_to_idle_before_starting_the_next_setup() const { return Get("Seconds to wait after both players return to idle before starting the next setup."); }
+
+        // Setting up loop reset position...
+        inline const char* Setting_up_loop_reset_position() const { return Get("Setting up loop reset position..."); }
+
+        // Settings
+        inline const char* Settings() const { return Get("Settings"); }
+
+        // Setup Time (seconds)
+        inline const char* Setup_Time_seconds() const { return Get("Setup Time (seconds)"); }
+
+        // Snapshot loaded
+        inline const char* Snapshot_loaded() const { return Get("Snapshot loaded"); }
+
+        // Stopped
+        inline const char* Stopped() const { return Get("Stopped"); }
+
+        // Stops recording and asks where to save the captured inputs as a playback file.
+        inline const char* Stops_recording_and_asks_where_to_save_the_captured_inputs_as_a_playback_file() const { return Get("Stops recording and asks where to save the captured inputs as a playback file."); }
+
+        // Takeover mode
+        inline const char* Takeover_mode() const { return Get("Takeover mode"); }
+
+        // Takeover settings
+        inline const char* Takeover_settings() const { return Get("Takeover settings"); }
+
+        // Throws the capture away and stops recording.
+        inline const char* Throws_the_capture_away_and_stops_recording() const { return Get("Throws the capture away and stops recording."); }
+
+        // Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s
+        inline const char* Playback_version_mismatch_File_version_s_Code_version_s_s_2() const { return Get("Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s"); }
+
+        // Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s
+        inline const char* Profile_version_mismatch_File_version_s_Code_version_s_s_2() const { return Get("Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s"); }
 };
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Overlay/Widget/TasPlaybackEditorView.h"
 #include "Overlay/Window/IWindow.h"
 
 #include <cstddef>
@@ -20,11 +21,31 @@ public:
 public:
     void Update() override;
 
+    // The same window, editing plain data instead of a live movie. There used to be a second
+    // frame editor for this - four buttons per row, a hex column, and a popup with A/B/C/D
+    // toggles - which did the same job worse. Returns false if the slot cannot be read,
+    // leaving the window alone.
+    //
+    // The playback library hosts the same editor itself, as a modal on top of its own entry
+    // dialog - see TasPlaybackEditorView.
+    bool OpenPlaybackSlot(int cfSlot);
+    // Back to editing the TAS movie. Unsaved playback edits are discarded.
+    void LeavePlaybackMode();
+
 protected:
     void BeforeDraw() override;
     void Draw() override;
 
 private:
+    // Which of the two things this window is right now. They share the frame list and
+    // nothing else: a movie is simulated, a recording slot is bytes.
+    enum class Mode {
+        Tas,
+        Playback,
+    };
+
+    void DrawPlaybackMode();
+
     // The window reads top to bottom in the order the tool is actually used: what state
     // am I in, what am I starting from, what have I built, what am I adding, play it back.
     void DrawInactiveState(TasManager& manager);
@@ -53,6 +74,12 @@ private:
     static int ParsedFrameCount(const char* text);
 
     WindowContainer* m_pWindowContainer = nullptr;
+
+    Mode m_mode = Mode::Tas;
+    TasPlaybackEditorView m_playbackEditor;
+    // Opened from a modal or from another window's button, so it has to be brought to the
+    // front once rather than appearing behind whatever opened it.
+    bool m_focusRequested = false;
 
     // Sized for a live capture rather than a typed command: one token per recorded frame,
     // up to TasManager::GetLiveRecordingFrameLimit() of them.

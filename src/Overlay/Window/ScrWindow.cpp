@@ -1,4 +1,8 @@
 #include "ScrWindow.h"
+
+#include "Overlay/Widget/HotkeyBindWidget.h"
+
+#include "Overlay/Window/TasWindow.h"
 #include "Game/Scr/ScrStateNames.h"
 #include "Overlay/Window/DummyActionsPanel.h"
 #include "Game/Playbacks/DummyActionManager.h"
@@ -60,9 +64,12 @@ void ScrWindow::DrawComboDataButton() {
     }
     ImGui::ShowHelpMarkerSameLine(Messages.Combo_data_button_tooltip());
 }
-void ScrWindow::DrawReplayPlaybackCaptureBody()
+void ScrWindow::DrawReplayPlaybackCaptureBody(const char* idScope, bool compact)
 {
     static const char* kToken = "ScrWindowReplayCapture";
+    // Visible label before ##, host-unique id after it, so two hosts drawing this in one
+    // frame do not both claim the same modal.
+    const std::string whosePopupId = L("Capture whose inputs?") + std::string("##") + (idScope ? idScope : "");
     static std::vector<char> s_captured;
     static char s_capturedFacing = 0;
     static std::string s_status;
@@ -75,22 +82,38 @@ void ScrWindow::DrawReplayPlaybackCaptureBody()
         (*g_gameVals.pGameState == GameState_InMatch);
     const bool busy = NativeFileDialog::IsOpen();
 
+    const std::string captureTip =
+        L("Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.");
+
     if (!mgr.IsReplayRecording())
     {
         ImGui::BeginDisabled(!inReplayMatch || busy);
         if (ImGui::Button(L("Capture playback from replay").c_str()))
         {
-            ImGui::OpenPopup(L("Capture whose inputs?").c_str());
+            ImGui::OpenPopup(whosePopupId.c_str());
         }
         ImGui::EndDisabled();
-        ImGui::ShowHelpMarkerSameLine(
-            L("Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.").c_str());
 
-        if (!inReplayMatch)
+        // One row in a compact host. The (?) is still there - without it nothing says the
+        // explanation exists - but the "(while watching a replay)" aside is dropped, because
+        // that is what the greyed-out button already says.
+        if (compact)
         {
-            const std::string note = L("(while watching a replay)");
-            ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
-            ImGui::TextDisabled("%s", note.c_str());
+            ImGui::HoverTooltipEvenDisabled(inReplayMatch
+                ? captureTip.c_str()
+                : L("Open a replay to capture a stretch of it.").c_str());
+            ImGui::ShowHelpMarkerSameLine(captureTip.c_str());
+        }
+        else
+        {
+            ImGui::ShowHelpMarkerSameLine(captureTip.c_str());
+
+            if (!inReplayMatch)
+            {
+                const std::string note = L("(while watching a replay)");
+                ImGui::SameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x);
+                ImGui::TextDisabled("%s", note.c_str());
+            }
         }
 
         const ImVec2 display = ImGui::GetIO().DisplaySize;
@@ -99,7 +122,7 @@ void ScrWindow::DrawReplayPlaybackCaptureBody()
             ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f),
                 ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         }
-        if (ImGui::BeginPopupModal(L("Capture whose inputs?").c_str(), nullptr,
+        if (ImGui::BeginPopupModal(whosePopupId.c_str(), nullptr,
                 ImGuiWindowFlags_AlwaysAutoResize))
         {
             ImGui::TextUnformatted(
@@ -124,16 +147,28 @@ void ScrWindow::DrawReplayPlaybackCaptureBody()
             ImGui::EndPopup();
         }
 
-        if (!s_status.empty())
+        if (!compact && !s_status.empty())
         {
             ImGui::TextDisabled("%s", s_status.c_str());
         }
     }
     else
     {
-        ImGui::TextDisabled(L("Recording %s inputs from frame %d...").c_str(),
-            mgr.IsReplayRecordingAsP1() ? "P1" : "P2",
-            mgr.GetReplayRecordingStartFrame());
+        if (compact)
+        {
+            // Row 1 of two: what is being recorded, and since when.
+            ImGui::TextColored(ImVec4(1.00f, 0.45f, 0.45f, 1.00f), "%s", L("Capturing").c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", FormatText(L("%s, from frame %d").c_str(),
+                mgr.IsReplayRecordingAsP1() ? L("Player 1").c_str() : L("Player 2").c_str(),
+                mgr.GetReplayRecordingStartFrame()).c_str());
+        }
+        else
+        {
+            ImGui::TextDisabled(L("Recording %s inputs from frame %d...").c_str(),
+                mgr.IsReplayRecordingAsP1() ? "P1" : "P2",
+                mgr.GetReplayRecordingStartFrame());
+        }
 
         ImGui::BeginDisabled(busy);
         if (ImGui::Button(L("Stop and Save...").c_str()))
@@ -160,11 +195,21 @@ void ScrWindow::DrawReplayPlaybackCaptureBody()
             }
         }
         ImGui::EndDisabled();
+        if (compact)
+        {
+            ImGui::ShowHelpMarkerSameLine(
+                L("Stops recording and asks where to save the captured inputs as a playback file.").c_str());
+        }
         ImGui::SameLine();
         if (ImGui::Button(L("Cancel").c_str()))
         {
             mgr.CancelReplayRecording();
             s_captured.clear();
+        }
+        if (compact)
+        {
+            ImGui::ShowHelpMarkerSameLine(
+                L("Throws the capture away and stops recording.").c_str());
         }
     }
 
@@ -207,6 +252,7 @@ void ScrWindow::DrawPlaybackTransferButtons()
     static int s_slot = 1;
     static bool s_openImportSlot = false;
     static bool s_openExportSlot = false;
+    static bool s_openEditSlot = false;
     static std::vector<char> s_importFrames;
     static char s_importFacing = 0;
     static std::string s_importName;
@@ -238,6 +284,16 @@ void ScrWindow::DrawPlaybackTransferButtons()
     ImGui::EndDisabled();
     ImGui::ShowHelpMarkerSameLine(
         L("Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot.").c_str());
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!inTraining || busy);
+    if (ImGui::Button(L("Edit Playback").c_str()))
+    {
+        s_openEditSlot = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::ShowHelpMarkerSameLine(
+        L("Open one of the four recording slots in the frame editor, where you can retype, insert, delete and reorder single frames. Saving there writes straight back into the slot.").c_str());
 
     if (!inTraining)
     {
@@ -347,6 +403,25 @@ void ScrWindow::DrawPlaybackTransferButtons()
     else if (importAnswer == -1)
     {
         s_importFrames.clear();
+    }
+
+    // Editing asks for the slot and then hands it to the frame editor - the same editor the
+    // TAS tool uses, switched to editing plain recording data.
+    const std::string editTitle = L("Edit which slot?");
+    if (s_openEditSlot)
+    {
+        ImGui::OpenPopup(editTitle.c_str());
+        s_openEditSlot = false;
+    }
+    if (drawSlotChooser(editTitle.c_str(), L("Choose a slot to edit.").c_str(), &s_slot) == 1)
+    {
+        if (auto* tas = ScrWindow::m_pWindowContainer->GetWindow<TasWindow>(WindowType_Tas))
+        {
+            // No status line on success: the editor window appearing is the feedback, and a
+            // note saying what you are already looking at outlives the window that caused it.
+            s_status = tas->OpenPlaybackSlot(s_slot) ? std::string()
+                : L("That slot could not be opened for editing.");
+        }
     }
 
     // Export asks for the slot first, then where to put it.
@@ -582,6 +657,7 @@ void ScrWindow::Tick() {
     // keep advancing exactly in those cases.
     self->TickSetupDelay();
     self->TickDummyActions();
+    self->TickReplayTakeover();
 
     TickLocalReplayRedirect();
 }
@@ -771,6 +847,12 @@ void ScrWindow::TickSaveStateHotkeys()
 
 void ScrWindow::RunPendingSaveStateRequests()
 {
+    // First: it ends with a state load of its own, which the block below then runs.
+    if (pending_takeover_reconfigure >= 0) {
+        const bool asP1 = pending_takeover_reconfigure == 0;
+        pending_takeover_reconfigure = -1;
+        ReconfigureReplayTakeover(asP1);
+    }
     if (pending_save_state) {
         pending_save_state = false;
         SaveTrainingState();
@@ -1429,13 +1511,6 @@ void ScrWindow::draw_playback_slot_section(int slot) {
     }
     ImGui::PopID();
 };
-void ScrWindow::DrawPlaybackEditor() {
-    if (ImGui::Button("Open Playback Editor")) {
-        ScrWindow::m_pWindowContainer->GetWindow(WindowType_PlaybackEditor)->ToggleOpen();
-    }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(Messages.Open_playback_editor_tooltip());
-}
 void ScrWindow::DrawSaveStatesBody() {
     if (*(bbcf_base_adress + 0x8F7758) == 0) {
         if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
@@ -1947,6 +2022,34 @@ namespace
     // game's own controller read, since that is the only place both pads exist as mapped
     // BBCF inputs; the mod's battle-input hook is per player, and during a takeover the
     // other player IS the replay playback.
+    // Same control as the Settings window's hotkey rows: click it, then press the key or the
+    // controller button. Writes straight to the real binding, so this is the setting, not a
+    // copy of it.
+    void DrawTakeoverHotkeyRow(const char* label, HotkeyManager::Action action)
+    {
+        HotkeyBinding binding = HotkeyManager::GetBinding(action);
+
+        std::string warning;
+        const HotkeyManager::Action conflict = HotkeyManager::FindConflict(binding, action);
+        if (conflict != HotkeyManager::Hotkey_Count) {
+            warning = std::string("Already used by \"") + HotkeyManager::DisplayName(conflict) +
+                "\". Pressing it will do both.";
+        }
+        else if (HotkeyManager::IsControllerBinding(binding)) {
+            warning = "Controller button: this also works during a match, so pick one you never "
+                "press while playing.";
+        }
+
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine(210.0f);
+        if (ImGuiHotkey::BindWidget(HotkeyManager::IniKey(action), binding,
+            HotkeyManager::DefaultBindingString(action),
+            warning.empty() ? nullptr : warning.c_str())) {
+            // Persists to settings.ini and re-arms controller polling for the new binding.
+            HotkeyManager::SetBinding(action, binding);
+        }
+    }
+
     unsigned char TakeoverInputSlot()
     {
         return Settings::settingsIni.takeoverInputSlot == 1 ? 1 : 0;
@@ -1975,39 +2078,17 @@ namespace
     }
 }
 
-void ScrWindow::DrawReplayTakeoverBody() {
-  
-    
+// The takeover used to be four buttons and a rule nobody could have guessed: press
+// "Takeover as P1", then press "Load Replay State", then press "Fix playback" if it came
+// out mirrored. It is one button and one dialog now - the two other steps were things the
+// mod already knew how to do for itself.
+void ScrWindow::DrawReplayTakeoverBody(const char* idScope, bool compact) {
+    const std::string setupPopupId = std::string("##takeover_setup_") + (idScope ? idScope : "");
 
-    char* bbcf_base = GetBbcfBaseAdress();
-
-
-
-    auto ensure_snapshot_apparatus_takeover = [&]() -> SnapshotApparatus* {
-        if (snap_apparatus_takeover == nullptr) {
-            snap_apparatus_takeover = new SnapshotApparatus();
-            snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
-        }
-        else if (!snap_apparatus_takeover->check_if_valid(g_interfaces.player1.GetData(),
-            g_interfaces.player2.GetData())) {
-            delete snap_apparatus_takeover;
-            snap_apparatus_takeover = new SnapshotApparatus();
-            snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
-        }
-        return snap_apparatus_takeover;
-    };
-    char current_round = *(bbcf_base + 0x11C034C);
-    //these are merely demonstrative, the formula to get the start of a players inputs in a round is: bbcf_base + 0x115B470 + 0x8d4 + (0x7080 * player_to_playback) + (0xE100 * current_round);
-    char* r1p1_start = bbcf_base + 0x115B470 + 0x8d4;
-    char* r1p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080;
-    char* r2p1_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080;
-    char* r2p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080;
-    char* r3p1_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
-    char* r3p2_start = bbcf_base + 0x115B470 + 0x8d4 + 0x7080 + 0x7080 + 0x7080 + 0x7080 + 0x7080;
-
-
+    // The library-based BETA tool is a separate feature with its own window; it earns a link
+    // from the mod menu, not a line in a window that is meant to stay out of the way.
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
-    {
+    if (!compact) {
         if (ImGui::Button("Unlimited Replay Takeover (BETA)")) {
             ScrWindow::m_pWindowContainer->GetWindow(WindowType_UnlimitedReplayTakeover)->ToggleOpen();
         }
@@ -2015,125 +2096,379 @@ void ScrWindow::DrawReplayTakeoverBody() {
         ImGui::ShowHelpMarker(Messages.Unlimited_replay_takeover_tooltip());
         ImGui::SameLine();
         ImGui::TextDisabled("Capture replay situations into a training library.");
+        ImGui::Separator();
     }
 #endif
 
-    if (*(bbcf_base_adress + 0x8F7758) == 0) { //checks if it is searching for a ranked match
-        if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
-        }
-        else {
-            ImGui::TextWrapped("%s", L("Cannot access replay takeover outside of a replay.").c_str());
-            return;
-        }
-        ImGui::Text("%s %d", L("Time:").c_str(), *g_gameVals.pMatchTimer);
-        if (*g_gameVals.pGameMode == GameMode_ReplayTheater) {
-            const std::string takeoverP1 = L("Takeover as P1");
-            const std::string takeoverP2 = L("Takeover as P2");
-            if (ImGui::Button(takeoverP1.c_str())) {
-                if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
-                    SnapshotApparatus* apparatus = ensure_snapshot_apparatus_takeover();
-                    if (!apparatus) {
-                        return;
-                    }
-                    *g_gameVals.pGameMode = GameMode_Training;
-                    apparatus->save_snapshot(0);
+    if (*(bbcf_base_adress + 0x8F7758) != 0) { // searching for a ranked match
+        ImGui::TextWrapped("%s", L("You cannot use this feature while searching for a ranked match.").c_str());
+        return;
+    }
 
-                    int player_to_playback = 1;
-                    char* rpstart = r1p1_start + (0x7080 * player_to_playback) + (0xE100 * current_round);
-                    replay_action_load = {};
+    if (!g_gameVals.pGameMode || g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        ImGui::TextWrapped("%s", L("Cannot access replay takeover outside of a replay.").c_str());
+        return;
+    }
 
+    const bool inReplay = *g_gameVals.pGameMode == GameMode_ReplayTheater;
+    const bool inTraining = *g_gameVals.pGameMode == GameMode_Training;
+    const bool running = inTraining && takeover_active;
 
+    const std::string takeover = L("Takeover from here");
+    const std::string restart = L("Restart from takeover point");
+    const std::string back = L("Return to replay");
+    const std::string takeoverTip =
+        L("Stops the replay at this exact moment and hands you one of the two players. The other side keeps doing everything it did in the replay.");
+    const std::string restartTip = FormatText(
+        L("Puts everything back to the moment you took over and starts the recorded side again. Hotkey: %s. This also happens by itself whenever a round ends, so a KO never kicks you out to character select.").c_str(),
+        HotkeyManager::DisplayString(
+            HotkeyManager::GetBinding(HotkeyManager::Hotkey_LoadReplayState)).c_str());
 
-                    for (int i = 0; i < 0x400; i++) {
-                        char* recorded_input = rpstart + (*g_gameVals.pFrameCount + i) * 2;
-                        replay_action_load.push_back(*recorded_input);
-                    }
-                    facing_left_replay_takeover = g_interfaces.player2.GetData()->facingLeft2;
-                    SaveTakeoverInputBinding(bbcf_base);
-                    *(bbcf_base + 0x891A38) = 0; // sets training mode to be "p1" sided
-                    // Your side reads the chosen slot; the replay's side keeps the other
-                    // one, so the two never point at the same device.
-                    *(bbcf_base + 0x8929A4) = TakeoverInputSlot();
-                    *(bbcf_base + 0x8929A8) = 1 - TakeoverInputSlot();
-                }
+    // A compact host gets three rows at most and no prose. Which three depends on what is
+    // happening: once you are inside a takeover the other controls are meaningless, so the
+    // window stops offering them and becomes a takeover panel instead.
+    if (compact) {
+        if (running) {
+            // 1: what mode you are in and which side is yours.
+            ImGui::TextColored(ImVec4(0.35f, 0.70f, 1.00f, 1.00f), "%s", L("Takeover mode").c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", (takeover_as_p1
+                ? L("- you are Player 1")
+                : L("- you are Player 2")).c_str());
 
+            // 2: the three things you can do from here.
+            const std::string shortRestart = L("Restart");
+            const std::string shortBack = L("Back to replay");
+            const std::string settings = L("Settings");
+
+            if (ImGui::Button(shortRestart.c_str())) {
+                pending_load_replay_state = true;
             }
-            ImGui::ShowHelpMarkerSameLine(Messages.Takeover_as_p1_tooltip());
-            ImGui::SameLineOrWrap(ImGui::ButtonWidth(takeoverP2.c_str()));
-            if (ImGui::Button(takeoverP2.c_str())) {
-                if (!g_interfaces.player1.IsCharDataNullPtr() && !g_interfaces.player2.IsCharDataNullPtr()) {
-                    SnapshotApparatus* apparatus = ensure_snapshot_apparatus_takeover();
-                    if (!apparatus) {
-                        return;
-                    }
-                    *g_gameVals.pGameMode = GameMode_Training;
-                    apparatus->save_snapshot(0);
+            ImGui::ShowHelpMarkerSameLine(restartTip.c_str());
 
-
-                    int player_to_playback = 0;
-                    char* rpstart = r1p1_start + (0x7080 * player_to_playback) + (0xE100 * current_round);
-                    replay_action_load = {};
-
-
-                    for (int i = 0; i < 0x400; i++) {
-
-                        char* recorded_input = rpstart + (*g_gameVals.pFrameCount + i) * 2;
-                        replay_action_load.push_back(*recorded_input);
-                    }
-                    auto len_replay = replay_action_load.size();
-                    facing_left_replay_takeover = g_interfaces.player1.GetData()->facingLeft2;
-                    //bypasses necessary to make p2 control 
-                    SaveTakeoverInputBinding(bbcf_base);
-                    *(bbcf_base + 0x891A38) = 1; // sets training mode to be "p2" sided
-                    *(bbcf_base + 0x8929A8) = TakeoverInputSlot();
-                    *(bbcf_base + 0x8929A4) = 1 - TakeoverInputSlot();
-
-                }
-            }
-            ImGui::ShowHelpMarkerSameLine(Messages.Takeover_as_p2_tooltip());
-        }
-        if (*g_gameVals.pGameMode == GameMode_Training) {
-            if (ImGui::Button(L("Load Replay State").c_str())) {
-                LoadReplayTakeoverState();
-            }
-            ImGui::ShowHelpMarkerSameLine(Messages.Load_replay_state_tooltip());
-        }
-
-        ImGui::SetNextItemWidth(140.0f);
-        ImGui::InputFloat(L("Setup time (s)").c_str(), &wait_before_exec_s2, 0.3f);
-        ImGui::ShowHelpMarkerSameLine(
-            L("Pauses the game for this long after a state loads, so you have time to get your hands in position. Set it to 0 for no delay.").c_str());
-        // Countdown indicator: DrawSaveStateSetupDelayStandalone.
-        if (*g_gameVals.pGameMode == GameMode_Training) {
-            const std::string returnToReplay = L("Return to replay");
-            const std::string fixPlayback = L("Fix playback");
-            if (ImGui::Button(returnToReplay.c_str())) {
-                playback_manager.set_playback_control(0); //makes sure the playback is stopped before going back to the replay
-                RestoreTakeoverInputBinding(bbcf_base);
-                *g_gameVals.pGameMode = GameMode_ReplayTheater;
-                snap_apparatus_takeover->load_snapshot(0);
+            ImGui::SameLine();
+            if (ImGui::Button(shortBack.c_str())) {
+                EndReplayTakeover();
             }
             ImGui::ShowHelpMarkerSameLine(Messages.Return_to_replay_tooltip());
 
-            ImGui::SameLineOrWrap(ImGui::ButtonWidth(fixPlayback.c_str()));
-            if (ImGui::Button(fixPlayback.c_str())) {
-                facing_left_replay_takeover = !facing_left_replay_takeover;
+            ImGui::SameLine();
+            if (ImGui::Button(settings.c_str())) {
+                // Opens on what is actually running, so Apply with nothing changed is a
+                // no-op rather than a surprise side swap.
+                takeover_modal_side = takeover_as_p1 ? 0 : 1;
+                ImGui::OpenPopup(setupPopupId.c_str());
             }
             ImGui::ShowHelpMarkerSameLine(
-                L("Try this if the takeover looks wrong before reporting a problem - it corrects it most of the time. Using it while the takeover is already working will break it instead, and clicking again puts it back.").c_str());
+                L("Change which side you play, the setup time, or the hotkey - and take the same moment over again with the new settings.").c_str());
 
+            // 3: the key that does the same as Restart, so it can be used without the mouse.
+            ImGui::TextDisabled("%s", FormatText(L("Restart hotkey: %s").c_str(),
+                HotkeyManager::DisplayString(
+                    HotkeyManager::GetBinding(HotkeyManager::Hotkey_LoadReplayState)).c_str()).c_str());
+
+            DrawTakeoverSetupModal(setupPopupId.c_str());
+            return;
         }
 
-        if (*g_gameVals.pGameMode == GameMode_Training) {
-            *g_gameVals.pMatchTimer = 3597;
+        ImGui::BeginDisabled(!inReplay);
+        if (ImGui::Button(takeover.c_str())) {
+            ImGui::OpenPopup(setupPopupId.c_str());
         }
+        ImGui::EndDisabled();
+        ImGui::HoverTooltipEvenDisabled(inReplay
+            ? takeoverTip.c_str()
+            : L("Open a replay to take one over from where it is.").c_str());
+        ImGui::ShowHelpMarkerSameLine(takeoverTip.c_str());
+
+        DrawTakeoverSetupModal(setupPopupId.c_str());
+        return;
     }
-    else {
-        ImGui::TextWrapped("%s", L("You cannot use this feature while searching for a ranked match.").c_str());
+
+    if (inReplay) {
+        if (ImGui::Button(takeover.c_str())) {
+            ImGui::OpenPopup(setupPopupId.c_str());
+        }
+        ImGui::ShowHelpMarkerSameLine(takeoverTip.c_str());
+
+        // Same window as the button, which is what BeginPopupModal requires.
+        DrawTakeoverSetupModal(setupPopupId.c_str());
+        return;
     }
+
+    if (running) {
+        ImGui::TextWrapped("%s", (takeover_as_p1
+            ? L("You are playing as Player 1. Player 2 is replaying the recorded match.")
+            : L("You are playing as Player 2. Player 1 is replaying the recorded match.")).c_str());
+
+        if (ImGui::Button(restart.c_str())) {
+            pending_load_replay_state = true;
+        }
+        ImGui::ShowHelpMarkerSameLine(restartTip.c_str());
+
+        ImGui::SameLineOrWrap(ImGui::ButtonWidth(back.c_str()));
+        if (ImGui::Button(back.c_str())) {
+            EndReplayTakeover();
+        }
+        ImGui::ShowHelpMarkerSameLine(Messages.Return_to_replay_tooltip());
+
+        // The old "Fix playback" button was a coin flip the user had to make: the mirroring
+        // is worked out from the side you took over now (see BeginReplayTakeover). This is
+        // kept only as a diagnostic for the case that turns out to be wrong somewhere, and
+        // only for people who have already opted into unfinished tooling.
+        if (Settings::settingsIni.enableInDevelopmentFeatures) {
+            bool mirrored = facing_left_replay_takeover != 0;
+            if (ImGui::Checkbox(L("Mirror the recorded inputs (diagnostic)").c_str(), &mirrored)) {
+                facing_left_replay_takeover = mirrored ? 1 : 0;
+                pending_load_replay_state = true;
+            }
+        }
+        return;
+    }
+
+    ImGui::TextWrapped("%s", L("Open a replay and press \"Takeover from here\".").c_str());
 }
 
+// P1/P2, how long the game freezes for afterwards, and the key that puts you back at the
+// takeover point - everything the feature has, in the one dialog you already have open.
+// Nothing else to press: the state load the user used to have to remember is part of
+// accepting this.
+void ScrWindow::DrawTakeoverSetupModal(const char* popupId) {
+    // Sized before it is centred, never auto-resized: a pivot needs a size, and an
+    // auto-resizing popup has none on the frame it appears. See docs/ImGuiModalCentering.md.
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowSize(ImVec2(430.0f, 250.0f), ImGuiCond_Appearing);
+    if (display.x > 0.0f && display.y > 0.0f) {
+        ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f),
+            ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    }
 
+    if (!ImGui::BeginPopupModal(popupId, nullptr, ImGuiWindowFlags_NoResize)) {
+        return;
+    }
+
+    const bool reconfiguring = takeover_active;
+
+    ImGui::TextUnformatted((reconfiguring
+        ? L("Takeover settings")
+        : L("Take over this replay")).c_str());
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::TextUnformatted(L("Play as").c_str());
+    ImGui::RadioButton(L("Player 1").c_str(), &takeover_modal_side, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton(L("Player 2").c_str(), &takeover_modal_side, 1);
+
+    ImGui::Spacing();
+
+    float setup = Settings::settingsIni.replayTakeoverSetupSeconds;
+    // Narrow: it holds "1.00" and a pair of steppers, not a sentence.
+    ImGui::SetNextItemWidth(86.0f);
+    if (ImGui::InputFloat(L("Setup time (s)").c_str(), &setup, 0.1f, 0.5f, "%.2f")) {
+        if (setup < 0.0f) {
+            setup = 0.0f;
+        }
+        // Kept in the draft only; written to settings.ini when the dialog is accepted, so
+        // arrowing through values does not rewrite the file once per click.
+        Settings::settingsIni.replayTakeoverSetupSeconds = setup;
+    }
+    ImGui::ShowHelpMarkerSameLine(
+        L("The game freezes for this long once you are in, so you can get your hands into position. 0 starts immediately.").c_str());
+
+    ImGui::Spacing();
+    ImGui::SeparatorText(L("Hotkeys").c_str());
+
+    // The same bind widget the Settings window uses, so a stick or hitbox button can be
+    // bound here too, and it writes to the same setting - this is not a second binding.
+    DrawTakeoverHotkeyRow(L("Restart from takeover point").c_str(),
+        HotkeyManager::Hotkey_LoadReplayState);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button((reconfiguring ? L("Apply") : L("Take over")).c_str(), ImVec2(120, 0))) {
+        char setupText[32];
+        snprintf(setupText, sizeof(setupText), "%g", Settings::settingsIni.replayTakeoverSetupSeconds);
+        Settings::changeSetting("ReplayTakeoverSetupSeconds", setupText);
+        if (reconfiguring) {
+            pending_takeover_reconfigure = takeover_modal_side;
+        } else {
+            BeginReplayTakeover(takeover_modal_side == 0);
+        }
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(L("Cancel").c_str(), ImVec2(120, 0))) {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+}
+
+void ScrWindow::BeginReplayTakeover(bool asP1) {
+    char* bbcf_base = GetBbcfBaseAdress();
+
+    if (!g_gameVals.pGameMode || !g_gameVals.pFrameCount) {
+        return;
+    }
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        return;
+    }
+
+    SnapshotApparatus* apparatus = EnsureTakeoverSnapshot();
+    if (!apparatus) {
+        return;
+    }
+
+    const char current_round = *(bbcf_base + 0x11C034C);
+
+    *g_gameVals.pGameMode = GameMode_Training;
+    apparatus->save_snapshot(0);
+
+    // The side you did not take is the one the replay drives, so that is the input stream
+    // to read. Formula for the start of a player's inputs in a round:
+    //   bbcf_base + 0x115B470 + 0x8d4 + (0x7080 * player) + (0xE100 * round)
+    const int player_to_playback = asP1 ? 1 : 0;
+    char* rpstart = bbcf_base + 0x115B470 + 0x8d4 + (0x7080 * player_to_playback) + (0xE100 * current_round);
+
+    replay_action_load.clear();
+    replay_action_load.reserve(0x400);
+    for (int i = 0; i < 0x400; i++) {
+        replay_action_load.push_back(*(rpstart + (*g_gameVals.pFrameCount + i) * 2));
+    }
+
+    // The facing byte a playback slot carries is read against the training side - the side
+    // you are on - not against the character replaying the inputs. Storing the replayed
+    // side's facing here (what the old code did) is therefore inverted whenever the two
+    // face each other, which is nearly always: that is the entire reason "Fix playback"
+    // existed and why flipping it fixed things "most of the time".
+    facing_left_replay_takeover = asP1
+        ? (g_interfaces.player1.GetData()->facingLeft2 != 0 ? 1 : 0)
+        : (g_interfaces.player2.GetData()->facingLeft2 != 0 ? 1 : 0);
+
+    SaveTakeoverInputBinding(bbcf_base);
+    *(bbcf_base + kTrainingSideOffset) = asP1 ? 0 : 1;
+    // Your side reads the chosen slot; the replay's side keeps the other one, so the two
+    // never point at the same device.
+    *(bbcf_base + (asP1 ? kSlotForP1Offset : kSlotForP2Offset)) = TakeoverInputSlot();
+    *(bbcf_base + (asP1 ? kSlotForP2Offset : kSlotForP1Offset)) = 1 - TakeoverInputSlot();
+
+    takeover_active = true;
+    takeover_as_p1 = asP1;
+    takeover_round_reset_armed = false;
+    wait_before_exec_s2 = Settings::settingsIni.replayTakeoverSetupSeconds;
+
+    LOG(1, "[Takeover] begin asP1=%d round=%d frame=%d facing=%d\n",
+        asP1 ? 1 : 0, (int)current_round, *g_gameVals.pFrameCount, facing_left_replay_takeover);
+
+    // No second button press: being in takeover mode is the point of having pressed it.
+    //
+    // Latched rather than run from here. This is the middle of the draw pass; loading a
+    // snapshot and arming the setup freeze belongs in the phase right after it, which is
+    // where the hotkey path has always done it (WindowManager: RunPendingSaveStateRequests).
+    // Doing it inline left the freeze to be undone by the rest of the frame, which is why
+    // the setup time stopped pausing anything.
+    pending_load_replay_state = true;
+}
+
+void ScrWindow::ReconfigureReplayTakeover(bool asP1) {
+    if (!takeover_active || !snap_apparatus_takeover) {
+        return;
+    }
+
+    // Back to the replay first, which restores the exact frame the takeover was taken at,
+    // then take it over again. The input binding is left alone: SaveTakeoverInputBinding
+    // only captures the first time, so the pads the user actually started with survive.
+    playback_manager.set_playback_control(0);
+    if (g_gameVals.pGameMode) {
+        *g_gameVals.pGameMode = GameMode_ReplayTheater;
+    }
+    snap_apparatus_takeover->load_snapshot(0);
+
+    LOG(1, "[Takeover] reconfiguring to asP1=%d\n", asP1 ? 1 : 0);
+    BeginReplayTakeover(asP1);
+}
+
+void ScrWindow::EndReplayTakeover() {
+    // Stop the playback before going back, or the replay inherits a running dummy action.
+    playback_manager.set_playback_control(0);
+    RestoreTakeoverInputBinding(GetBbcfBaseAdress());
+
+    if (g_gameVals.pGameMode) {
+        *g_gameVals.pGameMode = GameMode_ReplayTheater;
+    }
+    if (snap_apparatus_takeover) {
+        snap_apparatus_takeover->load_snapshot(0);
+    }
+
+    takeover_active = false;
+    takeover_round_reset_armed = false;
+    LOG(1, "[Takeover] returned to replay\n");
+}
+
+SnapshotApparatus* ScrWindow::EnsureTakeoverSnapshot() {
+    if (snap_apparatus_takeover == nullptr) {
+        snap_apparatus_takeover = new SnapshotApparatus();
+        snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
+    }
+    else if (!snap_apparatus_takeover->check_if_valid(g_interfaces.player1.GetData(),
+        g_interfaces.player2.GetData())) {
+        delete snap_apparatus_takeover;
+        snap_apparatus_takeover = new SnapshotApparatus();
+        snap_apparatus_takeover->ReserveSlots("replay_takeover", 1);
+    }
+    return snap_apparatus_takeover;
+}
+
+// Runs every frame from Tick(), not from the menu page: the two things it does have to keep
+// happening while the mod menu is shut, which is when people actually play.
+void ScrWindow::TickReplayTakeover() {
+    if (!takeover_active) {
+        return;
+    }
+    if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
+        return;
+    }
+
+    if (g_interfaces.player1.IsCharDataNullPtr() || g_interfaces.player2.IsCharDataNullPtr()) {
+        // The match went away underneath us. Give the pads back rather than leaving the
+        // takeover's input binding in place for whatever the user does next.
+        RestoreTakeoverInputBinding(GetBbcfBaseAdress());
+        takeover_active = false;
+        takeover_round_reset_armed = false;
+        LOG(1, "[Takeover] match ended underneath the takeover; bindings restored\n");
+        return;
+    }
+
+    // A takeover only swaps the game MODE. Underneath it is still the replay's versus match,
+    // so a KO still counts a round and the second one ends the match into character select -
+    // which is where a takeover session used to die with no way back. Reload the takeover
+    // point instead, which is what you wanted the moment the dummy died anyway.
+    if (g_gameVals.pMatchState) {
+        const int matchState = *g_gameVals.pMatchState;
+        const bool roundOver = matchState == MatchState_FinishSign ||
+            matchState == MatchState_WinLoseSign ||
+            matchState == MatchState_VictoryScreen;
+
+        if (roundOver && !takeover_round_reset_armed) {
+            takeover_round_reset_armed = true;
+            LOG(1, "[Takeover] round ended (matchState=%d); reloading the takeover point\n", matchState);
+            // Tick() runs from a mid-frame hook; the reload goes through the same latch the
+            // hotkey uses so the snapshot is never loaded from in there.
+            pending_load_replay_state = true;
+        }
+        else if (matchState == MatchState_Fight) {
+            takeover_round_reset_armed = false;
+        }
+    }
+
+    // Keeps the clock off the match, the same way the menu page used to while it was open.
+    if (g_gameVals.pMatchTimer) {
+        *g_gameVals.pMatchTimer = 3597;
+    }
+}
 
 void ScrWindow::DrawRoomSettingsBody() {
     const char* items[] = { "No Rematch", "No limit", "FT2", "FT3", "FT5", "FT10"};

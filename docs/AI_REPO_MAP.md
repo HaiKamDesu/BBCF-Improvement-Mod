@@ -30,6 +30,8 @@ No unit test suite is present; normal validation is build plus operator in-game 
   Local modifications inside `depends/imgui` are labelled `DO NOT DROP WHEN UPGRADING`; see
   `docs/ViewportMouseScaling.md` for what happened the two times one was silently lost.
   For any "mouse clicks don't register" report, start at `docs/OverlayInputTriage.md`.
+  Before adding a modal, read `docs/ImGuiModalCentering.md`: a centred auto-resizing popup
+  lands at the top middle on its first frame, and this has been re-fixed several times.
 - Mod menu (F1): `src/Overlay/Window/MainWindow.*` is only the shell (page list + feature search).
   Pages and their sections live in `src/Overlay/Window/MainMenu/`; every section is declared once
   in `MainMenuNav.cpp`'s table, which is also what the search indexes.

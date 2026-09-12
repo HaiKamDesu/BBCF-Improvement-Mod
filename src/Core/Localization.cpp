@@ -68,6 +68,46 @@ namespace
 			return !Trim(it->second).empty();
 		}
 
+	// A few strings the mod shows are several lines long. A real newline in a CSV field is
+	// legal - it has to be quoted, and the parser below handles it - but it splits one row
+	// across several lines in the file, which makes the table painful to read, diff and edit
+	// in a spreadsheet. So multi-line strings are written with "\n" instead and put back
+	// together here.
+	//
+	// An escape that is not recognised is left exactly as it was found, backslash included,
+	// so a Windows path like BBCF_IM\Palettes still arrives as itself. The codegen script
+	// decodes the same set before emitting its C++ literals, so the key a lookup is made
+	// with and the key the table is built with stay identical.
+	std::string UnescapeField(const std::string& field)
+	{
+		if (field.find('\\') == std::string::npos)
+		{
+			return field;
+		}
+
+		std::string out;
+		out.reserve(field.size());
+		for (size_t i = 0; i < field.size(); ++i)
+		{
+			if (field[i] != '\\' || i + 1 >= field.size())
+			{
+				out.push_back(field[i]);
+				continue;
+			}
+
+			switch (field[i + 1])
+			{
+			case 'n':  out.push_back('\n'); ++i; break;
+			case 'r':  out.push_back('\r'); ++i; break;
+			case 't':  out.push_back('\t'); ++i; break;
+			case '\\': out.push_back('\\'); ++i; break;
+			case '"':  out.push_back('"');  ++i; break;
+			default:   out.push_back(field[i]); break;
+			}
+		}
+		return out;
+	}
+
 	std::vector<std::vector<std::string>> ParseCsv(const std::string& content)
 	{
 		std::vector<std::vector<std::string>> rows;
@@ -77,7 +117,7 @@ namespace
 
 		auto finishField = [&]()
 			{
-				currentRow.push_back(currentField);
+				currentRow.push_back(UnescapeField(currentField));
 				currentField.clear();
 			};
 

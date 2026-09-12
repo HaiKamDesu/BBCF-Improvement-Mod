@@ -20,6 +20,10 @@ namespace ImGui
 	IMGUI_API void AddTextBold(ImDrawList* drawList, const ImVec2& pos, ImU32 col, const char* text, const char* textEnd = NULL);
 
 	IMGUI_API void HoverTooltip(const char* text);
+	// Like HoverTooltip, but fires on a greyed-out item too - which is exactly when a user
+	// most wants to know why they cannot press it. Used where a row has no space for a (?).
+	IMGUI_API void HoverTooltipEvenDisabled(const char* text);
+
 	IMGUI_API bool ButtonUrl(const std::string& label, const wchar_t* url, const ImVec2& btnSize = ImVec2(0, 0));
 	IMGUI_API void TextAlignedHorizontalCenter(const char* text, ...);
 	IMGUI_API void TextColoredAlignedHorizontalCenter(const ImVec4 color, const char* text);

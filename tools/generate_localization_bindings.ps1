@@ -1,10 +1,38 @@
-Param(
+﻿Param(
   [Parameter(Mandatory=$true)][string]$CsvPath,
   [Parameter(Mandatory=$true)][string]$OutPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# Multi-line strings are stored in the CSV with "\n" rather than a real newline, so one row
+# stays on one line. Localization.cpp decodes the same set when it loads the table; both sides
+# have to agree, or the key this file emits and the key the table is built with differ by an
+# invisible backslash and every lookup for that string misses.
+#
+# An unrecognised escape keeps its backslash, so BBCF_IM\Palettes survives.
+function Decode-Escapes([string]$raw) {
+  if ($raw.IndexOf('\') -lt 0) { return $raw }
+  $sb = New-Object System.Text.StringBuilder
+  $i = 0
+  while ($i -lt $raw.Length) {
+    $c = $raw[$i]
+    if ($c -ne '\' -or $i + 1 -ge $raw.Length) {
+      [void]$sb.Append($c)
+      $i++
+      continue
+    }
+    $n = $raw[$i + 1]
+    if ($n -eq 'n') { [void]$sb.Append("`n"); $i += 2 }
+    elseif ($n -eq 'r') { [void]$sb.Append("`r"); $i += 2 }
+    elseif ($n -eq 't') { [void]$sb.Append("`t"); $i += 2 }
+    elseif ($n -eq '\') { [void]$sb.Append('\'); $i += 2 }
+    elseif ($n -eq '"') { [void]$sb.Append('"'); $i += 2 }
+    else { [void]$sb.Append($c); $i++ }
+  }
+  return $sb.ToString()
+}
 
 function Sanitize-Name([string]$raw, [hashtable]$existing) {
   $sanitized = [Regex]::Replace($raw, '[^0-9A-Za-z_]+', '_')
@@ -53,7 +81,8 @@ try {
   $lines.Add("")
 
   $seen = @{}
-  foreach ($original in $keys) {
+  foreach ($rawKey in $keys) {
+    $original = Decode-Escapes $rawKey
     $method = Sanitize-Name $original $seen
     $escapedComment = $original.Replace("`r","").Replace("`n","\n")
     $escapedLiteral = $original.Replace("\", "\\").Replace('"', '\"').Replace("`r","").Replace("`n","\n")

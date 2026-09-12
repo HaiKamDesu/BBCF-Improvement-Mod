@@ -208,6 +208,9 @@
     <ClCompile Include="src\Overlay\Widget\StageSelectWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\GameModeSelectWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\HotkeyBindWidget.cpp" />
+    <ClCompile Include="src\Overlay\Widget\TasDocument.cpp" />
+    <ClCompile Include="src\Overlay\Widget\TasPlaybackEditorView.cpp" />
+    <ClCompile Include="src\Overlay\Widget\TasFrameListView.cpp" />
     <ClCompile Include="src\Overlay\Widget\ActiveGameModeWidget.cpp" />
     <ClCompile Include="src\Overlay\Widget\MarkdownRenderer.cpp" />
     <ClCompile Include="src\Overlay\Widget\UpdateProgressWidget.cpp" />
@@ -226,7 +229,6 @@
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\FrameAdvantage.cpp" />
     <ClCompile Include="src\Game\Menus\TrainingSetupMenu.cpp" />
     <ClCompile Include="src\Overlay\Window\InputBufferWindow.cpp" />
-    <ClCompile Include="src\Overlay\Window\PlaybackEditorWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\UnlimitedPlaybackWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\NetworkSquareColorWindow.cpp" />
     <ClCompile Include="src\Game\Jonb\JonbDBReader.cpp" />
@@ -241,7 +243,7 @@
     <ClCompile Include="src\Overlay\Window\FrameHistory\FrameHistoryWindow.cpp" />
     <ClCompile Include="src\Game\ScenesManager\ScenesManager.cpp" />
     <ClCompile Include="src\Overlay\Window\FrameAdvantage\FrameAdvantageWindow.cpp" />
-    <ClCompile Include="src\Overlay\Window\ReplayRewindWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\ReplayExtrasWindow.cpp" />
     <ClCompile Include="src\Game\ReplayRewind\ReplayRewind.cpp" />
     <ClCompile Include="src\Game\TasManager.cpp" />
     <ClCompile Include="src\Hooks\hooks_battle_input.cpp" />
@@ -453,6 +455,9 @@
     <ClInclude Include="src\Overlay\Widget\StageSelectWidget.h" />
     <ClInclude Include="src\Overlay\Widget\GameModeSelectWidget.h" />
     <ClInclude Include="src\Overlay\Widget\HotkeyBindWidget.h" />
+    <ClInclude Include="src\Overlay\Widget\TasDocument.h" />
+    <ClInclude Include="src\Overlay\Widget\TasPlaybackEditorView.h" />
+    <ClInclude Include="src\Overlay\Widget\TasFrameListView.h" />
     <ClInclude Include="src\Overlay\Widget\ActiveGameModeWidget.h" />
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
     <ClInclude Include="src\Overlay\Widget\UpdateProgressWidget.h" />
@@ -476,7 +481,6 @@
     <ClInclude Include="src\Game\ReplayStates\FrameState.h" />
     <ClInclude Include="src\Game\Menus\TrainingSetupMenu.h" />
     <ClInclude Include="src\Overlay\Window\InputBufferWindow.h" />
-    <ClInclude Include="src\Overlay\Window\PlaybackEditorWindow.h" />
     <ClInclude Include="src\Overlay\Window\UnlimitedPlaybackWindow.h" />
     <ClInclude Include="src\Overlay\Window\NetworkSquareColorWindow.h" />
     <ClInclude Include="src\Game\Jonb\JonbDBReader.h" />
@@ -497,7 +501,7 @@
     <ClInclude Include="src\Overlay\Window\FrameHistory\FrameHistoryWindow.h" />
     <ClInclude Include="src\Game\ScenesManager\ScenesManager.h" />
     <ClInclude Include="src\Overlay\Window\FrameAdvantage\FrameAdvantageWindow.h" />
-    <ClInclude Include="src\Overlay\Window\ReplayRewindWindow.h" />
+    <ClInclude Include="src\Overlay\Window\ReplayExtrasWindow.h" />
     <ClInclude Include="src\Game\ReplayRewind\ReplayRewind.h" />
     <ClInclude Include="src\Hooks\hooks_battle_input.h" />
     <ClInclude Include="src\Hooks\RankedAutomationHarness.h" />

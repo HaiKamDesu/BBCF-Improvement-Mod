@@ -80,11 +80,27 @@ public:
 	void DrawWakeupBody();
 	void DrawSaveStatesBody();
 	void DrawLocalReplaysBody();
-	void DrawReplayTakeoverBody();
+	// idScope keeps this body's modal unique when more than one host draws it in the same
+	// frame (the Replay Extras window and the mod menu's Replays page both do). compact
+	// drops the asides that only earn their space with the mod menu's width behind them.
+	void DrawReplayTakeoverBody(const char* idScope, bool compact);
+	// True while a replay takeover is running, so the menu page can stay reachable after the
+	// mode has flipped to training - which is exactly when the user needs its two buttons.
+	bool IsReplayTakeoverActive() const { return takeover_active; }
+	// Replay takeover. One button in the replay opens the setup dialog; accepting it does
+	// the whole thing (snapshot, side swap, input capture, state load) in one go.
+	void DrawTakeoverSetupModal(const char* popupId);
+	void BeginReplayTakeover(bool asP1);
+	// Same moment, different options. Puts the replay back - the snapshot IS the moment you
+	// took over - and takes it over again, so switching side mid-takeover is free.
+	void ReconfigureReplayTakeover(bool asP1);
+	void EndReplayTakeover();
+	void TickReplayTakeover();
+	SnapshotApparatus* EnsureTakeoverSnapshot();
 	// Capture a stretch of the replay you are watching as a playback file. Lives on the
 	// Replays page rather than in the playback library, because it is a replay job: the
 	// file it writes can then be imported into a slot, a library, or a dummy action.
-	void DrawReplayPlaybackCaptureBody();
+	void DrawReplayPlaybackCaptureBody(const char* idScope, bool compact);
 	void DrawRoomSettingsBody();
 	void DrawInputBufferButton();
 	void DrawComboDataButton();
@@ -111,7 +127,6 @@ private:
 	void DrawReplayRewind();
 	void DrawReplayRewind_old();
 	void DrawWakeupDelayControl();
-	void DrawPlaybackEditor();
 	PlaybackManager playback_manager;
 	bool m_showDemoWindow = false;
 	void* p2_old_char_data = NULL;
@@ -203,6 +218,15 @@ private:
 	SnapshotApparatus* snap_apparatus_takeover = nullptr;
 	std::vector<char> replay_action_load{};
 	int facing_left_replay_takeover = 0;
+	bool takeover_active = false;
+	bool takeover_as_p1 = true;
+	// Which side the setup dialog currently has picked, remembered between opens.
+	int takeover_modal_side = 0;
+	// One reload per round end, not one per frame for as long as the KO animation lasts.
+	bool takeover_round_reset_armed = false;
+	// Side to re-take the moment with, or -1. Latched like the state loads: it reloads a
+	// snapshot, which must not happen from the draw pass.
+	int pending_takeover_reconfigure = -1;
 	float wait_before_exec_s = 0;
 	float wait_before_exec_s2 = 0;
 	unsigned long long setup_delay_last_tick = 0;

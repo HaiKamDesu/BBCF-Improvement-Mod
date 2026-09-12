@@ -12,7 +12,7 @@
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
-#include "Overlay/Window/PlaybackEditorWindow.h"
+#include "Overlay/Widget/TasPlaybackEditorView.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 #include "Overlay/WindowManager.h"
 #include "Overlay/WindowContainer/WindowType.h"
@@ -412,7 +412,6 @@ namespace {
     static bool openCaptureSlotModal = false;
     static bool openReplayCaptureModal = false;
     static bool openEntryEditModal = false;
-    static bool openEntryPlaybackEditorModal = false;
     static bool openSendToSlotModal = false;
     static bool openSetIndexModal = false;
     static bool openDefaultConfirmModal = false;
@@ -1077,11 +1076,30 @@ void DrawPlaybackLibraryPopups() {
         }
         ImGui::EndPopup();
     }
+    // Editing an entry is one draft: its name, its weight, and - once you have been into the
+    // frame editor - its frames. Nothing reaches the library until Save on THIS dialog, so
+    // Cancel here really does undo the frame editing you did underneath it.
+    static TasPlaybackEditorView entryPlaybackEditor;
+    static bool openEntryPlaybackModal = false;
+    static bool playbackDraftValid = false;
+    static bool playbackDraftFacing = false;
+    static std::vector<char> playbackDraftFrames;
+
+    const auto clearPlaybackDraft = []() {
+        playbackDraftValid = false;
+        playbackDraftFacing = false;
+        playbackDraftFrames.clear();
+    };
+
     if (openEntryEditModal && entryPendingEdit >= 0 && entryPendingEdit < static_cast<int>(mgr.GetEntries().size())) {
         const auto& entry = mgr.GetEntries()[entryPendingEdit];
         std::strncpy(editEntryName, entry.name.c_str(), IM_ARRAYSIZE(editEntryName) - 1);
         editEntryName[IM_ARRAYSIZE(editEntryName) - 1] = '\0';
         editEntryWeight = entry.weight;
+        // A fresh dialog starts from what is actually stored, never from the last one's
+        // leftovers.
+        clearPlaybackDraft();
+        entryPlaybackEditor.Close();
         const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
         ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::OpenPopup(L("Edit Library Entry").c_str());
@@ -1095,46 +1113,75 @@ void DrawPlaybackLibraryPopups() {
                 editEntryWeight = 0.01f;
             }
             if (ImGui::Button(L("Edit Playback").c_str())) {
-                auto& entry = mgr.GetEntriesMutable()[entryPendingEdit];
-                entry.name = editEntryName;
-                entry.weight = editEntryWeight;
-                if (m_pWindowContainer) {
-                    auto* editorWindow = m_pWindowContainer->GetWindow<PlaybackEditorWindow>(WindowType_PlaybackEditor);
-                    if (editorWindow) {
-                        if (editorWindow->BeginUnlimitedEntryEdit(static_cast<size_t>(entryPendingEdit))) {
-                            openEntryPlaybackEditorModal = true;
-                        }
-                    }
+                // Opens on the draft if there is one, so going back in a second time shows
+                // the edits you already made rather than the file again.
+                std::vector<char> frames = playbackDraftFrames;
+                bool facing = playbackDraftFacing;
+                bool read = playbackDraftValid;
+                if (!read) {
+                    read = mgr.ReadEntryPlayback(static_cast<size_t>(entryPendingEdit), &facing, &frames);
+                }
+
+                if (read && entryPlaybackEditor.OpenBuffer(editEntryName, frames, facing)) {
+                    openEntryPlaybackModal = true;
+                } else {
+                    mgr.PushToast(L("Could not read that library entry."));
                 }
             }
+            ImGui::ShowHelpMarkerSameLine(
+                L("Opens this entry's frames in the editor. Saving there comes back here; nothing reaches the library until you save this dialog too.").c_str());
+
             ImGui::SameLine();
             if (ImGui::Button(FormatText("%s##edit_entry", L("Save").c_str()).c_str())) {
                 auto& entry = mgr.GetEntriesMutable()[entryPendingEdit];
                 entry.name = editEntryName;
                 entry.weight = editEntryWeight;
+                if (playbackDraftValid &&
+                    !mgr.WriteEntryPlayback(static_cast<size_t>(entryPendingEdit), playbackDraftFacing, playbackDraftFrames)) {
+                    mgr.PushToast(L("Saving that library entry failed."));
+                }
+                clearPlaybackDraft();
+                entryPlaybackEditor.Close();
                 mgr.PushToast(L("Entry updated."));
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
             if (ImGui::Button(FormatText("%s##edit_entry", L("Cancel").c_str()).c_str())) {
+                // Including the frames: they were only ever held here.
+                clearPlaybackDraft();
+                entryPlaybackEditor.Close();
                 ImGui::CloseCurrentPopup();
             }
-            if (openEntryPlaybackEditorModal) {
+            if (playbackDraftValid) {
+                ImGui::TextColored(ImVec4(1.0f, 0.76f, 0.30f, 1.0f), "%s",
+                    L("Edited frames are waiting on Save.").c_str());
+            }
+
+            // A modal on top of this one, so the dialogs are resolved in order rather than
+            // this one vanishing under a window somewhere else on screen.
+            const std::string playbackTitle = L("Edit Entry Playback");
+            if (openEntryPlaybackModal) {
                 const ImVec2 displayCenter = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
                 ImGui::SetNextWindowPos(displayCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-                ImGui::SetNextWindowSize(ImVec2(900.0f, 620.0f), ImGuiCond_Appearing);
-                ImGui::OpenPopup(L("Edit Entry Playback").c_str());
-                openEntryPlaybackEditorModal = false;
+                ImGui::SetNextWindowSize(ImVec2(760.0f, 560.0f), ImGuiCond_Appearing);
+                ImGui::OpenPopup(playbackTitle.c_str());
+                openEntryPlaybackModal = false;
             }
-            if (ImGui::BeginPopupModal(L("Edit Entry Playback").c_str(), nullptr, ImGuiWindowFlags_NoResize)) {
-                auto* editorWindow = m_pWindowContainer ? m_pWindowContainer->GetWindow<PlaybackEditorWindow>(WindowType_PlaybackEditor) : nullptr;
-                if (editorWindow) {
-                    editorWindow->DrawEmbeddedEditor();
-                } else {
-                    ImGui::TextDisabled("%s", L("Playback editor is unavailable.").c_str());
-                    if (ImGui::Button(FormatText("%s##edit_entry_playback_missing", L("Close").c_str()).c_str())) {
-                        ImGui::CloseCurrentPopup();
-                    }
+            if (ImGui::BeginPopupModal(playbackTitle.c_str(), nullptr, 0)) {
+                switch (entryPlaybackEditor.Draw()) {
+                case TasPlaybackEditorView::Outcome::Saved:
+                    playbackDraftFrames = entryPlaybackEditor.Frames();
+                    playbackDraftFacing = entryPlaybackEditor.FacingLeft();
+                    playbackDraftValid = true;
+                    entryPlaybackEditor.Close();
+                    ImGui::CloseCurrentPopup();
+                    break;
+                case TasPlaybackEditorView::Outcome::Closed:
+                    entryPlaybackEditor.Close();
+                    ImGui::CloseCurrentPopup();
+                    break;
+                default:
+                    break;
                 }
                 ImGui::EndPopup();
             }

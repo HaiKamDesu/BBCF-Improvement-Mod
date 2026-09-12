@@ -1380,3 +1380,143 @@ No section,No section,Sin sección
 section name,section name,nombre de sección
 Add section,Add section,Añadir sección
 "Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.","Add markers at important points in a long combo. Clicking one jumps straight to that frame without changing the movie.","Añade marcadores en puntos importantes de un combo largo. Al hacer clic, saltas directamente a ese frame sin cambiar el movie."
+(library entry),(library entry),(entrada de la biblioteca)
+(training mode only),(training mode only),(solo en modo entrenamiento)
+"A small window that appears over a replay with these same rewind, takeover and capture controls, so you do not have to open this menu while watching.","A small window that appears over a replay with these same rewind, takeover and capture controls, so you do not have to open this menu while watching.","Una ventana pequeña que aparece sobre la repetición con estos mismos controles de rebobinado, toma de control y captura, para que no tengas que abrir este menú mientras miras."
+Capture playback,Capture playback,Capturar playback
+Capture playback from replay,Capture playback from replay,Capturar playback desde la repetición
+Capture whose inputs?,Capture whose inputs?,¿Capturar los inputs de quién?
+Choose a playback file to import,Choose a playback file to import,Elige un archivo de playback para importar
+Choose a slot to edit.,Choose a slot to edit.,Elige una ranura para editar.
+Choose a slot to write out.,Choose a slot to write out.,Elige una ranura para exportar.
+Choose a slot.,Choose a slot.,Elige una ranura.
+Close Replay Extras?,Close Replay Extras?,¿Cerrar Extras de Repetición?
+Close it,Close it,Cerrarla
+"Close the Replay Extras window? Rewind, takeover and capture all live in here.","Close the Replay Extras window? Rewind, takeover and capture all live in here.","¿Cerrar la ventana de Extras de Repetición? El rebobinado, la toma de control y la captura viven todos aquí."
+Could not open the save dialog. The capture was kept.,Could not open the save dialog. The capture was kept.,No se pudo abrir el diálogo de guardado. La captura se conservó.
+Could not read that library entry.,Could not read that library entry.,No se pudo leer esa entrada de la biblioteca.
+Could not read that recording slot.,Could not read that recording slot.,No se pudo leer esa ranura de grabación.
+Discard and close,Discard and close,Descartar y cerrar
+Drops the idle frames off the end of the recording. Undoable like any other edit.,Drops the idle frames off the end of the recording. Undoable like any other edit.,Quita los frames inactivos del final de la grabación. Se puede deshacer como cualquier otra edición.
+Edit which slot?,Edit which slot?,¿Qué ranura editar?
+Editing slot %d.,Editing slot %d.,Editando la ranura %d.
+Export Playback,Export Playback,Exportar playback
+Export which slot?,Export which slot?,¿Qué ranura exportar?
+"Exported slot %d, %u frames.","Exported slot %d, %u frames.","Ranura %d exportada, %u frames."
+Import Playback,Import Playback,Importar playback
+Import into which slot?,Import into which slot?,¿En qué ranura importar?
+"Imported '%s' into slot %d, %u frames.","Imported '%s' into slot %d, %u frames.","'%s' importado en la ranura %d, %u frames."
+Input,Input,Input
+Keep it open,Keep it open,Mantenerla abierta
+Keeps the list scrolled to the current frame. Turn it off to read through the list while it plays.,Keeps the list scrolled to the current frame. Turn it off to read through the list while it plays.,Mantiene la lista desplazada hasta el frame actual. Desactívalo para leer la lista mientras se reproduce.
+Left,Left,Izquierda
+"Load a playback file into one of the game's four recording slots, so you can play it back from the training menu like anything you recorded yourself.","Load a playback file into one of the game's four recording slots, so you can play it back from the training menu like anything you recorded yourself.","Carga un archivo de playback en una de las cuatro ranuras de grabación del juego, para reproducirlo desde el menú de entrenamiento como cualquier cosa que hayas grabado tú."
+Loading '%s'.,Loading '%s'.,Cargando '%s'.
+Mirror the recorded inputs (diagnostic),Mirror the recorded inputs (diagnostic),Reflejar los inputs grabados (diagnóstico)
+No frames yet.,No frames yet.,Todavía no hay frames.
+Nothing is open for editing.,Nothing is open for editing.,No hay nada abierto para editar.
+Nothing was captured.,Nothing was captured.,No se capturó nada.
+"Open a replay and press ""Takeover from here"".","Open a replay and press ""Takeover from here"".","Abre una repetición y pulsa ""Tomar el control desde aquí""."
+"Open one of the four recording slots in the frame editor, where you can retype, insert, delete and reorder single frames. Saving there writes straight back into the slot.","Open one of the four recording slots in the frame editor, where you can retype, insert, delete and reorder single frames. Saving there writes straight back into the slot.","Abre una de las cuatro ranuras de grabación en el editor de frames, donde puedes reescribir, insertar, borrar y reordenar frames sueltos. Guardar allí escribe directamente en la ranura."
+Overwrite,Overwrite,Sobrescribir
+Play as,Play as,Jugar como
+Playback editor,Playback editor,Editor de playback
+Playback file,Playback file,Archivo de playback
+"Puts everything back to the moment you took over and starts the recorded side again. Hotkey: %s. This also happens by itself whenever a round ends, so a KO never kicks you out to character select.","Puts everything back to the moment you took over and starts the recorded side again. Hotkey: %s. This also happens by itself whenever a round ends, so a KO never kicks you out to character select.","Devuelve todo al momento en que tomaste el control y vuelve a lanzar el lado grabado. Atajo: %s. Esto también ocurre solo cuando termina un asalto, así que un KO nunca te saca a la selección de personaje."
+Re-read from the game.,Re-read from the game.,Releído desde el juego.
+Recorded facing: %s,Recorded facing: %s,Grabado mirando hacia: %s
+Recording %s inputs from frame %d...,Recording %s inputs from frame %d...,Grabando los inputs de %s desde el frame %d...
+Recording slot,Recording slot,Ranura de grabación
+Recording slot %d,Recording slot %d,Ranura de grabación %d
+Recording starts now and runs until you stop it.,Recording starts now and runs until you stop it.,La grabación empieza ahora y sigue hasta que la detengas.
+"Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.","Records one player's inputs from the replay as it plays, then saves them as a playback file. Start it where you want the capture to begin and stop it where you want it to end.",Graba los inputs de un jugador desde la repetición mientras avanza y los guarda como archivo de playback. Inícialo donde quieras que empiece la captura y detenlo donde quieras que termine.
+Replay Extras,Replay Extras,Extras de Repetición
+Replay rewind,Replay rewind,Rebobinado de repetición
+Restart from takeover point,Restart from takeover point,Reiniciar desde el punto de toma de control
+Right,Right,Derecha
+Save cancelled - the capture was discarded.,Save cancelled - the capture was discarded.,Guardado cancelado: la captura se descartó.
+Save the captured playback,Save the captured playback,Guardar el playback capturado
+Save the playback file,Save the playback file,Guardar el archivo de playback
+Saved %u frames.,Saved %u frames.,%u frames guardados.
+Saved.,Saved.,Guardado.
+Saving that library entry failed.,Saving that library entry failed.,No se pudo guardar esa entrada de la biblioteca.
+Setup time: %.1fs,Setup time: %.1fs,Tiempo de preparación: %.1fs
+Show replay extras window,Show replay extras window,Mostrar la ventana de extras de repetición
+"Slot %d is on loan to the playback library right now. It holds runtime data, not what you recorded - editing and saving still apply to the contents that get put back.","Slot %d is on loan to the playback library right now. It holds runtime data, not what you recorded - editing and saving still apply to the contents that get put back.","La ranura %d está prestada ahora mismo a la biblioteca de playback. Contiene datos de ejecución, no lo que grabaste: editar y guardar siguen aplicándose al contenido que se restaurará."
+Step a replay backwards instead of restarting it. The mod keeps checkpoints as the replay plays; rewinding jumps to the nearest one.,Step a replay backwards instead of restarting it. The mod keeps checkpoints as the replay plays; rewinding jumps to the nearest one.,Retrocede una repetición en lugar de reiniciarla. El mod guarda puntos de control mientras avanza; rebobinar salta al más cercano.
+"Stop a replay where it is and play it out yourself, against everything the other side actually did. Hotkey: %s puts you back at the moment you took over.","Stop a replay where it is and play it out yourself, against everything the other side actually did. Hotkey: %s puts you back at the moment you took over.","Detén una repetición donde esté y juégala tú mismo, contra todo lo que el otro lado hizo de verdad. El atajo %s te devuelve al momento en que tomaste el control."
+Stop and Save...,Stop and Save...,Detener y guardar...
+Stops the replay at this exact moment and hands you one of the two players. The other side keeps doing everything it did in the replay.,Stops the replay at this exact moment and hands you one of the two players. The other side keeps doing everything it did in the replay.,Detiene la repetición en este momento exacto y te entrega uno de los dos jugadores. El otro lado sigue haciendo todo lo que hizo en la repetición.
+Take over,Take over,Tomar el control
+Take over this replay,Take over this replay,Tomar el control de esta repetición
+Takeover from here,Takeover from here,Tomar el control desde aquí
+That file could not be read as a playback.,That file could not be read as a playback.,Ese archivo no se pudo leer como playback.
+That playback could not be saved.,That playback could not be saved.,Ese playback no se pudo guardar.
+That slot could not be opened for editing.,That slot could not be opened for editing.,Esa ranura no se pudo abrir para editar.
+"The game freezes for this long once you are in, so you can get your hands into position. 0 starts immediately.","The game freezes for this long once you are in, so you can get your hands into position. 0 starts immediately.","El juego se congela este tiempo en cuanto entras, para que coloques las manos. 0 empieza de inmediato."
+Throws away unsaved edits and reads the recording again.,Throws away unsaved edits and reads the recording again.,Descarta las ediciones sin guardar y vuelve a leer la grabación.
+Trailing idle frames removed.,Trailing idle frames removed.,Frames inactivos del final eliminados.
+Trim,Trim,Recortar
+Trimmed.,Trimmed.,Recortado.
+"Turn a stretch of a replay into a playback file, which you can then load into a recording slot, a playback library, or straight onto a dummy action.","Turn a stretch of a replay into a playback file, which you can then load into a recording slot, a playback library, or straight onto a dummy action.","Convierte un tramo de una repetición en un archivo de playback, que luego puedes cargar en una ranura de grabación, en una biblioteca de playback o directamente en una acción del muñeco."
+Unsaved changes to the previous slot were discarded.,Unsaved changes to the previous slot were discarded.,Se descartaron los cambios sin guardar de la ranura anterior.
+Unsaved changes.,Unsaved changes.,Cambios sin guardar.
+Use this when a recording plays back mirrored: it was made on the other side of the screen.,Use this when a recording plays back mirrored: it was made on the other side of the screen.,Usa esto cuando una grabación se reproduce reflejada: se hizo en el otro lado de la pantalla.
+"Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot.","Write one of the four recording slots out to a playback file, which can then be imported anywhere else - a dummy action, a library, or another slot.","Exporta una de las cuatro ranuras de grabación a un archivo de playback, que luego se puede importar en cualquier otro sitio: una acción del muñeco, una biblioteca u otra ranura."
+Writes these frames back into the library entry's file.,Writes these frames back into the library entry's file.,Escribe estos frames de vuelta en el archivo de la entrada de la biblioteca.
+Writes these frames back into the recording slot.,Writes these frames back into the recording slot.,Escribe estos frames de vuelta en la ranura de grabación.
+You are playing as Player 1. Player 2 is replaying the recorded match.,You are playing as Player 1. Player 2 is replaying the recorded match.,Estás jugando como Jugador 1. El Jugador 2 está reproduciendo el combate grabado.
+You are playing as Player 2. Player 1 is replaying the recorded match.,You are playing as Player 2. Player 1 is replaying the recorded match.,Estás jugando como Jugador 2. El Jugador 1 está reproduciendo el combate grabado.
+"You can bring it back from the mod menu's Replays page, where the same controls also live.","You can bring it back from the mod menu's Replays page, where the same controls also live.","Puedes volver a mostrarla desde la página Repeticiones del menú del mod, donde también están los mismos controles."
+Edited frames are waiting on Save.,Edited frames are waiting on Save.,Los frames editados esperan a que guardes.
+Keeps these frames for the dialog that opened this editor. Nothing is written until you save there too.,Keeps these frames for the dialog that opened this editor. Nothing is written until you save there too.,Conserva estos frames para el diálogo que abrió este editor. No se escribe nada hasta que guardes allí también.
+Open a replay to capture a stretch of it.,Open a replay to capture a stretch of it.,Abre una repetición para capturar un tramo de ella.
+Open a replay to take one over from where it is.,Open a replay to take one over from where it is.,Abre una repetición para tomar el control desde donde esté.
+Opens this entry's frames in the editor. Saving there comes back here; nothing reaches the library until you save this dialog too.,Opens this entry's frames in the editor. Saving there comes back here; nothing reaches the library until you save this dialog too.,Abre los frames de esta entrada en el editor. Guardar allí te devuelve aquí; nada llega a la biblioteca hasta que guardes también este diálogo.
+Throws away every edit made since this editor was opened.,Throws away every edit made since this editor was opened.,Descarta todas las ediciones hechas desde que se abrió este editor.
+%.1f seconds,%.1f seconds,%.1f segundos
+"%s, from frame %d","%s, from frame %d","%s, desde el frame %d"
+- you are Player 1,- you are Player 1,- eres el Jugador 1
+- you are Player 2,- you are Player 2,- eres el Jugador 2
+Apply,Apply,Aplicar
+Back to replay,Back to replay,Volver a la repetición
+Capturing,Capturing,Capturando
+"Change which side you play, the setup time, or the hotkey - and take the same moment over again with the new settings.","Change which side you play, the setup time, or the hotkey - and take the same moment over again with the new settings.","Cambia el lado que juegas, el tiempo de preparación o el atajo, y vuelve a tomar el control del mismo momento con los nuevos ajustes."
+Custom Snapshot,Custom Snapshot,Instantánea personalizada
+Ending Time (seconds),Ending Time (seconds),Tiempo final (segundos)
+Gap,Gap,Hueco
+How the library chooses the next enabled entry when it is triggered.,How the library chooses the next enabled entry when it is triggered.,Cómo elige la biblioteca la siguiente entrada activada cuando se dispara.
+Inputs are temporarily overridden; this happens once per lab session.,Inputs are temporarily overridden; this happens once per lab session.,Los inputs se anulan temporalmente; esto ocurre una vez por sesión de laboratorio.
+Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.,Lab state restored before each loop. Left/Middle/Right briefly take control the first time the loop starts to reset there and auto-save a snapshot; Custom Snapshot uses a snapshot you save manually.,El estado del laboratorio se restaura antes de cada bucle. Izquierda/Centro/Derecha toman el control brevemente la primera vez que arranca el bucle para reiniciar ahí y guardar una instantánea automática; Instantánea personalizada usa una que guardes tú.
+Loop Setup Countdown,Loop Setup Countdown,Cuenta atrás de preparación del bucle
+Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.,Loop restart restores this session-only snapshot before each slot. It is cleared when leaving lab.,"El reinicio del bucle restaura esta instantánea, que solo dura la sesión, antes de cada ranura. Se borra al salir del laboratorio."
+Maps the button or key used to start and stop loop playback.,Maps the button or key used to start and stop loop playback.,Asigna el botón o la tecla que inicia y detiene la reproducción en bucle.
+Middle,Middle,Centro
+No snapshot loaded,No snapshot loaded,Ninguna instantánea cargada
+No trigger is drawing from a library yet. Add an action on the Training page and point it at one.,No trigger is drawing from a library yet. Add an action on the Training page and point it at one.,Todavía ningún disparador usa una biblioteca. Añade una acción en la página Entrenamiento y apúntala a una.
+On loop,On loop,En bucle
+Picking order,Picking order,Orden de elección
+Position set up automatically when the loop starts,Position set up automatically when the loop starts,Posición preparada automáticamente al arrancar el bucle
+Replay Recording,Replay Recording,Grabación de repetición
+Replay recording is already running. Use the non-modal recording window to stop or cancel.,Replay recording is already running. Use the non-modal recording window to stop or cancel.,Ya hay una grabación de repetición en marcha. Usa la ventana de grabación para detenerla o cancelarla.
+Reset Position,Reset Position,Reiniciar posición
+Reset position snapshot ready,Reset position snapshot ready,Instantánea de posición de reinicio lista
+Restart,Restart,Reiniciar
+Restart hotkey: %s,Restart hotkey: %s,Atajo de reinicio: %s
+Restart lab state in-between,Restart lab state in-between,Reiniciar el estado del laboratorio entre medias
+Restore the saved loop snapshot now for verification.,Restore the saved loop snapshot now for verification.,Restaura ahora la instantánea guardada del bucle para comprobarla.
+Running,Running,En marcha
+Save current lab state as the loop restart snapshot.,Save current lab state as the loop restart snapshot.,Guarda el estado actual del laboratorio como instantánea de reinicio del bucle.
+Seconds to show a setup countdown after optional snapshot restore before playing the next slot.,Seconds to show a setup countdown after optional snapshot restore before playing the next slot.,"Segundos de cuenta atrás de preparación tras la restauración opcional de la instantánea, antes de reproducir la siguiente ranura."
+Seconds to wait after both players return to idle before starting the next setup.,Seconds to wait after both players return to idle before starting the next setup.,Segundos de espera tras volver ambos jugadores al reposo antes de empezar la siguiente preparación.
+Setting up loop reset position...,Setting up loop reset position...,Preparando la posición de reinicio del bucle...
+Settings,Settings,Ajustes
+Setup Time (seconds),Setup Time (seconds),Tiempo de preparación (segundos)
+Snapshot loaded,Snapshot loaded,Instantánea cargada
+Stopped,Stopped,Detenido
+Stops recording and asks where to save the captured inputs as a playback file.,Stops recording and asks where to save the captured inputs as a playback file.,Detiene la grabación y pregunta dónde guardar los inputs capturados como archivo de playback.
+Takeover mode,Takeover mode,Modo de toma de control
+Takeover settings,Takeover settings,Ajustes de toma de control
+Throws the capture away and stops recording.,Throws the capture away and stops recording.,Descarta la captura y detiene la grabación.
+Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Versión de playback incompatible.\n\nVersión del archivo: %s\nVersión del código: %s\n\n%s
+Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Versión de perfil incompatible.\n\nVersión del archivo: %s\nVersión del código: %s\n\n%s

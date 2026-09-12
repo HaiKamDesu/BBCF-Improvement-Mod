@@ -9,13 +9,12 @@
 #include "Overlay/Window/UpdateNotifierWindow.h"
 #include "Overlay/Window/ScrWindow.h"
 #include "Overlay/Window/InputBufferWindow.h"
-#include "Overlay/Window/PlaybackEditorWindow.h"
 #include "Overlay/Window/ComboDataWindow.h"
 #include "Overlay/Window/ReplayDBPopupWindow.h" 
 #include "Overlay/Window/PaletteSharePopupWindow.h"
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
-#include "Overlay/Window/ReplayRewindWindow.h"
+#include "Overlay/Window/ReplayExtrasWindow.h"
 #include "Overlay/Window/JukeboxWindow.h"
 #include "Overlay/Window/BgmReplacementWindow.h"
 #include "Overlay/Window/WinePopupWindow.h"
@@ -72,9 +71,6 @@ WindowContainer::WindowContainer()
 	AddWindow(WindowType_InputBufferP2,
 		new InputBufferWindow("Input Buffer P2", true, 2));
 
-	AddWindow(WindowType_PlaybackEditor,
-		new PlaybackEditorWindow("Playback Editor", true));
-
 	AddWindow(WindowType_ComboData,
 		new ComboDataWindow("Combo Data", true, ImGuiWindowFlags_AlwaysAutoResize));
 
@@ -87,8 +83,11 @@ WindowContainer::WindowContainer()
         AddWindow(WindowType_FrameAdvantage,
                 new FrameAdvantageWindow("Frame Advantage", true, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse));
 	
-        AddWindow(WindowType_ReplayRewind,
-                new ReplayRewindWindow(Messages.Replay_Rewind(), true, *this, ImGuiWindowFlags_NoTitleBar));
+        // A real title bar now: it has a name worth showing and a close button the user is
+        // allowed to press (which asks first, see ReplayExtrasWindow::DrawCloseConfirm).
+        AddWindow(WindowType_ReplayExtras,
+                new ReplayExtrasWindow((L("Replay Extras") + "###ReplayExtras").c_str(), true, *this,
+                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse));
 
         AddWindow(WindowType_WinePopup,
                 new WinePopupWindow("Wine Popup", true, *this, ImGuiWindowFlags_NoTitleBar));

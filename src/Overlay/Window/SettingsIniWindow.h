@@ -40,8 +40,18 @@ private:
 
 	void BuildRows();
 
+	bool RowMatchesFilter(const SettingRow& row) const;
+	int  VisibleRowCount(const char* category) const;
+	void DrawRow(SettingRow& row, bool& restartRowChanged);
+	void DrawCategoryTable(const char* category, bool& restartRowChanged);
+	void DrawNav(float width, float height);
+	void DrawPageBody(bool& restartRowChanged);
+	void DrawSearchResults(bool& restartRowChanged);
+
 	settingsIni_t m_settingsDraft{};
 	bool m_needsRestart = false;
 	ImGuiTextFilter m_settingsFilter;
 	std::vector<SettingRow> m_settingRows;
+	// Survives closing the popup, so reopening it lands where you left off.
+	int m_currentPage = 0;
 };

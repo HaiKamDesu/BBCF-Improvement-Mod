@@ -263,3 +263,7 @@ SETTING(int, lobbyAvatarAccessory2, "LobbyAvatarAccessory2", "-1");
 // answer "how much did that combo actually do" in the lab. See AbyssHpNumbersGate in
 // src/Hooks/hooks_bbcf.cpp.
 SETTING(bool, showHpNumbers, "ShowHpNumbers", "0");
+
+// How long the game freezes after a replay takeover loads, so you can get your hands into
+// position before the recorded side starts moving. Set from the takeover dialog itself.
+SETTING(float, replayTakeoverSetupSeconds, "ReplayTakeoverSetupSeconds", "1.0");
