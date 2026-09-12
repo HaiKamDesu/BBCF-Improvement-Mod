@@ -185,13 +185,9 @@ void RemoveSystemInputHook()
         HookManager::DeactivateHook("SystemInputWrite");
 }
 
-bool PollTrainingResetPressed(bool* outUpHeld)
+bool PollTrainingResetPressed()
 {
         constexpr uint32_t kActionResetPositions = 0x08000000; // just-pressed word bit
-        constexpr uint32_t kActionUp = 0x00000001;             // held word bit
-
-        bool pressed = false;
-        bool upHeld = false;
 
         for (size_t i = 0; i < kProbeMaxControllers; ++i)
         {
@@ -200,27 +196,18 @@ bool PollTrainingResetPressed(bool* outUpHeld)
                 {
                         break;
                 }
-                if (IsBadReadPtr(ptr + 0x28, 0x0C))
+                if (IsBadReadPtr(ptr + 0x28, 0x04))
                 {
                         continue;
                 }
 
                 const uint32_t edges = *reinterpret_cast<const uint32_t*>(ptr + 0x28);
-                const uint32_t held = *reinterpret_cast<const uint32_t*>(ptr + 0x30);
                 if (edges & kActionResetPositions)
                 {
-                        pressed = true;
-                }
-                if (held & kActionUp)
-                {
-                        upHeld = true;
+                        return true;
                 }
         }
 
-        if (outUpHeld != nullptr)
-        {
-                *outUpHeld = upHeld;
-        }
-        return pressed;
+        return false;
 }
 

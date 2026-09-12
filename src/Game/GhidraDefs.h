@@ -494,11 +494,22 @@ static constexpr uintptr_t ADDR_InputDevice_BuildActionWords = 0x000963F0;
 // NEVER carry more than 0x3FF => training reset does not travel through the
 // BattleInputWrite word.
 static constexpr uintptr_t ADDR_InputDevice_PackBattleWord = 0x000968E0;
-// Action-ID -> action-bit lookup table (31 dwords, .data). ActionIDs are the
-// small ints pushed to the check wrappers below (5=menu confirm 0x4000000,
-// 6=pause/start 0x8000000, 7-10=up/left/down/right 1/4/8/2, 11=B 0x8000,
+// Action-ID -> action-bit lookup table (31 dwords, .data; absolute VA 0x9DE0B0,
+// re-read and transcribed in full 2026-09-12). ActionIDs are the small ints
+// pushed to the check wrappers below (5=menu confirm 0x4000000, 6=reset
+// positions 0x8000000, 7-10=up/down/left/right 1/4/8/2, 11=B 0x8000,
 // 12=D 0x1000, 13=C 0x2000, 14=A 0x4000, 16=taunt 0x20000, 18=special 0x80000,
-// replay-shortcut ids 0x0B-0x14 map to 0x10000..0x200000 range).
+// replay-shortcut ids 0x0B-0x14 map to 0x10000..0x200000 range; ids 21-24 are a
+// second direction group at bits 8-11, unbound on keyboard).
+//
+// CORRECTION (2026-09-12): ids 8 and 9 were previously labelled left/down here.
+// They are DOWN(0x4) and LEFT(0x8). The action INDEX order is 0=Up, 1=Right,
+// 2=Down, 3=Left, established two independent ways: the keyboard default table
+// FUN_00469AB0 binds indices 0/1/2/3 to W/D/S/A, and the hardcoded fallbacks in
+// FUN_00469750 (below) attach VK_UP/VK_RIGHT/VK_DOWN/VK_LEFT to the same four.
+// So direction masks are Up=0x1, Right=0x2, Down=0x4, Left=0x8 - which is what
+// ControllerOverrideManager::EncodeDirections() already does; this comment was
+// the thing that was wrong, not the code.
 static constexpr uintptr_t ADDR_ActionIdMaskTable = 0x005DE0B0;
 // Check wrappers (thiscall, ecx = per-controller wrapper from FUN_0047E7B0(id),
 // which fans out to both devices of that controller):
@@ -547,10 +558,16 @@ static constexpr uintptr_t ADDR_BattleScene_FlagsOffset = 0x00062B7C; // offset,
 // recreate comes up with default Key Config: the game applies the SAVED
 // config in a separate later step (below).
 //
-// SystemManager (base+0x8929C8) controller slots (filled by the creators):
-//   +0x0C = keyboard SystemKeyControler   +0x18 = keyboard BattleKeyControler
+// SystemManager (base+0x8929C8, absolute 0xC929C8) controller slots:
+//   +0x0C = keyboard ctrl set A           +0x18 = keyboard ctrl set B
 //   +0x10+4*slot = pad ctrl set A (also aliased at +0x1C+4*slot)
 //   +0x24+4*slot = pad ctrl set B (returned by FUN_004C1380(sysMgr, slot))
+// CORRECTION (2026-09-12): +0x18 is NOT a BattleKeyControler. BOTH keyboard
+// objects are GAMESTEAM_SystemKeyControler - FUN_00473EF0 builds them from the
+// same factory at 0x89DBBC, whose RTTI COL 0x9AC408 names
+// GAMESTEAM_SystemKeyControlerFactory. GAMESTEAM_BattleKeyControler comes only
+// from the pad creator FUN_004722C0 (factory 0x89DBB4, COL 0x9AC3BC). This
+// matters: the two classes resolve bindings differently (see below).
 //
 // Binding accessors on the controller object:
 //   FUN_00496AD0(this, actionIdx, code) stdcall-thiscall = SetBinding
@@ -599,6 +616,57 @@ static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetB = 0x000BB6E0;
 static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetB = 0x000BB860;
 static constexpr uintptr_t ADDR_ApplyPadKeyConfig_SetA = 0x000BBA10;
 static constexpr uintptr_t ADDR_ApplyKeyboardKeyConfig_SetA = 0x000BBB30;
+
+// ---------------------------------------------------------------------------
+// SystemKeyControler direction resolution, and why device+0x30 bit 0 is NOT a
+// trustworthy "player is holding Up" (old snake's training side-swap report,
+// 2026-09-12; DEBUG.txt of 2026-09-11 22:24).
+//
+// vtbl+8 = "is this action's binding down", called per action index by
+// FUN_004963F0. The two classes differ:
+//   GAMESTEAM_BattleKeyControler : FUN_00469700 - configured binding only.
+//   GAMESTEAM_SystemKeyControler : FUN_00469750 - configured binding, PLUS a
+//     jump table at 0x469814 covering action indices 0-3 only, which appends
+//     HARDCODED, UNREBINDABLE keys and ORs up to three candidates:
+//       idx 0 (Up)    += VK_UP  and  VK_SPACE   <- two extras
+//       idx 1 (Right) += VK_RIGHT
+//       idx 2 (Down)  += VK_DOWN
+//       idx 3 (Left)  += VK_LEFT
+//     (game key ids 0x5E/0x41/0x5F/0x60/0x61; see the VK map below.) This is why
+//     the arrow keys and Space always steer BBCF on a keyboard no matter what the
+//     key config says.
+// Both keyboard controllers are SystemKeyControlers, so BOTH carry those extras,
+// and each is driven by a DIFFERENT saved key config set (set A / set B above).
+// A player who rebound only one set still has the other on the W/D/S/A default,
+// so e.g. a Q/W/E+Space layout has "W" lit as Up on one object while it means
+// Down in battle. Any code that ORs bit 0 across the controller objects therefore
+// reads Up when the player presses W, Space or the up arrow.
+//
+// Direction state: use the packed battle input word instead
+// (hooks_battle_input.h GetLastObservedBattleInput) - that is the player's real
+// in-match direction under their own battle key config, pad and keyboard alike,
+// and it carries none of the menu-side or hardcoded bits. Action words remain fine
+// for the reset EDGE (bit 0x08000000 = action index 0x1B, keyboard default
+// Backspace, pad default button 9).
+static constexpr uintptr_t ADDR_BattleKeyControler_IsBindingDown = 0x00069700; // FUN_00469700
+static constexpr uintptr_t ADDR_SystemKeyControler_IsBindingDown = 0x00069750; // FUN_00469750
+static constexpr uintptr_t ADDR_SystemKeyControler_DirExtrasJumpTable = 0x00069814;
+//
+// Keyboard key-code space (AASTEAM_CInputKeyBoard, vtable .rdata 0x84FCA8):
+//   FUN_004194E0 = poll. Copies the current 128-bit pressed map (this+8..+0x17) to
+//     the previous one (+0x18), reads GetKeyboardState into this+0x28 (256 VK
+//     bytes), then for each VK with 0x80 set maps VK -> game key id through the
+//     byte table at 0xA255C8 (0x6A = unmapped) and sets that bit in the map.
+//   FUN_00419400 = vtbl+0xC IsPressed(gameKeyId): map[id>>5] & (1 << (id & 31)).
+//   The VK -> game-key-id table is built at runtime by the keyboard ctor
+//     FUN_00419070 (it lives in BSS, so it is NOT readable from BBCF.exe on disk -
+//     reconstruct it from the ctor's stores if you need it again). Layout:
+//     ids 0x00-0x19 = VK 'A'-'Z', 0x1A-0x23 = VK '1'-'9','0', 0x24 = RETURN,
+//     0x25 = ESCAPE, 0x26-0x31 = F1-F12, 0x41 = SPACE, 0x42 = BACKSPACE,
+//     0x54-0x5D = numpad 0-9, 0x5E = UP, 0x5F = RIGHT, 0x60 = DOWN, 0x61 = LEFT.
+static constexpr uintptr_t ADDR_Keyboard_VkToGameKeyTable = 0x006255C8; // 256 bytes, BSS
+static constexpr uintptr_t ADDR_Keyboard_Poll = 0x000194E0;             // FUN_004194E0
+static constexpr uintptr_t ADDR_Keyboard_IsPressed = 0x00019400;        // FUN_00419400
 
 // ---------------------------------------------------------------------------
 // Platinum personality/voice roll (Sena/Luna). See

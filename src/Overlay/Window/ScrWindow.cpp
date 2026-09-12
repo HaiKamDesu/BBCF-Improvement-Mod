@@ -36,6 +36,7 @@
 #include "Game/Playbacks/PlaybackManager.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
+#include "Hooks/hooks_battle_input.h"
 #include "Hooks/hooks_system_input.h"
 #include "Core/logger.h"
 #include "Overlay/imgui_utils.h"
@@ -869,15 +870,53 @@ void ScrWindow::RunPendingSaveStateRequests()
 
 bool ScrWindow::s_swapCoordsToggle = false;
 
+namespace {
+
+// True while either battle input slot is holding an up direction (packed digits 7/8/9).
+//
+// Both slots, not just P1: the detection this replaces OR-ed every controller object the
+// game owns, so a player sitting on the P2 side could already toggle the swap. Reading
+// both keeps that working and stays strictly narrower than the old behaviour, so nobody
+// this feature works for today loses it.
+bool IsAnyPlayerHoldingUp()
+{
+    if (!IsBattleInputHookInstalled()) {
+        // Without the battle-input hook there is no trustworthy source for the player's
+        // direction, and the action words are exactly the thing that misreports it. Fail
+        // closed - the "Swap sides on every reset" checkbox still works by hand.
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            LOG(1, "[ResetSwap] battle input hook unavailable - Up+reset toggle disabled\n");
+        }
+        return false;
+    }
+
+    return GetLastObservedBattleInput(0).up || GetLastObservedBattleInput(1).up;
+}
+
+} // namespace
+
 void ScrWindow::TickTrainingResetSwap() {
     // "Hold Up while pressing the reset bind" toggles the always-swap ("P2 mode")
     // checkbox, mirroring how the native reset treats directions: only what's held at
     // the PRESS moment matters, releasing during the fadeout is fine.
     //
-    // Detection reads the game's own keyconfig-resolved logical action words on the
-    // battle-key controller objects (PollTrainingResetPressed - reset action edge bit
-    // + Up held bit, identified via the [ResetProbe] runs of 2026-07-19). This fires
-    // on the exact press frame, for any rebound key or controller button.
+    // The reset press itself is read from the game's own keyconfig-resolved logical
+    // action words (PollTrainingResetPressed - reset action edge bit, identified via
+    // the [ResetProbe] runs of 2026-07-19). This fires on the exact press frame, for
+    // any rebound key or controller button.
+    //
+    // "Up" is NOT read from those action words. Their Up bit lies on a keyboard: the
+    // captured controller set includes the two GAMESTEAM_SystemKeyControler objects
+    // (sysMgr+0x0C/+0x18), whose Up action is fed by BBCF's second key config set -
+    // untouched, and therefore still default W/D/S/A, for anyone who only rebound the
+    // other one - plus the hardcoded VK_SPACE and VK_UP fallbacks in FUN_00469750.
+    // Someone playing a Q/W/E+Space layout toggles this on every single reset, because
+    // their "down" key is the other config set's "up". See the SystemKeyControler block
+    // in GhidraDefs.h. So take the direction from the packed battle input word instead:
+    // that is the player's real, in-match direction under their own battle key config,
+    // identical for pad and keyboard, and it never carries the menu-side bits.
     //
     // The toggle is then applied only when the reset actually executes (frame counter
     // drops), armed for a few seconds from the press: this keeps the visual change in
@@ -902,10 +941,9 @@ void ScrWindow::TickTrainingResetSwap() {
 
     int current_frame_count = *g_gameVals.pFrameCount;
 
-    bool up_held = false;
-    if (PollTrainingResetPressed(&up_held)) {
+    if (PollTrainingResetPressed()) {
         armed_at_ms = GetTickCount64();
-        armed_up = up_held;
+        armed_up = IsAnyPlayerHoldingUp();
     }
 
     if (last_frame_count != -1 && current_frame_count < last_frame_count) {
