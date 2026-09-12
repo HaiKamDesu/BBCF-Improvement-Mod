@@ -555,7 +555,6 @@ Unlimited Playback (BETA),Unlimited Playback (BETA),Playback ilimitado (BETA)
 Playback Library,Playback Library,Biblioteca de playback
 Popup is always available. Runtime actions only work in the right context.,Popup is always available. Runtime actions only work in the right context.,La ventana siempre abre. Las acciones solo funcionan en el contexto correcto.
 Loop current playback,Loop current playback,Repetir playback actual
-This will continuously loop the current recording slot, subject to absolute positioning.,This will continuously loop the current recording slot, subject to absolute positioning.,Repite continuamente la ranura actual, sujeto al posicionamiento absoluto.
 A native file dialog is already open.,A native file dialog is already open.,Ya hay un selector de archivos nativo abierto.
 Mapped playback bind: %s,Mapped playback bind: %s,Asignado el botón de playback: %s
 Profile Compatibility,Profile Compatibility,Compatibilidad de perfil

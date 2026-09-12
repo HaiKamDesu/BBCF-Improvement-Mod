@@ -1257,9 +1257,6 @@ struct LocalizationKeysAccessor
         // Loop current playback
         inline const char* Loop_current_playback() const { return Get("Loop current playback"); }
 
-        // This will continuously loop the current recording slot
-        inline const char* This_will_continuously_loop_the_current_recording_slot() const { return Get("This will continuously loop the current recording slot"); }
-
         // A native file dialog is already open.
         inline const char* A_native_file_dialog_is_already_open() const { return Get("A native file dialog is already open."); }
 
