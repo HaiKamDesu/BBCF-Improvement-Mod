@@ -281,6 +281,11 @@ public:
     std::string GetActiveProfilePath() const;
     void SetActiveProfilePath(const std::string& path);
 
+    // Forces one of the dummy's own script states on it right now, with no trigger involved
+    // and nothing stored. Same two writes the animation trigger performs; it exists so the
+    // animation picker can preview a move without the user having to commit to it first.
+    bool PlayAnimationNow(scrState* state);
+
     std::string GetStatusText() const;
     const std::deque<ToastMessage>& GetToasts() const;
     void PruneExpiredToasts();

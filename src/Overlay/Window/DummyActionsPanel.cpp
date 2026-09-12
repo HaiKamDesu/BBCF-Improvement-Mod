@@ -1467,6 +1467,21 @@ namespace
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("With more than one move in the set the dummy picks one at random every time the trigger fires.").c_str());
 
+		// Trying a move is how you find out it was the wrong one. Without this, seeing a move meant
+		// assigning it to a trigger, closing the window, and arranging for that trigger to fire -
+		// so the picker is where the button belongs, next to the move you are looking at.
+		const bool canPlayNow = selected != nullptr && !g_interfaces.player2.IsCharDataNullPtr();
+		if (!canPlayNow) { ImGui::BeginDisabled(); }
+		if (ImGui::Button(L("Play now").c_str()) && canPlayNow)
+		{
+			UnlimitedPlaybackManager::Instance().PlayAnimationNow(selected);
+		}
+		if (!canPlayNow) { ImGui::EndDisabled(); }
+		ImGui::SameLine();
+		ImGui::HoverTooltipEvenDisabled(selected
+			? L("Plays the highlighted move on the dummy right now. Nothing is assigned or saved - the delay above is ignored too, so this is just a look at the move.").c_str()
+			: L("Pick a move on the left to play it.").c_str());
+
 		EndModalBodyAndSeparate();
 		ImGui::VerticalSpacing(4);
 		const bool haveAny = !action.animations.empty();

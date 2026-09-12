@@ -715,7 +715,6 @@ Entry overwritten from slot.,Entry overwritten from slot.,Entrada sobrescrita de
 Entry saved.,Entry saved.,Entrada guardada.
 Failed saving entry to file.,Failed saving entry to file.,Error al guardar la entrada en archivo.
 Entry saved to file.,Entry saved to file.,Entrada guardada en archivo.
-Play now works only during a training match.,Play now works only during a training match.,Reproducir ahora solo funciona en Training.
 Played: %s%s,Played: %s%s,Reproducido: %s%s
  (mirrored), (mirrored), (espejado)
 Unlimited playback config cleared.,Unlimited playback config cleared.,Configuración de playback ilimitado borrada.
@@ -1520,3 +1519,7 @@ Takeover settings,Takeover settings,Ajustes de toma de control
 Throws the capture away and stops recording.,Throws the capture away and stops recording.,Descarta la captura y detiene la grabación.
 Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Playback version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Versión de playback incompatible.\n\nVersión del archivo: %s\nVersión del código: %s\n\n%s
 Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s,Versión de perfil incompatible.\n\nVersión del archivo: %s\nVersión del código: %s\n\n%s
+Play now,Play now,Reproducir ahora
+"Plays the highlighted move on the dummy right now. Nothing is assigned or saved - the delay above is ignored too, so this is just a look at the move.","Plays the highlighted move on the dummy right now. Nothing is assigned or saved - the delay above is ignored too, so this is just a look at the move.","Reproduce el movimiento seleccionado en el muñeco ahora mismo. No se asigna ni se guarda nada, y el retardo de arriba tampoco se aplica: es solo para ver el movimiento."
+Pick a move on the left to play it.,Pick a move on the left to play it.,Elige un movimiento a la izquierda para reproducirlo.
+Playing: %s,Playing: %s,Reproduciendo: %s

@@ -1647,9 +1647,6 @@ struct LocalizationKeysAccessor
         // Entry saved to file.
         inline const char* Entry_saved_to_file() const { return Get("Entry saved to file."); }
 
-        // Play now works only during a training match.
-        inline const char* Play_now_works_only_during_a_training_match() const { return Get("Play now works only during a training match."); }
-
         // Played: %s%s
         inline const char* Played_s_s() const { return Get("Played: %s%s"); }
 
@@ -4025,6 +4022,18 @@ struct LocalizationKeysAccessor
 
         // Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s
         inline const char* Profile_version_mismatch_File_version_s_Code_version_s_s_2() const { return Get("Profile version mismatch.\n\nFile version: %s\nCode version: %s\n\n%s"); }
+
+        // Play now
+        inline const char* Play_now() const { return Get("Play now"); }
+
+        // Plays the highlighted move on the dummy right now. Nothing is assigned or saved - the delay above is ignored too, so this is just a look at the move.
+        inline const char* Plays_the_highlighted_move_on_the_dummy_right_now_Nothing_is_assigned_or_saved_the_delay_above_is_ignored_too_so_this_is_just_a_look_at_the_move() const { return Get("Plays the highlighted move on the dummy right now. Nothing is assigned or saved - the delay above is ignored too, so this is just a look at the move."); }
+
+        // Pick a move on the left to play it.
+        inline const char* Pick_a_move_on_the_left_to_play_it() const { return Get("Pick a move on the left to play it."); }
+
+        // Playing: %s
+        inline const char* Playing_s() const { return Get("Playing: %s"); }
 };
 
 

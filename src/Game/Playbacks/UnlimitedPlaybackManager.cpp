@@ -1,6 +1,7 @@
 #include "UnlimitedPlaybackManager.h"
 
 #include "Game/Playbacks/DummyActionManager.h"
+#include "Game/Scr/ScrStateNames.h"
 
 #include "Core/Localization.h"
 #include "Core/Settings.h"
@@ -2398,6 +2399,27 @@ void UnlimitedPlaybackManager::ProcessPendingTriggerDelays(int currentFrame) {
         config.pendingFireFrame = -1;
         StartResolvedAction(static_cast<TriggerType>(i), currentFrame);
     }
+}
+
+// Preview one animation immediately. Deliberately not routed through StartResolvedAction: that
+// belongs to a trigger, updates its bookkeeping and reads its configured action. This is the bare
+// script jump - the same pair of writes the animation branch of StartResolvedAction performs - so
+// picking a move in the animation config window can show it without saving anything first.
+bool UnlimitedPlaybackManager::PlayAnimationNow(scrState* state) {
+    if (!state || !state->addr) {
+        return false;
+    }
+    if (g_interfaces.player2.IsCharDataNullPtr()) {
+        return false;
+    }
+
+    auto* p2 = g_interfaces.player2.GetData();
+    memcpy(&(p2->nextScriptLineLocationInMemory), &(state->addr), 4);
+    p2->frameCounterCurrentSprite = p2->frameLengthCurrentSprite2 - 1;
+
+    LOG(1, "[UP] Previewed animation '%s' on the dummy.\n", state->name.c_str());
+    PushToast(FormatLocalized("Playing: %s", ScrStateNames::Display(state->name).c_str()));
+    return true;
 }
 
 bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int currentFrame) {
