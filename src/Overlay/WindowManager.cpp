@@ -18,6 +18,7 @@
 #include "Window/WinePopupWindow.h"
 
 #include "Game/EntityDiagnostics.h"
+#include "Game/ReplayPauseProbe.h"
 #include "Game/gamestates.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
@@ -766,15 +767,24 @@ void WindowManager::Render()
 		}
 	}
 
-	// Does a paused replay still draw its HUD? The hooked getter is called only from the four HUD
-	// element draws, so its call count is a direct proxy for those draws running. Pause is detected
+	// Does a paused replay still draw its HUD elements, and if not, are they being turned away by
+	// the element visible bit? The hook sits on the real per-element draw gate at 0x00637E10, so
+	// these counts mean what they say - unlike the previous round, which counted a resource loader
+	// and therefore measured nothing. Pause is detected
 	// by the world frame counter standing still, which needs no knowledge of where the pause state
 	// lives - the point at issue. Logged on every pause/resume transition as well as once a second,
 	// so a short pause cannot fall between two samples, and carrying the interval so a partial
 	// sample can be normalised against a full second.
-	extern volatile int g_replayHudGateCalls;
-	extern volatile int g_replayHudGateSuppressed;
-	extern volatile int g_replayHudGateLastRaw;
+	extern volatile int g_hudGateCalls;
+	extern volatile int g_hudGateHiddenBit24;
+	extern volatile int g_hudGateLastFlags;
+	extern volatile int g_hudPauseElems;
+	extern volatile int g_hudPauseFlagsOr;
+	extern volatile int g_hudPauseFlagsAnd;
+	extern volatile int g_hudPauseA0Or;
+	extern volatile int g_hudPauseA0And;
+	extern volatile int g_hudPauseA8Or;
+	extern volatile int g_hudPauseA8And;
 	if (g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_ReplayTheater && g_gameVals.pFrameCount)
 	{
 		static unsigned long long s_lastLogMs = 0;
@@ -790,23 +800,35 @@ void WindowManager::Render()
 		const bool paused = s_stalled > 10;
 		const bool transition = paused != s_paused;
 
+		ReplayPauseProbe::Update(true, paused);
+
 		const unsigned long long now = GetTickCount64();
 		if ((transition || now - s_lastLogMs > 1000) && s_budget < 200)
 		{
 			s_budget++;
-			LOG(2, "[HUD] gate: calls=%d ms=%llu paused=%d%s lastRaw=%d suppressed=%d setting=%d\n",
-				g_replayHudGateCalls,
+			LOG(2, "[HUD] all=%d hidden=%d | pauseTagged=%d flags or=0x%08X and=0x%08X | "
+			       "11A0 or=0x%08X and=0x%08X | 11A8 or=0x%08X and=0x%08X | ms=%llu paused=%d%s\n",
+				g_hudGateCalls - g_hudGateHiddenBit24,
+				g_hudGateHiddenBit24,
+				g_hudPauseElems,
+				g_hudPauseFlagsOr, g_hudPauseFlagsAnd,
+				g_hudPauseA0Or, g_hudPauseA0And,
+				g_hudPauseA8Or, g_hudPauseA8And,
 				now - s_lastLogMs,
 				paused ? 1 : 0,
-				transition ? (paused ? " <-- PAUSED" : " <-- RESUMED") : "",
-				g_replayHudGateLastRaw,
-				g_replayHudGateSuppressed,
-				g_modVals.showHudWhenReplayPaused);
+				transition ? (paused ? " <-- PAUSED" : " <-- RESUMED") : "");
 
 			s_lastLogMs = now;
 			s_paused = paused;
-			g_replayHudGateCalls = 0;
-			g_replayHudGateSuppressed = 0;
+			g_hudGateCalls = 0;
+			g_hudGateHiddenBit24 = 0;
+			g_hudPauseElems = 0;
+			g_hudPauseFlagsOr = 0;
+			g_hudPauseFlagsAnd = -1;
+			g_hudPauseA0Or = 0;
+			g_hudPauseA0And = -1;
+			g_hudPauseA8Or = 0;
+			g_hudPauseA8And = -1;
 		}
 	}
 
