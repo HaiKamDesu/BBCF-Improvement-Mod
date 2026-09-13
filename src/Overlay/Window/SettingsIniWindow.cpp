@@ -101,6 +101,7 @@ namespace {
 		{ "FrameHistoryEnabled", "Show input history", "Input history", "Shows a strip of your recent inputs on screen, one square per frame." },
 		{ "FrameHistoryCountEmptyFrames", "Input display: count idle frames", "Input history", "Also counts frames where you pressed nothing. Off makes the display more compact; on makes the timing between inputs literal." },
 		{ "Language", "Language", "Interface", "The language the mod's own menus are shown in. This does not change the game's language." },
+		{ "TrainingInputDelay", "Input delay (frames)", "Training", "Holds your own inputs back by this many frames in training mode, so you can practise at the delay online runs at. BBCF online always adds 2 frames of input delay whatever your ping, so 2 is the setting that matches a net match. 0 turns it off, 10 is the most it will take. The dummy is never delayed." },
 		{ "UnlimitedPlaybackLoopSetupSeconds", "Loop: setup time", "Playback loop", "How many seconds of breathing room you get at the start of each loop, before playback begins, so you can get into position." },
 		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop: wind-down time", "Playback loop", "How many seconds to wait at the end of each loop before it restarts." },
 		{ "UnlimitedPlaybackLoopRestartLabState", "Loop: reload training state", "Playback loop", "Reloads your saved training state every time the loop restarts, so positions and health are identical each repetition." },
@@ -229,6 +230,7 @@ namespace {
 		{ "Overlays",              SPage_Overlays },
 		{ "Input history",         SPage_Overlays },
 
+		{ "Training",              SPage_Training },
 		{ "Playback loop",         SPage_Training },
 
 		{ "Lobby",                 SPage_Online },

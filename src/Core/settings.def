@@ -225,6 +225,14 @@ SETTING(float, unlimitedPlaybackLoopSetupSeconds, "UnlimitedPlaybackLoopSetupSec
 SETTING(float, unlimitedPlaybackLoopEndingSeconds, "UnlimitedPlaybackLoopEndingSeconds", "0.0");
 SETTING(bool, unlimitedPlaybackLoopRestartLabState, "UnlimitedPlaybackLoopRestartLabState", "0");
 SETTING(int, unlimitedPlaybackLoopRestartMode, "UnlimitedPlaybackLoopRestartMode", "0");
+
+// Holds 1P's inputs back by this many frames while in training mode, so a match can be
+// practised at the delay online actually runs at. BBCF's netcode adds a hardcoded 2 frames
+// of input delay regardless of ping (docs/Research/OnlineSimulationTrainingFeasibility.md),
+// which is why 2 is the number most people want here. 0 is off; the reader clamps to 10.
+// It delays the 1P side only: the dummy stays instant, so recording a playback (which is
+// driven from the 2P side) is never captured through the delay.
+SETTING(int, trainingInputDelay, "TrainingInputDelay", "0");
 // SETTING(std::string, replayDatabaseFrontendUrl, "ReplayDatabaseFrontendUrl", "http://89.167.76.6:2000/");
 
 // Lobby avatar persistence. Puts the avatar, colour and both accessory slots you last had

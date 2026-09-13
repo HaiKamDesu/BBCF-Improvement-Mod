@@ -49,6 +49,7 @@ namespace MainMenu
 		Training_Dummy,
 		Training_Positions,
 		Training_SaveStates,
+		Training_InputDelay,
 		Training_Tas,
 
 		Overlays_Hitboxes,

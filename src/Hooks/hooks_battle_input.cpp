@@ -3,6 +3,7 @@
 #include "Core/logger.h"
 #include "Core/RuntimePlatform.h"
 #include "Core/interfaces.h"
+#include "Core/Settings.h"
 #include "Game/gamestates.h"
 
 #include <array>
@@ -64,6 +65,109 @@ namespace
         return INPUT_DIRECTION_NEUTRAL;
     }
 
+    // Training input delay ---------------------------------------------------------
+    // Holds 1P's inputs back by a few frames so training can be practised at the delay a
+    // net match runs at. BBCF's netcode adds a hardcoded 2 frames of input delay whatever
+    // the ping (ggpo_set_frame_delay(2) from 0x4E598C - see
+    // docs/Research/OnlineSimulationTrainingFeasibility.md), so this is the part of "online
+    // feel" that can be reproduced offline honestly. Rollback depth and timesync hitches
+    // are the rest of it, and neither is simulated here.
+    //
+    // 1P only, on purpose: the dummy stays instant, so a recorded playback - which is
+    // driven from the 2P side - is never captured through the delay and then replayed
+    // through it a second time.
+    constexpr size_t MAX_INPUT_DELAY_FRAMES = 10;
+
+    struct InputDelayLine
+    {
+        // One slot more than the delay itself: this frame's input is queued before the
+        // one that has finished waiting is taken out.
+        uint16_t queued[MAX_INPUT_DELAY_FRAMES + 1] = {};
+        size_t count = 0;
+        uint16_t frameOutput = INPUT_DIRECTION_NEUTRAL;
+        uint32_t lastFrame = 0;
+        bool hasFrame = false;
+    };
+    InputDelayLine g_inputDelay{};
+
+    uint16_t ApplyTrainingInputDelay(size_t player, uint16_t packedInput)
+    {
+        // The 2P side is not delayed and must not clear the line either: the writer runs
+        // for both players every frame, so resetting from here would empty 1P's queue
+        // before it ever reached its depth.
+        if (player != 0)
+        {
+            return packedInput;
+        }
+
+        int configured = Settings::settingsIni.trainingInputDelay;
+        if (configured < 0) { configured = 0; }
+        if (configured > static_cast<int>(MAX_INPUT_DELAY_FRAMES)) { configured = static_cast<int>(MAX_INPUT_DELAY_FRAMES); }
+
+        const bool eligible =
+            configured > 0 &&
+            g_gameVals.pFrameCount != nullptr &&
+            g_gameVals.pGameMode != nullptr &&
+            *g_gameVals.pGameMode == GameMode_Training;
+
+        if (!eligible)
+        {
+            g_inputDelay = InputDelayLine{};
+            return packedInput;
+        }
+
+        const uint32_t currentFrame = *g_gameVals.pFrameCount;
+
+        // The writer can run more than once within one game frame (see the override block
+        // below, which has to account for the same thing). The line must advance exactly
+        // once per frame or a single press would be smeared across several queue slots.
+        if (g_inputDelay.hasFrame && g_inputDelay.lastFrame == currentFrame)
+        {
+            return g_inputDelay.frameOutput;
+        }
+
+        // A frame counter that did not simply tick forward means the match jumped: a save
+        // state was loaded, a round reset, positions were reset. Whatever is in flight
+        // belongs to the timeline that was abandoned, so it is dropped instead of being
+        // replayed into the new one.
+        if (g_inputDelay.hasFrame && currentFrame != g_inputDelay.lastFrame + 1)
+        {
+            g_inputDelay.count = 0;
+        }
+
+        const size_t depth = static_cast<size_t>(configured);
+
+        // Turning the delay down mid-session leaves more in flight than the new depth
+        // wants; the oldest go, so the change takes effect now rather than after a
+        // backlog of stale inputs has drained.
+        while (g_inputDelay.count > depth)
+        {
+            for (size_t i = 1; i < g_inputDelay.count; ++i)
+            {
+                g_inputDelay.queued[i - 1] = g_inputDelay.queued[i];
+            }
+            --g_inputDelay.count;
+        }
+
+        g_inputDelay.queued[g_inputDelay.count++] = packedInput;
+
+        uint16_t output = INPUT_DIRECTION_NEUTRAL;
+        if (g_inputDelay.count > depth)
+        {
+            output = g_inputDelay.queued[0];
+            for (size_t i = 1; i < g_inputDelay.count; ++i)
+            {
+                g_inputDelay.queued[i - 1] = g_inputDelay.queued[i];
+            }
+            --g_inputDelay.count;
+        }
+
+        g_inputDelay.frameOutput = output;
+        g_inputDelay.lastFrame = currentFrame;
+        g_inputDelay.hasFrame = true;
+        return output;
+    }
+
     uint16_t __cdecl ProcessBattleInput(
         uint16_t packedInput,
         uint32_t playerIndex,
@@ -120,6 +224,11 @@ namespace
                     diagnostic->remaining);
             }
         }
+
+        // The delay runs before the override so an injected input (TAS, dummy playback)
+        // still lands on the frame it was scheduled for: what is being delayed is the
+        // human holding the pad, not the tooling standing in for one.
+        packedInput = ApplyTrainingInputDelay(normalizedPlayer, packedInput);
 
         OverrideState& overrideState = g_overrideState[normalizedPlayer];
         if (overrideState.active)

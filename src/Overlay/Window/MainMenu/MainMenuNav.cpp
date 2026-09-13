@@ -31,6 +31,7 @@ namespace MainMenu
 			{ Page_Training, Item_Group,   "Dummy actions",       "states scr script reversal wakeup gap on hit throw tech ai action notation playback slot library loop hotkey animation" },
 			{ Page_Training, Item_Group,   "Positions & timings", "swap coordinates sides corner switch position wakeup delay emergency tech roll okizeme knockdown" },
 			{ Page_Training, Item_Group,   "Save states",         "snapshot save load state situation reset drill" },
+			{ Page_Training, Item_Group,   "Input delay",         "delay input lag online netplay rollback frames latency ping xrd practice" },
 			{ Page_Training, Item_Loose,   "TAS combo editor",    "tas frame by frame combo editor rewind record movie" },
 
 			{ Page_Overlays, Item_Section, "Hitboxes",            "hitbox hurtbox collision throw range origin box overlay" },
