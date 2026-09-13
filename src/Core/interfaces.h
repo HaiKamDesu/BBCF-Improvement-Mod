@@ -136,6 +136,8 @@ struct modValues_t {
 	float frame_history_height;
 	float frame_history_spacing;
 	bool frame_history_auto_reset;
+	// Read from a naked hook, so it is a plain int rather than anything with a constructor.
+	int showHudWhenReplayPaused = 0;
 };
 //temporary placeholders until wrappers are created / final addresses updated
 struct temps_t

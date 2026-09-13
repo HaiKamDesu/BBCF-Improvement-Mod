@@ -18,6 +18,7 @@
 #include "Window/WinePopupWindow.h"
 
 #include "Game/EntityDiagnostics.h"
+#include "Game/gamestates.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
 #include "Network/LobbyAvatarManager.h"
@@ -750,6 +751,64 @@ void WindowManager::Render()
 	// Sampled here rather than from the hitbox overlay so the entity catalogue is produced whether
 	// or not that window happens to be open.
 	EntityDiagnostics::Update();
+
+	// The replay-pause HUD hook reads this mirror from assembly, so it cannot read settingsIni
+	// itself. applyRuntimeSettings refreshes it, but only when the Settings window is saved - which
+	// leaves it stale for every other way the value can change, a hand-edited ini among them.
+	// Copying it per frame costs nothing and removes that whole class of "the setting is on but
+	// nothing happens". Logged on change so a test can say which state it actually ran in.
+	{
+		const int wanted = Settings::settingsIni.showHudWhenReplayPaused ? 1 : 0;
+		if (wanted != g_modVals.showHudWhenReplayPaused)
+		{
+			g_modVals.showHudWhenReplayPaused = wanted;
+			LOG(2, "[HUD] keep-HUD-while-replay-paused is now %s\n", wanted ? "ON" : "off");
+		}
+	}
+
+	// Does a paused replay still draw its HUD? The hooked getter is called only from the four HUD
+	// element draws, so its call count is a direct proxy for those draws running. Pause is detected
+	// by the world frame counter standing still, which needs no knowledge of where the pause state
+	// lives - the point at issue. Logged on every pause/resume transition as well as once a second,
+	// so a short pause cannot fall between two samples, and carrying the interval so a partial
+	// sample can be normalised against a full second.
+	extern volatile int g_replayHudGateCalls;
+	extern volatile int g_replayHudGateSuppressed;
+	extern volatile int g_replayHudGateLastRaw;
+	if (g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_ReplayTheater && g_gameVals.pFrameCount)
+	{
+		static unsigned long long s_lastLogMs = 0;
+		static unsigned s_lastWorldFrame = 0;
+		static int s_stalled = 0;
+		static bool s_paused = false;
+		static int s_budget = 0;
+
+		const unsigned worldFrame = *g_gameVals.pFrameCount;
+		s_stalled = (worldFrame == s_lastWorldFrame) ? s_stalled + 1 : 0;
+		s_lastWorldFrame = worldFrame;
+
+		const bool paused = s_stalled > 10;
+		const bool transition = paused != s_paused;
+
+		const unsigned long long now = GetTickCount64();
+		if ((transition || now - s_lastLogMs > 1000) && s_budget < 200)
+		{
+			s_budget++;
+			LOG(2, "[HUD] gate: calls=%d ms=%llu paused=%d%s lastRaw=%d suppressed=%d setting=%d\n",
+				g_replayHudGateCalls,
+				now - s_lastLogMs,
+				paused ? 1 : 0,
+				transition ? (paused ? " <-- PAUSED" : " <-- RESUMED") : "",
+				g_replayHudGateLastRaw,
+				g_replayHudGateSuppressed,
+				g_modVals.showHudWhenReplayPaused);
+
+			s_lastLogMs = now;
+			s_paused = paused;
+			g_replayHudGateCalls = 0;
+			g_replayHudGateSuppressed = 0;
+		}
+	}
 
 	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())
 	{

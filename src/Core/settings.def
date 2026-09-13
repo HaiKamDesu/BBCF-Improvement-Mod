@@ -33,6 +33,9 @@ SETTING(bool, vsync, "V-sync", "0");
 SETTING(int, menusize, "MenuSize", "2");
 SETTING(bool, notifications, "Notifications", "1");
 SETTING(bool, checkupdates, "CheckUpdates", "1");
+// Pausing a replay makes the game hide its own HUD, input history included. With this on, the
+// HUD stays up while paused. Only affects Replay Theater; the pause menu itself is untouched.
+SETTING(bool, showHudWhenReplayPaused, "ShowHudWhenReplayPaused", "0");
 SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
 // Diagnostic only. Calls the game's own "does this entity have active hitboxes" routine
 // (BBCF.exe+0x18C3E0) once per entity per frame and writes its answer, and the six fields it

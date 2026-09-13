@@ -9106,6 +9106,64 @@ void __declspec(naked)GetIsHUDHidden()
 }
 
 // ---------------------------------------------------------------------------------------
+// Keeping the game's HUD up while a replay is paused.
+//
+// Pausing a replay hides the game's own interface, input history included - which is the one
+// moment a person most wants to read it. The HUD-hidden bitfield the mod already tracks is not
+// how: it carries only intro, astral and loading, and a live trace confirmed it never moves
+// across a pause.
+//
+// The real gate sits in front of every HUD draw and reads:
+//
+//     if (GameModeIsReplayTheater() && ReplayPauseFlag()) -> skip drawing
+//     if (hudHidden & 1) -> skip          (intro)
+//     if (hudHidden & 2) -> skip          (astral)
+//
+// ReplayPauseFlag is a one-instruction getter, `mov eax,[ecx+64EE8h]; ret`, and all four of its
+// callers in the binary are that same HUD gate.
+//
+// It is, however, DEAD. The field is a static at 0x015C0358 (the replay singleton at 0x0155B470
+// plus 0x64EE8), and it and its two siblings at 0x015C0350/0x015C0354 are written in exactly three
+// places each - all of them writing zero. Nothing in the binary ever sets any of them, which a
+// live trace confirmed: the getter is called ~5300 times a second during playback and returns 0
+// every time, paused or not. So this arm of the HUD gate never fires and cannot be what hides the
+// HUD, whatever it was originally for.
+//
+// What remains of the hook is its call counter, which is a usable proxy for "did the HUD draw
+// functions run", since nothing else calls this getter. That answers the question the gate itself
+// could not: whether a paused replay still draws its HUD at all.
+//
+// Six bytes of the getter are replaced, so the hook re-does the load it displaced and jumps to the
+// ret that follows. Nothing is pushed, so there is no prologue to undo on the way out.
+DWORD ReplayPauseHidesHudJmpBackAddr = 0;
+
+// Counters so the hook can say what it is actually doing, rather than being reasoned about. The
+// three outcomes point in completely different directions: never called means this gate is not on
+// the path that hides the HUD; called with a raw value of zero means the flag is not what marks a
+// pause; and suppressing while the HUD still hides means something else hides it too.
+volatile int g_replayHudGateCalls = 0;
+volatile int g_replayHudGateSuppressed = 0;
+volatile int g_replayHudGateLastRaw = 0;
+
+void __declspec(naked) ReplayPauseHidesHud()
+{
+	__asm
+	{
+		mov eax, dword ptr[ecx + 64EE8h]
+		mov g_replayHudGateLastRaw, eax
+		inc g_replayHudGateCalls
+		cmp g_modVals.showHudWhenReplayPaused, 0
+		je  keep_original
+		test eax, eax
+		je  keep_original
+		inc g_replayHudGateSuppressed
+		xor eax, eax
+	keep_original:
+		jmp[ReplayPauseHidesHudJmpBackAddr]
+	}
+}
+
+// ---------------------------------------------------------------------------------------
 // HP numbers on the health bars, outside Abyss.
 //
 // Abyss draws the exact HP figure over each health bar; nothing else does. The HUD update
@@ -9755,6 +9813,11 @@ bool placeHooks_bbcf()
 
 	GetEntityListDeleteAddrJmpBackAddr = HookManager::SetHook("GetEntityListDeleteAddr", "\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x86",
 		"xx????xx????xx????xx????xx", 6, GetEntityListDeleteAddr);
+
+	// mov eax,[ecx+64EE8h] / ret - unique in the binary, and nothing branches into the six bytes
+	// the patch covers.
+	ReplayPauseHidesHudJmpBackAddr = HookManager::SetHook("ReplayPauseHidesHud",
+		"\x8B\x81\xE8\x4E\x06\x00\xC3", "xxxxxxx", 6, ReplayPauseHidesHud);
 
 	GetIsHUDHiddenJmpBackAddr = HookManager::SetHook("GetIsHUDHidden", "\x83\x88\x78\x27\x00\x00\x00\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07",
 		"xxxxxx?xxxxxx?x????x????xx????xxxxxxxx?x????x????xx????xxxx", 7, GetIsHUDHidden);
