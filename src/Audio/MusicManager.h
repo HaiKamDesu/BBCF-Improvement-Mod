@@ -22,10 +22,18 @@ enum class MusicRotationMode {
     Shuffle
 };
 
-enum class RematchTrackMode {
-    CharacterSelect,
-    ResumeLast,
-    PlayNext
+// What the Jukebox does about the song a match opens on. The same three answers are
+// offered for the first match of a set and for a rematch, because they are the same
+// question asked at two different moments, and people want different answers to each
+// (open every set on the game's pick, then rotate from the playlist on rematches - or
+// never hear the game's pick at all).
+//
+// The order is the order the dropdowns show. It is NOT the order of the old
+// RematchTrackMode config value, which had ResumeLast at 1; LoadPreferences migrates it.
+enum class MatchTrackChoice {
+    CharacterSelectTrack,   // leave the song the game loaded alone
+    NextPlaylistTrack,      // advance through the enabled tracks, per the rotation mode
+    LastPlayedTrack         // whatever the Jukebox played last
 };
 
 class MusicManager {
@@ -115,8 +123,16 @@ public:
     void SetRepeatSingle(bool val) { m_repeatSingle = val; }
     bool IsRepeatSingle() const { return m_repeatSingle; }
 
-    void SetRematchTrackMode(RematchTrackMode mode) { m_rematchTrackMode = mode; }
-    RematchTrackMode GetRematchTrackMode() const { return m_rematchTrackMode; }
+    // The song a match opens on, asked separately for the first match of a set and for a
+    // rematch. Both default to the game's own track, which is what the Jukebox did before
+    // either of these existed: rotation would only replace that song once it ended, which
+    // is why a playlist with everything else turned off still opened on a song the user
+    // had disabled. See OnMatchInit.
+    void SetMatchStartTrackChoice(MatchTrackChoice choice) { m_matchStartTrackChoice = choice; }
+    MatchTrackChoice GetMatchStartTrackChoice() const { return m_matchStartTrackChoice; }
+
+    void SetRematchTrackChoice(MatchTrackChoice choice) { m_rematchTrackChoice = choice; }
+    MatchTrackChoice GetRematchTrackChoice() const { return m_rematchTrackChoice; }
 
     // Removes a custom Jukebox song for good: the converted .pac and the source file the
     // scan would otherwise find again, then rescans so the row goes away. Only valid for a
@@ -259,6 +275,10 @@ private:
     int SelectNextTrackAfter(int trackId);
     void ApplyPendingRematchTrack();
     bool IsVersusMode() const;
+    // Modes the Jukebox is allowed to take the match's opening track away from: the two
+    // the rematch override has always covered, plus Training. Story and Arcade are left
+    // alone on purpose - their BGM is part of a scripted scene, not a match's song.
+    bool IsTrackOverrideMode() const;
     void DetectSceneExitAndUnload();
     bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
 
@@ -298,7 +318,8 @@ private:
 
     MusicRotationMode m_rotationMode = MusicRotationMode::Sequential;
     bool m_repeatSingle = false;
-    RematchTrackMode m_rematchTrackMode = RematchTrackMode::CharacterSelect;
+    MatchTrackChoice m_matchStartTrackChoice = MatchTrackChoice::CharacterSelectTrack;
+    MatchTrackChoice m_rematchTrackChoice = MatchTrackChoice::CharacterSelectTrack;
 
     std::vector<int> m_shuffledPlaylist;
     int m_shuffleIndex = 0;
@@ -317,6 +338,10 @@ private:
     int m_lastMatchState = -1;     // last MatchState; for match-end (-> VictoryScreen) detection
     int m_lastPlaylistTrackId = -1; // last track successfully played by the Jukebox in the current VS/Online set
     int m_pendingRematchTrackId = -1;
+    // Retries for the queued match track, so a PlayTrack that comes too early for the
+    // match's audio bank is tried again instead of silently leaving the game's song.
+    int m_pendingTrackAttempts = 0;
+    static const int kPendingTrackMaxAttempts = 180;   // ~3 seconds at 60 fps
     bool m_rematchPending = false;
     bool m_customBgmLoaded = false; // true once we've taken over BGM (needs soft-reset on exit)
     bool m_modControllingBgm = false; // true once the mod is the authority on the current track

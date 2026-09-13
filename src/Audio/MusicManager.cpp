@@ -744,22 +744,28 @@ void MusicManager::Initialize() {
 }
 
 void MusicManager::OnMatchInit() {
-    const bool applyRematchPreference = m_rematchPending && IsVersusMode();
+    // Which of the two questions this match is answering. A rematch is only ever a thing
+    // in VS/Online, where the victory screen sets m_rematchPending; everything else,
+    // Training included, is a match start.
+    const bool isRematch = m_rematchPending && IsVersusMode();
+    const MatchTrackChoice choice = isRematch ? m_rematchTrackChoice : m_matchStartTrackChoice;
+    const bool overrideTrack = IsTrackOverrideMode() && choice != MatchTrackChoice::CharacterSelectTrack;
     const int lastPlaylistTrack = m_lastPlaylistTrackId;
     m_rematchPending = false;
     m_pendingRematchTrackId = -1;
+    m_pendingTrackAttempts = 0;
 
     LogMusic("MusicManager: OnMatchInit - resetting BGM state (current=%d anchor=%d controlling=%d loaded=%d mode=%d rematch=%d lastPlaylist=%d)\n",
         m_currentTrackId, m_anchorTrackId, m_modControllingBgm ? 1 : 0, m_customBgmLoaded ? 1 : 0,
-        g_gameVals.pGameMode ? *g_gameVals.pGameMode : -1, applyRematchPreference ? 1 : 0, lastPlaylistTrack);
+        g_gameVals.pGameMode ? *g_gameVals.pGameMode : -1, isRematch ? 1 : 0, lastPlaylistTrack);
     if (m_customBgmLoaded || m_modControllingBgm) {
         ClearBgmForSceneExit();
     }
 
     // Every match initially loads the Character Select track (the anchor).
-    // Re-sync bookkeeping to that native track first; a VS/Online rematch
-    // override, if requested, is queued below and applied only after the fight's
-    // audio bank finishes initializing.
+    // Re-sync bookkeeping to that native track first; the user's choice for this
+    // match, if it is not that track, is queued below and applied only after the
+    // fight's audio bank finishes initializing.
     m_customBgmLoaded = false;
     m_modControllingBgm = false;
     if (GetBgmFilename(m_anchorTrackId) != nullptr) {
@@ -771,21 +777,42 @@ void MusicManager::OnMatchInit() {
         }
     }
 
-    if (applyRematchPreference) {
-        if (m_rematchTrackMode == RematchTrackMode::ResumeLast) {
-            if (lastPlaylistTrack >= 0 && GetBgmFilename(lastPlaylistTrack) && IsTrackEnabled(lastPlaylistTrack)) {
-                m_pendingRematchTrackId = lastPlaylistTrack;
+    if (overrideTrack) {
+        if (choice == MatchTrackChoice::LastPlayedTrack &&
+            lastPlaylistTrack >= 0 &&
+            GetBgmFilename(lastPlaylistTrack) &&
+            IsTrackEnabled(lastPlaylistTrack)) {
+            m_pendingRematchTrackId = lastPlaylistTrack;
+        }
+
+        // Everything else advances through the playlist. "Play the last one" lands here
+        // too when there is no last one to play - on the first match of a session there
+        // never is, and doing nothing there would leave exactly the game track the user
+        // asked not to hear.
+        //
+        // The starting point is only a position in the playlist: -1 is a valid answer
+        // meaning "from the top", which is what SelectNextTrackAfter does with a track it
+        // cannot find. That matters because the anchor is not always known yet - entering
+        // Training directly, the game's track has not been observed even once.
+        if (m_pendingRematchTrackId < 0) {
+            int startFrom = lastPlaylistTrack >= 0 ? lastPlaylistTrack : m_anchorTrackId;
+            if (!GetBgmFilename(startFrom)) {
+                startFrom = -1;
             }
-        } else if (m_rematchTrackMode == RematchTrackMode::PlayNext) {
-            const int startingTrack = lastPlaylistTrack >= 0 ? lastPlaylistTrack : m_anchorTrackId;
-            if (GetBgmFilename(startingTrack)) {
-                m_pendingRematchTrackId = SelectNextTrackAfter(startingTrack);
-            }
+            m_pendingRematchTrackId = SelectNextTrackAfter(startFrom);
         }
     }
 
-    LogMusic("MusicManager: Rematch choice mode=%d queuedTrack=%d (anchor=%d)\n",
-        (int)m_rematchTrackMode, m_pendingRematchTrackId, m_anchorTrackId);
+    LogMusic("MusicManager: Match track choice=%d (rematch=%d) queuedTrack=%d anchor=%d enabled=%d\n",
+        (int)choice, isRematch ? 1 : 0, m_pendingRematchTrackId, m_anchorTrackId, m_enabled ? 1 : 0);
+
+    // The queued track is applied from Update(), which does nothing at all while rotation
+    // is switched off - so say so here rather than leaving a silent "it just played the
+    // game's song" to be worked out from behaviour.
+    if (m_pendingRematchTrackId >= 0 && !m_enabled) {
+        LogMusic("MusicManager: Rotation is off, so the queued track %d will NOT be played\n",
+            m_pendingRematchTrackId);
+    }
 }
 
 void MusicManager::Update() {
@@ -1400,6 +1427,18 @@ bool MusicManager::IsVersusMode() const {
     return mode == GameMode_Versus || mode == GameMode_Online;
 }
 
+bool MusicManager::IsTrackOverrideMode() const {
+    if (!g_gameVals.pGameMode) return false;
+    int mode = -1;
+    __try {
+        mode = *g_gameVals.pGameMode;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    return mode == GameMode_Versus || mode == GameMode_Online || mode == GameMode_Training;
+}
+
 void MusicManager::ApplyPendingRematchTrack() {
     if (m_pendingRematchTrackId < 0 || !g_gameVals.pMatchState) {
         return;
@@ -1412,16 +1451,33 @@ void MusicManager::ApplyPendingRematchTrack() {
         return;
     }
 
-    int trackId = m_pendingRematchTrackId;
-    m_pendingRematchTrackId = -1;
-    if (!IsVersusMode() || !GetBgmFilename(trackId) || !IsTrackEnabled(trackId)) {
-        LogMusic("MusicManager: Dropping invalid/out-of-mode rematch track %d\n", trackId);
+    const int trackId = m_pendingRematchTrackId;
+    if (!IsTrackOverrideMode() || !GetBgmFilename(trackId) || !IsTrackEnabled(trackId)) {
+        LogMusic("MusicManager: Dropping invalid/out-of-mode match track %d\n", trackId);
+        m_pendingRematchTrackId = -1;
+        m_pendingTrackAttempts = 0;
         return;
     }
 
-    LogMusic("MusicManager: Applying VS/Online rematch track %d (preference=%d)\n",
-        trackId, (int)m_rematchTrackMode);
-    PlayTrack(trackId);
+    // Keep asking until it takes. The match's audio bank is not necessarily up on the frame
+    // the match state first reads as started, and a PlayTrack that fails for that reason
+    // used to drop the choice on the floor - the match then ran on the game's own song,
+    // which is the whole thing the user asked not to happen. Bounded so a track that can
+    // never play (file deleted mid-session) costs a few seconds of retries, not the match.
+    if (PlayTrack(trackId)) {
+        LogMusic("MusicManager: Applied queued match track %d after %d attempt(s)\n",
+            trackId, m_pendingTrackAttempts + 1);
+        m_pendingRematchTrackId = -1;
+        m_pendingTrackAttempts = 0;
+        return;
+    }
+
+    if (++m_pendingTrackAttempts >= kPendingTrackMaxAttempts) {
+        LogMusic("MusicManager: Giving up on queued match track %d after %d attempts\n",
+            trackId, m_pendingTrackAttempts);
+        m_pendingRematchTrackId = -1;
+        m_pendingTrackAttempts = 0;
+    }
 }
 
 static int CallPlaySoundObject(uintptr_t playSoundObjAddr, void* playController, void* soundObj, const char* path, int* voiceHandleOut) {
@@ -2167,7 +2223,7 @@ bool MusicManager::PlayTrack(int trackId, bool force) {
 	m_songPlaybackFrames = 0;
 	m_modControllingBgm = true; // the mod is now the authority on the current track
 	m_customBgmLoaded = true;   // we've taken over BGM; needs soft-reset on scene exit
-	if (IsVersusMode()) {
+	if (IsTrackOverrideMode()) {
 		m_lastPlaylistTrackId = trackId;
 	}
 
@@ -2630,10 +2686,23 @@ void MusicManager::SavePreferences() {
     else if (m_rotationMode == MusicRotationMode::Shuffle) modeInt = 2;
     file << "RotationMode=" << modeInt << "\n";
 	file << "RepeatSingle=" << (m_repeatSingle ? "1" : "0") << "\n";
-	file << "RematchTrackMode=" << (int)m_rematchTrackMode << "\n";
+	file << "MatchStartTrack=" << (int)m_matchStartTrackChoice << "\n";
+	file << "RematchTrack=" << (int)m_rematchTrackChoice << "\n";
 
 	file.close();
     LOG(2, "MusicManager: Saved preferences\n");
+}
+
+// One of the three answers by its stored number, falling back to what is already set for
+// anything unrecognised - a config file written by a newer build must not silently become
+// "Character Select track" here.
+static MatchTrackChoice ParseMatchTrackChoice(const std::string& value, MatchTrackChoice fallback) {
+    switch (atoi(value.c_str())) {
+    case 0: return MatchTrackChoice::CharacterSelectTrack;
+    case 1: return MatchTrackChoice::NextPlaylistTrack;
+    case 2: return MatchTrackChoice::LastPlayedTrack;
+    default: return fallback;
+    }
 }
 
 void MusicManager::LoadPreferences() {
@@ -2678,11 +2747,17 @@ void MusicManager::LoadPreferences() {
                 else m_rotationMode = MusicRotationMode::Shuffle; // 2 (and legacy 0 "Random")
             } else if (key == "RepeatSingle") {
 				m_repeatSingle = (value == "1");
+			} else if (key == "MatchStartTrack") {
+				m_matchStartTrackChoice = ParseMatchTrackChoice(value, m_matchStartTrackChoice);
+			} else if (key == "RematchTrack") {
+				m_rematchTrackChoice = ParseMatchTrackChoice(value, m_rematchTrackChoice);
 			} else if (key == "RematchTrackMode") {
-				int rematchMode = std::stoi(value);
-				if (rematchMode >= (int)RematchTrackMode::CharacterSelect &&
-					rematchMode <= (int)RematchTrackMode::PlayNext) {
-					m_rematchTrackMode = (RematchTrackMode)rematchMode;
+				// Legacy key: one setting, covering rematches only, whose values were
+				// 0 = Character Select, 1 = resume the last one, 2 = play the next one.
+				switch (std::stoi(value)) {
+				case 1: m_rematchTrackChoice = MatchTrackChoice::LastPlayedTrack; break;
+				case 2: m_rematchTrackChoice = MatchTrackChoice::NextPlaylistTrack; break;
+				default: m_rematchTrackChoice = MatchTrackChoice::CharacterSelectTrack; break;
 				}
 			}
 		}
@@ -2702,7 +2777,8 @@ void MusicManager::ResetPreferences() {
     m_enabled = false;
 	m_rotationMode = MusicRotationMode::Sequential;
 	m_repeatSingle = false;
-	m_rematchTrackMode = RematchTrackMode::CharacterSelect;
+	m_matchStartTrackChoice = MatchTrackChoice::CharacterSelectTrack;
+	m_rematchTrackChoice = MatchTrackChoice::CharacterSelectTrack;
 	SavePreferences();
     LOG(2, "MusicManager: Preferences reset - all tracks enabled\n");
 }

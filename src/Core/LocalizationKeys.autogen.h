@@ -1860,6 +1860,12 @@ struct LocalizationKeysAccessor
         // Update to %s
         inline const char* Update_to_s() const { return Get("Update to %s"); }
 
+        // Update IM to %s
+        inline const char* Update_IM_to_s() const { return Get("Update IM to %s"); }
+
+        // You are running %s. Click to see what is in the new release and install it.
+        inline const char* You_are_running_s_Click_to_see_what_is_in_the_new_release_and_install_it() const { return Get("You are running %s. Click to see what is in the new release and install it."); }
+
         // Share_your_custom_palettes
         inline const char* Share_your_custom_palettes() const { return Get("Share_your_custom_palettes"); }
 
@@ -2853,29 +2859,29 @@ struct LocalizationKeysAccessor
         // Shuffle
         inline const char* Shuffle() const { return Get("Shuffle"); }
 
-        // VS/Online Rematch:
-        inline const char* VS_Online_Rematch() const { return Get("VS/Online Rematch:"); }
+        // When a match starts:
+        inline const char* When_a_match_starts() const { return Get("When a match starts:"); }
 
-        // Character Select Track
-        inline const char* Character_Select_Track() const { return Get("Character Select Track"); }
+        // When you rematch:
+        inline const char* When_you_rematch() const { return Get("When you rematch:"); }
 
-        // Resume Last Playlist Track
-        inline const char* Resume_Last_Playlist_Track() const { return Get("Resume Last Playlist Track"); }
+        // Play the track picked at Character Select
+        inline const char* Play_the_track_picked_at_Character_Select() const { return Get("Play the track picked at Character Select"); }
 
-        // Play Next Playlist Track
-        inline const char* Play_Next_Playlist_Track() const { return Get("Play Next Playlist Track"); }
+        // Play the next track in the playlist
+        inline const char* Play_the_next_track_in_the_playlist() const { return Get("Play the next track in the playlist"); }
 
-        // Character Select Track: use the song selected at Character Select
-        inline const char* Character_Select_Track_use_the_song_selected_at_Character_Select() const { return Get("Character Select Track: use the song selected at Character Select"); }
+        // Play the last track the Jukebox played
+        inline const char* Play_the_last_track_the_Jukebox_played() const { return Get("Play the last track the Jukebox played"); }
 
-        // Resume Last Playlist Track: restart the last song played by the Jukebox
-        inline const char* Resume_Last_Playlist_Track_restart_the_last_song_played_by_the_Jukebox() const { return Get("Resume Last Playlist Track: restart the last song played by the Jukebox"); }
+        // What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below.
+        inline const char* What_plays_when_you_enter_a_match_Training_local_VS_or_Online_Leave_it_on_the_Character_Select_track_to_keep_the_song_the_game_picked_pick_a_playlist_option_to_hear_only_the_tracks_you_have_ticked_below() const { return Get("What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below."); }
 
-        // Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song
-        inline const char* Play_Next_Playlist_Track_advance_from_the_last_Jukebox_song_using_the_selected_rotation_mode_if_none_has_played_yet_advance_from_the_Character_Select_song() const { return Get("Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song"); }
+        // What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above.
+        inline const char* What_plays_on_the_next_match_of_a_set_in_local_VS_and_Online_after_the_victory_screen_Training_never_gets_here_it_uses_the_setting_above() const { return Get("What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above."); }
 
-        // Only applies to local VS and Online rematches. The first match always uses the Character Select track.
-        inline const char* Only_applies_to_local_VS_and_Online_rematches_The_first_match_always_uses_the_Character_Select_track() const { return Get("Only applies to local VS and Online rematches. The first match always uses the Character Select track."); }
+        // Turn on "Enable Music Rotation" above for these two to do anything.
+        inline const char* Turn_on_Enable_Music_Rotation_above_for_these_two_to_do_anything() const { return Get("Turn on \"Enable Music Rotation\" above for these two to do anything."); }
 
         // Repeat Single
         inline const char* Repeat_Single() const { return Get("Repeat Single"); }
@@ -3276,6 +3282,18 @@ struct LocalizationKeysAccessor
         // The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode.
         inline const char* The_game_only_saves_the_accessories_its_own_equip_menu_offers_so_the_hidden_ones_are_gone_every_time_you_relaunch_With_this_on_whatever_you_last_had_equipped_is_re_applied_when_you_connect_to_network_mode() const { return Get("The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode."); }
 
+        // 0 is the game as it ships. 2 is what online feels like. Rollback and connection hitches are not simulated - only the delay is.
+        inline const char* _0_is_the_game_as_it_ships_2_is_what_online_feels_like_Rollback_and_connection_hitches_are_not_simulated_only_the_delay_is() const { return Get("0 is the game as it ships. 2 is what online feels like. Rollback and connection hitches are not simulated - only the delay is."); }
+
+        // Hold your own inputs back by a few frames so the lab answers as late as a net match does. BBCF online adds 2 frames of input delay whatever your ping, so 2 is the setting that matches it. The dummy is never delayed.
+        inline const char* Hold_your_own_inputs_back_by_a_few_frames_so_the_lab_answers_as_late_as_a_net_match_does_BBCF_online_adds_2_frames_of_input_delay_whatever_your_ping_so_2_is_the_setting_that_matches_it_The_dummy_is_never_delayed() const { return Get("Hold your own inputs back by a few frames so the lab answers as late as a net match does. BBCF online adds 2 frames of input delay whatever your ping, so 2 is the setting that matches it. The dummy is never delayed."); }
+
+        // Input delay
+        inline const char* Input_delay() const { return Get("Input delay"); }
+
+        // Input delay (frames)
+        inline const char* Input_delay_frames() const { return Get("Input delay (frames)"); }
+
         // Opens a window per player showing the inputs they are actually sending, one line per frame.
         inline const char* Opens_a_window_per_player_showing_the_inputs_they_are_actually_sending_one_line_per_frame() const { return Get("Opens a window per player showing the inputs they are actually sending, one line per frame."); }
 
@@ -3395,6 +3413,9 @@ struct LocalizationKeysAccessor
 
         // The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.
         inline const char* The_dummy_s_move_list_could_not_be_read_This_happens_on_the_training_character_select_screen_and_in_mirror_matches() const { return Get("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches."); }
+
+        // The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.
+        inline const char* The_mod_cannot_read_the_pad_right_now_so_the_delay_does_nothing_It_needs_the_mod_s_controller_hooks_which_are_off_or_could_not_be_installed() const { return Get("The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed."); }
 
         // The mod itself: settings, controllers, language, updates and help.
         inline const char* The_mod_itself_settings_controllers_language_updates_and_help() const { return Get("The mod itself: settings, controllers, language, updates and help."); }

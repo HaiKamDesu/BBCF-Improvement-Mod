@@ -786,6 +786,8 @@ Later,Later,Más tarde
 Skip this version,Skip this version,Omitir esta versión
 Open release page,Open release page,Abrir página de la versión
 Update to %s,Update to %s,Actualizar a %s
+Update IM to %s,Update IM to %s,Actualizar el IM a %s
+You are running %s. Click to see what is in the new release and install it.,You are running %s. Click to see what is in the new release and install it.,Estás usando la %s. Hacé clic para ver qué trae la nueva versión e instalarla.
 Share_your_custom_palettes,Share your custom palettes?,¿Compartir tus paletas personalizadas?
 Palette_share_popup_description,"When you play online, players who also use the Improvement Mod can already SEE the custom palette you're using.
 
@@ -1127,14 +1129,14 @@ Rotation Mode:,Rotation Mode:,Modo de rotación:
 Sequential: play tracks in order,Sequential: play tracks in order,Secuencial: reproduce las canciones en orden
 "Shuffle: play tracks in a shuffled order, no repeats until all have played","Shuffle: play tracks in a shuffled order, no repeats until all have played","Aleatorio: reproduce las canciones en orden aleatorio, sin repetir hasta que suenen todas"
 Shuffle,Shuffle,Aleatorio
-VS/Online Rematch:,VS/Online Rematch:,Revancha en VS/Online:
-Character Select Track,Character Select Track,Canción elegida en selección de personaje
-Resume Last Playlist Track,Resume Last Playlist Track,Retomar la última canción de la lista
-Play Next Playlist Track,Play Next Playlist Track,Reproducir la siguiente canción de la lista
-Character Select Track: use the song selected at Character Select,Character Select Track: use the song selected at Character Select,Canción elegida en selección de personaje: usa la canción elegida en la pantalla de selección
-Resume Last Playlist Track: restart the last song played by the Jukebox,Resume Last Playlist Track: restart the last song played by the Jukebox,Retomar la última canción de la lista: vuelve a poner la última canción que sonó en el Jukebox
-"Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song","Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song","Reproducir la siguiente canción de la lista: avanza desde la última canción del Jukebox según el modo de rotación elegido; si todavía no sonó ninguna, avanza desde la canción de selección de personaje"
-Only applies to local VS and Online rematches. The first match always uses the Character Select track.,Only applies to local VS and Online rematches. The first match always uses the Character Select track.,Solo se aplica a las revanchas en VS local y Online. La primera partida siempre usa la canción de selección de personaje.
+When a match starts:,When a match starts:,Cuando empieza una partida:
+When you rematch:,When you rematch:,Cuando pedís revancha:
+Play the track picked at Character Select,Play the track picked at Character Select,Reproducir la canción elegida en selección de personaje
+Play the next track in the playlist,Play the next track in the playlist,Reproducir la siguiente canción de la lista
+Play the last track the Jukebox played,Play the last track the Jukebox played,Reproducir la última canción que puso el Jukebox
+"What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below.","What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below.","Qué suena al entrar a una partida: Entrenamiento, VS local u Online. Dejalo en la canción de selección de personaje para conservar la que eligió el juego; elegí una opción de la lista para escuchar solo las canciones que tenés tildadas abajo."
+"What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above.","What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above.","Qué suena en la siguiente partida de una serie en VS local y Online, después de la pantalla de victoria. Entrenamiento nunca llega acá: usa la opción de arriba."
+"Turn on ""Enable Music Rotation"" above for these two to do anything.","Turn on ""Enable Music Rotation"" above for these two to do anything.","Activá ""Activar rotación de música"" arriba para que estas dos opciones hagan algo."
 Repeat Single,Repeat Single,Repetir una sola
 Repeat the current track instead of playing a new one,Repeat the current track instead of playing a new one,Repite la canción actual en vez de pasar a otra
 Play Next >|,Play Next >|,Siguiente >|
@@ -1268,6 +1270,10 @@ Needs training mode.,Needs training mode.,Necesita el modo entrenamiento.
 Open the online window,Open the online window,Abrir la ventana de en línea
 Put this back on automatically next launch,Put this back on automatically next launch,Volver a ponerlo automáticamente en el próximo inicio
 "The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode.","The game only saves the accessories its own equip menu offers, so the hidden ones are gone every time you relaunch. With this on, whatever you last had equipped is re-applied when you connect to network mode.","El juego solo guarda los accesorios que ofrece su propio menú de equipamiento, así que los ocultos se pierden cada vez que reinicias. Con esto activado, lo que tuvieras equipado por última vez se vuelve a aplicar al conectarte al modo en línea."
+0 is the game as it ships. 2 is what online feels like. Rollback and connection hitches are not simulated - only the delay is.,0 is the game as it ships. 2 is what online feels like. Rollback and connection hitches are not simulated - only the delay is.,0 es el juego tal cual viene. 2 es lo que se siente online. El rollback y los tirones de conexión no se simulan: solo el retardo.
+"Hold your own inputs back by a few frames so the lab answers as late as a net match does. BBCF online adds 2 frames of input delay whatever your ping, so 2 is the setting that matches it. The dummy is never delayed.","Hold your own inputs back by a few frames so the lab answers as late as a net match does. BBCF online adds 2 frames of input delay whatever your ping, so 2 is the setting that matches it. The dummy is never delayed.","Retrasa tus propios inputs unos frames para que el lab responda tan tarde como una partida online. BBCF online agrega 2 frames de retardo sin importar el ping, así que 2 es el valor que lo iguala. El dummy nunca se retrasa."
+Input delay,Input delay,Retardo de inputs
+Input delay (frames),Input delay (frames),Retardo de inputs (frames)
 "Opens a window per player showing the inputs they are actually sending, one line per frame.","Opens a window per player showing the inputs they are actually sending, one line per frame.","Abre una ventana por jugador que muestra los inputs que está enviando de verdad, una línea por frame."
 "Opens the rewind bar, so you can step a replay backwards instead of restarting it.","Opens the rewind bar, so you can step a replay backwards instead of restarting it.","Abre la barra de rebobinado, para retroceder una repetición en vez de reiniciarla."
 Overlays,Overlays,Superposiciones
@@ -1308,6 +1314,7 @@ Swap sides now,Swap sides now,Intercambiar lados ahora
 Swap sides on every reset,Swap sides on every reset,Intercambiar lados en cada reinicio
 The Discord is the fastest place to ask a question or report something broken.,The Discord is the fastest place to ask a question or report something broken.,El Discord es el sitio más rápido para preguntar algo o avisar de que algo está roto.
 "The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.","The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.",No se pudo leer la lista de movimientos del muñeco. Esto pasa en la pantalla de selección de personaje del entrenamiento y en los espejos.
+"The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.","The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.","El mod no puede leer el mando ahora mismo, así que el retardo no hace nada. Necesita los hooks de mando del mod, que están desactivados o no se pudieron instalar."
 "The mod itself: settings, controllers, language, updates and help.","The mod itself: settings, controllers, language, updates and help.","El mod en sí: ajustes, mandos, idioma, actualizaciones y ayuda."
 The palette editor itself opens once you are in a match.,The palette editor itself opens once you are in a match.,El editor de paletas se abre cuando estés en una partida.
 These tools moved into the mod menu.,These tools moved into the mod menu.,Estas herramientas se movieron al menú del mod.

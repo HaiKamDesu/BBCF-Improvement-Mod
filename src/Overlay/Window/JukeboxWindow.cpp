@@ -122,22 +122,49 @@ void JukeboxWindow::DrawControls() {
 		musicManager.SavePreferences();
 	}
 
-	ImGui::Text("%s", L("VS/Online Rematch:").c_str());
-	ImGui::SameLine();
-	const std::string rematchHelp =
-		L("Character Select Track: use the song selected at Character Select") + "\n" +
-		L("Resume Last Playlist Track: restart the last song played by the Jukebox") + "\n" +
-		L("Play Next Playlist Track: advance from the last Jukebox song using the selected rotation mode; if none has played yet, advance from the Character Select song") + "\n\n" +
-		L("Only applies to local VS and Online rematches. The first match always uses the Character Select track.");
-	ImGui::ShowHelpMarker(rematchHelp.c_str());
+	// Which song a match opens on. Two questions, not one: people want the game's own
+	// pick for the first match of a set and the playlist from the rematch on, or the
+	// playlist from the very first match, and one combined control could never say which
+	// of those it was doing. The wording is the whole point here - each option says what
+	// you will hear, not which internal mode it selects.
+	//
+	// Both are dead while rotation is off: MusicManager::Update returns before it can
+	// apply anything, so they grey out and say why instead of quietly doing nothing.
+	const bool rotationOn = musicManager.IsEnabled();
+	const std::string choiceItems =
+		L("Play the track picked at Character Select") + '\0' +
+		L("Play the next track in the playlist") + '\0' +
+		L("Play the last track the Jukebox played") + '\0';
 
-	int rematchMode = static_cast<int>(musicManager.GetRematchTrackMode());
-	const std::string rematchItems = L("Character Select Track") + '\0' +
-		L("Resume Last Playlist Track") + '\0' + L("Play Next Playlist Track") + '\0';
-	if (ImGui::Combo("##RematchTrackMode", &rematchMode, rematchItems.c_str())) {
-		musicManager.SetRematchTrackMode(static_cast<RematchTrackMode>(rematchMode));
+	ImGui::BeginDisabled(!rotationOn);
+
+	ImGui::Text("%s", L("When a match starts:").c_str());
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(L("What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below.").c_str());
+
+	int matchStartChoice = static_cast<int>(musicManager.GetMatchStartTrackChoice());
+	if (ImGui::Combo("##MatchStartTrack", &matchStartChoice, choiceItems.c_str())) {
+		musicManager.SetMatchStartTrackChoice(static_cast<MatchTrackChoice>(matchStartChoice));
 		musicManager.SavePreferences();
 	}
+
+	ImGui::Text("%s", L("When you rematch:").c_str());
+	ImGui::SameLine();
+	ImGui::ShowHelpMarker(L("What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above.").c_str());
+
+	int rematchChoice = static_cast<int>(musicManager.GetRematchTrackChoice());
+	if (ImGui::Combo("##RematchTrack", &rematchChoice, choiceItems.c_str())) {
+		musicManager.SetRematchTrackChoice(static_cast<MatchTrackChoice>(rematchChoice));
+		musicManager.SavePreferences();
+	}
+
+	ImGui::EndDisabled();
+
+	if (!rotationOn) {
+		ImGui::TextDisabledWrapped("%s", L("Turn on \"Enable Music Rotation\" above for these two to do anything.").c_str());
+	}
+
+	ImGui::Spacing();
 
 	// Repeat settings
 	ImGui::HorizontalSpacing();
