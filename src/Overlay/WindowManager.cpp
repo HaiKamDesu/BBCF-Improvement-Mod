@@ -18,7 +18,7 @@
 #include "Window/WinePopupWindow.h"
 
 #include "Game/EntityDiagnostics.h"
-#include "Game/ReplayPauseProbe.h"
+#include "Game/ReplayPauseHud.h"
 #include "Game/gamestates.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/FrameStallWatchdog.h"
@@ -753,83 +753,91 @@ void WindowManager::Render()
 	// or not that window happens to be open.
 	EntityDiagnostics::Update();
 
-	// The replay-pause HUD hook reads this mirror from assembly, so it cannot read settingsIni
-	// itself. applyRuntimeSettings refreshes it, but only when the Settings window is saved - which
-	// leaves it stale for every other way the value can change, a hand-edited ini among them.
-	// Copying it per frame costs nothing and removes that whole class of "the setting is on but
-	// nothing happens". Logged on change so a test can say which state it actually ran in.
+	// One line whenever the game changes mode or state. Cheap - two integer compares per frame -
+	// and it gives anything reading the log a precise sync point, so an automated run can wait for
+	// "the main menu exists" instead of sleeping for a guessed number of seconds. Every prior
+	// investigation in here had to infer where the game was from side effects.
+	if (g_gameVals.pGameMode && g_gameVals.pGameState)
+	{
+		static int s_mode = -1;
+		static int s_state = -1;
+		static int s_playback = -2;
+		static unsigned long long s_lastBeat = 0;
+		const int mode = *g_gameVals.pGameMode;
+		const int state = *g_gameVals.pGameState;
+		const unsigned long long now = GetTickCount64();
+
+		// Whether a replay is paused, read from the field the game itself pauses on. A script
+		// driving a pause test has no other honest way to know: a paused frame and a running
+		// frame can photograph identically, which is exactly how a "fix" that stopped the pause
+		// from happening at all was once mistaken for a working one.
+		const int playback = (mode == GameMode_ReplayTheater) ? ReplayPauseHud::PlaybackState() : -1;
+
+		// Whether the round announcement is over and the match is actually running. Every
+		// in-match measurement needs this: for the first several seconds of a match the screen
+		// is the character intro and the round banner, and anything compared there is comparing
+		// two frames of an animation. There is no game state for it - gameState is 15 from the
+		// moment the match loads - but the match timer is pinned until the round starts, so the
+		// first tick down is the transition. Latched, because the timer also stands still during
+		// a pause, and reset whenever the match is left.
+		static int s_prevTimer = -1;
+		static bool s_roundLive = false;
+		const int timer = (state == 15 && g_gameVals.pMatchTimer) ? *g_gameVals.pMatchTimer : -1;
+		if (timer < 0)
+		{
+			s_roundLive = false;
+		}
+		else if (s_prevTimer >= 0 && timer < s_prevTimer)
+		{
+			s_roundLive = true;
+		}
+		s_prevTimer = timer;
+		static bool s_prevRoundLive = false;
+
+		// On change, and as a heartbeat. The heartbeat matters for anything scripting the
+		// game: a reader that only sees transitions cannot tell "already at the title" from
+		// "never got there", and would wait forever for a line that was printed before it
+		// started looking.
+		//
+		// Half a second, not two. A script that taps a key until the mode changes has to wait
+		// out a full heartbeat before it can know the last press landed, and at two seconds
+		// that window was long enough to fire a second and third press - which confirmed
+		// straight past the menu the script was trying to stop on. The rate only matters while
+		// something is driving the game; 7200 lines an hour is well within what the log takes.
+		if (mode != s_mode || state != s_state || playback != s_playback
+			|| s_roundLive != s_prevRoundLive || now - s_lastBeat > 500)
+		{
+			LOG(1, "[State] gameMode=%d gameState=%d playback=%d round=%s\n",
+				mode, state, playback, s_roundLive ? "live" : "intro");
+			s_mode = mode;
+			s_state = state;
+			s_playback = playback;
+			s_prevRoundLive = s_roundLive;
+			s_lastBeat = now;
+		}
+	}
+
+	// Mirrored per frame rather than only when the Settings window is saved, which is the one
+	// moment applyRuntimeSettings covers - that left the value stale for every other way it can
+	// change, a hand-edited ini among them. Copying it per frame costs a comparison and removes
+	// that whole class of "the setting is on but nothing happens". Logged on change so a test can
+	// say which state it actually ran in.
 	{
 		const int wanted = Settings::settingsIni.showHudWhenReplayPaused ? 1 : 0;
 		if (wanted != g_modVals.showHudWhenReplayPaused)
 		{
 			g_modVals.showHudWhenReplayPaused = wanted;
-			LOG(2, "[HUD] keep-HUD-while-replay-paused is now %s\n", wanted ? "ON" : "off");
+			LOG(2, "[HUD] keep-the-input-display-while-paused is now %s\n", wanted ? "ON" : "off");
 		}
-	}
 
-	// Does a paused replay still draw its HUD elements, and if not, are they being turned away by
-	// the element visible bit? The hook sits on the real per-element draw gate at 0x00637E10, so
-	// these counts mean what they say - unlike the previous round, which counted a resource loader
-	// and therefore measured nothing. Pause is detected
-	// by the world frame counter standing still, which needs no knowledge of where the pause state
-	// lives - the point at issue. Logged on every pause/resume transition as well as once a second,
-	// so a short pause cannot fall between two samples, and carrying the interval so a partial
-	// sample can be normalised against a full second.
-	extern volatile int g_hudGateCalls;
-	extern volatile int g_hudGateHiddenBit24;
-	extern volatile int g_hudGateLastFlags;
-	extern volatile int g_hudPauseElems;
-	extern volatile int g_hudPauseFlagsOr;
-	extern volatile int g_hudPauseFlagsAnd;
-	extern volatile int g_hudPauseA0Or;
-	extern volatile int g_hudPauseA0And;
-	extern volatile int g_hudPauseA8Or;
-	extern volatile int g_hudPauseA8And;
-	if (g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_ReplayTheater && g_gameVals.pFrameCount)
-	{
-		static unsigned long long s_lastLogMs = 0;
-		static unsigned s_lastWorldFrame = 0;
-		static int s_stalled = 0;
-		static bool s_paused = false;
-		static int s_budget = 0;
-
-		const unsigned worldFrame = *g_gameVals.pFrameCount;
-		s_stalled = (worldFrame == s_lastWorldFrame) ? s_stalled + 1 : 0;
-		s_lastWorldFrame = worldFrame;
-
-		const bool paused = s_stalled > 10;
-		const bool transition = paused != s_paused;
-
-		ReplayPauseProbe::Update(true, paused);
-
-		const unsigned long long now = GetTickCount64();
-		if ((transition || now - s_lastLogMs > 1000) && s_budget < 200)
-		{
-			s_budget++;
-			LOG(2, "[HUD] all=%d hidden=%d | pauseTagged=%d flags or=0x%08X and=0x%08X | "
-			       "11A0 or=0x%08X and=0x%08X | 11A8 or=0x%08X and=0x%08X | ms=%llu paused=%d%s\n",
-				g_hudGateCalls - g_hudGateHiddenBit24,
-				g_hudGateHiddenBit24,
-				g_hudPauseElems,
-				g_hudPauseFlagsOr, g_hudPauseFlagsAnd,
-				g_hudPauseA0Or, g_hudPauseA0And,
-				g_hudPauseA8Or, g_hudPauseA8And,
-				now - s_lastLogMs,
-				paused ? 1 : 0,
-				transition ? (paused ? " <-- PAUSED" : " <-- RESUMED") : "");
-
-			s_lastLogMs = now;
-			s_paused = paused;
-			g_hudGateCalls = 0;
-			g_hudGateHiddenBit24 = 0;
-			g_hudPauseElems = 0;
-			g_hudPauseFlagsOr = 0;
-			g_hudPauseFlagsAnd = -1;
-			g_hudPauseA0Or = 0;
-			g_hudPauseA0And = -1;
-			g_hudPauseA8Or = 0;
-			g_hudPauseA8And = -1;
-		}
+		// AND the game mode in, because the branches being patched are not replay-specific: they
+		// are the generic "and we are not paused" half of four display switches, reached in every
+		// mode. Patched unconditionally, a training-mode pause would keep the input display up
+		// too - which the setting explicitly promises it will not. SetEnabled only writes on a
+		// real change, so this is a comparison per frame and two writes per mode transition.
+		const bool inReplayTheater =
+			g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_ReplayTheater;
+		ReplayPauseHud::SetEnabled(wanted != 0 && inReplayTheater);
 	}
 
 	if (g_interfaces.pSteamApiHelper->IsSteamOverlayActive())

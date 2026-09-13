@@ -91,7 +91,7 @@
     <ClCompile Include="src\Game\MatchState.cpp" />
     <ClCompile Include="src\Game\FrameStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\EntityDiagnostics.cpp" />
-    <ClCompile Include="src\Game\ReplayPauseProbe.cpp" />
+    <ClCompile Include="src\Game\ReplayPauseHud.cpp" />
     <ClCompile Include="src\Game\FrameStallWatchdog.cpp" />
     <ClCompile Include="src\Game\NetworkStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\SpectatorSyncDiagnostics.cpp" />
@@ -278,7 +278,7 @@
     <ClInclude Include="src\Game\MatchState.h" />
     <ClInclude Include="src\Game\FrameStallDiagnostics.h" />
     <ClInclude Include="src\Game\EntityDiagnostics.h" />
-    <ClInclude Include="src\Game\ReplayPauseProbe.h" />
+    <ClInclude Include="src\Game\ReplayPauseHud.h" />
     <ClInclude Include="src\Game\FrameStallWatchdog.h" />
     <ClInclude Include="src\Game\NetworkStallDiagnostics.h" />
     <ClInclude Include="src\Game\SpectatorSyncDiagnostics.h" />

@@ -1,4 +1,5 @@
 #include "hooks_bbcf.h"
+#include "Game/ReplayPauseHud.h"
 
 #include "Core/crashdump.h"
 #include "Core/interfaces.h"
@@ -9106,101 +9107,6 @@ void __declspec(naked)GetIsHUDHidden()
 }
 
 // ---------------------------------------------------------------------------------------
-// Keeping the game's HUD up while a replay is paused - investigation, not a fix yet.
-//
-// Two mechanisms have been ruled out with evidence:
-//
-//  - The HUD-hidden bitfield at <obj>+0x2778 carries only intro (0x01), astral (0x02) and
-//    loading (0x04), and a live trace showed it at 0 on both sides of every pause.
-//  - The replay-pause arm of the HUD gate reads a static at 0x015C0358 (the replay singleton
-//    at 0x0155B470 plus 0x64EE8). That address and its two siblings are written in exactly
-//    three instructions each, all storing zero. Nothing ever sets them, confirmed live at
-//    ~5300 reads a second returning 0 throughout. That arm is dead code.
-//
-// 0x00637E10 is the real per-element HUD draw gate, reached from the element draws that do the
-// float positioning work. It reads a flags word at element+0x24:
-//
-//     test ecx,1000000h / je  -> return 1, element not drawn   (bit 24 = visible)
-//     test cl,60h       / jne -> return 1, element not drawn
-//     test ecx,2000000h / je  -> skip the replay-pause arm     (bit 25 = opts into that hide)
-//
-// So elements are tagged to participate in a replay-pause hide whose flag is dead. Whatever
-// actually hides them must therefore act on bit 24, or stop them being enumerated at all. This
-// hook samples the flags word and counts elements turned away by bit 24, which distinguishes
-// those two - and unlike the previous attempt, it sits on a function that genuinely draws.
-DWORD HudElementDrawGateJmpBackAddr = 0;
-
-volatile int g_hudGateCalls = 0;
-volatile int g_hudGateHiddenBit24 = 0;
-volatile int g_hudGateLastFlags = 0;
-
-// Bit 25 of the flags word marks the elements the game itself tags as "hide me during a replay
-// pause" - which is precisely the HUD subset, separated from the ~200 other UI elements drawn each
-// frame. Accumulating OR and AND of their fields over an interval shows which bits move: OR gains a
-// bit that is ever set, AND keeps only bits always set, so comparing the pair across a pause
-// isolates exactly what changes about them.
-volatile int g_hudPauseElems = 0;
-volatile int g_hudPauseFlagsOr = 0;
-volatile int g_hudPauseFlagsAnd = -1;
-volatile int g_hudPauseA0Or = 0;
-volatile int g_hudPauseA0And = -1;
-volatile int g_hudPauseA8Or = 0;
-volatile int g_hudPauseA8And = -1;
-
-void __declspec(naked) HudElementDrawGate()
-{
-	__asm
-	{
-		push eax
-		push edx
-		test ecx, ecx
-		jz   no_sample
-		mov  eax, dword ptr[ecx + 24h]
-		mov  g_hudGateLastFlags, eax
-		inc  g_hudGateCalls
-		test eax, 1000000h
-		jnz  check_pause_tag
-		inc  g_hudGateHiddenBit24
-	check_pause_tag:
-		test eax, 2000000h
-		jz   no_sample
-		inc  g_hudPauseElems
-
-		mov  edx, g_hudPauseFlagsOr
-		or   edx, eax
-		mov  g_hudPauseFlagsOr, edx
-		mov  edx, g_hudPauseFlagsAnd
-		and  edx, eax
-		mov  g_hudPauseFlagsAnd, edx
-
-		mov  eax, dword ptr[ecx + 11A0h]
-		mov  edx, g_hudPauseA0Or
-		or   edx, eax
-		mov  g_hudPauseA0Or, edx
-		mov  edx, g_hudPauseA0And
-		and  edx, eax
-		mov  g_hudPauseA0And, edx
-
-		mov  eax, dword ptr[ecx + 11A8h]
-		mov  edx, g_hudPauseA8Or
-		or   edx, eax
-		mov  g_hudPauseA8Or, edx
-		mov  edx, g_hudPauseA8And
-		and  edx, eax
-		mov  g_hudPauseA8And, edx
-	no_sample:
-		pop edx
-		pop eax
-
-		// The displaced prologue, replayed exactly: push ebp / mov ebp,esp / sub esp,704h.
-		push ebp
-		mov  ebp, esp
-		sub  esp, 704h
-		jmp[HudElementDrawGateJmpBackAddr]
-	}
-}
-
-// ---------------------------------------------------------------------------------------
 // HP numbers on the health bars, outside Abyss.
 //
 // Abyss draws the exact HP figure over each health bar; nothing else does. The HUD update
@@ -9851,10 +9757,9 @@ bool placeHooks_bbcf()
 	GetEntityListDeleteAddrJmpBackAddr = HookManager::SetHook("GetEntityListDeleteAddr", "\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x86",
 		"xx????xx????xx????xx????xx", 6, GetEntityListDeleteAddr);
 
-	// push ebp / mov ebp,esp / sub esp,704h - unique in the binary, and nothing branches into the
-	// nine bytes the patch covers.
-	HudElementDrawGateJmpBackAddr = HookManager::SetHook("HudElementDrawGate",
-		"\x55\x8B\xEC\x81\xEC\x04\x07\x00\x00", "xxxxxxxxx", 9, HudElementDrawGate);
+	// Not a hook: a one-byte branch flip, applied and removed by the setting. Located here
+	// because this is the first point at which the unpacked code is there to scan for.
+	ReplayPauseHud::Locate();
 
 	GetIsHUDHiddenJmpBackAddr = HookManager::SetHook("GetIsHUDHidden", "\x83\x88\x78\x27\x00\x00\x00\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07",
 		"xxxxxx?xxxxxx?x????x????xx????xxxxxxxx?x????x????xx????xxxx", 7, GetIsHUDHidden);
