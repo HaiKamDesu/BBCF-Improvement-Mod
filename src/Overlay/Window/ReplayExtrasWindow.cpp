@@ -1,6 +1,7 @@
 #include "ReplayExtrasWindow.h"
 
 #include "Core/Localization.h"
+#include "Core/Settings.h"
 #include "Core/interfaces.h"
 #include "Game/SnapshotApparatus/SnapshotApparatus.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
@@ -154,6 +155,40 @@ namespace ReplayExtras
 		}
 	}
 
+	bool PauseHudApplies()
+	{
+		// Exactly the condition the patch itself is gated on - the game has to be in Replay
+		// Theater for the option to change anything. That rules out a takeover, which keeps
+		// this window open but switches the game to training.
+		return InReplayMatch();
+	}
+
+	void DrawPauseHudBody(WindowContainer& container, const char* idScope, bool compact)
+	{
+		(void)container;
+		(void)idScope;
+
+		// Read live rather than cached in a static: the same setting is on the Settings
+		// window's Replays page, and a cached copy would leave the two showing different
+		// answers until a restart.
+		bool keep = Settings::settingsIni.showHudWhenReplayPaused;
+		if (ImGui::CheckboxWrapped(Messages.Keep_input_display_on_replay_pause(), &keep))
+		{
+			Settings::settingsIni.showHudWhenReplayPaused = keep;
+			Settings::changeSetting("ShowHudWhenReplayPaused", keep ? "1" : "0");
+		}
+
+		// L() rather than a generated Messages accessor: the accessor name is the string, and
+		// for a sentence this long that is an unreadable 200-character identifier.
+		const std::string& why = L("Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels. Turn this on to leave them on screen. Pausing still pauses.");
+
+		if (compact)
+		{
+			ImGui::HoverTooltip(why.c_str());
+		}
+		ImGui::ShowHelpMarkerSameLine(why.c_str());
+	}
+
 	void DrawTakeoverBody(WindowContainer& container, const char* idScope, bool compact)
 	{
 		ScrWindow* scr = container.GetWindow<ScrWindow>(WindowType_Scr);
@@ -292,8 +327,13 @@ void ReplayExtrasWindow::BeforeDraw()
 	// right size for this window and letting the user drag it to a wrong one only produces
 	// wrapped rows and empty space. Measured from the font rather than hard-coded in pixels,
 	// because the menu size setting scales it.
+	// Four rows while the replay-pause option is on offer, three otherwise. The height still
+	// does not change under the mouse: the row appears and disappears with the game mode, not
+	// with anything the window itself does.
+	const float rowCount = ReplayExtras::PauseHudApplies() ? 4.0f : 3.0f;
+
 	const ImGuiStyle& style = ImGui::GetStyle();
-	const float rows = ImGui::GetFrameHeight() * 3.0f + style.ItemSpacing.y * 2.0f;
+	const float rows = ImGui::GetFrameHeight() * rowCount + style.ItemSpacing.y * (rowCount - 1.0f);
 	const float titleBar = ImGui::GetFrameHeight();
 	ImGui::SetNextWindowSize(
 		ImVec2(ImGui::GetFontSize() * 30.0f, titleBar + style.WindowPadding.y * 2.0f + rows),
@@ -307,9 +347,9 @@ void ReplayExtrasWindow::Draw()
 		return;
 	}
 
-	// Three rows, whatever mode this is in, so the window never changes height and the
-	// controls never move out from under the mouse. No headings and no collapsing: a heading
-	// over a single row spends that row saying what the button next to it already says.
+	// Three rows for the controls, whatever mode this is in, so they never move out from
+	// under the mouse. No headings and no collapsing: a heading over a single row spends that
+	// row saying what the button next to it already says.
 	switch (ReplayExtras::CurrentMode(*m_pWindowContainer))
 	{
 	case ReplayExtras::Mode::Takeover:
@@ -330,6 +370,13 @@ void ReplayExtrasWindow::Draw()
 		ReplayExtras::DrawTakeoverBody(*m_pWindowContainer, "extras", true);
 		ReplayExtras::DrawCaptureBody(*m_pWindowContainer, "extras", true);
 		break;
+	}
+
+	// Last, in every mode that has it, so the three controls people reach for keep the
+	// positions they have always had. This one is set once and then left alone.
+	if (ReplayExtras::PauseHudApplies())
+	{
+		ReplayExtras::DrawPauseHudBody(*m_pWindowContainer, "extras", true);
 	}
 
 	DrawCloseConfirm();

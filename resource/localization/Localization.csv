@@ -1,6 +1,9 @@
 ﻿MethodName,en,es
 _LanguageCode,en,es
 _DisplayName,English,Español
+Keep input display on replay pause,Keep input display on replay pause,Mantener el historial de inputs al pausar
+Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels. Turn this on to leave them on screen. Pausing still pauses.,Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels. Turn this on to leave them on screen. Pausing still pauses.,Al pausar una repetición el juego oculta su historial de inputs: las columnas de botones de ambos lados y los dos paneles de palanca y botones. Actívalo para dejarlos en pantalla. La pausa sigue pausando.
+Replay Playback,Replay Playback,Reproducción de repeticiones
 Toggle me with %s,Toggle me with %s,Activa la ventana con %s
 Toggle Online with %s,Toggle Online with %s,Abrir en línea con %s
 Toggle HUD with %s,Toggle HUD with %s,Ocultar HUD con %s

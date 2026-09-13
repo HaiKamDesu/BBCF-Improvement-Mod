@@ -6,6 +6,15 @@ struct LocalizationKeysAccessor
 {
         const char* Get(const std::string& key) const;
 
+        // Keep input display on replay pause
+        inline const char* Keep_input_display_on_replay_pause() const { return Get("Keep input display on replay pause"); }
+
+        // Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels. Turn this on to leave them on screen. Pausing still pauses.
+        inline const char* Pausing_a_replay_normally_makes_the_game_hide_its_input_display_the_button_columns_down_both_sides_and_the_two_stick_and_button_panels_Turn_this_on_to_leave_them_on_screen_Pausing_still_pauses() const { return Get("Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels. Turn this on to leave them on screen. Pausing still pauses."); }
+
+        // Replay Playback
+        inline const char* Replay_Playback() const { return Get("Replay Playback"); }
+
         // Toggle me with %s
         inline const char* Toggle_me_with_s() const { return Get("Toggle me with %s"); }
 

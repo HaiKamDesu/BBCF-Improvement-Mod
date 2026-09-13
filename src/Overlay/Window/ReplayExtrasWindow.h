@@ -51,6 +51,16 @@ namespace ReplayExtras
 	void DrawRewindBody(WindowContainer& container, const char* idScope, bool compact);
 	void DrawTakeoverBody(WindowContainer& container, const char* idScope, bool compact);
 	void DrawCaptureBody(WindowContainer& container, const char* idScope, bool compact);
+
+	// A fourth row, drawn only while it can do anything: the option that keeps the game's
+	// input display on screen when you pause the replay.
+	//
+	// Unlike the three above it is hidden rather than greyed out when it does not apply,
+	// because the thing it does not apply to is a takeover - which switches the game to
+	// training, where replay pausing does not exist at all. A greyed-out row there would be
+	// permanently greyed out and would only take up a row of a window sitting over a match.
+	bool PauseHudApplies();
+	void DrawPauseHudBody(WindowContainer& container, const char* idScope, bool compact);
 }
 
 class ReplayExtrasWindow : public IWindow
