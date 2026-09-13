@@ -203,6 +203,7 @@ void Settings::applyRuntimeSettings()
 	g_modVals.frame_history_height = Settings::settingsIni.FrameHistoryHeight;
 	g_modVals.frame_history_spacing = Settings::settingsIni.FrameHistorySpacing;
 	g_modVals.frame_history_auto_reset = Settings::settingsIni.frameHistoryAutoReset;
+	g_modVals.showHudWhenReplayPaused = Settings::settingsIni.showHudWhenReplayPaused ? 1 : 0;
 
 	//CA2W pszwide (host_c_str);
 	g_modVals.uploadReplayDataHost = Settings::settingsIni.uploadReplayDataHost;

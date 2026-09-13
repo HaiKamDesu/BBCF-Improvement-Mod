@@ -1,4 +1,5 @@
 #include "hooks_bbcf.h"
+#include "Game/ReplayPauseHud.h"
 
 #include "Core/crashdump.h"
 #include "Core/interfaces.h"
@@ -9755,6 +9756,10 @@ bool placeHooks_bbcf()
 
 	GetEntityListDeleteAddrJmpBackAddr = HookManager::SetHook("GetEntityListDeleteAddr", "\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x8E\x00\x00\x00\x00\x89\x86",
 		"xx????xx????xx????xx????xx", 6, GetEntityListDeleteAddr);
+
+	// Not a hook: a one-byte branch flip, applied and removed by the setting. Located here
+	// because this is the first point at which the unpacked code is there to scan for.
+	ReplayPauseHud::Locate();
 
 	GetIsHUDHiddenJmpBackAddr = HookManager::SetHook("GetIsHUDHidden", "\x83\x88\x78\x27\x00\x00\x00\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07\x8B\xCF\xFF\x50\x00\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x5F\xB8\x00\x00\x00\x00\x5B\xC3\x8B\x07",
 		"xxxxxx?xxxxxx?x????x????xx????xxxxxxxx?x????x????xx????xxxx", 7, GetIsHUDHidden);
