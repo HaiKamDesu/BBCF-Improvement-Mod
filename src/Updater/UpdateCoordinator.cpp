@@ -38,6 +38,16 @@ namespace Updater
 			return std::string("BBCFIM/") + MOD_VERSION;
 		}
 
+		// DEV ONLY - MUST BE false IN ANYTHING THAT SHIPS.
+		//
+		// Forces the footer's "Update IM to X" reminder to draw even when this build is
+		// already the newest release, so the thing can be looked at without waiting for a
+		// release to exist to be behind. The button is inert while it is standing in for a
+		// real update: clicking it would open the announcement popup over an empty release,
+		// so the click is swallowed and logged instead.
+		constexpr bool kForceShowUpdateReminder = false;
+		constexpr const char* kForcedUpdateReminderTag = "v99.9-TEST";
+
 		bool ShouldUseDevelopmentUpdateChannel()
 		{
 			return IsDebuggerPresent() || Settings::settingsIni.enableInDevelopmentFeatures;
@@ -148,44 +158,52 @@ namespace Updater
 	{
 	}
 
-	void UpdateCoordinator::DrawSkippedMainMenuLink()
+	void UpdateCoordinator::DrawMainMenuUpdateReminder()
 	{
 		UpdateUiSnapshot snapshot = GetSnapshot();
-		if (!snapshot.hasUpdate)
+		const bool forced = !snapshot.hasUpdate && kForceShowUpdateReminder;
+		if (!snapshot.hasUpdate && !forced)
 			return;
 
-		ImGui::Spacing();
+		if (forced)
+			snapshot.tag = kForcedUpdateReminderTag;
 
-		char text[128] = {};
-		const std::string format = L("Update to %s");
+		// A button, and a coloured one, rather than the dim underlined link this used to
+		// be. Somebody who pressed "Later" or "Skip this version" once is otherwise told
+		// nothing ever again, and goes on running a build from months ago without knowing
+		// it; every open of the menu should say so plainly and be one click from the
+		// release notes and the installer.
+		char text[192] = {};
+		const std::string format = L("Update IM to %s");
 		std::snprintf(text, sizeof(text), format.c_str(), snapshot.tag.c_str());
 
-		const ImVec4 linkColor = ImVec4(0.58f, 0.58f, 0.62f, 1.0f);
-		const ImVec4 hoverColor = ImVec4(0.76f, 0.76f, 0.80f, 1.0f);
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.48f, 0.24f, 1.00f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.62f, 0.32f, 1.00f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.38f, 0.19f, 1.00f));
+		const bool clicked = ImGui::Button(text);
+		ImGui::PopStyleColor(3);
 
-		const ImVec2 pos = ImGui::GetCursorScreenPos();
-		const ImVec2 textSize = ImGui::CalcTextSize(text);
-		ImGui::InvisibleButton("##BBCFIMUpdateMainMenuLink", textSize);
-		const bool hovered = ImGui::IsItemHovered();
-		const bool clicked = ImGui::IsItemClicked();
-
-		ImGui::GetWindowDrawList()->AddText(
-			pos,
-			ImGui::ColorConvertFloat4ToU32(hovered ? hoverColor : linkColor),
-			text);
-		if (hovered)
+		if (ImGui::IsItemHovered())
 		{
-			ImGui::GetWindowDrawList()->AddLine(
-				ImVec2(pos.x, pos.y + textSize.y),
-				ImVec2(pos.x + textSize.x, pos.y + textSize.y),
-				ImGui::ColorConvertFloat4ToU32(hoverColor));
+			char tooltip[256] = {};
+			const std::string tooltipFormat = L("You are running %s. Click to see what is in the new release and install it.");
+			std::snprintf(tooltip, sizeof(tooltip), tooltipFormat.c_str(), MOD_VERSION);
+			ImGui::SetTooltip("%s", tooltip);
 		}
 
-		if (clicked)
+		if (clicked && forced)
 		{
+			LOG(1, "[UPDATER] Update reminder clicked, but it is only being shown by "
+				"kForceShowUpdateReminder - there is no release to open.\n");
+		}
+		else if (clicked)
+		{
+			// Reopening by hand un-skips: the popup refusing to show because of a decision
+			// made in an earlier session is exactly what the click is asking to undo.
 			EnterCriticalSection(&m_lock);
 			m_snapshot.skipped = false;
-			m_snapshot.state = UpdateUiState_Available;
+			if (m_snapshot.state == UpdateUiState_Skipped)
+				m_snapshot.state = UpdateUiState_Available;
 			LeaveCriticalSection(&m_lock);
 			OpenPopup();
 		}

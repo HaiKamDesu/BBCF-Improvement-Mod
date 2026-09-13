@@ -53,7 +53,11 @@ namespace Updater
 		void StartUpdate();
 		void StartInstallRelease(const GitHubRelease& release);
 		void DrawSkippedLink();
-		void DrawSkippedMainMenuLink();
+		// The standing "you are running an old build" reminder in the mod menu's footer.
+		// Drawn whenever a newer release exists, including one the user skipped or put off:
+		// skipping silences the popup that opens by itself, not the reminder. Clicking it
+		// brings the release announcement back.
+		void DrawMainMenuUpdateReminder();
 		UpdateUiSnapshot GetSnapshot();
 
 	private:

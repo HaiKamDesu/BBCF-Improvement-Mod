@@ -315,6 +315,11 @@ void MainWindow::DrawFooter()
 
 	ImGui::Separator();
 
+	// First thing in the footer, not last: an out-of-date build is the one thing down here
+	// that the user needs to see without looking for it. Draws nothing when there is no
+	// newer release.
+	Updater::UpdateCoordinator::GetInstance().DrawMainMenuUpdateReminder();
+
 	ImGui::TextUnformatted(Messages.Current_online_players());
 	ImGui::SameLineOrWrap(ImGui::CalcTextSize("00000").x);
 	const std::string playerCount = g_interfaces.pSteamApiHelper
@@ -377,8 +382,6 @@ void MainWindow::DrawFooter()
 	ImGui::ButtonUrl(forumLabel, MOD_LINK_FORUM);
 	ImGui::SameLineOrWrap(ImGui::ButtonWidth(githubLabel));
 	ImGui::ButtonUrl(githubLabel, MOD_LINK_GITHUB);
-
-	Updater::UpdateCoordinator::GetInstance().DrawSkippedMainMenuLink();
 
 	// Last, and in the same window the button that opens it lives in.
 	m_settingsIniWindow.DrawModal();
