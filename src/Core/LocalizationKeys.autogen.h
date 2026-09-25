@@ -4149,12 +4149,6 @@ struct LocalizationKeysAccessor
         // A short note about the palette, stored in the palette file.
         inline const char* A_short_note_about_the_palette_stored_in_the_palette_file() const { return Get("A short note about the palette, stored in the palette file."); }
 
-        // Accept
-        inline const char* Accept() const { return Get("Accept"); }
-
-        // Accept or cancel the color you are editing first.
-        inline const char* Accept_or_cancel_the_color_you_are_editing_first() const { return Get("Accept or cancel the color you are editing first."); }
-
         // Actual size: one sheet pixel per screen pixel.
         inline const char* Actual_size_one_sheet_pixel_per_screen_pixel() const { return Get("Actual size: one sheet pixel per screen pixel."); }
 
@@ -4182,8 +4176,26 @@ struct LocalizationKeysAccessor
         // Close without saving.
         inline const char* Close_without_saving() const { return Get("Close without saving."); }
 
-        // Ctrl+Z / Ctrl+Y undo and redo accepted changes. Enter accepts and Escape cancels an open color.
-        inline const char* Ctrl_Z_Ctrl_Y_undo_and_redo_accepted_changes_Enter_accepts_and_Escape_cancels_an_open_color() const { return Get("Ctrl+Z / Ctrl+Y undo and redo accepted changes. Enter accepts and Escape cancels an open color."); }
+        // Ctrl+Z / Ctrl+Y undo and redo your changes. Escape cancels an open color.
+        inline const char* Ctrl_Z_Ctrl_Y_undo_and_redo_your_changes_Escape_cancels_an_open_color() const { return Get("Ctrl+Z / Ctrl+Y undo and redo your changes. Escape cancels an open color."); }
+
+        // Ctrl+C copies the open color; Ctrl+V pastes it into whichever color is open.
+        inline const char* Ctrl_C_copies_the_open_color_Ctrl_V_pastes_it_into_whichever_color_is_open() const { return Get("Ctrl+C copies the open color; Ctrl+V pastes it into whichever color is open."); }
+
+        // Copied %s. Open another color and press Ctrl+V to paste it.
+        inline const char* Copied_s_Open_another_color_and_press_Ctrl_V_to_paste_it() const { return Get("Copied %s. Open another color and press Ctrl+V to paste it."); }
+
+        // +%d more
+        inline const char* d_more() const { return Get("+%d more"); }
+
+        // Colors added with Ctrl+click. They keep their own color until you change the picker, then all take the picker's. Ctrl+click one again to take it back out.
+        inline const char* Colors_added_with_Ctrl_click_They_keep_their_own_color_until_you_change_the_picker_then_all_take_the_picker_s_Ctrl_click_one_again_to_take_it_back_out() const { return Get("Colors added with Ctrl+click. They keep their own color until you change the picker, then all take the picker's. Ctrl+click one again to take it back out."); }
+
+        // Ctrl+click adds more colors to the open one: they all take the picker's color once you change it. Alt+click moves on to another color and gives it the color you had, for walking along a ramp a step at a time.
+        inline const char* Ctrl_click_adds_more_colors_to_the_open_one_they_all_take_the_picker_s_color_once_you_change_it_Alt_click_moves_on_to_another_color_and_gives_it_the_color_you_had_for_walking_along_a_ramp_a_step_at_a_time() const { return Get("Ctrl+click adds more colors to the open one: they all take the picker's color once you change it. Alt+click moves on to another color and gives it the color you had, for walking along a ramp a step at a time."); }
+
+        // "Show color grid" at the top right lists all 256 colors of the file on screen, including the ones on no sprite.
+        inline const char* Show_color_grid_at_the_top_right_lists_all_256_colors_of_the_file_on_screen_including_the_ones_on_no_sprite() const { return Get("\"Show color grid\" at the top right lists all 256 colors of the file on screen, including the ones on no sprite."); }
 
         // Current
         inline const char* Current() const { return Get("Current"); }
@@ -4296,8 +4308,8 @@ struct LocalizationKeysAccessor
         // Put every fade setting back how it was.
         inline const char* Put_every_fade_setting_back_how_it_was() const { return Get("Put every fade setting back how it was."); }
 
-        // Recolor it with the picker, then Accept to keep it or Cancel to throw it away. Clicking empty space also cancels.
-        inline const char* Recolor_it_with_the_picker_then_Accept_to_keep_it_or_Cancel_to_throw_it_away_Clicking_empty_space_also_cancels() const { return Get("Recolor it with the picker, then Accept to keep it or Cancel to throw it away. Clicking empty space also cancels."); }
+        // Recolor it with the picker. Clicking another color, empty space or anything else keeps the change; Cancel throws it away.
+        inline const char* Recolor_it_with_the_picker_Clicking_another_color_empty_space_or_anything_else_keeps_the_change_Cancel_throws_it_away() const { return Get("Recolor it with the picker. Clicking another color, empty space or anything else keeps the change; Cancel throws it away."); }
 
         // Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back.
         inline const char* Replace_every_color_with_another_palette_s_one_of_the_game_s_or_one_of_yours_Undo_brings_your_colors_back() const { return Get("Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back."); }
@@ -4335,8 +4347,8 @@ struct LocalizationKeysAccessor
         // Strength
         inline const char* Strength() const { return Get("Strength"); }
 
-        // Take back the last accepted change (Ctrl+Z).
-        inline const char* Take_back_the_last_accepted_change_Ctrl_Z() const { return Get("Take back the last accepted change (Ctrl+Z)."); }
+        // Take back the last change (Ctrl+Z).
+        inline const char* Take_back_the_last_change_Ctrl_Z() const { return Get("Take back the last change (Ctrl+Z)."); }
 
         // That color could not be read from the game files.
         inline const char* That_color_could_not_be_read_from_the_game_files() const { return Get("That color could not be read from the game files."); }
@@ -4359,14 +4371,14 @@ struct LocalizationKeysAccessor
         // The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects.
         inline const char* The_swatch_blocks_in_the_corner_hold_the_colors_that_do_not_appear_on_the_sprites_mostly_effects() const { return Get("The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects."); }
 
-        // Throw this edit away, as if you never touched it (Escape).
-        inline const char* Throw_this_edit_away_as_if_you_never_touched_it_Escape() const { return Get("Throw this edit away, as if you never touched it (Escape)."); }
+        // Throw this edit away, as if you never touched it (Escape). Anything else you do next keeps it.
+        inline const char* Throw_this_edit_away_as_if_you_never_touched_it_Escape_Anything_else_you_do_next_keeps_it() const { return Get("Throw this edit away, as if you never touched it (Escape). Anything else you do next keeps it."); }
 
         // What should the palette start from?
         inline const char* What_should_the_palette_start_from() const { return Get("What should the palette start from?"); }
 
-        // What the color becomes if you press Accept.
-        inline const char* What_the_color_becomes_if_you_press_Accept() const { return Get("What the color becomes if you press Accept."); }
+        // What the color becomes. It is kept as soon as you move on to anything else.
+        inline const char* What_the_color_becomes_It_is_kept_as_soon_as_you_move_on_to_anything_else() const { return Get("What the color becomes. It is kept as soon as you move on to anything else."); }
 
         // Which character is this palette for?
         inline const char* Which_character_is_this_palette_for() const { return Get("Which character is this palette for?"); }
@@ -4446,8 +4458,8 @@ struct LocalizationKeysAccessor
         // From
         inline const char* From_2() const { return Get("From"); }
 
-        // Hold to see the game
-        inline const char* Hold_to_see_the_game() const { return Get("Hold to see the game"); }
+        // Press %s to hide the overlay and look at them; press it again and the editor is back where you left it.
+        inline const char* Press_s_to_hide_the_overlay_and_look_at_them_press_it_again_and_the_editor_is_back_where_you_left_it() const { return Get("Press %s to hide the overlay and look at them; press it again and the editor is back where you left it."); }
 
         // Live in training
         inline const char* Live_in_training() const { return Get("Live in training"); }
@@ -4467,32 +4479,29 @@ struct LocalizationKeysAccessor
         // To
         inline const char* To_2() const { return Get("To"); }
 
-        // While you hold this button down, the whole overlay turns see-through so you can look at the character.
-        inline const char* While_you_hold_this_button_down_the_whole_overlay_turns_see_through_so_you_can_look_at_the_character() const { return Get("While you hold this button down, the whole overlay turns see-through so you can look at the character."); }
-
         // %s never draws anything with this file. Its colors are still saved with the palette.
         inline const char* s_never_draws_anything_with_this_file_Its_colors_are_still_saved_with_the_palette() const { return Get("%s never draws anything with this file. Its colors are still saved with the palette."); }
 
         // (unused)
         inline const char* unused() const { return Get("(unused)"); }
 
-        // All 256 colors of this file.
-        inline const char* All_256_colors_of_this_file() const { return Get("All 256 colors of this file."); }
+        // All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.
+        inline const char* All_256_colors_of_this_file_as_a_grid_next_to_the_picture_Some_colors_are_on_no_sprite_and_can_only_be_reached_from_here() const { return Get("All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here."); }
 
-        // Color grid
-        inline const char* Color_grid() const { return Get("Color grid"); }
+        // Hide color grid
+        inline const char* Hide_color_grid() const { return Get("Hide color grid"); }
 
-        // Effect files are shown on the effect sprites the game draws with them, read from your game files. "Color grid" shows all 256 colors instead. In a training match the character also shows them live.
-        inline const char* Effect_files_are_shown_on_the_effect_sprites_the_game_draws_with_them_read_from_your_game_files_Color_grid_shows_all_256_colors_instead_In_a_training_match_the_character_also_shows_them_live() const { return Get("Effect files are shown on the effect sprites the game draws with them, read from your game files. \"Color grid\" shows all 256 colors instead. In a training match the character also shows them live."); }
+        // Show color grid
+        inline const char* Show_color_grid() const { return Get("Show color grid"); }
+
+        // Effect files are shown on the effect sprites the game draws with them, read from your game files. In a training match the character also shows them live.
+        inline const char* Effect_files_are_shown_on_the_effect_sprites_the_game_draws_with_them_read_from_your_game_files_In_a_training_match_the_character_also_shows_them_live() const { return Get("Effect files are shown on the effect sprites the game draws with them, read from your game files. In a training match the character also shows them live."); }
 
         // No effect sprite could be read for this file; showing the colors as a grid instead.
         inline const char* No_effect_sprite_could_be_read_for_this_file_showing_the_colors_as_a_grid_instead() const { return Get("No effect sprite could be read for this file; showing the colors as a grid instead."); }
 
         // Reading the effect sprites from the game files...
         inline const char* Reading_the_effect_sprites_from_the_game_files() const { return Get("Reading the effect sprites from the game files..."); }
-
-        // Show all 256 colors of this file as a grid instead of on the effect sprites. Some colors are not on any sprite and can only be reached from here.
-        inline const char* Show_all_256_colors_of_this_file_as_a_grid_instead_of_on_the_effect_sprites_Some_colors_are_not_on_any_sprite_and_can_only_be_reached_from_here() const { return Get("Show all 256 colors of this file as a grid instead of on the effect sprites. Some colors are not on any sprite and can only be reached from here."); }
 
         // Showing the colors as a grid instead.
         inline const char* Showing_the_colors_as_a_grid_instead() const { return Get("Showing the colors as a grid instead."); }
@@ -4541,9 +4550,6 @@ struct LocalizationKeysAccessor
 
         // Guess the range from the neighbors that look like lighter and darker steps of the color you clicked.
         inline const char* Guess_the_range_from_the_neighbors_that_look_like_lighter_and_darker_steps_of_the_color_you_clicked() const { return Get("Guess the range from the neighbors that look like lighter and darker steps of the color you clicked."); }
-
-        // Keep the change and close the picker (Enter).
-        inline const char* Keep_the_change_and_close_the_picker_Enter() const { return Get("Keep the change and close the picker (Enter)."); }
 
         // Last entry of the range.
         inline const char* Last_entry_of_the_range() const { return Get("Last entry of the range."); }

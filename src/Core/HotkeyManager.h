@@ -74,6 +74,11 @@ namespace HotkeyManager
 	// driven by a game hook rather than the render loop, which can tick more than once
 	// between Update() calls and would otherwise act on the same press twice.
 	bool ConsumePress(Action action);
+	// For an overlay control that gives the same keys a meaning of its own while it is up,
+	// such as the palette editor's Ctrl+C / Ctrl+V next to the lobby link hotkeys. Call it
+	// every frame the control is showing; the action stays quiet until a frame goes by
+	// without a claim.
+	void Claim(Action action);
 
 	const HotkeyBinding& GetBinding(Action action);
 	// Assigns and persists to settings.ini. Also suppresses the action until every part of

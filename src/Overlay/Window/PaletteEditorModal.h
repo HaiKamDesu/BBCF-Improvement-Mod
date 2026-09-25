@@ -16,7 +16,8 @@
 // edited, and because the sheet is stored as palette indices, the pixel under the cursor
 // *is* the answer: click the cape and the cape's entry opens in a picker, everything else
 // fades out so you see exactly what that entry paints, and the picker recolours all of it
-// live until you accept or cancel.
+// live. Moving on - clicking another colour, empty space, or anything else - keeps the
+// change; only Cancel throws it away.
 //
 // It is a four-step wizard - character, starting palette, edit, name and save - and works
 // outside a match: it edits its own copy and only touches disk on save. A new palette can
@@ -27,11 +28,6 @@ public:
 	// Registers the ImGui ini handler the fade settings are kept in. Must run before the
 	// first frame, which is when that file is parsed.
 	static void RegisterLayoutSettings();
-
-	// Call right after ImGui::NewFrame(). Applies "Hold to see the game": while that button
-	// is held, every overlay window is drawn nearly transparent so the live preview in
-	// training can be seen behind the editor.
-	static void BeginFrame();
 
 	// Starts the wizard at step 1, with `defaultCharIndex` preselected.
 	void OpenNew(int defaultCharIndex);
@@ -83,7 +79,14 @@ private:
 	void DrawCanvas(float width, float height);
 	void DrawEffectGrid();
 	void DrawCanvasHelp(const ImVec2& origin);
-	void DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& canvasMax);
+	// The "Show color grid" toggle over the canvas' top-right corner; true while hovered.
+	bool DrawGridToggle(const ImVec2& canvasMin, const ImVec2& canvasMax, bool clicked);
+	// The grid (when shown) and, while a colour is open, the picker under it.
+	void DrawSidePanel(const ImVec2& canvasMin, const ImVec2& canvasMax);
+	void DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& canvasMax, float top);
+	// All 256 entries of the file on screen as a 16x16 grid at the cursor, `cell` pixels
+	// each. Clicking one opens it. Returns whether the grid is hovered.
+	bool DrawEntryGrid(const char* id, float cell, float gap);
 	void DrawSingleColour();
 	void DrawShadeRamp();
 	void BeginExportPage();
@@ -121,9 +124,21 @@ private:
 	void GoToEditStep();
 	void RecountUsage();
 
+	// Opens `index` in the picker, keeping whatever the colour open before it became.
 	void Select(int index);
+	// A click on a colour, sheet or grid: Select, or with Ctrl/Alt/Shift held, add it to
+	// the open colour, carry the picker's colour over to it, or move the range end.
+	void ClickEntry(int index);
+	// Keeps the open colour's change and closes the picker. Anything that means "done with
+	// this colour" calls it; there is no Accept button.
 	void AcceptPick();
 	void CancelPick();
+	// A colour is open and the picker has changed something.
+	bool PickChanged();
+	// What the picker is editing: the open colour, or a gradient end. Null when none is open.
+	unsigned char* PickerColour();
+	void CopyColour();
+	void PasteColour();
 
 	// The file being edited with the open pick (and shade ramp) applied, into m_pendingFile.
 	void BuildPendingFile();
@@ -189,12 +204,18 @@ private:
 	std::string m_savedName;
 
 	// The open picker. m_selected >= 0 exactly while it is showing; nothing is committed
-	// until Accept, so Cancel is simply dropping m_pending.
+	// until AcceptPick, so Cancel is simply dropping m_pending.
 	int m_file = 0;              // 0 = character colours, 1-7 = effect files
 	int m_selected = -1;
 	unsigned char m_pending[4] = {};
 	unsigned char m_current[4] = {};
 	char m_pendingFile[IMPL_PALETTE_DATALEN] = {};
+	// Ctrl+clicked colours opened alongside m_selected, which take m_pending once it differs
+	// from m_current. Only meaningful while m_selected >= 0; Select clears them.
+	bool m_extra[256] = {};
+	int m_extraCount = 0;
+	unsigned char m_clipboard[4] = {}; // Ctrl+C / Ctrl+V, kept off the system clipboard
+	bool m_haveClipboard = false;
 
 	// Shade ramp: a run of neighbouring entries recoloured together, the way BBCF lays out
 	// a material's shading. Mode 0 recolours it to the picked colour keeping each entry's
@@ -227,8 +248,10 @@ private:
 	bool m_editAlpha = false;
 	int m_usage[256] = {};       // pixels on the sheet per entry
 	int m_usageKey = -1;         // which picture m_usage was counted on
-	bool m_effectGridView = false; // effect files: the 256-colour grid instead of the sprites
 	std::string m_effectNote;      // why an effect file has no picture, when it has none
+	bool m_entryGridOnScreen = false; // a 256-colour grid was drawn this frame, so the range tab needs none
+	int m_gridPressed = -1;        // the grid cell a left press started on
+	bool m_gridDragged = false;    // ...and it has moved to another cell, choosing a range
 
 	float m_zoom = 1.0f;
 	ImVec2 m_pan = ImVec2(0, 0); // image origin, relative to the canvas' top-left
@@ -239,4 +262,9 @@ private:
 
 	std::vector<IMPL_data_t> m_undo;
 	std::vector<IMPL_data_t> m_redo;
+
+	// The overlay hotkey hides the editor with the rest of the overlay, and ImGui closes
+	// every popup of a window that goes away. These notice that and put it back.
+	bool m_openLastDraw = false;
+	int m_lastDrawFrame = -1;
 };

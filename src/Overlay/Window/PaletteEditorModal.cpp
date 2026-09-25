@@ -1,5 +1,6 @@
 #include "PaletteEditorModal.h"
 
+#include "Core/HotkeyManager.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
 #include "Core/utils.h"
@@ -40,12 +41,6 @@ namespace
 	const char* kOverwriteId = "###palette_editor_overwrite";
 	const char* kSavedId = "###palette_editor_saved";
 
-	// "Hold to see the game": set while the button is held, applied by BeginFrame() on the
-	// next frame, since by the time the button knows, this frame's windows are drawn.
-	bool s_peekRequested = false;
-	float s_alphaBeforePeek = -1.0f;
-	const float kPeekAlpha = 0.07f;
-
 	// How far either side of the open colour the shade ramp strip reaches.
 	const int kRampReach = 12;
 
@@ -67,6 +62,7 @@ namespace
 	const ImVec4 kDefaultCanvasBackground(0.11f, 0.11f, 0.125f, 1.0f);
 	PaletteThumbnails::SheetFade g_fade;
 	ImVec4 g_canvasBackground = kDefaultCanvasBackground;
+	bool g_showColourGrid = false; // the 256-colour grid beside the picture
 
 	void* EditorLayout_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* name)
 	{
@@ -78,6 +74,7 @@ namespace
 		int r = 0, g = 0, b = 0;
 		float f = 0.0f;
 		float bg[3] = {};
+		int flag = 0;
 		if (sscanf_s(line, "Colour=%d,%d,%d", &r, &g, &b) == 3)
 		{
 			g_fade.red = (unsigned char)ImClamp(r, 0, 255);
@@ -92,6 +89,8 @@ namespace
 			g_fade.opacity = ImClamp(f, 0.0f, 1.0f);
 		else if (sscanf_s(line, "Background=%f,%f,%f", &bg[0], &bg[1], &bg[2]) == 3)
 			g_canvasBackground = ImVec4(ImClamp(bg[0], 0.0f, 1.0f), ImClamp(bg[1], 0.0f, 1.0f), ImClamp(bg[2], 0.0f, 1.0f), 1.0f);
+		else if (sscanf_s(line, "ColorGrid=%d", &flag) == 1)
+			g_showColourGrid = flag != 0;
 	}
 
 	void EditorLayout_WriteAll(ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
@@ -101,7 +100,8 @@ namespace
 		buf->appendf("Strength=%.3f\n", g_fade.strength);
 		buf->appendf("Shading=%.3f\n", g_fade.shading);
 		buf->appendf("Opacity=%.3f\n", g_fade.opacity);
-		buf->appendf("Background=%.3f,%.3f,%.3f\n\n", g_canvasBackground.x, g_canvasBackground.y, g_canvasBackground.z);
+		buf->appendf("Background=%.3f,%.3f,%.3f\n", g_canvasBackground.x, g_canvasBackground.y, g_canvasBackground.z);
+		buf->appendf("ColorGrid=%d\n\n", g_showColourGrid ? 1 : 0);
 	}
 
 	// Same characters the in-match editor accepts, since both end up as a file name.
@@ -126,6 +126,17 @@ namespace
 			ImGui::EndTooltip();
 		}
 	}
+
+	// Modifier keys for clicks, read from the keyboard itself as well as from ImGui: BBCF
+	// never hands its window the WM_SYSKEYDOWN that Alt arrives as, so ImGui's KeyAlt stays
+	// false while it is held. The mod's own hotkeys read the keys the same way.
+	bool KeyHeld(bool imguiState, int virtualKey)
+	{
+		return imguiState || (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+	}
+	bool ShiftHeld() { return KeyHeld(ImGui::GetIO().KeyShift, VK_SHIFT); }
+	bool CtrlHeld() { return KeyHeld(ImGui::GetIO().KeyCtrl, VK_CONTROL); }
+	bool AltHeld() { return KeyHeld(ImGui::GetIO().KeyAlt, VK_MENU); }
 
 	std::string ColorLabel(int colorIndex)
 	{
@@ -245,10 +256,13 @@ namespace
 	{
 		return L("How the editor works:") + "\n\n" +
 			L("Click a spot on the character to edit the color that paints it. Everything else fades out, so you can see exactly what that one color covers.") + "\n" +
-			L("Recolor it with the picker, then Accept to keep it or Cancel to throw it away. Clicking empty space also cancels.") + "\n\n" +
+			L("Recolor it with the picker. Clicking another color, empty space or anything else keeps the change; Cancel throws it away.") + "\n\n" +
+			L("Ctrl+click adds more colors to the open one: they all take the picker's color once you change it. Alt+click moves on to another color and gives it the color you had, for walking along a ramp a step at a time.") + "\n\n" +
 			L("Drag with any mouse button to move around; scroll to zoom.") + "\n" +
-			L("The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects.") + "\n\n" +
-			L("Ctrl+Z / Ctrl+Y undo and redo accepted changes. Enter accepts and Escape cancels an open color.");
+			L("The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects.") + "\n" +
+			L("\"Show color grid\" at the top right lists all 256 colors of the file on screen, including the ones on no sprite.") + "\n\n" +
+			L("Ctrl+Z / Ctrl+Y undo and redo your changes. Escape cancels an open color.") + "\n" +
+			L("Ctrl+C copies the open color; Ctrl+V pastes it into whichever color is open.");
 	}
 }
 
@@ -456,9 +470,10 @@ void PaletteEditorModal::RecountUsage()
 
 void PaletteEditorModal::Select(int index)
 {
-	if (index == m_selected)
+	if (index == m_selected && m_extraCount == 0)
 		return;
-	// Picking something else walks away from the open pick, the same as Cancel.
+	// Moving on to another colour keeps what this one became: click, adjust, click, adjust.
+	AcceptPick();
 	m_selected = index;
 	if (index >= 0)
 	{
@@ -472,10 +487,53 @@ void PaletteEditorModal::Select(int index)
 }
 
 
+void PaletteEditorModal::ClickEntry(int index)
+{
+	if (m_selected < 0)
+	{
+		Select(index);
+		return;
+	}
+
+	// Shift+click moves the end of the range being edited.
+	if (ShiftHeld() && m_rampOn)
+	{
+		m_rampEnd = (std::max)(1, index);
+		return;
+	}
+
+	// Ctrl+click adds a colour to the open one, or takes it back out. It keeps its own
+	// colour until the picker changes; then it takes the picker's, like the one clicked first.
+	if (CtrlHeld())
+	{
+		if (index != m_selected)
+		{
+			m_extra[index] = !m_extra[index];
+			m_extraCount += m_extra[index] ? 1 : -1;
+		}
+		return;
+	}
+
+	// Alt+click moves on to `index` and gives it the colour the picker had: pick the hair,
+	// Alt+click the next strand, nudge it, Alt+click the next...
+	if (AltHeld() && index != m_selected)
+	{
+		unsigned char carried[4];
+		memcpy(carried, m_pending, 4);
+		Select(index);
+		memcpy(m_pending, carried, 4);
+		return;
+	}
+
+	Select(index);
+}
+
 void PaletteEditorModal::AcceptPick()
 {
 	if (m_selected < 0)
 		return;
+	if (m_eyedropTarget)
+		ScreenColorPicker::Cancel();
 	BuildPendingFile();
 	char* file = FileData(m_palette, m_file);
 	if (memcmp(file, m_pendingFile, IMPL_PALETTE_DATALEN) != 0)
@@ -485,14 +543,60 @@ void PaletteEditorModal::AcceptPick()
 		m_dirty = true;
 	}
 	m_selected = -1;
+	memset(m_extra, 0, sizeof(m_extra));
+	m_extraCount = 0;
 }
 
+
+unsigned char* PaletteEditorModal::PickerColour()
+{
+	if (m_selected < 0)
+		return nullptr;
+	// In gradient mode the picker edits one of the two ends, not the colour clicked.
+	if (m_rampOn && m_rampMode == 1)
+		return m_rampEditEnd == 0 ? m_rampFrom : m_rampTo;
+	return m_pending;
+}
+
+void PaletteEditorModal::CopyColour()
+{
+	const unsigned char* colour = PickerColour();
+	if (!colour)
+		return;
+	memcpy(m_clipboard, colour, 4);
+	m_haveClipboard = true;
+	char hex[16];
+	sprintf_s(hex, "#%02X%02X%02X", colour[2], colour[1], colour[0]);
+	m_status = FormatText(L("Copied %s. Open another color and press Ctrl+V to paste it.").c_str(), hex);
+	m_statusIsError = false;
+}
+
+void PaletteEditorModal::PasteColour()
+{
+	unsigned char* colour = PickerColour();
+	if (!colour || !m_haveClipboard)
+		return;
+	// Transparency comes along only while it is being edited, as with the eyedropper.
+	memcpy(colour, m_clipboard, m_editAlpha ? 4 : 3);
+	if (colour != m_pending)
+		m_rampEndsCustom = true;
+}
+
+bool PaletteEditorModal::PickChanged()
+{
+	if (m_selected < 0)
+		return false;
+	BuildPendingFile();
+	return memcmp(FileData(m_palette, m_file), m_pendingFile, IMPL_PALETTE_DATALEN) != 0;
+}
 
 void PaletteEditorModal::CancelPick()
 {
 	if (m_eyedropTarget)
 		ScreenColorPicker::Cancel();
 	m_selected = -1;
+	memset(m_extra, 0, sizeof(m_extra));
+	m_extraCount = 0;
 }
 
 void PaletteEditorModal::PushUndo(const IMPL_data_t& before)
@@ -505,7 +609,9 @@ void PaletteEditorModal::PushUndo(const IMPL_data_t& before)
 
 void PaletteEditorModal::Undo()
 {
-	if (m_undo.empty() || m_selected >= 0)
+	// An open colour is kept first, so Undo takes back that change when there is one.
+	AcceptPick();
+	if (m_undo.empty())
 		return;
 	m_redo.push_back(m_palette);
 	CopyColourFiles(m_palette, m_undo.back());
@@ -515,8 +621,10 @@ void PaletteEditorModal::Undo()
 
 void PaletteEditorModal::Redo()
 {
-	if (m_redo.empty() || m_selected >= 0)
+	// An open change is a new change, and a new change ends what there was to redo.
+	if (m_redo.empty() || PickChanged())
 		return;
+	CancelPick();
 	m_undo.push_back(m_palette);
 	CopyColourFiles(m_palette, m_redo.back());
 	m_redo.pop_back();
@@ -525,7 +633,7 @@ void PaletteEditorModal::Redo()
 
 void PaletteEditorModal::RequestClose()
 {
-	if (m_dirty || m_selected >= 0)
+	if (m_dirty || PickChanged())
 		m_requestDiscard = true;
 	else
 		ImGui::CloseCurrentPopup();
@@ -535,6 +643,13 @@ void PaletteEditorModal::RequestClose()
 
 void PaletteEditorModal::Draw(const std::function<void()>& onSaved)
 {
+	// Not drawn last frame while it was open: the overlay was hidden, and ImGui has closed
+	// the popup since. Everything it was showing is still here, so just put it back.
+	const int frame = ImGui::GetFrameCount();
+	if (m_openLastDraw && m_lastDrawFrame != frame - 1 && !ImGui::IsPopupOpen(kEditorPopupId))
+		m_requestOpen = true;
+	m_lastDrawFrame = frame;
+
 	if (m_requestOpen)
 	{
 		m_requestOpen = false;
@@ -543,6 +658,7 @@ void PaletteEditorModal::Draw(const std::function<void()>& onSaved)
 	const bool open = ImGui::IsPopupOpen(kEditorPopupId);
 	DrawEditor(onSaved);
 	const bool stillOpen = open && ImGui::IsPopupOpen(kEditorPopupId);
+	m_openLastDraw = stillOpen;
 	UpdateLive(stillOpen);
 	// The effect sprites are only worth their memory while the editor is up.
 	if (!stillOpen)
@@ -553,9 +669,12 @@ void PaletteEditorModal::Draw(const std::function<void()>& onSaved)
 void PaletteEditorModal::DrawEditor(const std::function<void()>& onSaved)
 {
 	const std::string title = L("Palette Editor") + (m_dirty ? " *" : "") + kEditorPopupId;
-	ImGui::SetNextWindowSize(ImVec2(1400, 900), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(760, 520), ImVec2(FLT_MAX, FLT_MAX));
-	if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+	// The whole screen: the picture is the editor, and it wants every pixel it can get.
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->WorkPos);
+	ImGui::SetNextWindowSize(viewport->WorkSize);
+	if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
 		return;
 
 	DrawStepHeader();
@@ -637,7 +756,6 @@ void PaletteEditorModal::DrawNavigation(const std::function<void()>& onSaved)
 
 	const float buttonWidth = 120.0f;
 	const ImGuiStyle& style = ImGui::GetStyle();
-	const bool picking = m_selected >= 0;
 
 	ImGui::AlignTextToFramePadding();
 	if (!m_status.empty() && m_step != Step_Details)
@@ -656,15 +774,15 @@ void PaletteEditorModal::DrawNavigation(const std::function<void()>& onSaved)
 
 	ImGui::SameLine();
 	const bool atFirstStep = m_step == Step_Character || (m_editingExisting && m_step == Step_Edit);
-	ImGui::BeginDisabled(atFirstStep || picking);
+	ImGui::BeginDisabled(atFirstStep);
 	if (ImGui::Button(L("< Back").c_str(), ImVec2(buttonWidth, 0)))
 	{
+		AcceptPick();
 		m_status.clear();
 		m_step = (Step)(m_step - 1);
 	}
 	ImGui::EndDisabled();
-	Tip(picking ? L("Accept or cancel the color you are editing first.")
-		: L("Go back a step. Your edits are kept unless you pick a different character or starting palette."));
+	Tip(L("Go back a step. Your edits are kept unless you pick a different character or starting palette."));
 
 	ImGui::SameLine();
 	if (m_step == Step_Details)
@@ -679,10 +797,11 @@ void PaletteEditorModal::DrawNavigation(const std::function<void()>& onSaved)
 		return;
 	}
 
-	const bool canContinue = !(m_step == Step_Base && !m_choice.valid) && !picking;
+	const bool canContinue = !(m_step == Step_Base && !m_choice.valid);
 	ImGui::BeginDisabled(!canContinue);
 	if (ImGui::Button(L("Next >").c_str(), ImVec2(buttonWidth, 0)))
 	{
+		AcceptPick();
 		m_status.clear();
 		if (m_step == Step_Character)
 			m_step = Step_Base;
@@ -692,8 +811,7 @@ void PaletteEditorModal::DrawNavigation(const std::function<void()>& onSaved)
 			m_step = Step_Details;
 	}
 	ImGui::EndDisabled();
-	Tip(picking ? L("Accept or cancel the color you are editing first.")
-		: m_step == Step_Edit ? L("Done recoloring: go on to naming and saving the palette.")
+	Tip(m_step == Step_Edit ? L("Done recoloring: go on to naming and saving the palette.")
 		: L("Go on to the next step. Double-clicking a picture does the same."));
 }
 
@@ -1092,14 +1210,20 @@ bool PaletteEditorModal::DrawBaseChooser(const char* id, const ImVec2& size, Bas
 
 void PaletteEditorModal::DrawEditStep()
 {
-	if (m_selected < 0)
-	{
-		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal))
-			Undo();
-		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal) ||
-			ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal))
-			Redo();
-	}
+	if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal))
+		Undo();
+	if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal) ||
+		ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal))
+		Redo();
+
+	// Ctrl+C / Ctrl+V copy the open colour and paste it into another. The same keys join and
+	// copy lobby links by default, which would be a strange thing to do from in here.
+	HotkeyManager::Claim(HotkeyManager::Hotkey_CopyLobbyLink);
+	HotkeyManager::Claim(HotkeyManager::Hotkey_JoinLobbyLink);
+	if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C, ImGuiInputFlags_RouteGlobal))
+		CopyColour();
+	if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V, ImGuiInputFlags_RouteGlobal))
+		PasteColour();
 
 	ConsumePageDialog();
 	PollEyedropper();
@@ -1112,14 +1236,10 @@ void PaletteEditorModal::DrawEditStep()
 
 void PaletteEditorModal::DrawToolbar()
 {
-	const bool picking = m_selected >= 0;
-	const std::string finishFirst = L("Accept or cancel the color you are editing first.");
-
 	// Which of the palette's eight files is on screen.
 	auto fileLabel = [](int file) {
 		return file == 0 ? L("Character colors") : FormatText(L("Effect %d").c_str(), file);
 	};
-	ImGui::BeginDisabled(picking);
 	ImGui::SetNextItemWidth(170.0f);
 	if (ImGui::BeginCombo("##pe_file", fileLabel(m_file).c_str()))
 	{
@@ -1131,8 +1251,8 @@ void PaletteEditorModal::DrawToolbar()
 			const std::string label = unused ? fileLabel(f) + "  " + L("(unused)") : fileLabel(f);
 			if (ImGui::Selectable(label.c_str(), f == m_file, unused ? ImGuiSelectableFlags_Disabled : 0))
 			{
+				AcceptPick(); // into the file it was opened on, before that changes
 				m_file = f;
-				m_selected = -1;
 				m_effectNote.clear();
 				m_fitPending = true;
 			}
@@ -1144,29 +1264,21 @@ void PaletteEditorModal::DrawToolbar()
 		}
 		ImGui::EndCombo();
 	}
-	ImGui::EndDisabled();
-	Tip(picking ? finishFirst : L("A palette is eight sets of 256 colors: the character, and seven the game uses for that character's effects (slashes, projectiles, auras...). Choose which one to edit."));
-
-	if (m_file != 0 && EffectSheets::ImageCount(m_charIndex, m_file) > 0)
-	{
-		ImGui::SameLine();
-		ImGui::Checkbox(L("Color grid").c_str(), &m_effectGridView);
-		Tip(L("Show all 256 colors of this file as a grid instead of on the effect sprites. Some colors are not on any sprite and can only be reached from here."));
-	}
+	Tip(L("A palette is eight sets of 256 colors: the character, and seven the game uses for that character's effects (slashes, projectiles, auras...). Choose which one to edit."));
 
 	VerticalSeparator();
 
-	ImGui::BeginDisabled(m_undo.empty() || picking);
+	ImGui::BeginDisabled(m_undo.empty() && !PickChanged());
 	if (ImGui::Button(Messages.Undo()))
 		Undo();
 	ImGui::EndDisabled();
-	Tip(picking ? finishFirst : L("Take back the last accepted change (Ctrl+Z)."));
+	Tip(L("Take back the last change (Ctrl+Z)."));
 	ImGui::SameLine();
-	ImGui::BeginDisabled(m_redo.empty() || picking);
+	ImGui::BeginDisabled(m_redo.empty() || PickChanged());
 	if (ImGui::Button(Messages.Redo()))
 		Redo();
 	ImGui::EndDisabled();
-	Tip(picking ? finishFirst : L("Put back what Undo took (Ctrl+Y)."));
+	Tip(L("Put back what Undo took (Ctrl+Y)."));
 
 	VerticalSeparator();
 
@@ -1200,15 +1312,14 @@ void PaletteEditorModal::DrawToolbar()
 
 	VerticalSeparator();
 
-	ImGui::BeginDisabled(picking);
 	if (ImGui::Button(L("Apply palette...").c_str()))
 	{
+		AcceptPick();
 		m_applyChoice = m_loadedChoice;
 		m_applyFilter.Clear();
 		m_requestApply = true;
 	}
-	ImGui::EndDisabled();
-	Tip(picking ? finishFirst : L("Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back."));
+	Tip(L("Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back."));
 	ImGui::SameLine();
 	if (ImGui::Button(L("Fade out settings...").c_str()))
 		m_requestFadeSettings = true;
@@ -1216,20 +1327,24 @@ void PaletteEditorModal::DrawToolbar()
 
 	VerticalSeparator();
 	const bool dialogBusy = NativeFileDialog::IsOpen();
-	ImGui::BeginDisabled(picking || dialogBusy);
+	ImGui::BeginDisabled(dialogBusy);
 	if (ImGui::Button(L("Export page...").c_str()))
+	{
+		AcceptPick();
 		BeginExportPage();
-	Tip(picking ? finishFirst : L("Save the colors on screen - the character colors, or this effect file - as a PNG. Import it on any palette's page to copy these exact colors over."));
+	}
+	Tip(L("Save the colors on screen - the character colors, or this effect file - as a PNG. Import it on any palette's page to copy these exact colors over."));
 	ImGui::SameLine();
 	if (ImGui::Button(L("Import page...").c_str()))
 	{
+		AcceptPick();
 		NativeFileDialog::Request request;
 		request.title = "Import page";
 		request.filters.push_back({ "PNG palette (*.png)", "*.png" });
 		request.contextId = kDialogImportPage;
 		NativeFileDialog::Open(kFileDialogOwner, request);
 	}
-	Tip(picking ? finishFirst : L("Replace the colors on screen with a PNG's - a page exported from here, or any palette PNG. Undo brings yours back."));
+	Tip(L("Replace the colors on screen with a PNG's - a page exported from here, or any palette PNG. Undo brings yours back."));
 	ImGui::EndDisabled();
 
 	VerticalSeparator();
@@ -1237,13 +1352,9 @@ void PaletteEditorModal::DrawToolbar()
 	{
 		ImGui::AlignTextToFramePadding();
 		ImGui::TextColored(ImVec4(0.30f, 0.85f, 0.39f, 1.0f), "%s", L("Live in training").c_str());
-		Tip(L("The character in your training match is wearing this palette right now, open color included. Closing the editor puts their palette back, unless you saved."));
-		ImGui::SameLine();
-		ImGui::Button(L("Hold to see the game").c_str());
-		// Read by BeginFrame() next frame: the overlay turns see-through while this is held.
-		if (ImGui::IsItemActive())
-			s_peekRequested = true;
-		Tip(L("While you hold this button down, the whole overlay turns see-through so you can look at the character."));
+		Tip(L("The character in your training match is wearing this palette right now, open color included. Closing the editor puts their palette back, unless you saved.") + "\n\n" +
+			FormatText(L("Press %s to hide the overlay and look at them; press it again and the editor is back where you left it.").c_str(),
+				Settings::settingsIni.togglebutton.c_str()));
 	}
 	else
 	{
@@ -1257,10 +1368,11 @@ void PaletteEditorModal::DrawCanvas(float width, float height)
 {
 	ImGui::BeginChild("##pe_canvas", ImVec2(width, height), ImGuiChildFlags_Borders,
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
+	m_entryGridOnScreen = false; // DrawEntryGrid sets it, before the picker is drawn
 
 	// What to draw: the reference sheet for the character colours; for an effect file,
 	// the effect sprites the game draws with it, read from the game files. The colour grid
-	// is the fallback when there is no picture for a file, or when asked for.
+	// fills the canvas instead when there is no picture for a file.
 	const unsigned char* indices = nullptr;
 	int sheetWidth = 0, sheetHeight = 0;
 	int imageKey = m_charIndex;
@@ -1269,7 +1381,7 @@ void PaletteEditorModal::DrawCanvas(float width, float height)
 	{
 		haveSheet = PaletteThumbnails::GetEditorSheetIndices(m_charIndex, &indices, &sheetWidth, &sheetHeight);
 	}
-	else if (!m_effectGridView && EffectSheets::ImageCount(m_charIndex, m_file) > 0)
+	else if (EffectSheets::ImageCount(m_charIndex, m_file) > 0)
 	{
 		std::string error;
 		const EffectSheets::Status status = EffectSheets::Request(m_charIndex, &error);
@@ -1321,6 +1433,9 @@ void PaletteEditorModal::DrawCanvas(float width, float height)
 	if (m_selected >= 0)
 	{
 		mask[m_selected] = 1;
+		for (int i = 0; i < 256; i++)
+			if (m_extra[i])
+				mask[i] = 1;
 		if (m_rampOn)
 			for (int i = RampLow(); i <= RampHigh(); i++)
 				mask[i] = 1;
@@ -1454,8 +1569,9 @@ void PaletteEditorModal::DrawCanvas(float width, float height)
 		io.MousePos.x >= helpPos.x - 3.0f && io.MousePos.y >= helpPos.y - 3.0f &&
 		io.MousePos.x < helpPos.x + helpSize.x + 3.0f && io.MousePos.y < helpPos.y + helpSize.y + 3.0f;
 	DrawCanvasHelp(origin);
+	const bool toggleHovered = DrawGridToggle(origin, canvasMax, clickReleased);
 
-	if (!helpHovered && hovered && !panning && underMouse > 0)
+	if (!helpHovered && !toggleHovered && hovered && !panning && underMouse > 0)
 	{
 		if (m_zoom >= 4.0f)
 		{
@@ -1476,40 +1592,171 @@ void PaletteEditorModal::DrawCanvas(float width, float height)
 	if (panning)
 		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 
-	if (clickReleased && !helpHovered && mouseInCanvas)
+	if (clickReleased && !helpHovered && !toggleHovered && mouseInCanvas)
 	{
-		// Shift+click moves the end of the range being edited instead of picking.
-		if (m_rampOn && m_selected >= 0 && io.KeyShift)
-		{
-			if (underMouse > 0)
-				m_rampEnd = underMouse;
-		}
-		// Clicking the background or off the picture closes whatever is open.
-		else if (underMouse > 0)
-			Select(underMouse);
-		else
-			CancelPick();
+		if (underMouse > 0)
+			ClickEntry(underMouse);
+		// Clicking the background or off the picture is "done with this one" - unless it
+		// was a modifier click that just missed.
+		else if (!ShiftHeld() && !CtrlHeld() && !AltHeld())
+			AcceptPick();
 	}
 
 	draw->PopClipRect();
 
-	DrawPickerPanel(origin, canvasMax);
+	DrawSidePanel(origin, canvasMax);
 
 	ImGui::EndChild();
 }
 
-void PaletteEditorModal::DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& canvasMax)
+bool PaletteEditorModal::DrawGridToggle(const ImVec2& canvasMin, const ImVec2& canvasMax, bool clicked)
+{
+	// Quiet, like the (?) opposite it: text on the canvas, not a button.
+	const std::string label = g_showColourGrid ? L("Hide color grid") : L("Show color grid");
+	const ImVec2 size = ImGui::CalcTextSize(label.c_str());
+	const ImVec2 pos(canvasMax.x - size.x - 10.0f, canvasMin.y + 4.0f);
+	const ImVec2 mouse = ImGui::GetIO().MousePos;
+	const bool hovered = ImGui::IsWindowHovered() &&
+		mouse.x >= pos.x - 3.0f && mouse.y >= pos.y - 3.0f &&
+		mouse.x < pos.x + size.x + 3.0f && mouse.y < pos.y + size.y + 3.0f;
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	const ImU32 colour = ImGui::GetColorU32(ImGuiCol_TextDisabled, hovered ? 1.0f : 0.7f);
+	draw->AddText(pos, colour, label.c_str());
+	if (hovered)
+	{
+		draw->AddLine(ImVec2(pos.x, pos.y + size.y), ImVec2(pos.x + size.x, pos.y + size.y), colour);
+		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		ImGui::SetTooltip("%s", L("All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.").c_str());
+		if (clicked)
+		{
+			g_showColourGrid = !g_showColourGrid;
+			ImGui::MarkIniSettingsDirty();
+		}
+	}
+	return hovered;
+}
+
+void PaletteEditorModal::DrawSidePanel(const ImVec2& canvasMin, const ImVec2& canvasMax)
+{
+	// Panels over the canvas' top-right corner rather than windows: they belong to the
+	// picture, and a window could be dragged off somewhere it hides what it is editing.
+	// Both start under the grid toggle.
+	const float margin = 10.0f;
+	float top = canvasMin.y + ImGui::GetTextLineHeight() + 10.0f;
+	if (g_showColourGrid)
+	{
+		const float width = (std::min)(kPickerWidth, canvasMax.x - canvasMin.x - margin * 2.0f);
+		ImGui::SetCursorScreenPos(ImVec2(canvasMax.x - width - margin, top));
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
+		ImGui::BeginChild("##pe_grid_panel", ImVec2(width, 0),
+			ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
+			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		ImGui::PopStyleColor();
+		DrawEntryGrid("##pe_side_grid", floorf(ImGui::GetContentRegionAvail().x / 16.0f), 1.0f);
+		ImGui::EndChild();
+		top = ImGui::GetItemRectMax().y + 6.0f;
+	}
+	DrawPickerPanel(canvasMin, canvasMax, top);
+}
+
+bool PaletteEditorModal::DrawEntryGrid(const char* id, float cell, float gap)
+{
+	// While it is on screen, the Range / gradient tab uses this grid rather than its own.
+	m_entryGridOnScreen = true;
+	const ImVec2 gridOrigin = ImGui::GetCursorScreenPos();
+	ImGui::InvisibleButton(id, ImVec2(cell * 16.0f, cell * 16.0f));
+	const bool hovered = ImGui::IsItemHovered();
+	const bool active = ImGui::IsItemActive();
+	const ImVec2 mouse = ImGui::GetIO().MousePos;
+	int underMouse = -1;
+	if (hovered || active)
+	{
+		// Clamped while held, so a drag that leaves the grid keeps the nearest cell.
+		const int cx = (int)floorf((mouse.x - gridOrigin.x) / cell);
+		const int cy = (int)floorf((mouse.y - gridOrigin.y) / cell);
+		if (active)
+			underMouse = ImClamp(cy, 0, 15) * 16 + ImClamp(cx, 0, 15);
+		else if (cx >= 0 && cy >= 0 && cx < 16 && cy < 16)
+			underMouse = cy * 16 + cx;
+	}
+
+	// A click opens a colour. With a range being edited, dragging from one cell to another
+	// chooses the range instead, and Shift+click moves its end.
+	const bool rangeMode = m_rampOn && m_selected >= 0;
+	if (ImGui::IsItemActivated() && underMouse >= 0)
+	{
+		m_gridPressed = underMouse;
+		m_gridDragged = false;
+	}
+	if (active && rangeMode && m_gridPressed >= 0 && (m_gridDragged || underMouse != m_gridPressed))
+	{
+		m_gridDragged = true;
+		const int low = RampLow(), high = RampHigh();
+		// Entry 0 is the transparent slot of every file, never part of a range.
+		m_rampStart = (std::max)(1, m_gridPressed);
+		m_rampEnd = (std::max)(1, underMouse);
+		if ((RampLow() != low || RampHigh() != high) && !m_rampEndsCustom)
+			ResetRampEnds();
+	}
+	if (ImGui::IsItemDeactivated())
+	{
+		if (!m_gridDragged && m_gridPressed >= 0 && hovered)
+		{
+			ClickEntry(m_gridPressed);
+		}
+		m_gridPressed = -1;
+		m_gridDragged = false;
+	}
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	const float rounding = gap > 1.0f ? 2.0f : 0.0f;
+	const unsigned char* shown = (const unsigned char*)m_pendingFile;
+	for (int i = 0; i < 256; i++)
+	{
+		const ImVec2 c0(gridOrigin.x + (i % 16) * cell, gridOrigin.y + (i / 16) * cell);
+		const ImVec2 c1(c0.x + cell - gap, c0.y + cell - gap);
+		const unsigned char* e = shown + i * 4;
+		draw->AddRectFilled(c0, c1, IM_COL32(e[2], e[1], e[0], 255), rounding);
+		// Outside the range is dimmed, so the run reads at a glance.
+		if (rangeMode && (i < RampLow() || i > RampHigh()))
+			draw->AddRectFilled(c0, c1, IM_COL32(20, 20, 24, 150), rounding);
+	}
+	auto outline = [&](int i, ImU32 colour, float thickness) {
+		const ImVec2 c0(gridOrigin.x + (i % 16) * cell - 1.0f, gridOrigin.y + (i / 16) * cell - 1.0f);
+		draw->AddRect(c0, ImVec2(c0.x + cell, c0.y + cell), colour, rounding, 0, thickness);
+	};
+	if (m_selected >= 0 && m_rampOn)
+		for (int i = RampLow(); i <= RampHigh(); i++)
+			outline(i, ImGui::GetColorU32(ImGuiCol_CheckMark), 1.5f);
+	if (underMouse >= 0)
+		outline(underMouse, IM_COL32(200, 200, 200, 255), 1.5f);
+	if (m_selected >= 0)
+	{
+		for (int i = 0; i < 256; i++)
+			if (m_extra[i])
+				outline(i, IM_COL32(255, 255, 255, 200), 1.5f);
+		outline(m_selected, IM_COL32(255, 255, 255, 255), 2.5f);
+	}
+
+	if (underMouse >= 0)
+	{
+		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		const unsigned char* e = shown + underMouse * 4;
+		ImGui::SetTooltip("#%03d  %02X%02X%02X\n%s", underMouse + 1, e[2], e[1], e[0], L("Click to edit this color").c_str());
+	}
+	return hovered;
+}
+
+void PaletteEditorModal::DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& canvasMax, float top)
 {
 	if (m_selected < 0)
 		return;
 
-	// A panel over the canvas' top-right corner rather than a window: it belongs to the
-	// picture, and a window could be dragged off somewhere it hides what it is editing.
 	// It grows with its contents but never past the canvas; beyond that it scrolls.
 	const float margin = 10.0f;
 	const float width = (std::min)(kPickerWidth, canvasMax.x - canvasMin.x - margin * 2.0f);
-	const float maxHeight = (std::max)(120.0f, canvasMax.y - canvasMin.y - margin * 2.0f);
-	ImGui::SetCursorScreenPos(ImVec2(canvasMax.x - width - margin, canvasMin.y + margin));
+	const float maxHeight = (std::max)(120.0f, canvasMax.y - top - margin);
+	ImGui::SetCursorScreenPos(ImVec2(canvasMax.x - width - margin, top));
 	ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, maxHeight));
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
 	ImGui::BeginChild("##pe_picker", ImVec2(width, 0),
@@ -1518,6 +1765,13 @@ void PaletteEditorModal::DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& 
 
 	ImGui::Text("#%03d", m_selected + 1);
 	ImGui::SameLine();
+	if (m_extraCount > 0)
+	{
+		ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), "%s",
+			FormatText(L("+%d more").c_str(), m_extraCount).c_str());
+		Tip(L("Colors added with Ctrl+click. They keep their own color until you change the picker, then all take the picker's. Ctrl+click one again to take it back out."));
+		ImGui::SameLine();
+	}
 	if (m_file != 0)
 		ImGui::TextDisabled("%s", FormatText(L("Effect %d").c_str(), m_file).c_str());
 	else if (m_usage[m_selected] > 0)
@@ -1553,15 +1807,11 @@ void PaletteEditorModal::DrawPickerPanel(const ImVec2& canvasMin, const ImVec2& 
 	ImGui::Checkbox(L("Edit transparency").c_str(), &m_editAlpha);
 	Tip(L("Show an alpha slider too. Most palettes never touch it; the game draws some effects with it."));
 
+	// No Accept: clicking another color, empty space or anything else keeps the change.
 	ImGui::Spacing();
-	const float buttonWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-	if (ImGui::Button(L("Accept").c_str(), ImVec2(buttonWidth, 0)))
-		AcceptPick();
-	Tip(L("Keep the change and close the picker (Enter)."));
-	ImGui::SameLine();
-	if (ImGui::Button(Messages.Cancel(), ImVec2(buttonWidth, 0)))
+	if (ImGui::Button(Messages.Cancel(), ImVec2(-FLT_MIN, 0)))
 		CancelPick();
-	Tip(L("Throw this edit away, as if you never touched it (Escape)."));
+	Tip(L("Throw this edit away, as if you never touched it (Escape). Anything else you do next keeps it."));
 
 	// Enter and Escape, but not while typing into the picker's own fields, which use them.
 	if (!ImGui::IsAnyItemActive())
@@ -1609,7 +1859,7 @@ void PaletteEditorModal::DrawSingleColour()
 		{ "##pe_current", L("Current"), m_current,
 			L("The color as it is now, before this edit. Click to go back to it."), true },
 		{ "##pe_modified", L("Modified"), m_pending,
-			L("What the color becomes if you press Accept."), false },
+			L("What the color becomes. It is kept as soon as you move on to anything else."), false },
 		{ "##pe_original", L("Original"), BaseEntry(m_selected),
 			L("The color in the palette you started from, or last applied. Click to use it."), true },
 	};
@@ -1748,6 +1998,13 @@ void PaletteEditorModal::BuildPendingFile()
 	if (m_selected < 0)
 		return;
 	memcpy(m_pendingFile + m_selected * 4, m_pending, 4);
+	// The Ctrl+clicked colours follow the picker once it has moved off the colour it opened on.
+	if (m_extraCount > 0 && memcmp(m_pending, m_current, 4) != 0)
+	{
+		for (int i = 0; i < 256; i++)
+			if (m_extra[i])
+				memcpy(m_pendingFile + i * 4, m_pending, 4);
+	}
 	if (m_rampOn)
 		ApplyRamp(m_pendingFile);
 }
@@ -1759,61 +2016,66 @@ void PaletteEditorModal::DrawShadeRamp()
 	// --- 1. Which colours ----------------------------------------------------------------
 	ImGui::SeparatorText(L("1. Choose the range").c_str());
 
-	// All 256 entries of this file, in order, so a range can reach anywhere. Drag across
-	// it to select; the run is outlined and the colour you clicked is marked with a dot.
-	const int columns = 16;
-	const float cell = floorf(ImGui::GetContentRegionAvail().x / columns);
-	const ImVec2 origin = ImGui::GetCursorScreenPos();
-	ImGui::InvisibleButton("##pe_range_grid", ImVec2(cell * columns, cell * columns));
-	const bool hovered = ImGui::IsItemHovered();
-	const ImVec2 mouse = ImGui::GetIO().MousePos;
-	const int cx = ImClamp((int)((mouse.x - origin.x) / cell), 0, columns - 1);
-	const int cy = ImClamp((int)((mouse.y - origin.y) / cell), 0, columns - 1);
-	// Entry 0 is the transparent slot of every file, never part of a range.
-	const int underMouse = (std::max)(1, cy * columns + cx);
-	if (ImGui::IsItemActivated())
-	{
-		m_rampStart = underMouse;
-		m_rampEnd = underMouse;
-	}
-	else if (ImGui::IsItemActive())
-	{
-		m_rampEnd = underMouse;
-	}
-	if (hovered)
-	{
-		const unsigned char* e = (const unsigned char*)m_pendingFile + underMouse * 4;
-		ImGui::SetTooltip("#%03d  %02X%02X%02X", underMouse + 1, e[2], e[1], e[0]);
-	}
-
+	// The color grid on screen already does this (DrawEntryGrid); two grids is one too many.
 	ImDrawList* draw = ImGui::GetWindowDrawList();
-	const unsigned char* shown = (const unsigned char*)m_pendingFile;
-	const int low = RampLow(), high = RampHigh();
-	for (int i = 0; i < 256; i++)
+	if (!m_entryGridOnScreen)
 	{
-		const ImVec2 c0(origin.x + (i % columns) * cell, origin.y + (i / columns) * cell);
-		const ImVec2 c1(c0.x + cell - 1.0f, c0.y + cell - 1.0f);
-		const unsigned char* e = shown + i * 4;
-		const bool inRange = i >= low && i <= high;
-		draw->AddRectFilled(c0, c1, IM_COL32(e[2], e[1], e[0], 255));
-		// Outside the range is dimmed, so the run reads at a glance.
-		if (!inRange)
-			draw->AddRectFilled(c0, c1, IM_COL32(20, 20, 24, 150));
-		if (i == m_selected)
-			draw->AddCircleFilled(ImVec2((c0.x + c1.x) * 0.5f, (c0.y + c1.y) * 0.5f), cell * 0.18f + 1.0f,
-				IM_COL32(255, 255, 255, 255));
-	}
-	// Outline the range, row by row, since it can wrap across several.
-	for (int row = low / columns; row <= high / columns; row++)
-	{
-		const int a = (std::max)(low, row * columns);
-		const int b = (std::min)(high, row * columns + columns - 1);
-		const ImVec2 r0(origin.x + (a % columns) * cell - 1.0f, origin.y + row * cell - 1.0f);
-		const ImVec2 r1(origin.x + (b % columns + 1) * cell, origin.y + (row + 1) * cell);
-		draw->AddRect(r0, r1, ImGui::GetColorU32(ImGuiCol_CheckMark), 0.0f, 0, 2.0f);
+		// All 256 entries of this file, in order, so a range can reach anywhere. Drag across
+		// it to select; the run is outlined and the colour you clicked is marked with a dot.
+		const int columns = 16;
+		const float cell = floorf(ImGui::GetContentRegionAvail().x / columns);
+		const ImVec2 origin = ImGui::GetCursorScreenPos();
+		ImGui::InvisibleButton("##pe_range_grid", ImVec2(cell * columns, cell * columns));
+		const bool hovered = ImGui::IsItemHovered();
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
+		const int cx = ImClamp((int)((mouse.x - origin.x) / cell), 0, columns - 1);
+		const int cy = ImClamp((int)((mouse.y - origin.y) / cell), 0, columns - 1);
+		// Entry 0 is the transparent slot of every file, never part of a range.
+		const int underMouse = (std::max)(1, cy * columns + cx);
+		if (ImGui::IsItemActivated())
+		{
+			m_rampStart = underMouse;
+			m_rampEnd = underMouse;
+		}
+		else if (ImGui::IsItemActive())
+		{
+			m_rampEnd = underMouse;
+		}
+		if (hovered)
+		{
+			const unsigned char* e = (const unsigned char*)m_pendingFile + underMouse * 4;
+			ImGui::SetTooltip("#%03d  %02X%02X%02X", underMouse + 1, e[2], e[1], e[0]);
+		}
+
+		const unsigned char* shown = (const unsigned char*)m_pendingFile;
+		const int low = RampLow(), high = RampHigh();
+		for (int i = 0; i < 256; i++)
+		{
+			const ImVec2 c0(origin.x + (i % columns) * cell, origin.y + (i / columns) * cell);
+			const ImVec2 c1(c0.x + cell - 1.0f, c0.y + cell - 1.0f);
+			const unsigned char* e = shown + i * 4;
+			const bool inRange = i >= low && i <= high;
+			draw->AddRectFilled(c0, c1, IM_COL32(e[2], e[1], e[0], 255));
+			// Outside the range is dimmed, so the run reads at a glance.
+			if (!inRange)
+				draw->AddRectFilled(c0, c1, IM_COL32(20, 20, 24, 150));
+			if (i == m_selected)
+				draw->AddCircleFilled(ImVec2((c0.x + c1.x) * 0.5f, (c0.y + c1.y) * 0.5f), cell * 0.18f + 1.0f,
+					IM_COL32(255, 255, 255, 255));
+		}
+		// Outline the range, row by row, since it can wrap across several.
+		for (int row = low / columns; row <= high / columns; row++)
+		{
+			const int a = (std::max)(low, row * columns);
+			const int b = (std::min)(high, row * columns + columns - 1);
+			const ImVec2 r0(origin.x + (a % columns) * cell - 1.0f, origin.y + row * cell - 1.0f);
+			const ImVec2 r1(origin.x + (b % columns + 1) * cell, origin.y + (row + 1) * cell);
+			draw->AddRect(r0, r1, ImGui::GetColorU32(ImGuiCol_CheckMark), 0.0f, 0, 2.0f);
+		}
 	}
 
 	// Exact numbers, for when the run is known.
+	const int low = RampLow(), high = RampHigh();
 	int first = low + 1, last = high + 1;
 	const float fieldWidth = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(L("From").c_str()).x -
 		ImGui::CalcTextSize(L("to").c_str()).x - ImGui::GetStyle().ItemSpacing.x * 4.0f) * 0.5f;
@@ -1929,7 +2191,7 @@ void PaletteEditorModal::DrawCanvasHelp(const ImVec2& origin)
 		if (m_file != 0)
 		{
 			ImGui::Spacing();
-			ImGui::TextUnformatted(L("Effect files are shown on the effect sprites the game draws with them, read from your game files. \"Color grid\" shows all 256 colors instead. In a training match the character also shows them live.").c_str());
+			ImGui::TextUnformatted(L("Effect files are shown on the effect sprites the game draws with them, read from your game files. In a training match the character also shows them live.").c_str());
 		}
 		ImGui::PopTextWrapPos();
 		ImGui::EndTooltip();
@@ -1950,15 +2212,13 @@ void PaletteEditorModal::DrawEffectGrid()
 	const float cell = floorf((std::min)((size.x - pickerRoom - 20.0f) / 16.0f, (size.y - top - 12.0f) / 16.0f));
 	if (cell < 4.0f)
 	{
-		DrawPickerPanel(origin, canvasMax);
+		DrawPickerPanel(origin, canvasMax, origin.y + 10.0f);
 		return;
 	}
 
 	const ImVec2 gridOrigin(origin.x + (size.x - pickerRoom - cell * 16.0f) * 0.5f, origin.y + top);
 	std::string note;
-	if (m_effectGridView)
-		note = L("All 256 colors of this file.");
-	else if (EffectSheets::ImageCount(m_charIndex, m_file) == 0)
+	if (EffectSheets::ImageCount(m_charIndex, m_file) == 0)
 		note = FormatText(L("%s never draws anything with this file. Its colors are still saved with the palette.").c_str(),
 			getCharacterNameByIndexA(m_charIndex).c_str());
 	else if (!m_effectNote.empty())
@@ -1968,77 +2228,16 @@ void PaletteEditorModal::DrawEffectGrid()
 	draw->AddText(ImVec2(origin.x + 30.0f, origin.y + 5.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled), note.c_str());
 
 	ImGui::SetCursorScreenPos(gridOrigin);
-	ImGui::InvisibleButton("##pe_effect_grid", ImVec2(cell * 16.0f, cell * 16.0f));
-	const bool hovered = ImGui::IsItemHovered();
-	int underMouse = -1;
-	if (hovered)
-	{
-		const ImVec2 mouse = ImGui::GetIO().MousePos;
-		const int cx = (int)((mouse.x - gridOrigin.x) / cell);
-		const int cy = (int)((mouse.y - gridOrigin.y) / cell);
-		if (cx >= 0 && cy >= 0 && cx < 16 && cy < 16)
-			underMouse = cy * 16 + cx;
-	}
-	if (underMouse >= 0 && ImGui::IsItemClicked(ImGuiMouseButton_Left))
-	{
-		if (m_rampOn && m_selected >= 0 && ImGui::GetIO().KeyShift)
-			m_rampEnd = (std::max)(1, underMouse);
-		else
-			Select(underMouse);
-	}
-	// A click on the empty canvas around the grid closes the open colour, as on the sheet.
-	else if (!hovered && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-		CancelPick();
-
-	const unsigned char* shown = (const unsigned char*)m_pendingFile;
-	for (int i = 0; i < 256; i++)
-	{
-		const ImVec2 c0(gridOrigin.x + (i % 16) * cell, gridOrigin.y + (i / 16) * cell);
-		const unsigned char* e = shown + i * 4;
-		draw->AddRectFilled(c0, ImVec2(c0.x + cell - 2.0f, c0.y + cell - 2.0f), IM_COL32(e[2], e[1], e[0], 255), 2.0f);
-	}
-	auto outline = [&](int i, ImU32 colour, float thickness) {
-		const ImVec2 c0(gridOrigin.x + (i % 16) * cell - 1.0f, gridOrigin.y + (i / 16) * cell - 1.0f);
-		draw->AddRect(c0, ImVec2(c0.x + cell, c0.y + cell), colour, 2.0f, 0, thickness);
-	};
-	if (m_selected >= 0 && m_rampOn)
-		for (int i = RampLow(); i <= RampHigh(); i++)
-			outline(i, ImGui::GetColorU32(ImGuiCol_CheckMark), 1.5f);
-	if (underMouse >= 0)
-		outline(underMouse, IM_COL32(200, 200, 200, 255), 1.5f);
-	if (m_selected >= 0)
-		outline(m_selected, IM_COL32(255, 255, 255, 255), 2.5f);
-
-	if (underMouse >= 0)
-	{
-		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-		const unsigned char* e = shown + underMouse * 4;
-		ImGui::SetTooltip("#%03d  %02X%02X%02X\n%s", underMouse + 1, e[2], e[1], e[0], L("Click to edit this color").c_str());
-	}
+	const bool hovered = DrawEntryGrid("##pe_effect_grid", cell, 2.0f);
+	// A click on the empty canvas around the grid is "done with this one", as on the sheet.
+	if (!hovered && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+		AcceptPick();
 
 	DrawCanvasHelp(origin);
-	DrawPickerPanel(origin, canvasMax);
+	DrawPickerPanel(origin, canvasMax, origin.y + 10.0f);
 }
 
 // --- Live preview in training ----------------------------------------------------------------
-
-void PaletteEditorModal::BeginFrame()
-{
-	ImGuiStyle& style = ImGui::GetStyle();
-	if (s_peekRequested)
-	{
-		if (s_alphaBeforePeek < 0.0f)
-			s_alphaBeforePeek = style.Alpha;
-		style.Alpha = kPeekAlpha;
-	}
-	else if (s_alphaBeforePeek >= 0.0f)
-	{
-		style.Alpha = s_alphaBeforePeek;
-		s_alphaBeforePeek = -1.0f;
-	}
-	// The button sets it again every frame it is still held.
-	s_peekRequested = false;
-}
 
 bool PaletteEditorModal::InTrainingMatch()
 {

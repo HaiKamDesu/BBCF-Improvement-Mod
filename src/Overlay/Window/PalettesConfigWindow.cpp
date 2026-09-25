@@ -1255,7 +1255,16 @@ void PalettesConfigWindow::DrawModal()
 	// how many palettes someone has. FirstUseEver so a resize sticks for the session.
 	ImGui::SetNextWindowSize(ImVec2(1280, 1000), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(700, 480), ImVec2(FLT_MAX, FLT_MAX));
-	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, 0))
+
+	// Not drawn last frame while it was open: the overlay was hidden. Reopen it without
+	// BuildRows, so the unsaved assignments and an open palette editor are still there.
+	const int frame = ImGui::GetFrameCount();
+	if (m_modalOpenLastDraw && m_modalLastDrawFrame != frame - 1 && !ImGui::IsPopupOpen("###palettes_modal"))
+		ImGui::OpenPopup("###palettes_modal");
+	m_modalLastDrawFrame = frame;
+
+	m_modalOpenLastDraw = ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, 0);
+	if (!m_modalOpenLastDraw)
 		return;
 
 	if (!g_interfaces.pPaletteManager)

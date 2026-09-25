@@ -1561,8 +1561,6 @@ Unsaved changes,Unsaved changes,Cambios sin guardar
 (unnamed),(unnamed),(sin nombre)
 < Back,< Back,< Atrás
 "A short note about the palette, stored in the palette file.","A short note about the palette, stored in the palette file.","Una nota corta sobre la paleta, guardada en el archivo de la paleta."
-Accept,Accept,Aceptar
-Accept or cancel the color you are editing first.,Accept or cancel the color you are editing first.,Primero acepta o cancela el color que estás editando.
 Actual size: one sheet pixel per screen pixel.,Actual size: one sheet pixel per screen pixel.,Tamaño real: un píxel de la hoja por píxel de pantalla.
 Apply palette,Apply palette,Aplicar paleta
 Apply palette...,Apply palette...,Aplicar paleta...
@@ -1572,7 +1570,13 @@ Canvas background,Canvas background,Fondo del lienzo
 Click to edit this color,Click to edit this color,Clic para editar este color
 Close the editor without saving. Asks first if you changed anything.,Close the editor without saving. Asks first if you changed anything.,Cierra el editor sin guardar. Pregunta antes si cambiaste algo.
 Close without saving.,Close without saving.,Cerrar sin guardar.
-Ctrl+Z / Ctrl+Y undo and redo accepted changes. Enter accepts and Escape cancels an open color.,Ctrl+Z / Ctrl+Y undo and redo accepted changes. Enter accepts and Escape cancels an open color.,Ctrl+Z / Ctrl+Y deshacen y rehacen los cambios aceptados. Enter acepta y Escape cancela el color abierto.
+Ctrl+Z / Ctrl+Y undo and redo your changes. Escape cancels an open color.,Ctrl+Z / Ctrl+Y undo and redo your changes. Escape cancels an open color.,Ctrl+Z / Ctrl+Y deshacen y rehacen tus cambios. Escape cancela el color abierto.
+Ctrl+C copies the open color; Ctrl+V pastes it into whichever color is open.,Ctrl+C copies the open color; Ctrl+V pastes it into whichever color is open.,Ctrl+C copia el color abierto; Ctrl+V lo pega en el color que esté abierto.
+Copied %s. Open another color and press Ctrl+V to paste it.,Copied %s. Open another color and press Ctrl+V to paste it.,Copiado %s. Abre otro color y presiona Ctrl+V para pegarlo.
++%d more,+%d more,+%d más
+"Colors added with Ctrl+click. They keep their own color until you change the picker, then all take the picker's. Ctrl+click one again to take it back out.","Colors added with Ctrl+click. They keep their own color until you change the picker, then all take the picker's. Ctrl+click one again to take it back out.","Colores agregados con Ctrl+clic. Mantienen su propio color hasta que cambias el selector, y entonces todos toman el del selector. Ctrl+clic de nuevo en uno para sacarlo."
+"Ctrl+click adds more colors to the open one: they all take the picker's color once you change it. Alt+click moves on to another color and gives it the color you had, for walking along a ramp a step at a time.","Ctrl+click adds more colors to the open one: they all take the picker's color once you change it. Alt+click moves on to another color and gives it the color you had, for walking along a ramp a step at a time.","Ctrl+clic agrega más colores al abierto: todos toman el color del selector en cuanto lo cambias. Alt+clic pasa a otro color y le da el color que tenías, para recorrer una rampa paso a paso."
+"""Show color grid"" at the top right lists all 256 colors of the file on screen, including the ones on no sprite.","""Show color grid"" at the top right lists all 256 colors of the file on screen, including the ones on no sprite.","""Mostrar grilla de colores"", arriba a la derecha, lista los 256 colores del archivo en pantalla, incluidos los que no están en ningún sprite."
 Current,Current,Actual
 Done recoloring: go on to naming and saving the palette.,Done recoloring: go on to naming and saving the palette.,Listo de recolorear: seguir a nombrar y guardar la paleta.
 Drag with any mouse button to move around; scroll to zoom.,Drag with any mouse button to move around; scroll to zoom.,Arrastra con cualquier botón del mouse para moverte; la rueda hace zoom.
@@ -1610,7 +1614,7 @@ Palette saved,Palette saved,Paleta guardada
 Pick something to start from first.,Pick something to start from first.,Primero elige algo de lo que partir.
 Put back what Undo took (Ctrl+Y).,Put back what Undo took (Ctrl+Y).,Recuperar lo que quitó Deshacer (Ctrl+Y).
 Put every fade setting back how it was.,Put every fade setting back how it was.,Volver todos los ajustes de atenuado a como estaban.
-"Recolor it with the picker, then Accept to keep it or Cancel to throw it away. Clicking empty space also cancels.","Recolor it with the picker, then Accept to keep it or Cancel to throw it away. Clicking empty space also cancels.","Recoloréalo con el selector, después Aceptar para quedártelo o Cancelar para descartarlo. Hacer clic en un espacio vacío también cancela."
+"Recolor it with the picker. Clicking another color, empty space or anything else keeps the change; Cancel throws it away.","Recolor it with the picker. Clicking another color, empty space or anything else keeps the change; Cancel throws it away.","Recoloréalo con el selector. Hacer clic en otro color, en un espacio vacío o en cualquier otra cosa conserva el cambio; Cancelar lo descarta."
 Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back.,Replace every color with another palette's - one of the game's or one of yours. Undo brings your colors back.,"Reemplazar todos los colores con los de otra paleta, del juego o tuya. Deshacer recupera tus colores."
 Replace every color with the selected palette's (double-clicking a picture does the same).,Replace every color with the selected palette's (double-clicking a picture does the same).,Reemplazar todos los colores con los de la paleta elegida (doble clic en una imagen hace lo mismo).
 Replace the existing palette with this one.,Replace the existing palette with this one.,Reemplazar la paleta existente con esta.
@@ -1623,7 +1627,7 @@ Start over?,Start over?,¿Empezar de nuevo?
 Starting from it throws away the colors you have edited so far.,Starting from it throws away the colors you have edited so far.,Partir de ahí descarta los colores que editaste hasta ahora.
 Starting palette,Starting palette,Paleta de inicio
 Strength,Strength,Intensidad
-Take back the last accepted change (Ctrl+Z).,Take back the last accepted change (Ctrl+Z).,Deshacer el último cambio aceptado (Ctrl+Z).
+Take back the last change (Ctrl+Z).,Take back the last change (Ctrl+Z).,Deshacer el último cambio (Ctrl+Z).
 That color could not be read from the game files.,That color could not be read from the game files.,No se pudo leer ese color de los archivos del juego.
 That palette is no longer installed.,That palette is no longer installed.,Esa paleta ya no está instalada.
 "The color as it is now, before this edit. Click to go back to it.","The color as it is now, before this edit. Click to go back to it.","El color como está ahora, antes de esta edición. Clic para volver a él."
@@ -1631,9 +1635,9 @@ The color behind the sheet. A different one helps when a palette's colors are cl
 The color faded-out parts are pulled towards. Gray keeps things neutral; something loud makes the edited color pop.,The color faded-out parts are pulled towards. Gray keeps things neutral; something loud makes the edited color pop.,El color hacia el que van las partes atenuadas. El gris es neutro; algo llamativo hace resaltar el color editado.
 "The color in the palette you started from, or last applied. Click to use it.","The color in the palette you started from, or last applied. Click to use it.","El color en la paleta de la que partiste, o la última aplicada. Clic para usarlo."
 "The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects.","The swatch blocks in the corner hold the colors that do not appear on the sprites, mostly effects.","Los bloques de muestras de la esquina tienen los colores que no aparecen en los sprites, mayormente efectos."
-"Throw this edit away, as if you never touched it (Escape).","Throw this edit away, as if you never touched it (Escape).","Descartar esta edición, como si no la hubieras tocado (Escape)."
+"Throw this edit away, as if you never touched it (Escape). Anything else you do next keeps it.","Throw this edit away, as if you never touched it (Escape). Anything else you do next keeps it.","Descartar esta edición, como si no la hubieras tocado (Escape). Cualquier otra cosa que hagas después la conserva."
 What should the palette start from?,What should the palette start from?,¿De qué debería partir la paleta?
-What the color becomes if you press Accept.,What the color becomes if you press Accept.,Cómo queda el color si presionas Aceptar.
+What the color becomes. It is kept as soon as you move on to anything else.,What the color becomes. It is kept as soon as you move on to anything else.,Cómo queda el color. Se conserva en cuanto pasas a cualquier otra cosa.
 Which character is this palette for?,Which character is this palette for?,¿Para qué personaje es esta paleta?
 "While a color is open, everything it does not paint is faded like this. Open a color to see changes live.","While a color is open, everything it does not paint is faded like this. Open a color to see changes live.","Mientras hay un color abierto, todo lo que no pinta se atenúa así. Abre un color para ver los cambios en vivo."
 Who made the palette. Stored in the palette file.,Who made the palette. Stored in the palette file.,Quién hizo la paleta. Se guarda en el archivo de la paleta.
@@ -1660,22 +1664,21 @@ You already have a palette with this name. Saving asks before replacing it.,You 
 Character colors,Character colors,Colores del personaje
 Effect %d,Effect %d,Efecto %d
 From,From,Desde
-Hold to see the game,Hold to see the game,Mantener para ver el juego
+Press %s to hide the overlay and look at them; press it again and the editor is back where you left it.,Press %s to hide the overlay and look at them; press it again and the editor is back where you left it.,Presiona %s para ocultar el overlay y verlo; presiónalo de nuevo y el editor vuelve tal como lo dejaste.
 Live in training,Live in training,En vivo en entrenamiento
 Live preview off,Live preview off,Vista en vivo apagada
 Open the editor during a training match with this character and they wear the palette live while you edit - effects included.,Open the editor during a training match with this character and they wear the palette live while you edit - effects included.,"Abre el editor durante una partida de entrenamiento con este personaje y lucirá la paleta en vivo mientras editas, efectos incluidos."
 Swap,Swap,Intercambiar
 "The character in your training match is wearing this palette right now, open color included. Closing the editor puts their palette back, unless you saved.","The character in your training match is wearing this palette right now, open color included. Closing the editor puts their palette back, unless you saved.","El personaje de tu partida de entrenamiento lleva esta paleta ahora mismo, incluido el color abierto. Cerrar el editor le devuelve su paleta, salvo que hayas guardado."
 To,To,Hasta
-"While you hold this button down, the whole overlay turns see-through so you can look at the character.","While you hold this button down, the whole overlay turns see-through so you can look at the character.","Mientras mantienes apretado este botón, todo el overlay se vuelve transparente para que veas al personaje."
 %s never draws anything with this file. Its colors are still saved with the palette.,%s never draws anything with this file. Its colors are still saved with the palette.,%s nunca dibuja nada con este archivo. Sus colores igual se guardan con la paleta.
 (unused),(unused),(sin uso)
-All 256 colors of this file.,All 256 colors of this file.,Los 256 colores de este archivo.
-Color grid,Color grid,Grilla de colores
-"Effect files are shown on the effect sprites the game draws with them, read from your game files. ""Color grid"" shows all 256 colors instead. In a training match the character also shows them live.","Effect files are shown on the effect sprites the game draws with them, read from your game files. ""Color grid"" shows all 256 colors instead. In a training match the character also shows them live.","Los archivos de efectos se muestran sobre los sprites de efectos que el juego dibuja con ellos, leídos de tus archivos del juego. ""Grilla de colores"" muestra los 256 colores en su lugar. En una partida de entrenamiento el personaje también los muestra en vivo."
+"All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.","All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.","Los 256 colores de este archivo como grilla, junto a la imagen. Algunos colores no están en ningún sprite y solo se alcanzan desde aquí."
+Hide color grid,Hide color grid,Ocultar grilla de colores
+Show color grid,Show color grid,Mostrar grilla de colores
+"Effect files are shown on the effect sprites the game draws with them, read from your game files. In a training match the character also shows them live.","Effect files are shown on the effect sprites the game draws with them, read from your game files. In a training match the character also shows them live.","Los archivos de efectos se muestran sobre los sprites de efectos que el juego dibuja con ellos, leídos de tus archivos del juego. En una partida de entrenamiento el personaje también los muestra en vivo."
 No effect sprite could be read for this file; showing the colors as a grid instead.,No effect sprite could be read for this file; showing the colors as a grid instead.,No se pudo leer ningún sprite de efecto para este archivo; se muestran los colores como grilla.
 Reading the effect sprites from the game files...,Reading the effect sprites from the game files...,Leyendo los sprites de efectos de los archivos del juego...
-Show all 256 colors of this file as a grid instead of on the effect sprites. Some colors are not on any sprite and can only be reached from here.,Show all 256 colors of this file as a grid instead of on the effect sprites. Some colors are not on any sprite and can only be reached from here.,Muestra los 256 colores de este archivo como grilla en lugar de sobre los sprites de efectos. Algunos colores no están en ningún sprite y solo se alcanzan desde aquí.
 Showing the colors as a grid instead.,Showing the colors as a grid instead.,Se muestran los colores como grilla.
 "%s never draws anything with this file, so there is nothing to see it on and nothing it would change.","%s never draws anything with this file, so there is nothing to see it on and nothing it would change.","%s nunca dibuja nada con este archivo, así que no hay dónde verlo ni nada que cambie."
 1. Choose the range,1. Choose the range,1. Elige el rango
@@ -1692,7 +1695,6 @@ Fill the range with an even blend from a start color to an end color - what the 
 First entry of the range.,First entry of the range.,Primera entrada del rango.
 Gradient between two colors,Gradient between two colors,Degradado entre dos colores
 Guess the range from the neighbors that look like lighter and darker steps of the color you clicked.,Guess the range from the neighbors that look like lighter and darker steps of the color you clicked.,Adivina el rango a partir de los vecinos que parecen tonos más claros y más oscuros del color que clickeaste.
-Keep the change and close the picker (Enter).,Keep the change and close the picker (Enter).,Quedarse con el cambio y cerrar el selector (Enter).
 Last entry of the range.,Last entry of the range.,Última entrada del rango.
 One color,One color,Un color
 Range / gradient,Range / gradient,Rango / degradado

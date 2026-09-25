@@ -99,10 +99,12 @@ namespace
 		bool suppressedUntilRelease = false;
 		float heldSeconds = 0.0f;
 		bool repeated = false;
+		int claimedAt = -100; // g_updateCount of the last Claim()
 	};
 
 	ActionState g_actions[HotkeyManager::Hotkey_Count];
 	bool g_loaded = false;
+	int g_updateCount = 0;
 	// True when at least one action is bound to a controller. While it is false and no rebind
 	// prompt is open, the device layer is never polled at all, so a keyboard-only setup pays
 	// nothing for this feature.
@@ -450,6 +452,7 @@ void HotkeyManager::Update()
 	if (g_anyDeviceBinding || g_capturing)
 		InputDevices::Update(g_anyDirectInputBinding);
 
+	++g_updateCount;
 	const bool focused = IsGameWindowFocused();
 	const bool typing = IsTypingInImGuiTextField();
 	const float deltaTime = GetImGuiDeltaTime();
@@ -473,7 +476,10 @@ void HotkeyManager::Update()
 		// is never "typing", so device bindings ignore that gate (see utils.h).
 		// Nothing fires while a rebind prompt is listening either, or assigning F1 would
 		// toggle the menu shut in the middle of assigning it.
-		const bool gated = !focused || g_capturing ||
+		// A claim is made while the overlay draws, which is after this runs, so one made
+		// last frame still counts.
+		const bool claimed = g_updateCount - state.claimedAt <= 1;
+		const bool gated = !focused || g_capturing || claimed ||
 			(typing && state.binding.source == HotkeyBinding::Source_Keyboard);
 
 		state.prevDown = state.down;
@@ -513,6 +519,12 @@ bool HotkeyManager::WasPressedOrRepeated(Action action)
 		return false;
 	const ActionState& state = g_actions[action];
 	return (state.down && !state.prevDown) || state.repeated;
+}
+
+void HotkeyManager::Claim(Action action)
+{
+	if (action >= 0 && action < Hotkey_Count)
+		g_actions[action].claimedAt = g_updateCount;
 }
 
 bool HotkeyManager::ConsumePress(Action action)

@@ -85,6 +85,11 @@ private:
 
 	PaletteEditorModal m_editor;
 
+	// The overlay hotkey hides this with the rest of the overlay, and ImGui closes the
+	// popups of a window that goes away. DrawModal notices and puts it back, drafts intact.
+	bool m_modalOpenLastDraw = false;
+	int m_modalLastDrawFrame = -1;
+
 	// The block list manager.
 	void DrawBlockedModal();
 	bool m_openBlocked = false;
