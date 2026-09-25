@@ -375,9 +375,79 @@ void RefreshSteamUserStatsWrapperSlot(ISteamUserStats** ppSteamUserStats)
 		wrapper);
 }
 
+namespace
+{
+	// BBCF's own copy of steam_api.h's s_CallbackCounterAndContext: { init callback, counter,
+	// CSteamAPIContext }. The accessors the game calls (SteamFriends() and the rest, 116 of
+	// them) all push its address to SteamInternal_ContextInit, and CSteamAPIContext::Init
+	// (0x407A70) fills the context - those are the stores hook_SteamAPI_Init patches to learn
+	// where each interface pointer lives. RVAs, since the image is relocatable.
+	const uintptr_t kSteamContextBlockRva = 0x5D3210;
+	const uintptr_t kSteamContextInitCallbackRva = 0x7E60; // what the block's first slot holds
+
+	// The hook_SteamAPI_Init path lost the startup race: the game called SteamAPI_Init before
+	// our detour was in, so the store-site patches were never placed and no interface slot is
+	// known. The slots are not a secret, though - they are fixed offsets into the block above,
+	// and by the title screen the game has long since filled them. Recover them from there.
+	void RecoverMissedSteamContextSlots()
+	{
+		const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
+		void** const block = reinterpret_cast<void**>(base + kSteamContextBlockRva);
+
+		// Only trust the address if it still holds what BBCF puts there: the build it was
+		// read from is the only one there is, but a mismatch must mean "leave it alone".
+		if (block[0] != reinterpret_cast<void*>(base + kSteamContextInitCallbackRva))
+		{
+			LOG(0, "[STEAM] Missed SteamAPI_Init and the Steam context is not where it should be "
+				"(slot0=%p, expected %p); the overlay cannot start this session.\n",
+				block[0], reinterpret_cast<void*>(base + kSteamContextInitCallbackRva));
+			return;
+		}
+
+		// block[1] is the callback counter; the context itself starts at block[2].
+		void** const context = block + 2;
+		if (reinterpret_cast<uintptr_t>(block[1]) == 0 || !context[0])
+		{
+			LOG(0, "[STEAM] Missed SteamAPI_Init and the game has not filled its Steam context yet; "
+				"the overlay cannot start this session.\n");
+			return;
+		}
+
+		// Same slots the store-site patches record: CSteamAPIContext's member offsets.
+		auto slot = [&](int byteOffset) { return reinterpret_cast<void*>(reinterpret_cast<char*>(context) + byteOffset); };
+		if (!g_tempVals.ppSteamUser)        g_tempVals.ppSteamUser = static_cast<ISteamUser**>(slot(0x04));
+		if (!g_tempVals.ppSteamFriends)     g_tempVals.ppSteamFriends = static_cast<ISteamFriends**>(slot(0x08));
+		if (!g_tempVals.ppSteamUtils)       g_tempVals.ppSteamUtils = static_cast<ISteamUtils**>(slot(0x0C));
+		if (!g_tempVals.ppSteamMatchmaking) g_tempVals.ppSteamMatchmaking = static_cast<ISteamMatchmaking**>(slot(0x10));
+		if (!g_tempVals.ppSteamUserStats)   g_tempVals.ppSteamUserStats = static_cast<ISteamUserStats**>(slot(0x14));
+		if (!g_tempVals.ppSteamNetworking)  g_tempVals.ppSteamNetworking = static_cast<ISteamNetworking**>(slot(0x20));
+
+		LOG(0, "[STEAM] Missed SteamAPI_Init; recovered the interface slots from the game's Steam "
+			"context at %p (user=%p friends=%p utils=%p matchmaking=%p userstats=%p networking=%p)\n",
+			context, *g_tempVals.ppSteamUser, *g_tempVals.ppSteamFriends, *g_tempVals.ppSteamUtils,
+			*g_tempVals.ppSteamMatchmaking, *g_tempVals.ppSteamUserStats, *g_tempVals.ppSteamNetworking);
+	}
+}
+
 bool InitSteamApiWrappers()
 {
 	LOG(1, "InitSteamApiWrappers\n");
+
+	if (!g_tempVals.ppSteamUser || !g_tempVals.ppSteamFriends || !g_tempVals.ppSteamUtils ||
+		!g_tempVals.ppSteamMatchmaking || !g_tempVals.ppSteamUserStats || !g_tempVals.ppSteamNetworking)
+	{
+		RecoverMissedSteamContextSlots();
+	}
+	else
+	{
+		// Known already - from the SteamAPI_Init hook, or an earlier call's recovery. Say
+		// whether that agrees with the recovery path's address, so a normal boot keeps
+		// proving the fallback is aimed at the right place.
+		const uintptr_t context = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr)) + kSteamContextBlockRva + 8;
+		LOG(1, "[STEAM] Interface slots already known; context fallback address %s (%p vs %p)\n",
+			reinterpret_cast<uintptr_t>(g_tempVals.ppSteamUser) == context + 4 ? "matches" : "DOES NOT MATCH",
+			g_tempVals.ppSteamUser, reinterpret_cast<void*>(context + 4));
+	}
 
 	if (g_tempVals.ppSteamMatchmaking &&
 		!g_interfaces.pSteamMatchmakingWrapper)
