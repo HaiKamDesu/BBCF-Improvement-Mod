@@ -804,6 +804,9 @@ void ScrWindow::LoadTrainingState()
     if (apparatus) {
         apparatus->load_snapshot(0);
     }
+    if (g_gameVals.pFrameCount) {
+        g_gameVals.framesToReach = *g_gameVals.pFrameCount;
+    }
     BeginSetupDelay(wait_before_exec_s);
 }
 

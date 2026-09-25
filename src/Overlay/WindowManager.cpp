@@ -20,6 +20,7 @@
 
 #include "Game/EntityDiagnostics.h"
 #include "Game/OnlineInputDelay.h"
+#include "Game/TasManager.h"
 #include "Game/ReplayPauseHud.h"
 #include "Game/gamestates.h"
 #include "Game/FrameStallDiagnostics.h"
@@ -1000,6 +1001,19 @@ void WindowManager::HandleButtons()
 	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_JukeboxNextTrack))
 	{
 		GetMusicManager().PlayNextTrack();
+	}
+
+	// Ensures freeze always engages immediately when requested, rather than waiting
+	// for the frame counter to reach whatever value it had reached the last time
+	// the game was frozen and then advanced past via step-frame. Does not take effect during TAS Timeline.
+	if (g_gameVals.pFrameCount)
+	{
+		static unsigned s_prevFrameCountForResetWatch = 0;
+		if (*g_gameVals.pFrameCount < s_prevFrameCountForResetWatch && !TasManager::Instance().IsPlaybackRunning())
+		{
+			g_gameVals.framesToReach = 0;
+		}
+		s_prevFrameCountForResetWatch = *g_gameVals.pFrameCount;
 	}
 
 	// Driven from the render loop rather than the GetFrameCounter hook: that hook only
