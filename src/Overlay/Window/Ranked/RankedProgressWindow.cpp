@@ -6216,10 +6216,22 @@ namespace
 		}
 	}
 
+	// 2026-09-26 crash fix. GetRankDisplayName only names AUTH and the special
+	// ranks 36-42; for every ordinary rank 1-35 it returns nullptr, and
+	// std::string(nullptr) reads address 0 -- exactly the access violation in
+	// Crash_20260926_162733 (ecx=0, eax=0, read at 0x00000000, first frame in
+	// the dialog). FormatVisibleRankLabel is the file's own null-safe wrapper
+	// and falls back to "LV%u"; use it, and never hand a raw pointer to
+	// std::string here again.
 	std::string FormatRankForPersistView(const RankedProgressOverlaySnapshot& s)
 	{
 		const uint32_t visible = InternalRankToVisibleRank(s.currentRank, s.isUnranked);
-		return std::string(GetRankDisplayName(visible, s.isUnranked));
+		std::string label = FormatVisibleRankLabel(visible, s.isUnranked);
+		if (label.empty())
+		{
+			label = "?";
+		}
+		return label;
 	}
 }
 

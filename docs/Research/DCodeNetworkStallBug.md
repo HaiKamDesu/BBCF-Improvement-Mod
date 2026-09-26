@@ -1738,3 +1738,20 @@ Right-click on the ranked progress or network square colour window → a dialog
 with the last confirmed-saved state beside the live one, the upload time, and
 an explicit "unsaved" delta. This is the thing that would have told the
 reporter, at 14:40, that nothing since 14:34 was being kept.
+
+## 2026-09-26: "Steam uploads" dialog crash (fixed)
+
+`Crash_20260926_162733`: `EXCEPTION_ACCESS_VIOLATION`, **read at 0x00000000**,
+`ecx=0 eax=0`, top frame in the mod on the overlay thread, called from the
+game's frame loop — the first frame the dialog drew with a captured snapshot.
+
+Cause: `FormatRankForPersistView` did `std::string(GetRankDisplayName(...))`.
+`GetRankDisplayName` only names AUTH and the special ranks 36–42; for every
+ordinary rank 1–35 it returns **`nullptr`**, and `std::string(nullptr)`
+dereferences address 0. So it faulted for anyone at LV1–LV35 the first time
+the dialog opened with `haveRanked` set — the forced wedge was incidental, it
+just made that the first such open.
+
+Fix (`FormatRankForPersistView`): call the file's own null-safe
+`FormatVisibleRankLabel`, which falls back to `LV%u`, and never hand that raw
+pointer to `std::string` again. A sweep found no other unguarded wraps.
