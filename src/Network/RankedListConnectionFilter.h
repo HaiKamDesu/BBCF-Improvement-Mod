@@ -63,6 +63,8 @@ enum RankedListSortMode_
 };
 
 // Gated behind Settings::settingsIni.enableRankedListConnectionFilter.
+class RoomMemberEntry; // Game/Room/RoomMemberEntry.h; only pointers are used here
+
 class RankedListConnectionFilter
 {
 public:
@@ -384,6 +386,8 @@ private:
 	// Right after a ranked join: dump the game-side room slots once, and if our
 	// own entry sits outside the match pair the host's room is stale -- act now.
 	void InspectRoomAfterJoin();
+	void DumpRoomSlots(const char* tag, const RoomMemberEntry* me, unsigned long long sinceJoinMs, int* outOccupied, int* outOthersInPair);
+	void PollInMatchRoomDump();
 	// One-line dump of a lobby's cached liveness for the join-window logs.
 	std::string DescribeLobbyLiveness(uint64_t lobbyId) const;
 
@@ -397,6 +401,7 @@ private:
 	// Zombie rooms (keyed by lobbyId) - see BrokenLobbyInfo.
 	std::unordered_map<uint64_t, BrokenLobbyInfo> m_brokenLobbies;
 	uint64_t m_roomInspectedLobbyId = 0; // InspectRoomAfterJoin runs once per join
+	uint64_t m_inMatchDumpedLobbyId = 0;  // PollInMatchRoomDump runs once per lobby
 	// Rate limiter for PollLobbyLiveness' RequestLobbyData calls.
 	unsigned long long m_lastLivenessRequestTickMs = 0;
 	// GetTickCount64() of the last JoinLobby attempt, for elapsed-time in the

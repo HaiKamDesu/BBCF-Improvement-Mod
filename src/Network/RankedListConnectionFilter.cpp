@@ -2471,6 +2471,7 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	// every few seconds and picks up the results).
 	PollProbes();
 	PollPendingConnectionConfirmation();
+	PollInMatchRoomDump();
 	PollLobbyLiveness();
 
 	// Periodic whole-list reachability recheck - hidden entries included, so
@@ -3360,41 +3361,9 @@ void RankedListConnectionFilter::InspectRoomAfterJoin()
 	const unsigned long long now = GetTickCount64();
 	const unsigned long long sinceJoinMs = m_pendingJoinTickMs != 0 ? now - m_pendingJoinTickMs : 0ull;
 
-	// Dump every occupied slot. The six unnamed bytes are logged raw on purpose:
-	// one of them is the "OK" state the popup renders, and a healthy dump next
-	// to a stale one is how it gets identified.
 	int occupied = 0;
 	int othersInPair = 0;
-	LOG(1, "[RankedListFilter] room after join (lobby=%llu, +%llums): our slot member=%u matchPlayer=%u matchId=%u\n",
-		static_cast<unsigned long long>(m_pendingLobbyId), sinceJoinMs,
-		me->memberIndex, me->matchPlayerIndex, me->matchId);
-	for (uint16_t i = 0; i < MAX_PLAYERS_IN_ROOM; ++i)
-	{
-		const RoomMemberEntry* const e = g_interfaces.pRoomManager->GetRoomMemberEntryByIndex(i);
-		if (e == nullptr)
-		{
-			continue;
-		}
-		++occupied;
-		if (e != me && e->matchPlayerIndex < 2)
-		{
-			++othersInPair;
-		}
-		const char* name = "<unknown>";
-		if (g_interfaces.pSteamFriendsWrapper != nullptr)
-		{
-			const char* const resolved = g_interfaces.pSteamFriendsWrapper->GetFriendPersonaName(CSteamID(e->steamId));
-			if (resolved != nullptr && resolved[0] != '\0')
-			{
-				name = resolved;
-			}
-		}
-		LOG(1, "[RankedListFilter]   slot[%u] member=%u steamId=%llu (%s)%s matchId=%u matchPlayer=%u netcolor=%u raw+1..3=%02X %02X %02X raw+35..37=%02X %02X %02X\n",
-			i, e->memberIndex, static_cast<unsigned long long>(e->steamId), name,
-			e == me ? " <me>" : (e->steamId == m_pendingConnectionTarget ? " <host>" : ""),
-			e->matchId, e->matchPlayerIndex, e->netcolor,
-			e->N00009344, e->N00009342, e->N00009340, e->N00009349, e->N0000934C, e->N0000934A);
-	}
+	DumpRoomSlots("room after join", me, sinceJoinMs, &occupied, &othersInPair);
 
 	// The signature: we are not in the match pair.
 	if (me->matchPlayerIndex < 2)
@@ -3432,4 +3401,74 @@ void RankedListConnectionFilter::InspectRoomAfterJoin()
 		LOG(1, "[RankedListFilter] auto-leaving stale lobby %llu\n", static_cast<unsigned long long>(lobbyId));
 		g_interfaces.pSteamMatchmakingWrapper->LeaveLobby(CSteamID(lobbyId));
 	}
+}
+
+// One line per occupied slot. The six unnamed RoomMemberEntry bytes are logged
+// raw on purpose: one of them is the "OK" state the popup renders. Right after
+// a join every healthy dump shows +0x35..0x37 = 00 FF FF (nobody has pressed
+// OK yet), so the flag is only identifiable from a dump taken once both
+// players have confirmed -- that is what PollInMatchRoomDump is for.
+void RankedListConnectionFilter::DumpRoomSlots(const char* tag, const RoomMemberEntry* me,
+	unsigned long long sinceJoinMs, int* outOccupied, int* outOthersInPair)
+{
+	int occupied = 0;
+	int othersInPair = 0;
+	LOG(1, "[RankedListFilter] %s (lobby=%llu, +%llums): our slot member=%u matchPlayer=%u matchId=%u\n",
+		tag, static_cast<unsigned long long>(m_pendingLobbyId != 0 ? m_pendingLobbyId : m_roomInspectedLobbyId),
+		sinceJoinMs, me ? me->memberIndex : 255u, me ? me->matchPlayerIndex : 255u, me ? me->matchId : 0u);
+	for (uint16_t i = 0; i < MAX_PLAYERS_IN_ROOM; ++i)
+	{
+		const RoomMemberEntry* const e = g_interfaces.pRoomManager->GetRoomMemberEntryByIndex(i);
+		if (e == nullptr)
+		{
+			continue;
+		}
+		++occupied;
+		if (e != me && e->matchPlayerIndex < 2)
+		{
+			++othersInPair;
+		}
+		const char* name = "<unknown>";
+		if (g_interfaces.pSteamFriendsWrapper != nullptr)
+		{
+			const char* const resolved = g_interfaces.pSteamFriendsWrapper->GetFriendPersonaName(CSteamID(e->steamId));
+			if (resolved != nullptr && resolved[0] != '\0')
+			{
+				name = resolved;
+			}
+		}
+		LOG(1, "[RankedListFilter]   slot[%u] member=%u steamId=%llu (%s)%s matchId=%u matchPlayer=%u netcolor=%u raw+1..3=%02X %02X %02X raw+35..37=%02X %02X %02X\n",
+			i, e->memberIndex, static_cast<unsigned long long>(e->steamId), name,
+			e == me ? " <me>" : (e->steamId == m_pendingConnectionTarget ? " <host>" : ""),
+			e->matchId, e->matchPlayerIndex, e->netcolor,
+			e->N00009344, e->N00009342, e->N00009340, e->N00009349, e->N0000934C, e->N0000934A);
+	}
+	if (outOccupied) *outOccupied = occupied;
+	if (outOthersInPair) *outOthersInPair = othersInPair;
+}
+
+// Once per lobby, the first tick we are actually in a match: both players have
+// pressed OK by now, so whichever byte changed since the post-join dump is the
+// confirmation flag.
+void RankedListConnectionFilter::PollInMatchRoomDump()
+{
+	if (!Settings::settingsIni.rankedStaleRoomDetect || g_interfaces.pRoomManager == nullptr)
+	{
+		return;
+	}
+	if (m_roomInspectedLobbyId == 0 || m_roomInspectedLobbyId == m_inMatchDumpedLobbyId)
+	{
+		return;
+	}
+	if (!g_interfaces.pRoomManager->IsRoomFunctional() || !g_interfaces.pRoomManager->IsThisPlayerInMatch())
+	{
+		return;
+	}
+	const RoomMemberEntry* const me = g_interfaces.pRoomManager->GetThisPlayerRoomMemberEntry();
+	if (me == nullptr)
+	{
+		return;
+	}
+	m_inMatchDumpedLobbyId = m_roomInspectedLobbyId;
+	DumpRoomSlots("room in match", me, 0ull, nullptr, nullptr);
 }

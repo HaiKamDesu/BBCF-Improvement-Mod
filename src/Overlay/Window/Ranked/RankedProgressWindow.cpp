@@ -6162,6 +6162,7 @@ namespace
 	RankedProgressOverlaySnapshot g_lastLiveRanked;
 	bool g_haveLastLiveRanked = false;
 	bool g_steamUploadsOpenRequested = false;
+	int g_steamUploadsRecenterFrames = 0;
 
 	// The ranked overlay is only "active" on the ranked screens, but the write
 	// that persists a match lands while the player is on exactly those screens,
@@ -6259,12 +6260,32 @@ void DrawSteamUploadsDialog()
 	{
 		ImGui::OpenPopup(title.c_str());
 		g_steamUploadsOpenRequested = false;
+		g_steamUploadsRecenterFrames = 3;
 	}
 
-	RankedUi::CenterNextModalOnOpen();
-	RankedUi::SetNextModalDefaultSize(560.0f, 0.0f);
+	// 2026-09-26: the dialog opened off-centre. CenterNextModalOnOpen centres
+	// with a pivot under ImGuiCond_Appearing, i.e. using the window's size on
+	// the frame it first appears -- and with height 0 + AlwaysAutoResize that
+	// size was not known yet, so it centred a near-empty window and never
+	// re-fired. Do what the sibling dialogs do (a real default size, no
+	// auto-resize) and, belt and braces, re-centre for the first few frames.
+	RankedUi::SetNextModalDefaultSize(560.0f, 440.0f);
+	if (g_steamUploadsRecenterFrames > 0)
+	{
+		const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+		if (displaySize.x > 0.0f && displaySize.y > 0.0f)
+		{
+			ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.5f),
+				ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		}
+		--g_steamUploadsRecenterFrames;
+	}
+	else
+	{
+		RankedUi::CenterNextModalOnOpen();
+	}
 	bool open = true;
-	if (!ImGui::BeginPopupModal(title.c_str(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize))
+	if (!ImGui::BeginPopupModal(title.c_str(), &open, ImGuiWindowFlags_NoCollapse))
 	{
 		return;
 	}
