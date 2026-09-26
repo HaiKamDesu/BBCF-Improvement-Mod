@@ -216,14 +216,25 @@ namespace
 	typedef void(__fastcall* StartLoginFn)(void* workMgr, void* unused);
 
 	constexpr int kReloginFailureThreshold = 2;  // two consecutive rejects, not a blip
-	constexpr int kMaxReloginsPerSession = 8;
 	constexpr ULONGLONG kReloginCooldownMs = 20000;
+	// 2026-09-26: a flat per-session cap of 8 ran out mid-session. The wedge
+	// recurred every few minutes for two hours, the fix recovered it twelve
+	// times, hit 8/8 at 14:32, and from then on 71 straight rejections with
+	// nothing left to try -- 35 minutes of progress at risk while the game was
+	// still running. A cap must never be able to run out while the player is
+	// still playing, so it is a sliding window instead: the cooldown above
+	// already prevents a tight loop, and this only guards against a server that
+	// rejects every fresh session too.
+	constexpr int kMaxReloginsPerWindow = 6;
+	constexpr ULONGLONG kReloginWindowMs = 10 * 60 * 1000;
 	// Requests already in flight when the re-login fires still carry the old
 	// token and will fail; they must not count toward the next trigger.
 	constexpr ULONGLONG kReloginGraceMs = 5000;
 
 	int g_consecutiveWebApiFailures = 0;
-	int g_reloginsThisSession = 0;
+	int g_reloginsThisSession = 0;      // for logging only
+	int g_reloginsInWindow = 0;
+	ULONGLONG g_reloginWindowStartMs = 0;
 	ULONGLONG g_lastReloginMs = 0;
 	ULONGLONG g_reloginGraceUntilMs = 0;
 
@@ -654,11 +665,16 @@ namespace
 		{
 			return;
 		}
-		if (g_reloginsThisSession >= kMaxReloginsPerSession)
-		{
-			return;
-		}
 		const ULONGLONG now = GetTickCount64();
+		if (g_reloginWindowStartMs == 0 || (now - g_reloginWindowStartMs) >= kReloginWindowMs)
+		{
+			g_reloginWindowStartMs = now;
+			g_reloginsInWindow = 0;
+		}
+		if (g_reloginsInWindow >= kMaxReloginsPerWindow)
+		{
+			return; // window exhausted; it reopens by itself
+		}
 		if (g_lastReloginMs != 0 && (now - g_lastReloginMs) < kReloginCooldownMs)
 		{
 			return;
@@ -674,6 +690,7 @@ namespace
 
 		g_lastReloginMs = now;
 		++g_reloginsThisSession;
+		++g_reloginsInWindow;
 
 		uint8_t* const latch = reinterpret_cast<uint8_t*>(moduleBase + kWorkMgrLoginLatchRva);
 		const uint8_t latchBefore = IsBadReadPtr(latch, 1) ? 0xFF : *latch;
@@ -699,9 +716,10 @@ namespace
 		// running (this happened during match load). Record the tick count so
 		// the next capture distinguishes them instead of leaving it open.
 		g_reloginTickMark = g_strategyTicks;
-		IncidentPrintf("[WebApi] !!! forcing a fresh user/login (%s, %d/%d this session;"
+		IncidentPrintf("[WebApi] !!! forcing a fresh user/login (%s, #%d this session, %d/%d in the last %llu min;"
 			" login latch %u -> 0, tickerTicks=%u)\n",
-			reason, g_reloginsThisSession, kMaxReloginsPerSession, latchBefore, g_strategyTicks);
+			reason, g_reloginsThisSession, g_reloginsInWindow, kMaxReloginsPerWindow,
+			kReloginWindowMs / 60000, latchBefore, g_strategyTicks);
 		startLogin(workMgr, nullptr);
 	}
 
@@ -979,9 +997,28 @@ namespace
 		{
 			return;
 		}
-		for (++p; *p != '\0' && *p != '"'; ++p)
+		// Replace the value with '#' + its FNV-1a fingerprint -- the same hash
+		// WebApiSessionFingerprint computes over client+0x8 -- so a response's
+		// session can be compared against the sessionHash= on the result lines
+		// without the token itself ever reaching the log. Needed to test whether
+		// some endpoint's response carries a session the client never stored.
+		char* const valueStart = p + 1;
+		char* valueEnd = valueStart;
+		uint32_t hash = 2166136261u;
+		for (; *valueEnd != '\0' && *valueEnd != '"'; ++valueEnd)
 		{
-			*p = '#';
+			hash = (hash ^ static_cast<uint8_t>(*valueEnd)) * 16777619u;
+		}
+		const size_t valueLength = static_cast<size_t>(valueEnd - valueStart);
+		for (size_t i = 0; i < valueLength; ++i)
+		{
+			valueStart[i] = '#';
+		}
+		if (valueLength >= 9 && valueLength > 0)
+		{
+			char hex[9];
+			sprintf_s(hex, "%08X", hash);
+			memcpy(valueStart + 1, hex, 8);
 		}
 	}
 
@@ -1060,19 +1097,29 @@ namespace
 		const int32_t done = *reinterpret_cast<const int32_t*>(req + kHttpReqDoneOffset);
 		const int32_t httpOk = *reinterpret_cast<const int32_t*>(req + kHttpReqHttpOkOffset);
 
-		// std::string with SSO: the buffer is inline until capacity exceeds 15.
+		// std::wstring, not std::string -- FUN_00438890 compares it with
+		// lstrcmpW(L"https") and its SSO capacity is 7 wchars. Reading it as narrow
+		// stopped at the first wchar's NUL, which is why every line so far said
+		// url="h". MSVC layout: 8 inline wchars at +0 (a wchar_t* once capacity
+		// exceeds 7), size at +0x10, capacity at +0x14.
 		const uint32_t urlLength = *reinterpret_cast<const uint32_t*>(req + kHttpReqUrlLengthOffset);
 		const uint32_t urlCapacity = *reinterpret_cast<const uint32_t*>(req + kHttpReqUrlCapacityOffset);
-		const char* url = reinterpret_cast<const char*>(req + kHttpReqUrlOffset);
-		if (urlCapacity > 15)
+		const wchar_t* url = reinterpret_cast<const wchar_t*>(req + kHttpReqUrlOffset);
+		if (urlCapacity > 7)
 		{
-			url = *reinterpret_cast<const char* const*>(req + kHttpReqUrlOffset);
+			url = *reinterpret_cast<const wchar_t* const*>(req + kHttpReqUrlOffset);
 		}
 		char urlText[160] = "<unreadable>";
-		if (url != nullptr && urlLength < sizeof(urlText) && !IsBadReadPtr(url, urlLength + 1))
+		if (url != nullptr && urlLength < sizeof(urlText) - 1 &&
+			!IsBadReadPtr(url, (urlLength + 1) * sizeof(wchar_t)))
 		{
-			memcpy(urlText, url, urlLength);
-			urlText[urlLength] = '\0';
+			size_t i = 0;
+			for (; i < urlLength; ++i)
+			{
+				const wchar_t w = url[i];
+				urlText[i] = (w >= 0x20 && w < 0x7F) ? static_cast<char>(w) : '?';
+			}
+			urlText[i] = '\0';
 		}
 
 		const char* const begin = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset);
@@ -1174,6 +1221,96 @@ namespace
 		}
 	}
 
+	// Endpoint table at 009D4C54, indexed by request type.
+	const char* const kWebApiEndpointNames[12] = {
+		"user/create", "user/login", "catalog/get_region", "catalog/get_area",
+		"catalog/get_lobby", "lobby/get_status", "matching/start", "matching/confirm",
+		"matching/end", "tus/read", "tus/write", "tss/read",
+	};
+
+	// One compact line per request type that has a completed descriptor: the
+	// endpoint, the completion flags, and the head of the decoded response with
+	// the session already reduced to its fingerprint.
+	//
+	// Why: the 2026-09-26 onsets show the REJECTED request carrying the newest
+	// token the client knows -- the one minted by the immediately preceding
+	// success -- so a race between two tus requests is ruled out, and so is an
+	// idle timeout (a 3m47s gap succeeded, a 14s gap failed). What is left is
+	// that some other endpoint (lobby/get_status, matching/*) rotates the
+	// server-side session and the client does not store that response's token.
+	// This shows, at the moment of rejection, what session each endpoint's last
+	// response carried versus what the client holds.
+	void LogAllPendingRequests(uintptr_t moduleBase)
+	{
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return;
+		}
+		size_t heldLength = 0;
+		const uint32_t held = WebApiSessionFingerprint(client, &heldLength);
+		IncidentPrintf("[WebApi] endpoint state at rejection (client holds session #%08X, len %u):\n",
+			held, static_cast<unsigned>(heldLength));
+
+		for (int type = 0; type < 12; ++type)
+		{
+			const uint8_t* const slotPtr = client + kWebApiPendingSlotsOffset + type * 4;
+			if (IsBadReadPtr(slotPtr, sizeof(void*)))
+			{
+				continue;
+			}
+			const uint8_t* const* const slot = *reinterpret_cast<const uint8_t* const* const*>(slotPtr);
+			if (slot == nullptr || IsBadReadPtr(slot, sizeof(void*)))
+			{
+				continue;
+			}
+			const uint8_t* const req = *slot;
+			if (req == nullptr || IsBadReadPtr(req, kHttpReqSize))
+			{
+				continue;
+			}
+			const int32_t done = *reinterpret_cast<const int32_t*>(req + kHttpReqDoneOffset);
+			const int32_t httpOk = *reinterpret_cast<const int32_t*>(req + kHttpReqHttpOkOffset);
+			const char* const begin = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset);
+			const char* const end = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset + 4);
+			const ptrdiff_t bodyLength = (begin != nullptr && end >= begin) ? (end - begin) : -1;
+
+			char head[96] = "(no body)";
+			if (bodyLength > 0)
+			{
+				size_t copy = static_cast<size_t>(bodyLength);
+				if (copy > kHttpResponseLogBytes)
+				{
+					copy = kHttpResponseLogBytes;
+				}
+				if (!IsBadReadPtr(begin, copy))
+				{
+					char rawBody[kHttpResponseLogBytes + 1];
+					memcpy(rawBody, begin, copy);
+					rawBody[copy] = '\0';
+					char decoded[kHttpResponseLogBytes + 1];
+					if (DecodeWebApiResponse(rawBody, copy, decoded, sizeof(decoded)))
+					{
+						// The header -- session fingerprint, result, date -- is all
+						// that is needed here; cut before any payload.
+						const char* cut = strstr(decoded, ",\"param\"");
+						if (cut == nullptr) cut = strstr(decoded, ",\"psnVer\"");
+						size_t n = cut != nullptr ? static_cast<size_t>(cut - decoded) : strlen(decoded);
+						if (n > sizeof(head) - 1) n = sizeof(head) - 1;
+						memcpy(head, decoded, n);
+						head[n] = '\0';
+					}
+					else
+					{
+						sprintf_s(head, "(undecodable, %d bytes)", static_cast<int>(bodyLength));
+					}
+				}
+			}
+			IncidentPrintf("[WebApi]   [%2d] %-18s done=%d httpOk=%d bytes=%-6d %s\n",
+				type, kWebApiEndpointNames[type], done, httpOk, static_cast<int>(bodyLength), head);
+		}
+	}
+
 	// Records every non-zero outcome the strategy ticks publish, so a capture
 	// says "9" (no TUS data) or "0xB" (HTTP error) outright.
 	void SampleWorkMgrState(uintptr_t moduleBase)
@@ -1226,6 +1363,7 @@ namespace
 		{
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusRead, "tus/read");
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusWrite, "tus/write");
+			LogAllPendingRequests(moduleBase);
 
 			// A single reject can be a blip; a streak is the wedge, and the wedge
 			// never heals on its own -- 26/26 failures over 24 minutes on
