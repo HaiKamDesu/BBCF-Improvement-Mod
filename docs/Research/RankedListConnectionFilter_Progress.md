@@ -3383,3 +3383,19 @@ they live at the matchmaking layer. Implementation:
    class C pre-join too)?
 3. Are pre-join member counts predictive (a would-be response=4 preceded by members=2)?
 4. Does any healthy host ever keep one lobby id across matches (layer-2 false positive)?
+
+## 2026-09-26 - Unmet-requirement filter let a host through (Dragonking88)
+
+Session 17:28 (release/8-7-2): Dragonking88's room was shown as sort #0 (delay=2, rtt
+178-182ms) with `HideUnmetRequirementRooms=1`, and clicking it produced the game's "The
+room's connectivity requirements are not met" popup (click snapshot 17:31:13.317,
+latchedTarget=Dragonking88). Both requirement offsets were re-verified against the game's
+own getters (vtable+0x5c `FUN_0046e8a0` -> `+0x10a` RANK_RTT_FILTER, vtable+0x58
+`FUN_0046e850` -> `+0x5e` RANK_AREA_FILTER), so the reads were right - the comparison was
+not. Re-reading `FUN_004ae6d0` case 0x27: the game evaluates the RTT filter, and if that
+PASSES it falls through (`LAB_004aec61`) and ALSO evaluates the area filter; either miss ->
+state 0x28 (the popup). Our filter was `if (rttFilter) ... else if (areaFilter)`, so a host
+with a permissive RTT filter (digit 1/2) plus area filter 2 (needs digit 3) passed our
+gate and failed the game's. Fixed: required digit = max of both. The `live order applied`
+log line now prints each shown row's `req=rtt/area` words, and a `requirement hide:` line
+records every row the filter hides, so the next such popup can be tied to values.

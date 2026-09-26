@@ -1548,13 +1548,20 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	}
 	// Requirement filter: replicate the game's own join gate
 	// (FUN_004ae6d0 case 0x27) that produces "The room's connectivity
-	// requirements are not met" - the row's RANK_RTT_FILTER (entry+0x10a,
-	// required = 1..4, anything else nonzero = 4) or, failing that, its
-	// RANK_AREA_FILTER (entry+0x5e, 1 -> requires digit 2, 2 -> requires
-	// digit 3) is compared against OUR measured Delay digit to that host.
-	// Rows we'd be rejected from are hidden preemptively. Unresolved RTT
-	// (digit unknown) rows are shown - the game itself waits in
-	// "RMSR_CheckingRTT" rather than rejecting in that state.
+	// requirements are not met". The game applies BOTH of the host's
+	// requirements, one after the other, and rejects on the first miss:
+	//   1. RANK_RTT_FILTER (entry+0x10a, vtable+0x5c): required digit =
+	//      1..4, anything else nonzero = 4;
+	//   2. RANK_AREA_FILTER (entry+0x5e, vtable+0x58): 1 -> requires
+	//      digit 2, 2 -> requires digit 3.
+	// Each is compared against OUR measured Delay digit to that host
+	// (FUN_004a6620(entry+0x78)). An earlier build treated the two as
+	// either/or (area only consulted when the RTT filter was 0), which let
+	// a host with a permissive RTT filter but a strict area filter through
+	// to the in-game rejection popup. Rows we'd be rejected from are hidden
+	// preemptively. Unresolved RTT (digit unknown) rows are shown - the
+	// game itself waits in "RMSR_CheckingRTT" rather than rejecting in
+	// that state.
 	const bool hideUnmet = Settings::settingsIni.hideUnmetRequirementRooms;
 	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
 	m_liveHiddenPeers.clear();
@@ -1633,18 +1640,21 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 				requiredDigit = (row.rttFilter >= 1 && row.rttFilter <= 4)
 					? row.rttFilter : 4;
 			}
-			else if (row.areaFilter == 1)
+			if (row.areaFilter == 1)
 			{
-				requiredDigit = 2;
+				requiredDigit = (std::max)(requiredDigit, 2);
 			}
 			else if (row.areaFilter == 2)
 			{
-				requiredDigit = 3;
+				requiredDigit = (std::max)(requiredDigit, 3);
 			}
 			if (delayDigit < requiredDigit)
 			{
 				hide = true;
 				reason = HiddenReason::Requirement;
+				LOG(1, "[RankedListFilter] requirement hide: %llu rttFilter=%d areaFilter=%d needs digit %d, ours %d\n",
+					static_cast<unsigned long long>(row.steamId), static_cast<int>(row.rttFilter),
+					static_cast<int>(row.areaFilter), requiredDigit, delayDigit);
 			}
 		}
 		// NOTE: an earlier build refused to live-hide the row under the
@@ -1952,7 +1962,8 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	std::string orderDump;
 	for (int32_t slot = 0; slot < shownCount; ++slot)
 	{
-		const uint64_t steamId = rows[static_cast<size_t>(desired[static_cast<size_t>(slot)])].steamId;
+		const LiveRow& shownRow = rows[static_cast<size_t>(desired[static_cast<size_t>(slot)])];
+		const uint64_t steamId = shownRow.steamId;
 		const char* name = "???";
 		int delay = -1;
 		for (const LobbyCandidate& candidate : m_candidates)
@@ -1969,7 +1980,11 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			delay = it->second.gameTier;
 		}
 		char part[96];
-		snprintf(part, sizeof(part), " #%d %s(delay=%d)", slot, name, delay);
+		// req=rtt/area: the host's RANK_RTT_FILTER / RANK_AREA_FILTER words,
+		// so a "requirements are not met" popup on a shown row can be
+		// diagnosed from the log.
+		snprintf(part, sizeof(part), " #%d %s(delay=%d req=%d/%d)", slot, name, delay,
+			static_cast<int>(shownRow.rttFilter), static_cast<int>(shownRow.areaFilter));
 		orderDump += part;
 	}
 	LOG(1, "[RankedListFilter] live order applied (%d shown, %d hidden live):%s\n",
