@@ -59,6 +59,9 @@ public:
 	std::vector<IMPlayer> GetIMPlayersInCurrentMatch() const;
 	std::vector<IMPlayer> GetIMPlayersInCurrentRoom() const;
 	std::vector<const RoomMemberEntry*> GetOtherRoomMemberEntriesInCurrentMatch() const;
+	// Public since 2026-09-26: the ranked stale-room check reads slots directly.
+	const RoomMemberEntry* GetThisPlayerRoomMemberEntry() const;
+	const RoomMemberEntry* GetRoomMemberEntryByIndex(uint16_t index) const;
 
 	std::vector<IMPlayer> GetIMPlayersInCurrentMatchNonSpec() const;
 	static RoomSettingsStatic* GetRoomSettingsStaticBaseAdress();
@@ -71,8 +74,6 @@ private:
 	bool IsPacketFromSameMatch(Packet* packet) const;
 	bool IsPacketFromSpectator(Packet* packet) const;;
 	uint16_t GetThisPlayerRoomMemberIndex() const;
-	const RoomMemberEntry* GetThisPlayerRoomMemberEntry() const;
-	const RoomMemberEntry* GetRoomMemberEntryByIndex(uint16_t index) const;
 	bool IsPlayerInRoom(const IMPlayer& player) const;
 	bool IsThisPlayer(const uint64_t otherSteamID) const;
 	

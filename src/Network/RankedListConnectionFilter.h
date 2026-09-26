@@ -381,6 +381,9 @@ private:
 	// Marks (lobbyId, owner) broken after a join the Steam layer accepted but
 	// the host's game never engaged. Idempotent; bumps failCount.
 	void MarkLobbyBroken(uint64_t lobbyId, uint64_t ownerSteamId, const char* reason);
+	// Right after a ranked join: dump the game-side room slots once, and if our
+	// own entry sits outside the match pair the host's room is stale -- act now.
+	void InspectRoomAfterJoin();
 	// One-line dump of a lobby's cached liveness for the join-window logs.
 	std::string DescribeLobbyLiveness(uint64_t lobbyId) const;
 
@@ -393,6 +396,7 @@ private:
 	std::unordered_map<uint64_t, LobbyLiveness> m_lobbyLiveness;
 	// Zombie rooms (keyed by lobbyId) - see BrokenLobbyInfo.
 	std::unordered_map<uint64_t, BrokenLobbyInfo> m_brokenLobbies;
+	uint64_t m_roomInspectedLobbyId = 0; // InspectRoomAfterJoin runs once per join
 	// Rate limiter for PollLobbyLiveness' RequestLobbyData calls.
 	unsigned long long m_lastLivenessRequestTickMs = 0;
 	// GetTickCount64() of the last JoinLobby attempt, for elapsed-time in the

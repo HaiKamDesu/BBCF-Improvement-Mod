@@ -66,6 +66,17 @@ SETTING(bool, rankedProgressShowLosses, "RankedProgressShowLosses", "0");
 SETTING(bool, rankedProgressShowWinrate, "RankedProgressShowWinrate", "1");
 SETTING(bool, rankedProgressShowCharacterLeaderboardPlacement, "RankedProgressShowCharacterLeaderboardPlacement", "0");
 SETTING(bool, rankedProgressShowGlobalLeaderboardPlacement, "RankedProgressShowGlobalLeaderboardPlacement", "0");
+// Ranked "match found with two strangers": joining a host whose game-side room
+// still holds a previous match's pair puts us in a slot outside that pair
+// (matchPlayerIndex >= 2, matchId 0) and the popup renders the stale pair, both
+// already OK. Nothing progresses until RankMatchLeaveMyself ~2 min later. Detect
+// it ~300ms after LobbyEnter, mark the lobby broken and the host unreachable
+// right away, and say so on screen. See docs/Research/RankedStaleRoom.md.
+SETTING(bool, rankedStaleRoomDetect, "RankedStaleRoomDetect", "1");
+// Additionally leave the stale lobby automatically. Off by default: nothing in
+// the mod has ever left a lobby on the game's behalf, so this is proven in the
+// field before it is turned on for everyone.
+SETTING(bool, rankedStaleRoomAutoLeave, "RankedStaleRoomAutoLeave", "0");
 SETTING(bool, rankedAutomationHarnessEnabled, "RankedAutomationHarnessEnabled", "0");
 SETTING(std::string, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8");
 SETTING(std::string, toggleJukeboxButton, "ToggleJukeboxButton", "F10");

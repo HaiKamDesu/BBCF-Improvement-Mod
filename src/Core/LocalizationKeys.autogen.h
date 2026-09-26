@@ -4808,6 +4808,12 @@ struct LocalizationKeysAccessor
 
         // Everything is saved.
         inline const char* Everything_is_saved() const { return Get("Everything is saved."); }
+
+        // Stale ranked room: the host still shows a previous match. Cancel and pick someone else.
+        inline const char* Stale_ranked_room_the_host_still_shows_a_previous_match_Cancel_and_pick_someone_else() const { return Get("Stale ranked room: the host still shows a previous match. Cancel and pick someone else."); }
+
+        // Stale ranked room: the host still shows a previous match. Left it automatically.
+        inline const char* Stale_ranked_room_the_host_still_shows_a_previous_match_Left_it_automatically() const { return Get("Stale ranked room: the host still shows a previous match. Left it automatically."); }
 };
 
 

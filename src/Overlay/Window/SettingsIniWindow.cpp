@@ -74,6 +74,8 @@ namespace {
 		{ "ShowRankedListFilterWindow", "Show ranked list filter window", "Ranked list", "Shows the small filter window next to the ranked player list." },
 		{ "ShowRankedListHiddenPopup", "Show hidden players popup", "Ranked list", "Remembers whether the \"hidden players\" popup was left open, so it comes back next time." },
 		{ "RankedListSortMode", "Ranked list sort mode", "Ranked list", "How the ranked player list is ordered." },
+		{ "RankedStaleRoomDetect", "Catch stale ranked rooms", "Ranked list", "Sometimes clicking a ranked player shows a 'match found' with two other people already marked OK and nothing ever starts. That host's game is still holding an old match. This notices it as soon as you join, hides that host for a while and tells you, instead of leaving you waiting two minutes. Leave it on." },
+		{ "RankedStaleRoomAutoLeave", "Auto-leave stale ranked rooms", "Ranked list", "When a stale room is caught (see above), also back out of it automatically instead of waiting for you to cancel. Experimental; leave it off unless a developer asked you to try it." },
 		{ "RankedListNetworkFilter", "Minimum connection quality", "Ranked list", "Hides ranked players whose connection rating to you is below this level. 0 shows everyone. Players whose rating has not been measured yet stay visible until it is." },
 		{ "HideUnmetRequirementRooms", "Hide rooms you cannot join", "Ranked list", "Hides rooms that demand a better connection than yours, so everything left in the list is actually joinable." },
 		{ "LoadForeignPalettesToggleDefault", "Show other players' palettes by default", "Palettes", "Whether custom colours made by other players are shown when you start the game. You can still flip this per session from the palette menu." },

@@ -1,10 +1,14 @@
 #include "RankedListConnectionFilter.h"
 
+#include "Core/Localization.h"
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Game/gamestates.h"
 #include "Network/RoomManager.h"
+#include "Game/Room/RoomMemberEntry.h"
+#include "Overlay/NotificationBar/NotificationBar.h"
+#include "SteamApiWrapper/SteamFriendsWrapper.h"
 #include "Overlay/Window/Ranked/RankedProgressWindow.h"
 #include "SteamApiWrapper/SteamMatchmakingWrapper.h"
 
@@ -2431,6 +2435,8 @@ void RankedListConnectionFilter::PollPendingConnectionConfirmation()
 	{
 		return;
 	}
+	// Before the confirmation below clears the pending state.
+	InspectRoomAfterJoin();
 
 	// Read the raw game room slots (same source the ranked prediction UI uses on
 	// the confirmation screen) - NOT GetIMPlayersInCurrentRoom, which only lists
@@ -3316,4 +3322,114 @@ bool RankedListConnectionFilter::IsLobbyListLikelyOpen()
 	// Short grace period to bridge single-frame reads mid-transition.
 	constexpr unsigned long long kGraceMs = 750;
 	return m_lastRowsPopulatedTickMs != 0 && now - m_lastRowsPopulatedTickMs < kGraceMs;
+}
+
+// ---- Stale-room detection ----
+// 2026-09-26, three captures in one day: the click lands in the right Steam
+// lobby (owner == the row clicked, 1/2 -> 2/2, host confirmed as a room member),
+// yet "match found" shows two strangers already marked OK and nothing starts
+// until RankMatchLeaveMyself ~2 minutes later. The room struct explains it:
+// across 24 joins, every one that loaded a match had our entry at
+// matchPlayerIndex 0/1 with a non-zero matchId, and every one that got kicked
+// with a readable room had us at matchPlayerIndex 4 or 6 with matchId 0. The
+// host's game-side room still holds its previous match's pair in slots 0/1 --
+// their OK flags included -- and we get appended after them. No room existed
+// on our side before the click, so the stale entries are the host's.
+//
+// Detection is possible ~300ms after LobbyEnter, the moment the room becomes
+// functional. The mod already treats "join accepted, game backed out
+// pre-match" as the zombie-room class in OnLeaveLobby; this just reaches the
+// same verdict two minutes earlier, with a reason, and tells the player.
+void RankedListConnectionFilter::InspectRoomAfterJoin()
+{
+	if (!Settings::settingsIni.rankedStaleRoomDetect)
+	{
+		return;
+	}
+	if (m_pendingLobbyId == 0 || m_pendingLobbyId == m_roomInspectedLobbyId)
+	{
+		return;
+	}
+	const RoomMemberEntry* const me = g_interfaces.pRoomManager->GetThisPlayerRoomMemberEntry();
+	if (me == nullptr)
+	{
+		return; // our slot has not arrived yet; try again next poll
+	}
+	m_roomInspectedLobbyId = m_pendingLobbyId;
+
+	const unsigned long long now = GetTickCount64();
+	const unsigned long long sinceJoinMs = m_pendingJoinTickMs != 0 ? now - m_pendingJoinTickMs : 0ull;
+
+	// Dump every occupied slot. The six unnamed bytes are logged raw on purpose:
+	// one of them is the "OK" state the popup renders, and a healthy dump next
+	// to a stale one is how it gets identified.
+	int occupied = 0;
+	int othersInPair = 0;
+	LOG(1, "[RankedListFilter] room after join (lobby=%llu, +%llums): our slot member=%u matchPlayer=%u matchId=%u\n",
+		static_cast<unsigned long long>(m_pendingLobbyId), sinceJoinMs,
+		me->memberIndex, me->matchPlayerIndex, me->matchId);
+	for (uint16_t i = 0; i < MAX_PLAYERS_IN_ROOM; ++i)
+	{
+		const RoomMemberEntry* const e = g_interfaces.pRoomManager->GetRoomMemberEntryByIndex(i);
+		if (e == nullptr)
+		{
+			continue;
+		}
+		++occupied;
+		if (e != me && e->matchPlayerIndex < 2)
+		{
+			++othersInPair;
+		}
+		const char* name = "<unknown>";
+		if (g_interfaces.pSteamFriendsWrapper != nullptr)
+		{
+			const char* const resolved = g_interfaces.pSteamFriendsWrapper->GetFriendPersonaName(CSteamID(e->steamId));
+			if (resolved != nullptr && resolved[0] != '\0')
+			{
+				name = resolved;
+			}
+		}
+		LOG(1, "[RankedListFilter]   slot[%u] member=%u steamId=%llu (%s)%s matchId=%u matchPlayer=%u netcolor=%u raw+1..3=%02X %02X %02X raw+35..37=%02X %02X %02X\n",
+			i, e->memberIndex, static_cast<unsigned long long>(e->steamId), name,
+			e == me ? " <me>" : (e->steamId == m_pendingConnectionTarget ? " <host>" : ""),
+			e->matchId, e->matchPlayerIndex, e->netcolor,
+			e->N00009344, e->N00009342, e->N00009340, e->N00009349, e->N0000934C, e->N0000934A);
+	}
+
+	// The signature: we are not in the match pair.
+	if (me->matchPlayerIndex < 2)
+	{
+		return;
+	}
+
+	char reason[160];
+	sprintf_s(reason, "stale room: our slot matchPlayer=%u matchId=%u, %d occupied, %d other(s) already in the pair",
+		me->matchPlayerIndex, me->matchId, occupied, othersInPair);
+	LOG(1, "[RankedListFilter] !!! %s (lobby=%llu owner=%llu, +%llums after join)\n",
+		reason, static_cast<unsigned long long>(m_pendingLobbyId),
+		static_cast<unsigned long long>(m_pendingConnectionTarget), sinceJoinMs);
+
+	const uint64_t lobbyId = m_pendingLobbyId;
+	const uint64_t owner = m_pendingConnectionTarget;
+	MarkLobbyBroken(lobbyId, owner, reason);
+	MarkUnreachable(owner, reason);
+
+	const bool autoLeave = Settings::settingsIni.rankedStaleRoomAutoLeave &&
+		g_interfaces.pSteamMatchmakingWrapper != nullptr;
+	if (g_notificationBar != nullptr)
+	{
+		g_notificationBar->AddNotification(autoLeave
+			? L("Stale ranked room: the host still shows a previous match. Left it automatically.").c_str()
+			: L("Stale ranked room: the host still shows a previous match. Cancel and pick someone else.").c_str());
+	}
+	if (autoLeave)
+	{
+		// Clear the pending state first so the wrapper's OnLeaveLobby does not
+		// mark the same failure a second time with a generic reason.
+		m_pendingLobbyId = 0;
+		m_pendingConnectionTarget = 0;
+		m_pendingJoinTickMs = 0;
+		LOG(1, "[RankedListFilter] auto-leaving stale lobby %llu\n", static_cast<unsigned long long>(lobbyId));
+		g_interfaces.pSteamMatchmakingWrapper->LeaveLobby(CSteamID(lobbyId));
+	}
 }
