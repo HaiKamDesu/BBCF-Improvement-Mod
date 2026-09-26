@@ -6224,10 +6224,13 @@ namespace
 	// the dialog). FormatVisibleRankLabel is the file's own null-safe wrapper
 	// and falls back to "LV%u"; use it, and never hand a raw pointer to
 	// std::string here again.
+	//
+	// 2026-09-26 off-by-one: CaptureRankedProgressOverlaySnapshot already
+	// stores the VISIBLE rank in currentRank (it converts at the end of the
+	// capture), so converting again here showed LV35 as 36 = "Leader".
 	std::string FormatRankForPersistView(const RankedProgressOverlaySnapshot& s)
 	{
-		const uint32_t visible = InternalRankToVisibleRank(s.currentRank, s.isUnranked);
-		std::string label = FormatVisibleRankLabel(visible, s.isUnranked);
+		std::string label = FormatVisibleRankLabel(s.currentRank, s.isUnranked);
 		if (label.empty())
 		{
 			label = "?";
@@ -6310,17 +6313,54 @@ void DrawSteamUploadsDialog()
 	const ULONGLONG agoMs = GetTickCount64() - g_persistedView.whenTickMs;
 	const unsigned agoMin = static_cast<unsigned>(agoMs / 60000ULL);
 	const unsigned agoSec = static_cast<unsigned>((agoMs / 1000ULL) % 60ULL);
+
+	RankedProgressOverlaySnapshot live{};
+	const bool haveLive = CaptureRankedProgressOverlaySnapshot(&live) && live.active;
+	const RankedProgressOverlaySnapshot& saved = g_persistedView.ranked;
+	const RankedProgressOverlaySnapshot& now = haveLive ? live : (g_haveLastLiveRanked ? g_lastLiveRanked : saved);
+
+	uint8_t liveColor = 0, liveCounter = 0;
+	const bool haveLiveNet = CaptureLocalNetworkSquareValues(&liveColor, &liveCounter);
+
+	// When the server already has exactly what we have, the comparison table
+	// is noise: just say so, in green, with the sync time.
+	const bool rankedInSync = !g_persistedView.haveRanked ||
+		(saved.currentRank == now.currentRank && saved.isUnranked == now.isUnranked &&
+		 saved.currentLp == now.currentLp && saved.earnedPoints == now.earnedPoints &&
+		 saved.totalPoints == now.totalPoints);
+	const bool netInSync = !g_persistedView.haveNetColor || !haveLiveNet ||
+		(g_persistedView.netColor == liveColor && g_persistedView.netCounter == liveCounter);
+	if (rankedInSync && netInSync)
+	{
+		ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.0f), "%s", L("Steam has your current state.").c_str());
+		ImGui::Text("%s: %02u:%02u:%02u  (%u min %02u s %s)",
+			L("Last synced").c_str(),
+			g_persistedView.when.wHour, g_persistedView.when.wMinute, g_persistedView.when.wSecond,
+			agoMin, agoSec, L("ago").c_str());
+		if (g_persistedView.haveRanked)
+		{
+			ImGui::TextDisabled("%s %s, %u LP", L("Rank").c_str(), FormatRankForPersistView(saved).c_str(),
+				static_cast<unsigned int>(saved.currentLp));
+		}
+		if (g_persistedView.haveNetColor)
+		{
+			DrawNetworkSquareColorForValues(g_persistedView.netColor, g_persistedView.netCounter, 1.0f);
+		}
+		ImGui::Spacing();
+		if (ImGui::Button(L("Close").c_str(), ImVec2(120.0f, 0.0f)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+		return;
+	}
+
 	ImGui::Text("%s: %02u:%02u:%02u  (%u min %02u s %s)",
 		L("Last successful upload").c_str(),
 		g_persistedView.when.wHour, g_persistedView.when.wMinute, g_persistedView.when.wSecond,
 		agoMin, agoSec, L("ago").c_str());
 	ImGui::TextWrapped("%s", L("This is what the server currently has. Anything beyond it is lost if the game closes now.").c_str());
 	ImGui::Separator();
-
-	RankedProgressOverlaySnapshot live{};
-	const bool haveLive = CaptureRankedProgressOverlaySnapshot(&live) && live.active;
-	const RankedProgressOverlaySnapshot& saved = g_persistedView.ranked;
-	const RankedProgressOverlaySnapshot& now = haveLive ? live : (g_haveLastLiveRanked ? g_lastLiveRanked : saved);
 
 	if (ImGui::BeginTable("steam_uploads_table", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp))
 	{
@@ -6345,8 +6385,6 @@ void DrawSteamUploadsDialog()
 
 	if (g_persistedView.haveNetColor)
 	{
-		uint8_t liveColor = 0, liveCounter = 0;
-		const bool haveLiveNet = CaptureLocalNetworkSquareValues(&liveColor, &liveCounter);
 		ImGui::Spacing();
 		ImGui::TextUnformatted(L("Net colour").c_str());
 		ImGui::Indent();

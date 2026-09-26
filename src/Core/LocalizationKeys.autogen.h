@@ -4809,6 +4809,12 @@ struct LocalizationKeysAccessor
         // Everything is saved.
         inline const char* Everything_is_saved() const { return Get("Everything is saved."); }
 
+        // Steam has your current state.
+        inline const char* Steam_has_your_current_state() const { return Get("Steam has your current state."); }
+
+        // Last synced
+        inline const char* Last_synced() const { return Get("Last synced"); }
+
         // Stale ranked room: the host still shows a previous match. Cancel and pick someone else.
         inline const char* Stale_ranked_room_the_host_still_shows_a_previous_match_Cancel_and_pick_someone_else() const { return Get("Stale ranked room: the host still shows a previous match. Cancel and pick someone else."); }
 
