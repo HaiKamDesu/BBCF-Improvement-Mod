@@ -1655,3 +1655,86 @@ Added: on a decode failure the log now reports whether the 32-char prefix is
 hex and shows the first 40 characters. The prefix is an MD5 over the payload,
 not a credential, and 8 base64 characters past it decode to ~6 plaintext
 bytes — nowhere near the session value.
+
+## 2026-09-26: a session that ran out of retries — and a correction
+
+Session 12:39:04 → 15:19 (`DebugHistory/DEBUG_20260926_151941.txt`). The
+wedge recurred every few minutes for two hours. `DCodeAutoRelogin` recovered
+it **twelve times**, then hit the flat cap of `8/8` at 14:32:55, and from then
+on: 71 consecutive rejections with the session hash frozen at `C9A1E227`,
+nothing left to try, game still running.
+
+### Correction: ranked LP DOES roll back with the profile
+
+I told the reporter, in the moment, that LP and rank were safe because they
+ride Steam leaderboards, citing the 2026-09-20 session where matches carried
+across a restart. That reading was wrong — that session simply had a
+successful write near its end. Measured today:
+
+| | rank | lp | wins | matches |
+|---|---|---|---|---|
+| session end (15:10) | 35 | 233992 | 1423 | 3196 |
+| next session load (15:20:19) | 34 | 227754 | 1411 | 3183 |
+
+Rank 35 → 34, −6238 LP, −12 wins, −13 matches — back to the last confirmed
+write. **Steam leaderboard uploads succeeding (198 of them, the last seconds
+before exit) protect nothing**; the profile blob is authoritative on load and
+the displayed rank comes from it. Everything the mod shows in the ranked
+overlay lives in the thing the wedge breaks.
+
+### Cap → sliding window (`a5aa808`)
+
+A cap that can run out while the player is still playing is the wrong shape.
+Now 6 attempts per 10-minute window, reopening on its own; the 20 s cooldown
+still prevents a tight loop.
+
+### The cause: what nine onsets rule out
+
+Extracting the events immediately before each first rejection:
+
+```
+onset  last success              first reject
+  1    r7  CE7A0A66 12:40:12     r11 CE7A0A66 12:40:26   (14 s)
+  3    r8  2115E389 13:24:34     r11 2115E389 13:26:47   (2m13s)
+  4    r8  3F669A8E 13:44:00     r11 3F669A8E 14:06:17   (22 min)
+  6    r8  05042F40 14:17:12     r11 05042F40 14:18:44   (92 s)
+  9    r8  C9A1E227 14:34:57     r11 C9A1E227 14:35:56   (59 s)
+```
+
+In every case the rejected request carries **the newest token the client
+knows — the one minted by the immediately preceding success.** That rules out
+the rotation-race idea (two in-flight requests sharing a token): a raced
+request would carry an *older* token than the last success, and none does.
+
+An idle timeout is ruled out too: onset 2 had a 3m47s gap that **succeeded**,
+onset 1 a 14 s gap that failed.
+
+What survives: the client is not the only thing talking to the server on this
+session. `lobby/get_status`, `matching/start|confirm|end` and the catalog
+calls all carry and rotate the same token. If any of their responses rotates
+the server-side session but the client's handler for that endpoint does not
+store the returned token, the next `tus/*` request sends a token the server
+has already moved past. It is intermittent because it depends on whether such
+a call lands between two profile calls, and it is more frequent now because
+ranked lobbies generate more of that traffic.
+
+### Diagnostics to settle it (`a5aa808`)
+
+- **URL read fixed.** The descriptor's URL is a `std::wstring`; reading it as
+  narrow stopped at the first wchar's NUL, which is why every line so far said
+  `url="h"`. Each line now names its endpoint.
+- **Session → fingerprint, not `###`.** A decoded response's session value is
+  replaced by `#` + its FNV-1a hash — the same hash the `sessionHash=` lines
+  use — so what a response *carried* can be compared with what the client
+  *holds*, without the token reaching the log.
+- **All twelve endpoints dumped on rejection.** One line each: endpoint, done,
+  httpOk, byte count, and the decoded header (session fingerprint, result,
+  date). If a `lobby/get_status` or `matching/*` response shows a session the
+  client does not hold, the cause is found.
+
+### "Steam uploads" dialog (this commit)
+
+Right-click on the ranked progress or network square colour window → a dialog
+with the last confirmed-saved state beside the live one, the upload time, and
+an explicit "unsaved" delta. This is the thing that would have told the
+reporter, at 14:40, that nothing since 14:34 was being kept.
