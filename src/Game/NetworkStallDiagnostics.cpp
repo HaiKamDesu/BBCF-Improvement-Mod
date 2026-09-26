@@ -285,6 +285,7 @@ namespace
 	// instead, so the next capture states the outcome instead of us inferring it
 	// from how long the attempt took.
 	int32_t g_lastWorkMgrState = 0;
+	ProfilePersistState g_profilePersist;
 
 	bool IsDiagnosticsEnabled()
 	{
@@ -1387,6 +1388,16 @@ namespace
 		else if (state == 7 || state == 8)
 		{
 			++g_successfulTransfers;
+			if (state == 8)
+			{
+				// A confirmed tus/write is the only event that makes progress
+				// durable. Stamp it so the overlay can show the player exactly
+				// which state the server holds and what they would lose.
+				++g_profilePersist.serial;
+				g_profilePersist.haveTime = true;
+				GetLocalTime(&g_profilePersist.whenLocal);
+				g_profilePersist.whenTickMs = GetTickCount64();
+			}
 			if (g_consecutiveWebApiFailures > 0)
 			{
 				IncidentPrintf("[WebApi] recovered after %d consecutive failure(s)\n",
@@ -1865,6 +1876,14 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 extern "C" void __cdecl DCodeFetchTickEnterThunk(void* row)
 {
 	NetworkStallDiagnostics::OnFetchTickEnter(row);
+}
+
+void NetworkStallDiagnostics::GetProfilePersistState(ProfilePersistState* out)
+{
+	if (out != nullptr)
+	{
+		*out = g_profilePersist;
+	}
 }
 
 void NetworkStallDiagnostics::OnUpdate()

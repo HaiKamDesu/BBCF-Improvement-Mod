@@ -1769,3 +1769,15 @@ On Hitstun,On Hitstun,En hitstun
 "the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","en cuanto el dummy deja de recibir golpes y puede volver a actuar: no durante un combo, ni después de una caída"
 Original colors,Original colors,Colores originales
 Download,Download,Descargar
+Steam uploads,Steam uploads,Subidas a Steam
+Last saved to the server###SteamUploadsDialog,Last saved to the server###SteamUploadsDialog,Último guardado en el servidor###SteamUploadsDialog
+Last successful upload,Last successful upload,Última subida exitosa
+ago,ago,atrás
+Nothing has been uploaded yet this session.,Nothing has been uploaded yet this session.,Todavía no se subió nada en esta sesión.
+This is what the server currently has. Anything beyond it is lost if the game closes now.,This is what the server currently has. Anything beyond it is lost if the game closes now.,Esto es lo que tiene el servidor ahora. Todo lo que esté más allá se pierde si el juego se cierra ahora.
+Saved on the server,Saved on the server,Guardado en el servidor
+As of right now,As of right now,Ahora mismo
+LP,LP,LP
+Net colour,Net colour,Color de red
+Unsaved progress,Unsaved progress,Progreso sin guardar
+Everything is saved.,Everything is saved.,Todo está guardado.

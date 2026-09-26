@@ -4772,6 +4772,42 @@ struct LocalizationKeysAccessor
 
         // Download
         inline const char* Download() const { return Get("Download"); }
+
+        // Steam uploads
+        inline const char* Steam_uploads() const { return Get("Steam uploads"); }
+
+        // Last saved to the server###SteamUploadsDialog
+        inline const char* Last_saved_to_the_server_SteamUploadsDialog() const { return Get("Last saved to the server###SteamUploadsDialog"); }
+
+        // Last successful upload
+        inline const char* Last_successful_upload() const { return Get("Last successful upload"); }
+
+        // ago
+        inline const char* ago() const { return Get("ago"); }
+
+        // Nothing has been uploaded yet this session.
+        inline const char* Nothing_has_been_uploaded_yet_this_session() const { return Get("Nothing has been uploaded yet this session."); }
+
+        // This is what the server currently has. Anything beyond it is lost if the game closes now.
+        inline const char* This_is_what_the_server_currently_has_Anything_beyond_it_is_lost_if_the_game_closes_now() const { return Get("This is what the server currently has. Anything beyond it is lost if the game closes now."); }
+
+        // Saved on the server
+        inline const char* Saved_on_the_server() const { return Get("Saved on the server"); }
+
+        // As of right now
+        inline const char* As_of_right_now() const { return Get("As of right now"); }
+
+        // LP
+        inline const char* LP() const { return Get("LP"); }
+
+        // Net colour
+        inline const char* Net_colour() const { return Get("Net colour"); }
+
+        // Unsaved progress
+        inline const char* Unsaved_progress() const { return Get("Unsaved progress"); }
+
+        // Everything is saved.
+        inline const char* Everything_is_saved() const { return Get("Everything is saved."); }
 };
 
 

@@ -1,4 +1,5 @@
 #include "NetworkSquareColorWindow.h"
+#include "Overlay/Window/Ranked/RankedProgressWindow.h"
 
 #include "Core/Localization.h"
 #include "Core/Settings.h"
@@ -1006,9 +1007,51 @@ void NetworkSquareColorWindow::BeforeDraw()
 	ImGui::SetNextWindowSize(ImVec2(430.0f, 112.0f), ImGuiCond_FirstUseEver);
 }
 
+namespace
+{
+	// Shared by the F1-menu window and the standalone overlay window.
+	void DrawNetworkSquareColorContextMenu()
+	{
+		if (ImGui::BeginPopupContextWindow("network_square_color_context", ImGuiPopupFlags_MouseButtonRight))
+		{
+			if (ImGui::MenuItem(L("Steam uploads").c_str()))
+			{
+				RequestSteamUploadsDialog();
+			}
+			ImGui::EndPopup();
+		}
+	}
+}
+
 void NetworkSquareColorWindow::Draw()
 {
+	DrawNetworkSquareColorContextMenu();
 	DrawNetworkSquareColorContent(1.0f);
+	DrawSteamUploadsDialog();
+}
+
+bool CaptureLocalNetworkSquareValues(uint8_t* outColor, uint8_t* outCounter)
+{
+	NetworkSquareColorState state{};
+	int score = 0;
+	if (!TryCaptureLocalSquareScore(&state, &score) || !state.localColorAvailable)
+	{
+		return false;
+	}
+	if (outColor != nullptr) *outColor = state.localColor;
+	if (outCounter != nullptr) *outCounter = state.localCounter;
+	return true;
+}
+
+void DrawNetworkSquareColorForValues(uint8_t color, uint8_t counter, float alpha)
+{
+	NetworkSquareColorState state{};
+	state.localColorAvailable = true;
+	state.localCounterAvailable = true;
+	state.localColor = color;
+	state.localCounter = counter;
+	state.localUnavailableReason = "snapshot";
+	DrawNetworkSquareColorContentForState(state, alpha);
 }
 
 void DrawNetworkSquareColorProgressStandalone()
@@ -1061,6 +1104,7 @@ void DrawNetworkSquareColorProgressStandalone()
 	if (ImGui::Begin((L("Network Square Color") + "###NetworkSquareColorProgress").c_str(), &open, ImGuiWindowFlags_NoCollapse))
 	{
 		ImGui::SetWindowSize(ImVec2(430.0f, 112.0f), ImGuiCond_FirstUseEver);
+		DrawNetworkSquareColorContextMenu();
 		if (hasLocalScore)
 		{
 			LogNetworkSquareColorDiagnostics(state);
@@ -1074,6 +1118,7 @@ void DrawNetworkSquareColorProgressStandalone()
 	ImGui::End();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor();
+	DrawSteamUploadsDialog();
 
 	if (!open)
 	{

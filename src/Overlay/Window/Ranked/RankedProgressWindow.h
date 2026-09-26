@@ -54,6 +54,13 @@ struct RankedProgressOverlaySnapshot
 void DrawRankedMatchesMainMenuSection();
 bool CaptureRankedProgressOverlaySnapshot(RankedProgressOverlaySnapshot* outSnapshot);
 void DrawRankedProgressOverlayStandalone();
+
+// "Steam uploads": shows the last state the profile server confirmed it saved
+// (the state a restart would come back to) next to the live state, so the
+// player can see exactly what is still unsaved. Any window may request it;
+// the draw is frame-guarded so several hosts can call it safely.
+void RequestSteamUploadsDialog();
+void DrawSteamUploadsDialog();
 bool TriggerRankedProgressAutomationAnimation(uint32_t characterId, int32_t lpDelta);
 
 // Shared rank display helpers (internal rank -> visible rank -> label/color),

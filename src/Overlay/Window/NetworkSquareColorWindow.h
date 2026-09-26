@@ -24,3 +24,8 @@ protected:
 };
 
 void DrawNetworkSquareColorProgressStandalone();
+
+// For the "Steam uploads" dialog: read the live square colour/counter, and draw
+// the same square the window draws but for supplied values (a saved snapshot).
+bool CaptureLocalNetworkSquareValues(uint8_t* outColor, uint8_t* outCounter);
+void DrawNetworkSquareColorForValues(uint8_t color, uint8_t counter, float alpha);

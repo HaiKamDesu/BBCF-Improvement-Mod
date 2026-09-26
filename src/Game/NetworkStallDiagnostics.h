@@ -15,10 +15,27 @@
 //    for the rest of the process lifetime), the offending payload has already
 //    been captured and can be dumped. Also hosts the optional auto-recovery
 //    watchdog (Settings::settingsIni.dcodeAutoRecover).
+#include <Windows.h>
+#include <cstdint>
+
+// The last moment the profile server CONFIRMED a write of the player's profile
+// (work-manager result 8). Everything the player earns after this is only in
+// RAM and is discarded on restart if no later write succeeds -- which is the
+// whole cost of the D-Code wedge. Serial 0 means nothing has been confirmed
+// this session yet.
+struct ProfilePersistState
+{
+	uint64_t serial = 0;
+	bool haveTime = false;
+	SYSTEMTIME whenLocal = {};
+	ULONGLONG whenTickMs = 0;
+};
+
 namespace NetworkStallDiagnostics
 {
 	void OnUpdate();
 	void OnFetchTickEnter(void* row);
+	void GetProfilePersistState(ProfilePersistState* out);
 }
 
 // Plain-C thunk for the naked asm hook in hooks_bbcf.cpp.

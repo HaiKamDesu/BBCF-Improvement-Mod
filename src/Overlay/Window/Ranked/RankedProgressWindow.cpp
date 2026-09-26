@@ -1,4 +1,6 @@
 #include "RankedProgressWindow.h"
+#include "Game/NetworkStallDiagnostics.h"
+#include "Overlay/Window/NetworkSquareColorWindow.h"
 
 #include "RankedMainMenuSection.h"
 #include "RankedModalWindow.h"
@@ -3121,6 +3123,7 @@ namespace
 		DrawRankedProgressCharacterSelectorDialog();
 		DrawRankedRulesDialog();
 		DrawRankedLadderWindow();
+		DrawSteamUploadsDialog();
 	}
 
 	bool IsRankAllOrigin(const char* origin)
@@ -5816,6 +5819,10 @@ void DrawRankedProgressOverlayStandalone()
 		{
 			g_rankedRulesDialog.requestOpenForCurrentRank = true;
 		}
+		if (ImGui::MenuItem(L("Steam uploads").c_str()))
+		{
+			RequestSteamUploadsDialog();
+		}
 		ImGui::Separator();
 		if (ImGui::MenuItem(L("Show matches").c_str(), nullptr, g_rankedProgressTopRowOptions.showMatches))
 		{
@@ -6133,4 +6140,213 @@ void DrawRankedProgressOverlayStandalone()
 		g_rankedUploadCompletionSerial > g_uploadSerialAtMatchEntry;
 	DrawRankedPredictionWindow(renderedDisplay, currentGameState, networkState, victoryStep, rankedEntryActive, inMatch, rankedRematchScreen, s_sawState58ThisVictoryCycle, matchUploadCompletedThisCycle);
 	DrawRankedGlobalDialogs();
+}
+
+// ---- "Steam uploads" dialog ----
+namespace
+{
+	struct PersistedProfileView
+	{
+		bool valid = false;
+		uint64_t serial = 0;
+		SYSTEMTIME when = {};
+		ULONGLONG whenTickMs = 0;
+		RankedProgressOverlaySnapshot ranked;
+		bool haveRanked = false;
+		bool haveNetColor = false;
+		uint8_t netColor = 0;
+		uint8_t netCounter = 0;
+	};
+
+	PersistedProfileView g_persistedView;
+	RankedProgressOverlaySnapshot g_lastLiveRanked;
+	bool g_haveLastLiveRanked = false;
+	bool g_steamUploadsOpenRequested = false;
+
+	// The ranked overlay is only "active" on the ranked screens, but the write
+	// that persists a match lands while the player is on exactly those screens,
+	// so remembering the last active snapshot every frame and copying it at
+	// write time gives the values the server received.
+	void TrackLiveRankedForPersistView()
+	{
+		RankedProgressOverlaySnapshot live{};
+		if (CaptureRankedProgressOverlaySnapshot(&live) && live.active)
+		{
+			g_lastLiveRanked = live;
+			g_haveLastLiveRanked = true;
+		}
+	}
+
+	void RefreshPersistedProfileView()
+	{
+		ProfilePersistState persist{};
+		NetworkStallDiagnostics::GetProfilePersistState(&persist);
+		if (persist.serial == 0 || persist.serial == g_persistedView.serial)
+		{
+			return;
+		}
+		g_persistedView.valid = true;
+		g_persistedView.serial = persist.serial;
+		g_persistedView.when = persist.whenLocal;
+		g_persistedView.whenTickMs = persist.whenTickMs;
+		g_persistedView.haveRanked = g_haveLastLiveRanked;
+		if (g_haveLastLiveRanked)
+		{
+			g_persistedView.ranked = g_lastLiveRanked;
+		}
+		g_persistedView.haveNetColor =
+			CaptureLocalNetworkSquareValues(&g_persistedView.netColor, &g_persistedView.netCounter);
+	}
+
+	void DrawPersistRow(const char* label, const std::string& saved, const std::string& now, bool differs)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::TextUnformatted(label);
+		ImGui::TableSetColumnIndex(1);
+		ImGui::TextUnformatted(saved.c_str());
+		ImGui::TableSetColumnIndex(2);
+		if (differs)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.2f, 1.0f), "%s", now.c_str());
+		}
+		else
+		{
+			ImGui::TextUnformatted(now.c_str());
+		}
+	}
+
+	std::string FormatRankForPersistView(const RankedProgressOverlaySnapshot& s)
+	{
+		const uint32_t visible = InternalRankToVisibleRank(s.currentRank, s.isUnranked);
+		return std::string(GetRankDisplayName(visible, s.isUnranked));
+	}
+}
+
+void RequestSteamUploadsDialog()
+{
+	g_steamUploadsOpenRequested = true;
+}
+
+void DrawSteamUploadsDialog()
+{
+	// Several windows host this; draw at most once per frame.
+	static int s_lastFrame = -1;
+	const int frame = ImGui::GetFrameCount();
+	if (frame == s_lastFrame)
+	{
+		return;
+	}
+	s_lastFrame = frame;
+
+	TrackLiveRankedForPersistView();
+	RefreshPersistedProfileView();
+
+	const std::string title = L("Last saved to the server###SteamUploadsDialog");
+	if (g_steamUploadsOpenRequested)
+	{
+		ImGui::OpenPopup(title.c_str());
+		g_steamUploadsOpenRequested = false;
+	}
+
+	RankedUi::CenterNextModalOnOpen();
+	RankedUi::SetNextModalDefaultSize(560.0f, 0.0f);
+	bool open = true;
+	if (!ImGui::BeginPopupModal(title.c_str(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+	if (!open)
+	{
+		ImGui::EndPopup();
+		return;
+	}
+
+	if (!g_persistedView.valid)
+	{
+		ImGui::TextWrapped("%s", L("Nothing has been uploaded yet this session.").c_str());
+		ImGui::Spacing();
+		if (ImGui::Button(L("Close").c_str(), ImVec2(120.0f, 0.0f)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+		return;
+	}
+
+	const ULONGLONG agoMs = GetTickCount64() - g_persistedView.whenTickMs;
+	const unsigned agoMin = static_cast<unsigned>(agoMs / 60000ULL);
+	const unsigned agoSec = static_cast<unsigned>((agoMs / 1000ULL) % 60ULL);
+	ImGui::Text("%s: %02u:%02u:%02u  (%u min %02u s %s)",
+		L("Last successful upload").c_str(),
+		g_persistedView.when.wHour, g_persistedView.when.wMinute, g_persistedView.when.wSecond,
+		agoMin, agoSec, L("ago").c_str());
+	ImGui::TextWrapped("%s", L("This is what the server currently has. Anything beyond it is lost if the game closes now.").c_str());
+	ImGui::Separator();
+
+	RankedProgressOverlaySnapshot live{};
+	const bool haveLive = CaptureRankedProgressOverlaySnapshot(&live) && live.active;
+	const RankedProgressOverlaySnapshot& saved = g_persistedView.ranked;
+	const RankedProgressOverlaySnapshot& now = haveLive ? live : (g_haveLastLiveRanked ? g_lastLiveRanked : saved);
+
+	if (ImGui::BeginTable("steam_uploads_table", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp))
+	{
+		ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+		ImGui::TableSetupColumn(L("Saved on the server").c_str());
+		ImGui::TableSetupColumn(L("As of right now").c_str());
+		ImGui::TableHeadersRow();
+
+		if (g_persistedView.haveRanked)
+		{
+			DrawPersistRow(L("Rank").c_str(), FormatRankForPersistView(saved), FormatRankForPersistView(now),
+				saved.currentRank != now.currentRank || saved.isUnranked != now.isUnranked);
+			DrawPersistRow(L("LP").c_str(), std::to_string(saved.currentLp), std::to_string(now.currentLp),
+				saved.currentLp != now.currentLp);
+			DrawPersistRow(L("Wins").c_str(), std::to_string(saved.earnedPoints), std::to_string(now.earnedPoints),
+				saved.earnedPoints != now.earnedPoints);
+			DrawPersistRow(L("Matches").c_str(), std::to_string(saved.totalPoints), std::to_string(now.totalPoints),
+				saved.totalPoints != now.totalPoints);
+		}
+		ImGui::EndTable();
+	}
+
+	if (g_persistedView.haveNetColor)
+	{
+		uint8_t liveColor = 0, liveCounter = 0;
+		const bool haveLiveNet = CaptureLocalNetworkSquareValues(&liveColor, &liveCounter);
+		ImGui::Spacing();
+		ImGui::TextUnformatted(L("Net colour").c_str());
+		ImGui::Indent();
+		ImGui::TextDisabled("%s", L("Saved on the server").c_str());
+		DrawNetworkSquareColorForValues(g_persistedView.netColor, g_persistedView.netCounter, 1.0f);
+		if (haveLiveNet)
+		{
+			ImGui::TextDisabled("%s", L("As of right now").c_str());
+			DrawNetworkSquareColorForValues(liveColor, liveCounter, 1.0f);
+		}
+		ImGui::Unindent();
+	}
+
+	ImGui::Separator();
+	if (g_persistedView.haveRanked)
+	{
+		const long long dLp = static_cast<long long>(now.currentLp) - static_cast<long long>(saved.currentLp);
+		const long long dWins = static_cast<long long>(now.earnedPoints) - static_cast<long long>(saved.earnedPoints);
+		const long long dMatches = static_cast<long long>(now.totalPoints) - static_cast<long long>(saved.totalPoints);
+		if (dLp == 0 && dWins == 0 && dMatches == 0)
+		{
+			ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.0f), "%s", L("Everything is saved.").c_str());
+		}
+		else
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.2f, 1.0f), "%s: %+lld LP, %+lld %s, %+lld %s",
+				L("Unsaved progress").c_str(), dLp, dWins, L("Wins").c_str(), dMatches, L("Matches").c_str());
+		}
+	}
+	ImGui::Spacing();
+	if (ImGui::Button(L("Close").c_str(), ImVec2(120.0f, 0.0f)))
+	{
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::EndPopup();
 }
