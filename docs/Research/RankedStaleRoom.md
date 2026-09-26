@@ -99,3 +99,27 @@ Next RE, in order:
    suspect).
 3. Verify by hosting with the mod: dump our own room after every match end and
    look for entries that survive.
+
+## 2026-09-26: first healthy dumps
+
+Three ordinary joins in session 16:15:52, dumped ~440–550 ms after `LobbyEnter`:
+
+```
+room after join (+547ms): our slot member=1 matchPlayer=1 matchId=0
+  slot[0] ... (Haina) <host>  matchId=0 matchPlayer=0 netcolor=0 raw+1..3=00 00 00 raw+35..37=00 FF FF
+  slot[1] ... (Kam)   <me>    matchId=0 matchPlayer=1 netcolor=0 raw+1..3=00 00 00 raw+35..37=00 FF FF
+```
+
+Two things this settles:
+
+- **`matchId` is 0 on healthy joins too** (the host showed 1 once, 0 the next
+  time). So `matchId == 0` is *not* a stale signal at join time, and the
+  detector is right to key on `matchPlayerIndex >= 2` alone.
+- **The OK flag is not identifiable from a post-join dump**: at that moment
+  nobody has pressed OK, and every entry reads `+0x35..0x37 = 00 FF FF`. The
+  `FF FF` pair looks like unset -1 markers; `+0x35` is the candidate. Hence
+  `PollInMatchRoomDump`: a second dump on the first tick we are actually in a
+  match, when both players have confirmed — whichever byte moved is the flag.
+  That identifies it from any normal match rather than waiting for a stale one.
+
+No stale room occurred this session (0 detections).

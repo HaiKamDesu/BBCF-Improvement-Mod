@@ -1755,3 +1755,34 @@ just made that the first such open.
 Fix (`FormatRankForPersistView`): call the file's own null-safe
 `FormatVisibleRankLabel`, which falls back to `LV%u`, and never hand that raw
 pointer to `std::string` again. A sweep found no other unguarded wraps.
+
+## 2026-09-26: first run of the per-endpoint tooling (forced wedge)
+
+Session 16:15:52 (`DebugHistory/DEBUG_20260926_162736.txt`), one set with the
+harness off, one with it on. Everything the previous commit added is confirmed
+working on a real rejection:
+
+- `url="http://153.122.81.62/steam/api/tus/read"` — the wide-string fix holds;
+  every line now names its endpoint.
+- The cap line reads `#1 this session, 1/6 in the last 10 min`.
+- The `endpoint state at rejection` block renders, with each response's
+  session reduced to a fingerprint comparable to the `sessionHash=` lines:
+
+```
+endpoint state at rejection (client holds session #87629B3C, len 13):
+  [ 1] user/login   done=1 httpOk=1 bytes=255  {"session":"#C36F4608####","result":0,...}
+  [ 9] tus/read     done=1 httpOk=1 bytes=135  {"session":"#87629B3C####","result":1,...,"param":{"status":3}}
+  [10] tus/write    done=1 httpOk=1 bytes=255  {"session":"#F22FB326####","result":0,...}
+```
+
+That is the instrument the cause needs: what each endpoint's last response
+*carried* versus what the client *holds*, side by side. On the forced wedge the
+mismatch is trivially ours (we corrupted the held token), so it says nothing
+about the cause — as expected. **No natural wedge occurred in the off set**
+(zero rejections before the TEST line), so there is still no cause data.
+Recovery fired twice. The dialog crash from this session is recorded above.
+
+Next: nothing to force. Play with the harness off; the natural wedge triggers
+the block automatically. The tell will be a `lobby/get_status` [5] or
+`matching/*` [6–8] line whose session fingerprint differs from what the client
+holds while `tus/*` returns status 3.
