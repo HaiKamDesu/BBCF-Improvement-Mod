@@ -4,6 +4,9 @@
 #include "Core/logger.h"
 #include "Core/utils.h"
 #include "Network/RankedListConnectionFilter.h"
+#include "Core/interfaces.h"
+#include "Network/RoomManager.h"
+#include "Game/Room/RoomMemberEntry.h"
 
 #include <Windows.h>
 #include <cstdint>
@@ -261,6 +264,8 @@ namespace
 	unsigned g_reloginTickMark = 0;
 	int g_sessionRestores = 0;
 	uint32_t g_lastDefenceHash = 0;
+	ULONGLONG g_sessionRejectedAtMs = 0; // last tus/read or tus/write refused with param.status 3
+	unsigned g_profileHolds = 0;
 	uint32_t g_loginSlotBaselineHash = 0; // session in the user/login slot when the re-login was forced
 	unsigned g_loginTokensEnforced = 0;
 
@@ -323,6 +328,13 @@ namespace
 		int autoRecoveries = 0;
 		int32_t snapshotCtx[kSubObjectContextDwords] = {};
 		uint8_t snapshotBlob[kProfileBlobSize] = {};
+		// The last payload the game accepted for this slot, and whose profile it
+		// is (the room member's Steam ID at the time), so a rejected re-fetch of
+		// the SAME profile can be answered with it instead of a wipe.
+		bool haveGoodBlob = false;
+		uint64_t goodBlobSteamId = 0;
+		uint8_t goodBlob[kProfileBlobSize] = {};
+		bool heldOnRejection = false; // state 3 reached via the hold; re-fetch after re-login
 	};
 
 	SlotTrack g_slotTracks[kRoomSlotCountMax];
@@ -1180,6 +1192,81 @@ namespace
 		return hash;
 	}
 
+	// param.status of the completed response in one request slot, or -1.
+	int PendingResponseStatus(uintptr_t moduleBase, int type)
+	{
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return -1;
+		}
+		const uint8_t* const slotPtr = client + kWebApiPendingSlotsOffset + type * 4;
+		if (IsBadReadPtr(slotPtr, sizeof(void*)))
+		{
+			return -1;
+		}
+		const uint8_t* const* const slot = *reinterpret_cast<const uint8_t* const* const*>(slotPtr);
+		if (slot == nullptr || IsBadReadPtr(slot, sizeof(void*)))
+		{
+			return -1;
+		}
+		const uint8_t* const req = *slot;
+		if (req == nullptr || IsBadReadPtr(req, kHttpReqSize) ||
+			*reinterpret_cast<const int32_t*>(req + kHttpReqDoneOffset) == 0 ||
+			*reinterpret_cast<const int32_t*>(req + kHttpReqHttpOkOffset) == 0)
+		{
+			return -1;
+		}
+		const char* const begin = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset);
+		const char* const end = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset + 4);
+		if (begin == nullptr || end <= begin || (end - begin) > 4096 || IsBadReadPtr(begin, static_cast<size_t>(end - begin)))
+		{
+			return -1;
+		}
+		char json[1100];
+		if (!DecodeWebApiResponse(begin, static_cast<size_t>(end - begin), json, sizeof(json)))
+		{
+			return -1;
+		}
+		const char* at = strstr(json, "\"status\":");
+		return at != nullptr ? atoi(at + 9) : -1;
+	}
+
+	// The AASTEAM_CUMSTask worker (see LogUMSWorkerState for the field map).
+	uint8_t* UMSWorker(uintptr_t moduleBase)
+	{
+		uint8_t* const* const singletonPtr = reinterpret_cast<uint8_t* const*>(moduleBase + kUserManagedStorageSingletonRva);
+		if (IsBadReadPtr(singletonPtr, sizeof(void*)) || *singletonPtr == nullptr)
+		{
+			return nullptr;
+		}
+		uint8_t* const ums = *singletonPtr;
+		if (IsBadReadPtr(ums + 4, sizeof(void*)))
+		{
+			return nullptr;
+		}
+		uint8_t* const worker = *reinterpret_cast<uint8_t* const*>(ums + 4);
+		if (worker == nullptr || IsBadReadPtr(worker, 0x110) || IsBadWritePtr(worker, 0x110))
+		{
+			return nullptr;
+		}
+		return worker;
+	}
+
+	uint64_t RoomMemberSteamIdForSlot(int slot)
+	{
+		if (g_interfaces.pRoomManager == nullptr || slot < 0 || slot > 0xFFFF)
+		{
+			return 0;
+		}
+		const RoomMemberEntry* const e = g_interfaces.pRoomManager->GetRoomMemberEntryByIndex(static_cast<uint16_t>(slot));
+		if (e == nullptr || IsBadReadPtr(e, sizeof(RoomMemberEntry)))
+		{
+			return 0;
+		}
+		return e->steamId;
+	}
+
 	// Dumps the pending request descriptor for one WebApi request type. Only
 	// called once a failure has been observed, at which point the descriptor is
 	// complete and is only ever freed from this same (game) thread by
@@ -1479,6 +1566,11 @@ namespace
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusRead, "tus/read");
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusWrite, "tus/write");
 			LogAllPendingRequests(moduleBase);
+			if (state == 0xB && (PendingResponseStatus(moduleBase, kWebApiTypeTusRead) == 3 ||
+				PendingResponseStatus(moduleBase, kWebApiTypeTusWrite) == 3))
+			{
+				g_sessionRejectedAtMs = GetTickCount64();
+			}
 
 			// A single reject can be a blip; a streak is the wedge, and the wedge
 			// never heals on its own -- 26/26 failures over 24 minutes on
@@ -1547,6 +1639,7 @@ namespace
 	{
 		const uint8_t* const netUserData = reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
 		int rearmed = 0;
+		int refetched = 0;
 		for (int slot = 0; slot < kRoomSlotCountMax; ++slot)
 		{
 			g_slotTracks[slot].autoRecoveries = 0;
@@ -1569,8 +1662,17 @@ namespace
 				g_slotTracks[slot].lastState = 0;
 				++rearmed;
 			}
+			else if (*state == 3 && g_slotTracks[slot].heldOnRejection)
+			{
+				// The slot is showing the payload we kept in place; now that the
+				// session is good again, let the game fetch the real one.
+				*state = 0;
+				g_slotTracks[slot].lastState = 0;
+				g_slotTracks[slot].heldOnRejection = false;
+				++refetched;
+			}
 		}
-		IncidentPrintf("[%s] re-armed %d wedged slot(s) and reset all retry budgets\n", tag, rearmed);
+		IncidentPrintf("[%s] re-armed %d wedged slot(s), re-fetching %d held slot(s), reset all retry budgets\n", tag, rearmed, refetched);
 	}
 
 	// Returns true if the latch was found set (whether or not we cleared it).
@@ -1862,7 +1964,8 @@ namespace
 
 void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 {
-	if (!IsLoggingEnabled() && !Settings::settingsIni.dcodeAutoRecover)
+	if (!IsLoggingEnabled() && !Settings::settingsIni.dcodeAutoRecover &&
+		!Settings::settingsIni.dcodeKeepProfileOnRejection)
 	{
 		return;
 	}
@@ -1929,6 +2032,56 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 		}
 	}
 
+	// 2026-09-27: make a session rejection invisible. The profile server drops
+	// sessions at random (DCodeNetworkStallBug.md, 2026-09-27); when that hits
+	// a tus/read, FUN_00422B00 stores recv=0 through worker+0xBC (which points
+	// at this row's subObject+0xD0) and sets the error latch (worker+0xC0 bit 0),
+	// and the tick we are entering (FUN_004A25C0) would poll that, wipe the row
+	// (FUN_004A0D50) and park the slot at 6 -- the D-Code vanishes until the
+	// re-login and a fresh fetch land. Instead, hand the tick the last payload
+	// it accepted for this same profile: put it back in the row, report
+	// 0x6800 received, clear the latch. The game's own success path then runs
+	// (checksum passes, state 3) and nothing on screen changes. The re-login
+	// still fires from SampleWorkMgrState, and ReArmAllSlots re-fetches the
+	// real payload once a transfer succeeds again. Only for param.status 3:
+	// a genuinely missing/corrupt profile still takes the game's own path.
+	if (state == 2 && Settings::settingsIni.dcodeKeepProfileOnRejection && track.haveGoodBlob &&
+		g_sessionRejectedAtMs != 0 && (now - g_sessionRejectedAtMs) < 5000 &&
+		!IsBadReadPtr(subObject + kSubObjectRecvSizeOffset, sizeof(int32_t)) &&
+		*reinterpret_cast<const int32_t*>(subObject + kSubObjectRecvSizeOffset) == 0)
+	{
+		uint8_t* const worker = UMSWorker(moduleBase);
+		if (worker != nullptr && worker[0x1C] != 0 && (worker[0xC0] & 1) != 0)
+		{
+			uint8_t* const recvTarget = *reinterpret_cast<uint8_t* const*>(worker + 0xBC);
+			const uint64_t memberSteamId = RoomMemberSteamIdForSlot(slot);
+			if (recvTarget != subObject + kSubObjectRecvSizeOffset)
+			{
+				IncidentPrintf("[DCodeTick] slot %d: rejected transfer targets %p, this row's context is %p; not held\n",
+					slot, recvTarget, subObject + kSubObjectRecvSizeOffset);
+			}
+			else if (memberSteamId == 0 || memberSteamId != track.goodBlobSteamId)
+			{
+				IncidentPrintf("[DCodeTick] slot %d: rejected fetch is for %llu, the kept payload is %llu's; not held\n",
+					slot, static_cast<unsigned long long>(memberSteamId),
+					static_cast<unsigned long long>(track.goodBlobSteamId));
+			}
+			else if (!IsBadWritePtr(row, kProfileBlobSize) &&
+				!IsBadWritePtr(subObject + kSubObjectRecvSizeOffset, sizeof(int32_t)))
+			{
+				memcpy(row, track.goodBlob, kProfileBlobSize);
+				*reinterpret_cast<int32_t*>(subObject + kSubObjectRecvSizeOffset) = static_cast<int32_t>(kProfileBlobSize);
+				*reinterpret_cast<int32_t*>(worker + 0xB8) = static_cast<int32_t>(kProfileBlobSize);
+				worker[0xC0] &= static_cast<uint8_t>(~1u);
+				track.heldOnRejection = true;
+				++g_profileHolds;
+				IncidentPrintf("[DCodeTick] slot %d: profile server rejected the session; kept the last accepted profile"
+					" in place (hold #%u, checksum16=0x%04X), re-fetch after re-login\n",
+					slot, g_profileHolds, ProfileChecksum16(row, kProfileBlobSize));
+			}
+		}
+	}
+
 	// While a request is in flight the row buffer already contains whatever the
 	// transport has written; the tick that completes the exchange validates and,
 	// on failure, wipes it before returning. Snapshotting at entry therefore
@@ -1961,6 +2114,18 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 			{
 				IncidentPrintf("[DCodeTick] slot %d accepted payload checksum16=0x%04X (valid=0xFFFF)\n",
 					slot, ProfileChecksum16(row, kProfileBlobSize));
+				// Keep it, tagged with whose it is, for the rejection hold above.
+				// A held payload is not re-captured: it is the same bytes.
+				if (!track.heldOnRejection)
+				{
+					const uint64_t memberSteamId = RoomMemberSteamIdForSlot(slot);
+					if (memberSteamId != 0)
+					{
+						memcpy(track.goodBlob, row, kProfileBlobSize);
+						track.goodBlobSteamId = memberSteamId;
+						track.haveGoodBlob = true;
+					}
+				}
 			}
 			track.autoRecoveries = 0;
 		}

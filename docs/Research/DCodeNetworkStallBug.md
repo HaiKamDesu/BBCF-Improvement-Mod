@@ -1845,3 +1845,28 @@ already uploaded OK; the crashed session modified none of them.
 (Runtime addresses in crash_context.txt are base 0x7A0000; subtract 0x3A0000
 for Ghidra/objdump on the on-disk image. `run_ghidra_exit_thread_timeout.cmd`
 has the corrected list.)
+
+## 2026-09-27 - Making the rejection invisible (DCodeKeepProfileOnRejection)
+
+Since the server loss cannot be prevented, the visible symptom is removed
+instead. The chain on a rejected tus/read: the worker thread (`FUN_00422B00`)
+writes recv=0 through `worker+0xBC` (a pointer to the row's `subObject+0xD0`)
+and sets the error latch `worker+0xC0 bit0`; the fetch tick `FUN_004A25C0`
+then polls (`FUN_00422E70` -> 100), sees `recvSize != 0x6800`, wipes the row
+(`FUN_004A0D50`) and parks the slot at 6. The D-Code is gone until the re-login
+and a fresh fetch land (3.5 s best, minutes worst).
+
+`OnFetchTickEnter` (our hook at the tick's entry, before the poll) now, when
+the slot is at 2, the last work-manager result was 0xB with `param.status 3`
+(within 5 s), the worker is done with the latch set and recv=0, the worker's
+recv pointer is THIS row's context, and the room member in this slot is the
+same Steam ID whose payload we last saw accepted: copies that payload back
+into the row, sets `subObject+0xD0 = 0x6800`, clears the latch. The game's own
+tick then validates the checksum and moves to 3 -- nothing changes on screen.
+`ReArmAllSlots` (on the next successful transfer after the re-login) sets such
+held slots back to 0 so the real payload is fetched. Log lines:
+`kept the last accepted profile in place (hold #N)` / `re-fetching N held
+slot(s)`. Rejections with any other status, or a slot with no accepted
+payload yet (first fetch of the session), take the game's own path as before.
+Test: `DCodeForceSessionWedge=1` -- the forced status-3 rejection should now
+leave the D-Code on screen, with the hold line in the log.
