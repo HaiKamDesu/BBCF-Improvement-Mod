@@ -147,6 +147,7 @@ namespace
 	// Timing alone cannot tell these apart -- it already misled this
 	// investigation twice -- so read the flag instead of inferring it.
 	constexpr uintptr_t kWebApiPendingSlotsOffset = 0x40;
+	constexpr int kWebApiTypeUserLogin = 1;
 	constexpr int kWebApiTypeTusRead = 9;
 	constexpr int kWebApiTypeTusWrite = 10;
 	constexpr uintptr_t kHttpReqUrlOffset = 0x00;
@@ -260,6 +261,8 @@ namespace
 	unsigned g_reloginTickMark = 0;
 	int g_sessionRestores = 0;
 	uint32_t g_lastDefenceHash = 0;
+	uint32_t g_loginSlotBaselineHash = 0; // session in the user/login slot when the re-login was forced
+	unsigned g_loginTokensEnforced = 0;
 
 
 	typedef void(__fastcall* CNetworkerUpdateFn)(void* self, void* unused);
@@ -543,6 +546,7 @@ namespace
 	}
 
 	void DefendReloginSession(uintptr_t moduleBase); // defined below, called every frame
+	uint32_t ReadLoginResponseSession(uintptr_t moduleBase, char* out, size_t outSize); // defined below
 	void ReArmAllSlots(uintptr_t moduleBase, const char* tag); // defined below
 
 	void __fastcall CNetworkerUpdateTrampoline(void* self, void* unused)
@@ -711,6 +715,11 @@ namespace
 			const uint8_t* const poisoned = WebApiClient(moduleBase);
 			g_poisonedSessionHash = (poisoned != nullptr)
 				? WebApiSessionFingerprint(poisoned, nullptr) : 0;
+			// The previous login's reply is still in the slot; anything else
+			// that shows up there during the window is the login we just asked for.
+			char previousLogin[kWebApiSessionMaxLen + 1];
+			g_loginSlotBaselineHash = ReadLoginResponseSession(moduleBase, previousLogin, sizeof(previousLogin));
+			SecureZeroMemory(previousLogin, sizeof(previousLogin));
 		}
 		// 2026-09-20: a run where the defence never armed. Either the token never
 		// held a good value, or the ticker that drives the defence was not
@@ -750,6 +759,34 @@ namespace
 			IncidentPrintf("[WebApi] session %08X -> %08X during the defence window (tick %u)\n",
 				g_lastDefenceHash, current, g_strategyTicks - g_reloginTickMark);
 			g_lastDefenceHash = current;
+		}
+
+		// 2026-09-27 00:41:11 (natural wedge): the login reply and a stale
+		// tus/read rejection echoing the rejected token were parsed in the SAME
+		// strategy tick, login first. The client ended the tick holding the
+		// rejected token again, so the cross-tick diff below saw no change and
+		// the fresh login went unused for three minutes. Read the login slot's
+		// own reply: if it carries a token that is not the previous login's and
+		// not the rejected one, that is our login, and a client still holding
+		// the rejected token gets it written back directly.
+		if (current == g_poisonedSessionHash && length != 0 &&
+			!IsBadWritePtr(client + kWebApiSessionOffset, kWebApiSessionMaxLen))
+		{
+			char fresh[kWebApiSessionMaxLen + 1];
+			const uint32_t freshHash = ReadLoginResponseSession(moduleBase, fresh, sizeof(fresh));
+			if (freshHash != 0 && freshHash != g_loginSlotBaselineHash && freshHash != g_poisonedSessionHash)
+			{
+				memset(client + kWebApiSessionOffset, 0, kWebApiSessionMaxLen);
+				memcpy(client + kWebApiSessionOffset, fresh, strlen(fresh));
+				memcpy(g_goodSessionSnapshot, client + kWebApiSessionOffset, kWebApiSessionMaxLen);
+				g_haveGoodSnapshot = true;
+				++g_loginTokensEnforced;
+				IncidentPrintf("[WebApi] login reply carries %08X but the client still held the rejected %08X;"
+					" written back (%u, tick %u)\n",
+					freshHash, g_poisonedSessionHash, g_loginTokensEnforced, g_strategyTicks - g_reloginTickMark);
+				g_lastDefenceHash = freshHash;
+			}
+			SecureZeroMemory(fresh, sizeof(fresh));
 		}
 
 		if (!g_haveGoodSnapshot)
@@ -1027,7 +1064,7 @@ namespace
 	// these responses. Anything else leaves `out` empty and the caller logs
 	// nothing but a length -- a format change should cost diagnostics, not a
 	// leaked credential.
-	bool DecodeWebApiResponse(const char* raw, size_t rawLength, char* out, size_t outSize)
+	bool DecodeWebApiResponse(const char* raw, size_t rawLength, char* out, size_t outSize, bool scrub = true)
 	{
 		out[0] = '\0';
 		if (rawLength <= kEnvelopeHashChars)
@@ -1062,8 +1099,85 @@ namespace
 			out[0] = '\0';
 			return false;
 		}
-		ScrubSessionValue(out);
+		if (scrub)
+		{
+			ScrubSessionValue(out);
+		}
 		return true;
+	}
+
+	// The session the user/login slot's completed response carries, unscrubbed
+	// (it never reaches a log: only its fingerprint does). 0 when the slot is
+	// empty, unfinished, failed, or not a result-0 login reply.
+	uint32_t ReadLoginResponseSession(uintptr_t moduleBase, char* out, size_t outSize)
+	{
+		out[0] = '\0';
+		const uint8_t* const client = WebApiClient(moduleBase);
+		if (client == nullptr)
+		{
+			return 0;
+		}
+		const uint8_t* const slotPtr = client + kWebApiPendingSlotsOffset + kWebApiTypeUserLogin * 4;
+		if (IsBadReadPtr(slotPtr, sizeof(void*)))
+		{
+			return 0;
+		}
+		const uint8_t* const* const slot = *reinterpret_cast<const uint8_t* const* const*>(slotPtr);
+		if (slot == nullptr || IsBadReadPtr(slot, sizeof(void*)))
+		{
+			return 0;
+		}
+		const uint8_t* const req = *slot;
+		if (req == nullptr || IsBadReadPtr(req, kHttpReqSize))
+		{
+			return 0;
+		}
+		if (*reinterpret_cast<const int32_t*>(req + kHttpReqDoneOffset) == 0 ||
+			*reinterpret_cast<const int32_t*>(req + kHttpReqHttpOkOffset) == 0)
+		{
+			return 0;
+		}
+		const char* const begin = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset);
+		const char* const end = *reinterpret_cast<const char* const*>(req + kHttpReqResponseVectorOffset + 4);
+		if (begin == nullptr || end <= begin || (end - begin) > 4096 || IsBadReadPtr(begin, static_cast<size_t>(end - begin)))
+		{
+			return 0;
+		}
+		char json[1100];
+		if (!DecodeWebApiResponse(begin, static_cast<size_t>(end - begin), json, sizeof(json), false) ||
+			strstr(json, "\"result\":0") == nullptr)
+		{
+			return 0;
+		}
+		const char* at = strstr(json, "\"session\"");
+		if (at == nullptr)
+		{
+			return 0;
+		}
+		at += 9;
+		while (*at == ':' || *at == ' ')
+		{
+			++at;
+		}
+		if (*at != '"')
+		{
+			return 0;
+		}
+		++at;
+		uint32_t hash = 2166136261u;
+		size_t length = 0;
+		while (at[length] != '\0' && at[length] != '"' && length < outSize - 1 && length < kWebApiSessionMaxLen)
+		{
+			hash = (hash ^ static_cast<uint8_t>(at[length])) * 16777619u;
+			++length;
+		}
+		if (length == 0 || at[length] != '"')
+		{
+			return 0;
+		}
+		memcpy(out, at, length);
+		out[length] = '\0';
+		return hash;
 	}
 
 	// Dumps the pending request descriptor for one WebApi request type. Only

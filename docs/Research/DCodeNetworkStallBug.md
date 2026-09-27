@@ -1786,3 +1786,62 @@ Next: nothing to force. Play with the harness off; the natural wedge triggers
 the block automatically. The tell will be a `lobby/get_status` [5] or
 `matching/*` [6–8] line whose session fingerprint differs from what the client
 holds while `tus/*` returns status 3.
+
+## 2026-09-27 - First natural wedge with full diagnostics (session 18:44 -> 00:53)
+
+`DCodeForceSessionWedge=0` all session. Six re-logins, all recovered; 141 OK
+transfers, 18 rejections. What the endpoint dumps proved:
+
+- **Only three endpoints are ever used**: user/login [1], tus/read [9], tus/write
+  [10]. Every other slot (lobby/get_status, matching/*, tss/read) stayed empty
+  the whole session, so "another endpoint rotates the session" is dead.
+- **Tokens die at random ages with nothing in flight.** Age at rejection, with
+  no request in between: 4 s (token from a login, 00:40:43 -> 00:40:47), 6 s
+  (login 00:48:27 -> 00:48:33), 28 s (write ok 00:47:50 -> read 00:48:18),
+  2m38s (write ok 00:03:56 -> write 00:06:34), 4m19s (write ok 00:36:08 ->
+  read 00:40:27). Meanwhile the first login's token survived 42 minutes idle
+  and the longest OK-after-gap was 41m46s. Idle expiry is dead.
+- **Once rejected, a token never comes back**: every retry with the same token
+  is rejected (30 in a row over 15 min on the 26th). Not a load-balancer
+  routing miss - a bare POST shows one `Server: Apache` / `PHP/5.3.3` host,
+  `Connection: close`.
+- **Server clocks agree** (arrival minus response `date` = 4.7-6.6 s for OK
+  and rejected alike), so there is no second backend with a skewed clock.
+
+Conclusion: the profile server (`153.122.81.62`, Apache + PHP 5.3) simply
+loses sessions - some server-side store drops them at random, more often in
+the busy evening hours (six losses in 45 minutes from 00:06 to 00:51, none in
+the five hours before). The game's only defect is that it never re-logs-in
+after `param.status: 3`; nothing the client sends causes the loss. The mod's
+auto re-login is the right fix and there is nothing further to find client-side.
+
+One client-side gap did show up. At 00:41:11 the forced login's reply
+(52C91F2A) and a stale tus/read rejection echoing the rejected token (5CFDC988)
+were parsed in the same strategy tick, login first, so the client ended the
+tick still holding 5CFDC988; the cross-tick defence saw no change, the login
+went unused, and the next recovery took until 00:44:01. Fix: `DefendReloginSession`
+now reads the user/login slot's own reply (`ReadLoginResponseSession`) and, when
+the client still holds the rejected token but the slot carries a token that is
+neither the previous login's nor the rejected one, writes it back directly.
+Log line: `login reply carries X but the client still held the rejected Y; written back`.
+
+## 2026-09-27 00:54:38 - "Thread Delete Time Out" on exit (not the mod)
+
+Exit crash right after a 40-second session. `Thread Delete Time Out` is the
+game's own string: `FUN_0041AD90` (thread delete) sets state 2, calls
+vtable+8 (stop), then `WaitForSingleObject(thread, 3000)`; on `WAIT_TIMEOUT` it
+shows the box via `FUN_0044EE10` and carries on destroying. The worker proc
+(`FUN_0041ADD0`) was still inside a job's `Run()`; on return it does
+`EnterCriticalSection(job+4)` at `0041AA81` (ret `0041AA87`) on a critical
+section the main thread had already destroyed -> AV write at 0x14. The log
+shows what the job was: tus/read on slot 2 went in flight at 00:54:29.134 and
+the game was closed with it pending; the profile server was slow that evening
+(same server that was dropping sessions) so the request did not finish within
+the game's 3 s. No dinput8 frame anywhere in the worker's stack. Steam's
+"unable to sync" afterwards is Steam-side: `cloud_log.txt` shows
+`BYieldingBuildFileListToSync Failed` for AppID 2371090 (a different game) in
+the same minute, and the 00:53:52 exit sync of bbsave/bbrd/replay_list had
+already uploaded OK; the crashed session modified none of them.
+(Runtime addresses in crash_context.txt are base 0x7A0000; subtract 0x3A0000
+for Ghidra/objdump on the on-disk image. `run_ghidra_exit_thread_timeout.cmd`
+has the corrected list.)
