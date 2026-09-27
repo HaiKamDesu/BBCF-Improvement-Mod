@@ -4,9 +4,6 @@
 #include "Core/logger.h"
 #include "Core/utils.h"
 #include "Network/RankedListConnectionFilter.h"
-#include "Core/interfaces.h"
-#include "Network/RoomManager.h"
-#include "Game/Room/RoomMemberEntry.h"
 
 #include <Windows.h>
 #include <cstdint>
@@ -265,7 +262,7 @@ namespace
 	int g_sessionRestores = 0;
 	uint32_t g_lastDefenceHash = 0;
 	ULONGLONG g_sessionRejectedAtMs = 0; // last tus/read or tus/write refused with param.status 3
-	unsigned g_profileHolds = 0;
+	unsigned g_rejectionHolds = 0;
 	uint32_t g_loginSlotBaselineHash = 0; // session in the user/login slot when the re-login was forced
 	unsigned g_loginTokensEnforced = 0;
 
@@ -328,13 +325,13 @@ namespace
 		int autoRecoveries = 0;
 		int32_t snapshotCtx[kSubObjectContextDwords] = {};
 		uint8_t snapshotBlob[kProfileBlobSize] = {};
-		// The last payload the game accepted for this slot, and whose profile it
-		// is (the room member's Steam ID at the time), so a rejected re-fetch of
-		// the SAME profile can be answered with it instead of a wipe.
-		bool haveGoodBlob = false;
-		uint64_t goodBlobSteamId = 0;
-		uint8_t goodBlob[kProfileBlobSize] = {};
-		bool heldOnRejection = false; // state 3 reached via the hold; re-fetch after re-login
+		// Session-rejection hold: the transfer failed with param.status 3 and we
+		// are keeping the slot at 2 (transport "still pending") until the
+		// re-login lands, then re-issuing the fetch from 0.
+		bool holdingForRelogin = false;
+		ULONGLONG holdSinceMs = 0;
+		int releases = 0;            // re-fetches issued by the hold
+		ULONGLONG firstReleaseMs = 0;
 	};
 
 	SlotTrack g_slotTracks[kRoomSlotCountMax];
@@ -1253,20 +1250,6 @@ namespace
 		return worker;
 	}
 
-	uint64_t RoomMemberSteamIdForSlot(int slot)
-	{
-		if (g_interfaces.pRoomManager == nullptr || slot < 0 || slot > 0xFFFF)
-		{
-			return 0;
-		}
-		const RoomMemberEntry* const e = g_interfaces.pRoomManager->GetRoomMemberEntryByIndex(static_cast<uint16_t>(slot));
-		if (e == nullptr || IsBadReadPtr(e, sizeof(RoomMemberEntry)))
-		{
-			return 0;
-		}
-		return e->steamId;
-	}
-
 	// Dumps the pending request descriptor for one WebApi request type. Only
 	// called once a failure has been observed, at which point the descriptor is
 	// complete and is only ever freed from this same (game) thread by
@@ -1566,8 +1549,10 @@ namespace
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusRead, "tus/read");
 			LogPendingHttpRequest(moduleBase, kWebApiTypeTusWrite, "tus/write");
 			LogAllPendingRequests(moduleBase);
-			if (state == 0xB && (PendingResponseStatus(moduleBase, kWebApiTypeTusRead) == 3 ||
-				PendingResponseStatus(moduleBase, kWebApiTypeTusWrite) == 3))
+			const bool sessionRejected = state == 0xB &&
+				(PendingResponseStatus(moduleBase, kWebApiTypeTusRead) == 3 ||
+				 PendingResponseStatus(moduleBase, kWebApiTypeTusWrite) == 3);
+			if (sessionRejected)
 			{
 				g_sessionRejectedAtMs = GetTickCount64();
 			}
@@ -1585,7 +1570,10 @@ namespace
 			else
 			{
 				++g_consecutiveWebApiFailures;
-				if (g_consecutiveWebApiFailures >= kReloginFailureThreshold)
+				// The threshold exists to ignore a blip; a response body that says
+				// status 3 is not a blip, and the rejection hold below keeps the
+				// slot from ever producing a second failure to count.
+				if (sessionRejected || g_consecutiveWebApiFailures >= kReloginFailureThreshold)
 				{
 					TryForceRelogin(moduleBase, "profile server rejecting the session");
 				}
@@ -1639,7 +1627,6 @@ namespace
 	{
 		const uint8_t* const netUserData = reinterpret_cast<const uint8_t*>(moduleBase + kNetworkUserDataRva);
 		int rearmed = 0;
-		int refetched = 0;
 		for (int slot = 0; slot < kRoomSlotCountMax; ++slot)
 		{
 			g_slotTracks[slot].autoRecoveries = 0;
@@ -1662,17 +1649,8 @@ namespace
 				g_slotTracks[slot].lastState = 0;
 				++rearmed;
 			}
-			else if (*state == 3 && g_slotTracks[slot].heldOnRejection)
-			{
-				// The slot is showing the payload we kept in place; now that the
-				// session is good again, let the game fetch the real one.
-				*state = 0;
-				g_slotTracks[slot].lastState = 0;
-				g_slotTracks[slot].heldOnRejection = false;
-				++refetched;
-			}
 		}
-		IncidentPrintf("[%s] re-armed %d wedged slot(s), re-fetching %d held slot(s), reset all retry budgets\n", tag, rearmed, refetched);
+		IncidentPrintf("[%s] re-armed %d wedged slot(s) and reset all retry budgets\n", tag, rearmed);
 	}
 
 	// Returns true if the latch was found set (whether or not we cleared it).
@@ -1965,7 +1943,7 @@ namespace
 void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 {
 	if (!IsLoggingEnabled() && !Settings::settingsIni.dcodeAutoRecover &&
-		!Settings::settingsIni.dcodeKeepProfileOnRejection)
+		!Settings::settingsIni.dcodeRetryOnRejection)
 	{
 		return;
 	}
@@ -2032,52 +2010,79 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 		}
 	}
 
-	// 2026-09-27: make a session rejection invisible. The profile server drops
-	// sessions at random (DCodeNetworkStallBug.md, 2026-09-27); when that hits
-	// a tus/read, FUN_00422B00 stores recv=0 through worker+0xBC (which points
-	// at this row's subObject+0xD0) and sets the error latch (worker+0xC0 bit 0),
-	// and the tick we are entering (FUN_004A25C0) would poll that, wipe the row
-	// (FUN_004A0D50) and park the slot at 6 -- the D-Code vanishes until the
-	// re-login and a fresh fetch land. Instead, hand the tick the last payload
-	// it accepted for this same profile: put it back in the row, report
-	// 0x6800 received, clear the latch. The game's own success path then runs
-	// (checksum passes, state 3) and nothing on screen changes. The re-login
-	// still fires from SampleWorkMgrState, and ReArmAllSlots re-fetches the
-	// real payload once a transfer succeeds again. Only for param.status 3:
-	// a genuinely missing/corrupt profile still takes the game's own path.
-	if (state == 2 && Settings::settingsIni.dcodeKeepProfileOnRejection && track.haveGoodBlob &&
-		g_sessionRejectedAtMs != 0 && (now - g_sessionRejectedAtMs) < 5000 &&
-		!IsBadReadPtr(subObject + kSubObjectRecvSizeOffset, sizeof(int32_t)) &&
-		*reinterpret_cast<const int32_t*>(subObject + kSubObjectRecvSizeOffset) == 0)
+	// 2026-09-27: a session rejection must not become a failed fetch. What the
+	// screen does with a failure: the ranked match-setup state (FUN_004AF1A0
+	// case 0x36) polls FUN_0049D560 for the opponent's row every frame and
+	// moves on the moment the row is ready OR FUN_0049A7F0 says the slot is at
+	// 6 -- it builds the opponent card from the wiped row and never looks again,
+	// so a later successful re-fetch changes nothing (the "invisible D-Code").
+	// It does keep waiting, up to 600 frames, while the slot is merely busy.
+	// The lobby/ranking D-Code views (FUN_0070BB50 etc.) behave the same:
+	// "NM_LoadingDCode" while busy, an error card on 6.
+	//
+	// So when the transport has finished with param.status 3 (worker done,
+	// error latch set, recv 0 written through worker+0xBC into this row's
+	// context), keep the slot at 2 by clearing the worker's done flag: the
+	// tick's poll (FUN_00422E70) then returns -100 and nothing is wiped. Once
+	// the re-login has landed, set the slot to 0: the display re-triggers
+	// (FUN_004A26A0 -> FUN_004A0CF0 reset -> state 1) and the next tick
+	// re-submits (FUN_0041AB10 resets done/busy, the worker clears its latch),
+	// this time with the new session. The screen sees ~3 s of "loading" and
+	// then the real card. Only for status 3; anything else takes the game's path.
+	if (state == 2 && Settings::settingsIni.dcodeRetryOnRejection)
 	{
 		uint8_t* const worker = UMSWorker(moduleBase);
-		if (worker != nullptr && worker[0x1C] != 0 && (worker[0xC0] & 1) != 0)
+		const bool rejectedNow = !track.holdingForRelogin && worker != nullptr &&
+			g_sessionRejectedAtMs != 0 && (now - g_sessionRejectedAtMs) < 5000 &&
+			worker[0x1C] != 0 && (worker[0xC0] & 1) != 0 &&
+			*reinterpret_cast<uint8_t* const*>(worker + 0xBC) == subObject + kSubObjectRecvSizeOffset &&
+			!IsBadReadPtr(subObject + kSubObjectRecvSizeOffset, sizeof(int32_t)) &&
+			*reinterpret_cast<const int32_t*>(subObject + kSubObjectRecvSizeOffset) == 0;
+		if (rejectedNow)
 		{
-			uint8_t* const recvTarget = *reinterpret_cast<uint8_t* const*>(worker + 0xBC);
-			const uint64_t memberSteamId = RoomMemberSteamIdForSlot(slot);
-			if (recvTarget != subObject + kSubObjectRecvSizeOffset)
+			if (track.firstReleaseMs == 0 || (now - track.firstReleaseMs) > 30000)
 			{
-				IncidentPrintf("[DCodeTick] slot %d: rejected transfer targets %p, this row's context is %p; not held\n",
-					slot, recvTarget, subObject + kSubObjectRecvSizeOffset);
+				track.firstReleaseMs = now;
+				track.releases = 0;
 			}
-			else if (memberSteamId == 0 || memberSteamId != track.goodBlobSteamId)
+			if (track.releases < 4)
 			{
-				IncidentPrintf("[DCodeTick] slot %d: rejected fetch is for %llu, the kept payload is %llu's; not held\n",
-					slot, static_cast<unsigned long long>(memberSteamId),
-					static_cast<unsigned long long>(track.goodBlobSteamId));
+				track.holdingForRelogin = true;
+				track.holdSinceMs = now;
+				++g_rejectionHolds;
+				IncidentPrintf("[DCodeTick] slot %d: fetch refused (session rejected); holding it as pending until the re-login lands (hold #%u)\n",
+					slot, g_rejectionHolds);
 			}
-			else if (!IsBadWritePtr(row, kProfileBlobSize) &&
-				!IsBadWritePtr(subObject + kSubObjectRecvSizeOffset, sizeof(int32_t)))
+			else
 			{
-				memcpy(row, track.goodBlob, kProfileBlobSize);
-				*reinterpret_cast<int32_t*>(subObject + kSubObjectRecvSizeOffset) = static_cast<int32_t>(kProfileBlobSize);
-				*reinterpret_cast<int32_t*>(worker + 0xB8) = static_cast<int32_t>(kProfileBlobSize);
-				worker[0xC0] &= static_cast<uint8_t>(~1u);
-				track.heldOnRejection = true;
-				++g_profileHolds;
-				IncidentPrintf("[DCodeTick] slot %d: profile server rejected the session; kept the last accepted profile"
-					" in place (hold #%u, checksum16=0x%04X), re-fetch after re-login\n",
-					slot, g_profileHolds, ProfileChecksum16(row, kProfileBlobSize));
+				IncidentPrintf("[DCodeTick] slot %d: fetch refused again after %d re-fetches in 30 s; leaving it to the game\n",
+					slot, track.releases);
+			}
+		}
+		if (track.holdingForRelogin)
+		{
+			const bool loginLanded = g_haveGoodSnapshot && g_sessionDefenceUntilMs != 0 && now < g_sessionDefenceUntilMs;
+			const bool noLoginComing = g_sessionDefenceUntilMs == 0 || now >= g_sessionDefenceUntilMs;
+			const bool timedOut = (now - track.holdSinceMs) > 8000;
+			if (loginLanded || noLoginComing || timedOut)
+			{
+				if (worker != nullptr)
+				{
+					worker[0x1C] = 1; // leave the finished job looking finished
+				}
+				*reinterpret_cast<int32_t*>(subObject + kSubObjectFetchStateOffset) = 0;
+				track.holdingForRelogin = false;
+				++track.releases;
+				IncidentPrintf("[DCodeTick] slot %d: %s after %llums; fetch state 2 -> 0, the display re-issues it (re-fetch %d)\n",
+					slot, loginLanded ? "re-login landed" : (timedOut ? "hold timed out" : "no re-login pending"),
+					now - track.holdSinceMs, track.releases);
+				track.lastState = 0;
+				track.stateSinceMs = now;
+				return; // nothing else to do this tick; the game sees state 0 and returns -1
+			}
+			if (worker != nullptr)
+			{
+				worker[0x1C] = 0; // poll answers "still pending"
 			}
 		}
 	}
@@ -2114,18 +2119,6 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 			{
 				IncidentPrintf("[DCodeTick] slot %d accepted payload checksum16=0x%04X (valid=0xFFFF)\n",
 					slot, ProfileChecksum16(row, kProfileBlobSize));
-				// Keep it, tagged with whose it is, for the rejection hold above.
-				// A held payload is not re-captured: it is the same bytes.
-				if (!track.heldOnRejection)
-				{
-					const uint64_t memberSteamId = RoomMemberSteamIdForSlot(slot);
-					if (memberSteamId != 0)
-					{
-						memcpy(track.goodBlob, row, kProfileBlobSize);
-						track.goodBlobSteamId = memberSteamId;
-						track.haveGoodBlob = true;
-					}
-				}
 			}
 			track.autoRecoveries = 0;
 		}

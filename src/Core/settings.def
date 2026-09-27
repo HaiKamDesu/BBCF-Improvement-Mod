@@ -103,7 +103,7 @@ SETTING(bool, dcodeTusGateAutoClear, "DCodeTusGateAutoClear", "1");
 // restarting the game has always been the only cure. On a failure streak this
 // re-runs that login in place. See docs/Research/DCodeNetworkStallBug.md.
 SETTING(bool, dcodeAutoRelogin, "DCodeAutoRelogin", "1");
-SETTING(bool, dcodeKeepProfileOnRejection, "DCodeKeepProfileOnRejection", "1");
+SETTING(bool, dcodeRetryOnRejection, "DCodeRetryOnRejection", "1");
 // TEST ONLY: corrupt one byte of the live session token so the server rejects
 // it exactly the way the real bug does (result 11 / status 3), to exercise the
 // re-login fix above end-to-end without waiting days for a natural occurrence.

@@ -1846,27 +1846,35 @@ already uploaded OK; the crashed session modified none of them.
 for Ghidra/objdump on the on-disk image. `run_ghidra_exit_thread_timeout.cmd`
 has the corrected list.)
 
-## 2026-09-27 - Making the rejection invisible (DCodeKeepProfileOnRejection)
+## 2026-09-27 - Why the opponent's D-Code is invisible, and the rejection hold
 
-Since the server loss cannot be prevented, the visible symptom is removed
-instead. The chain on a rejected tus/read: the worker thread (`FUN_00422B00`)
-writes recv=0 through `worker+0xBC` (a pointer to the row's `subObject+0xD0`)
-and sets the error latch `worker+0xC0 bit0`; the fetch tick `FUN_004A25C0`
-then polls (`FUN_00422E70` -> 100), sees `recvSize != 0x6800`, wipes the row
-(`FUN_004A0D50`) and parks the slot at 6. The D-Code is gone until the re-login
-and a fresh fetch land (3.5 s best, minutes worst).
+First attempt (reuse the last accepted payload) could not fire in the case that
+matters: the opponent's fetch is the FIRST fetch of that profile, so there is
+nothing to reuse (wedge test 13:57: slot 0 rejected 3x, accepted at 13:57:55,
+match at 13:58:04, card still empty).
 
-`OnFetchTickEnter` (our hook at the tick's entry, before the poll) now, when
-the slot is at 2, the last work-manager result was 0xB with `param.status 3`
-(within 5 s), the worker is done with the latch set and recv=0, the worker's
-recv pointer is THIS row's context, and the room member in this slot is the
-same Steam ID whose payload we last saw accepted: copies that payload back
-into the row, sets `subObject+0xD0 = 0x6800`, clears the latch. The game's own
-tick then validates the checksum and moves to 3 -- nothing changes on screen.
-`ReArmAllSlots` (on the next successful transfer after the re-login) sets such
-held slots back to 0 so the real payload is fetched. Log lines:
-`kept the last accepted profile in place (hold #N)` / `re-fetching N held
-slot(s)`. Rejections with any other status, or a slot with no accepted
-payload yet (first fetch of the session), take the game's own path as before.
-Test: `DCodeForceSessionWedge=1` -- the forced status-3 rejection should now
-leave the D-Code on screen, with the hold line in the log.
+What the screen does (DCodeDisplay*GhidraReport.txt): `FUN_0049D560(key, idx)`
+returns the row when `FUN_004A1930` says ready, else 0 (and re-triggers only if
+`FUN_004A0B80 != 100` and not busy). `FUN_0049A7F0` = "slot at 6". The ranked
+match-setup state machine `FUN_004AF1A0` **case 0x36** polls both every frame
+and advances to 0x37 (calling `FUN_004A9D20`, the card build) the moment the
+row is ready OR the slot reports 6, or after 600 frames. Once advanced it
+never looks again, so the 7-seconds-later successful re-fetch changed nothing.
+While the slot is merely busy (1/2) it keeps waiting. The lobby/ranking D-Code
+views (`FUN_0070BB50`, `FUN_00648C10`, `FUN_0070B3E0`, `FUN_0073ADC0`) do the
+same: "NM_LoadingDCode" while busy, an error card (`FUN_0064F920(3)`) on 6.
+
+Fix (`DCodeRetryOnRejection`, default on): at the tick's entry, when the
+transport finished with status 3 (worker done, latch, recv 0 through
+`worker+0xBC` == this row's `subObject+0xD0`), clear the worker's done flag so
+`FUN_00422E70` answers -100 and the slot stays at 2 -- nothing is wiped, the
+screen keeps waiting. `SampleWorkMgrState` forces the re-login on the first
+status-3 body (the 2-failure threshold no longer applies to a confirmed
+rejection, since the hold prevents a second failure). Once the re-login lands
+(`g_haveGoodSnapshot` inside the defence window), set the slot to 0 and restore
+the done flag: the display re-triggers (`FUN_004A26A0` -> `FUN_004A0CF0`
+reset -> 1), the next tick re-submits (`FUN_0041AB10` resets done/busy, the
+worker `FUN_00422B00` clears its latch) with the new session. Bounds: hold at
+most 8 s; at most 4 re-fetches per slot per 30 s, then the game's own path.
+Log lines: `holding it as pending until the re-login lands (hold #N)`,
+`re-login landed after Nms; fetch state 2 -> 0`. Test: `DCodeForceSessionWedge=1`.
