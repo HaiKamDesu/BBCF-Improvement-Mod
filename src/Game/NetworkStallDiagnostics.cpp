@@ -4,6 +4,8 @@
 #include "Core/logger.h"
 #include "Core/utils.h"
 #include "Network/RankedListConnectionFilter.h"
+#include "Core/Localization.h"
+#include "Overlay/NotificationBar/NotificationBar.h"
 
 #include <Windows.h>
 #include <cstdint>
@@ -262,6 +264,8 @@ namespace
 	int g_sessionRestores = 0;
 	uint32_t g_lastDefenceHash = 0;
 	ULONGLONG g_sessionRejectedAtMs = 0; // last tus/read or tus/write refused with param.status 3
+	ULONGLONG g_sessionOutageStartMs = 0; // first status-3 of the current outage; 0 once a transfer succeeds again
+	bool g_sessionOutageWarned = false;
 	unsigned g_rejectionHolds = 0;
 	uint32_t g_loginSlotBaselineHash = 0; // session in the user/login slot when the re-login was forced
 	unsigned g_loginTokensEnforced = 0;
@@ -687,6 +691,12 @@ namespace
 		}
 		if (g_reloginsInWindow >= kMaxReloginsPerWindow)
 		{
+			if (!g_sessionOutageWarned && g_notificationBar != nullptr)
+			{
+				g_sessionOutageWarned = true;
+				g_notificationBar->AddNotification("%s",
+					L("The profile server keeps dropping your sign-in and the automatic sign-in has paused. Progress may not be saving; check Steam uploads.").c_str());
+			}
 			return; // window exhausted; it reopens by itself
 		}
 		if (g_lastReloginMs != 0 && (now - g_lastReloginMs) < kReloginCooldownMs)
@@ -1555,6 +1565,11 @@ namespace
 			if (sessionRejected)
 			{
 				g_sessionRejectedAtMs = GetTickCount64();
+				if (g_sessionOutageStartMs == 0)
+				{
+					g_sessionOutageStartMs = g_sessionRejectedAtMs;
+					g_sessionOutageWarned = false;
+				}
 			}
 
 			// A single reject can be a blip; a streak is the wedge, and the wedge
@@ -1600,6 +1615,16 @@ namespace
 				// budgets the outage consumed and un-wedge anything still sat at
 				// state 6. Otherwise the D-Code stays missing until the next match.
 				ReArmAllSlots(moduleBase, "WebApi");
+				// Tell the player it happened and healed -- the whole point of the
+				// work above is that nothing on screen gives it away any more.
+				if (g_sessionOutageStartMs != 0 && g_notificationBar != nullptr)
+				{
+					const unsigned seconds = static_cast<unsigned>((GetTickCount64() - g_sessionOutageStartMs + 500) / 1000);
+					char text[256];
+					snprintf(text, sizeof(text), L("The profile server dropped your sign-in for %u s. Signed back in automatically; nothing was lost.").c_str(), seconds);
+					g_notificationBar->AddNotification("%s", text);
+				}
+				g_sessionOutageStartMs = 0;
 			}
 			g_consecutiveWebApiFailures = 0;
 		}

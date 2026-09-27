@@ -4815,6 +4815,12 @@ struct LocalizationKeysAccessor
         // Last synced
         inline const char* Last_synced() const { return Get("Last synced"); }
 
+        // The profile server dropped your sign-in for %u s. Signed back in automatically; nothing was lost.
+        inline const char* The_profile_server_dropped_your_sign_in_for_u_s_Signed_back_in_automatically_nothing_was_lost() const { return Get("The profile server dropped your sign-in for %u s. Signed back in automatically; nothing was lost."); }
+
+        // The profile server keeps dropping your sign-in and the automatic sign-in has paused. Progress may not be saving; check Steam uploads.
+        inline const char* The_profile_server_keeps_dropping_your_sign_in_and_the_automatic_sign_in_has_paused_Progress_may_not_be_saving_check_Steam_uploads() const { return Get("The profile server keeps dropping your sign-in and the automatic sign-in has paused. Progress may not be saving; check Steam uploads."); }
+
         // Stale ranked room: the host still shows a previous match. Cancel and pick someone else.
         inline const char* Stale_ranked_room_the_host_still_shows_a_previous_match_Cancel_and_pick_someone_else() const { return Get("Stale ranked room: the host still shows a previous match. Cancel and pick someone else."); }
 
