@@ -409,6 +409,86 @@ hang. The reporter thread still deadlocks in that scenario - it allocates, and o
 lock nothing in-process can avoid that - so the watchdog handing off to WER *is* the capture
 path for this crash class, not a fallback.
 
+## A crash during shutdown is not the cause: exit-time crashes (2026-09-28)
+
+Randomtrr2 (8.8, Windows on ARM) reported "the game crashes when starting an online match,
+since 8.6". The bundle showed `0xC0000005` inside ntdll on a BBCF worker thread
+(`BBCF+0x1aa87` / `BBCF+0x1addd`), and the same signature was already sitting in the dev
+machine's `CrashReports` from an automated session that had been closed. Both dumps said the
+same thing once the **main thread** was read. The worker's own stack said none of it:
+
+```
+main thread:  BBCF exit()                       0x007A567F, right after WinMain returned
+               -> atexit thunk 0x008481C0        deletes the singleton at DAT_00A29E04
+               -> thread-pool dtor 0x0041A8D0
+               -> 0x0041AD90: WaitForSingleObject(worker, 3000) == WAIT_TIMEOUT
+               -> 0x0044EE10: MessageBoxA("Thread Delete Time Out.", "Continue")
+worker:       0x0041A9E0 pool loop: job->Run() returned, EnterCriticalSection(job+4)
+               -> the job (the D-Code/profile task, L"bbdc.dat") was already freed and its
+                  CRITICAL_SECTION zeroed by an earlier static destructor -> AV
+```
+
+So the game was **already closing**. WinMain returned, the CRT ran static destructors, one of
+them freed the D-Code job while a profile-server request was still in flight, and the pool
+thread crashed when that request finished. The crash is a side effect of the shutdown. The
+report to chase is whatever ended the main loop, and nothing we logged could say what that
+was. Layer 1 (the hook in BBCF's own filter) proves it was not a crash BBCF swallowed: that
+path would have written the bundle first, and the one-bundle guard would have blocked this one.
+
+What the mod records now (`src/Core/ExitDiagnostics.*`):
+
+- **How the process ends.** Detours on `PostQuitMessage`, `DestroyWindow` (game window),
+  `MessageBoxA/W`, `ExitProcess`, `TerminateProcess` (self), and BBCF's statically linked
+  `exit()` at RVA `0x3A54B4`. That one is byte-checked, so another build fails closed, and
+  there are no interior branch targets. `exit()` says outright whether it was reached the
+  normal way (return address RVA `0x3A5684`, i.e. WinMain returned) or called directly (41
+  sites, mostly a bundled CLI library). Each event carries its caller's stack.
+- **Lifecycle window messages** on the main thread, through thread-local `WH_CALLWNDPROC` +
+  `WH_GETMESSAGE` hooks rather than code patches: `WM_CLOSE`, `SC_CLOSE` (with the Alt/F4
+  state), `WM_DESTROY` of the game window, `WM_QUIT` reaching the loop, `WM_QUERYENDSESSION` /
+  `WM_ENDSESSION`, `WM_ACTIVATEAPP`, `WM_DISPLAYCHANGE`.
+- **D3D device health.** Present/PresentEx/TestCooperativeLevel/CheckDeviceState result
+  changes (device lost / removed / hung), every Reset/ResetEx result, and the time of the last
+  presented frame.
+- **BBCF's "Thread Delete Time Out."** is named as what it is when it appears.
+
+Everything goes to DEBUG.txt as `[Exit] ...` when it happens, and into a fixed POD ring
+(allocation-free, because `ExitProcess` is also on our own crash path). `crash_context.txt`
+now carries:
+
+- `Host:` - x64, native x86, or **ARM64 under x86 emulation** (`IsWow64Process2`; plain
+  `IsWow64Process` cannot tell them apart).
+- `DURING SHUTDOWN` at the top when the exit path had already been entered, and a
+  `Process phase` section giving how long before the report it started and on which thread.
+- The **main thread's stack** whenever the fault is on another thread. The main thread is
+  suspended just long enough to read its context and walk its EBP chain, plus a scan for
+  BBCF/mod addresses on its stack, with no allocation while it is suspended.
+- `Lifecycle events`: the ring, oldest first, with times relative to the report.
+- The faulting thread ID is now the real one. It used to print `GetCurrentThreadId()`, which
+  is the reporter thread in every off-thread report.
+- A warning when the register block is not a valid x86 context (`cs != 0x23`). Randomtrr2's
+  came back with `cs=ss=0x3A64` and every GPR zero under ARM64 emulation.
+
+Verified in-game 2026-09-28 (dev machine). The two normal ways out look different, and that is
+how to read a report:
+
+- **The window was closed** (X button, Alt+F4, taskbar, `bbcfctl stop`): `WM_CLOSE` posted, then
+  BBCF's WM_CLOSE handler (`BBCF.exe+0x4f399`) calls `DestroyWindow`, then `WM_DESTROY`, then
+  `PostQuitMessage(0)` from `BBCF.exe+0x4f387`, then `WM_QUIT`, then `BBCF exit(0): WinMain
+  RETURNED`, then `ExitProcess(0)`.
+- **The game quit on its own** (title screen "Esc: Exit Game"): **no `WM_CLOSE`**. BBCF calls
+  `DestroyWindow` itself from game code, stack `BBCF.exe+0x4f059 <- +0x1f9834 <- +0x14fbf4 <-
+  +0x4f281 <- +0x83065 <- +0x4edbb (WinMain)`, and the rest of the chain is the same. The
+  `DestroyWindow` stack names the code that decided to quit.
+- `PostQuitMessage` from a non-main thread is noise: the intro movie's LAV decoder threads do
+  it on every boot, and the log says so.
+- `PresentEx` returning `0x08760878` (`S_PRESENT_OCCLUDED`) right before `WM_QUIT` is the window
+  going away, not a device problem.
+
+Triage rule: if `crash_context.txt` says `DURING SHUTDOWN`, or the main thread is in `exit()`
+/ `Thread Delete Time Out.`, do not debug the crashing thread first. Read the lifecycle events
+before the `BBCF exit()` line: they say what ended the game.
+
 ## Sources
 
 - [STATUS_STACK_BUFFER_OVERRUN doesn't mean that there was a stack buffer overrun](https://devblogs.microsoft.com/oldnewthing/20190108-00/?p=100655)

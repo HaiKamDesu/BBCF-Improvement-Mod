@@ -85,6 +85,9 @@
     <ClCompile Include="src\Core\crashdump.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\ExitDiagnostics.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -333,6 +336,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\crashdump.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\ExitDiagnostics.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\ControllerOverrideManager.h">

@@ -106,6 +106,7 @@
     <ClCompile Include="src\SteamApiWrapper\steamApiWrappers.cpp" />
     <ClCompile Include="src\Core\interfaces.cpp" />
     <ClCompile Include="src\Core\crashdump.cpp" />
+    <ClCompile Include="src\Core\ExitDiagnostics.cpp" />
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp" />
     <ClCompile Include="src\Core\RuntimePlatform.cpp" />
     <ClCompile Include="src\Core\WineCheck.cpp" />
@@ -302,6 +303,7 @@
     <ClInclude Include="src\Game\CharData.h" />
     <ClInclude Include="src\Core\interfaces.h" />
     <ClInclude Include="src\Core\crashdump.h" />
+    <ClInclude Include="src\Core\ExitDiagnostics.h" />
     <ClInclude Include="src\Core\ControllerOverrideManager.h" />
     <ClInclude Include="src\Core\DirectInputWrapper.h" />
     <ClInclude Include="src\Core\RuntimePlatform.h" />

@@ -1,5 +1,6 @@
 #include "interfaces.h"
 
+#include "ExitDiagnostics.h"
 #include "logger.h"
 #include "utils.h"
 
@@ -20,6 +21,9 @@ void AdoptGameWindow(HWND hwnd, bool fromDevice, const char* source)
 	{
 		return;
 	}
+
+	// No-op unless this is the main thread; see ExitDiagnostics::InstallWindowHooks.
+	ExitDiagnostics::InstallWindowHooks();
 
 	// A guess never overrides an answer.
 	if (!fromDevice && g_gameWindowFromDevice)

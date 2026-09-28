@@ -8,6 +8,7 @@
 #include "dllmain.h"
 #include "ControllerOverrideManager.h"
 #include "DirectInputWrapper.h"
+#include "ExitDiagnostics.h"
 #include "Localization.h"
 #include "RuntimePlatform.h"
 #include "WineCheck.h"
@@ -309,6 +310,12 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 
 	ForceLog("[Init] Detours hooks placed OK");
 
+	// How the process ends: PostQuitMessage/DestroyWindow/MessageBox/ExitProcess/BBCF's
+	// exit(). A crash that happens while the game is already closing is otherwise
+	// indistinguishable from one that closed it. The lifecycle window hooks are installed
+	// from the main thread itself (CreateWindowExW / AdoptGameWindow / Present).
+	ExitDiagnostics::InstallApiHooks();
+
 	// Before the first frame rather than in WindowManager::Initialize, so the game's own boot
 	// frames are covered. The watchdog thread waits for the first Heartbeat() to learn which
 	// thread to sample, so starting it this early costs nothing and just widens the window it
@@ -367,6 +374,9 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 
         DisableThreadLibraryCalls(hinstDLL);
         ForceLog("[Init] DisableThreadLibraryCalls done");
+
+        // Static import of BBCF.exe: this is the thread that goes on to run WinMain.
+        ExitDiagnostics::RecordMainThread();
 
         InstallCrashHandlers();
         ForceLog("[Init] Crash handlers installed in DllMain");

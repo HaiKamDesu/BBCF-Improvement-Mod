@@ -4,6 +4,7 @@
 
 #include "Core/interfaces.h"
 #include "Core/crashdump.h"
+#include "Core/ExitDiagnostics.h"
 #include "Core/logger.h"
 #include "D3D9EXWrapper/ID3D9Wrapper_Sprite.h"
 #include "D3D9EXWrapper/ID3DXWrapper_Effect.h"
@@ -1578,6 +1579,9 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 	DWORD dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance, LPVOID lpParam)
 {
 	LOG(7, "CreateWindowExW\n");
+	// BBCF creates its windows on its main thread, which is the thread the lifecycle window
+	// hooks have to be installed from (see ExitDiagnostics::InstallWindowHooks).
+	ExitDiagnostics::InstallWindowHooks();
 	if (!orig_CreateWindowExW)
 	{
 		LOG(2, "CreateWindowExW hook called without original function\n");

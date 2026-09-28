@@ -4,6 +4,8 @@
 
 #include "crashdump.h"
 
+#include "ExitDiagnostics.h"
+
 #include "Settings.h"
 #include "info.h"
 #include "logger.h"
@@ -660,7 +662,14 @@ namespace
                 }
 
                 const CONTEXT& c = *ExPtr->ContextRecord;
-                oss << "\nRegisters (faulting thread " << GetCurrentThreadId() << "):\n";
+                // The report is usually written by the reporter thread, so the current
+                // thread is not the one that faulted. Printing GetCurrentThreadId() here named
+                // the reporter as "the faulting thread" in every off-thread report.
+                const DWORD faultingThread = g_faultingThreadId.load();
+                oss << "\nRegisters (faulting thread "
+                    << (faultingThread != 0 ? faultingThread : GetCurrentThreadId())
+                    << (faultingThread != 0 && faultingThread == ExitDiagnostics::MainThreadId() ? ", the main thread" : "")
+                    << "):\n";
 #if defined(_M_IX86)
                 oss << "  eax=" << Hex32(c.Eax) << " ebx=" << Hex32(c.Ebx)
                     << " ecx=" << Hex32(c.Ecx) << " edx=" << Hex32(c.Edx) << "\n";
@@ -674,6 +683,19 @@ namespace
                 // what a 'ret' that consumed a saved register instead of the
                 // return address leaves behind. Worth naming, because that
                 // shipped twice.
+                // A 32-bit process always runs with cs=0x23 (0x1B on native 32-bit Windows).
+                // Anything else means the record itself is not a real register snapshot -
+                // seen from a Windows-on-ARM machine, where BBCF runs under x86 emulation and
+                // the context came back with cs=ss=0x3A64 and every GPR zero. The stack
+                // below is walked from this record, so it has to be read with that in mind.
+                if ((c.SegCs & 0xFFFF) != 0x23 && (c.SegCs & 0xFFFF) != 0x1B)
+                {
+                        oss << "  Note: this register block is not a valid x86 context (cs should be 0x23), so\n"
+                               "        treat the registers and the walked stack below as unreliable. Seen under\n"
+                               "        x86 emulation on ARM64 - check the Host line. The dump's own thread list\n"
+                               "        is still accurate.\n";
+                }
+
                 if (c.Ebp != 0 && c.Esp > c.Ebp)
                 {
                         oss << "  Note: esp is above ebp, so the frame was already unwound at the point of the\n"
@@ -719,6 +741,244 @@ namespace
                 }
         }
 
+        // What the machine really is. BBCF is a 32-bit process, so IsWow64Process alone
+        // cannot tell x64 from ARM64, and on ARM64 the game runs under x86 emulation -
+        // which changes what a garbled register block or an odd timing race means.
+        std::string DescribeHost()
+        {
+                using IsWow64Process2_t = BOOL(WINAPI*)(HANDLE, USHORT*, USHORT*);
+                const HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+                const auto isWow64Process2 = kernel32
+                        ? reinterpret_cast<IsWow64Process2_t>(GetProcAddress(kernel32, "IsWow64Process2"))
+                        : nullptr;
+                if (isWow64Process2 != nullptr)
+                {
+                        USHORT processMachine = 0;
+                        USHORT nativeMachine = 0;
+                        if (isWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine))
+                        {
+                                switch (nativeMachine)
+                                {
+                                case 0xAA64: return "ARM64 Windows - BBCF runs under x86 emulation";
+                                case 0x8664: return "x64 Windows (WOW64)";
+                                case 0x014C: return "32-bit x86 Windows";
+                                default:
+                                {
+                                        char text[64];
+                                        sprintf_s(text, "native machine 0x%04X", nativeMachine);
+                                        return text;
+                                }
+                                }
+                        }
+                }
+
+                BOOL isWow64 = FALSE;
+                IsWow64Process(GetCurrentProcess(), &isWow64);
+                return isWow64 ? "64-bit Windows (WOW64; IsWow64Process2 unavailable)" : "32-bit Windows";
+        }
+
+        // The main thread at the moment of the report, captured from another thread.
+        //
+        // This is the single most useful thing a crash on a worker thread can show, and it
+        // is what cracked Randomtrr2's report: the worker's stack only said "a BBCF job
+        // touched freed memory", while the main thread was sitting in exit() behind a
+        // "Thread Delete Time Out." box - i.e. the game was already closing.
+        //
+        // POD-only and SEH-guarded: the main thread is SUSPENDED while this runs, so
+        // nothing here may allocate or take a lock (it could be holding the heap lock),
+        // and its stack is read raw rather than through dbghelp. Two views: the EBP chain,
+        // which is exact where frame pointers exist, and a scan for values that point into
+        // BBCF.exe or the mod, which survives frame-pointer-omitted system DLLs.
+        struct ThreadStackCapture
+        {
+                bool suspended;
+                bool haveContext;
+                DWORD error;
+                DWORD eip;
+                DWORD esp;
+                DWORD ebp;
+                uintptr_t chain[40];
+                int chainCount;
+                uintptr_t scan[32];
+                int scanCount;
+        };
+
+        bool InRange(uintptr_t value, uintptr_t begin, uintptr_t end)
+        {
+                return value >= begin && value < end;
+        }
+
+        void CaptureThreadStackGuarded(HANDLE thread, uintptr_t gameBegin, uintptr_t gameEnd,
+                                       uintptr_t modBegin, uintptr_t modEnd, ThreadStackCapture& out)
+        {
+                if (SuspendThread(thread) == static_cast<DWORD>(-1))
+                {
+                        out.error = GetLastError();
+                        return;
+                }
+                out.suspended = true;
+
+                CONTEXT context{};
+                context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+                if (!GetThreadContext(thread, &context))
+                {
+                        out.error = GetLastError();
+                        ResumeThread(thread);
+                        return;
+                }
+                out.haveContext = true;
+#if defined(_M_IX86)
+                out.eip = context.Eip;
+                out.esp = context.Esp;
+                out.ebp = context.Ebp;
+
+                __try
+                {
+                        out.chain[out.chainCount++] = context.Eip;
+                        uintptr_t frame = context.Ebp;
+                        while (out.chainCount < static_cast<int>(_countof(out.chain)))
+                        {
+                                if (frame == 0 || (frame & 3) != 0 || frame < context.Esp ||
+                                    frame > context.Esp + 0x100000)
+                                {
+                                        break;
+                                }
+                                const uintptr_t next = *reinterpret_cast<const uintptr_t*>(frame);
+                                const uintptr_t returnAddress = *reinterpret_cast<const uintptr_t*>(frame + 4);
+                                if (returnAddress == 0)
+                                {
+                                        break;
+                                }
+                                out.chain[out.chainCount++] = returnAddress;
+                                if (next <= frame)
+                                {
+                                        break;
+                                }
+                                frame = next;
+                        }
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                }
+
+                __try
+                {
+                        const uintptr_t* slot = reinterpret_cast<const uintptr_t*>(context.Esp);
+                        for (int i = 0; i < 8192 && out.scanCount < static_cast<int>(_countof(out.scan)); ++i, ++slot)
+                        {
+                                const uintptr_t value = *slot;
+                                if (InRange(value, gameBegin, gameEnd) || InRange(value, modBegin, modEnd))
+                                {
+                                        out.scan[out.scanCount++] = value;
+                                }
+                        }
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                }
+#endif
+                ResumeThread(thread);
+        }
+
+        // A stack slot is only worth printing if it is a return address, i.e. the bytes
+        // just before it are a call: E8 rel32 (5 bytes), FF /2 with a disp32 or absolute
+        // operand (6), FF /2 with a disp8 (3), or FF /2 through a register (2). Everything
+        // else in a module range is a pointer to data or a string. Guarded: the candidate
+        // can sit at the very start of a mapping.
+        bool LooksLikeReturnAddressGuarded(uintptr_t value)
+        {
+                __try
+                {
+                        const uint8_t* const p = reinterpret_cast<const uint8_t*>(value);
+                        if (p[-5] == 0xE8)
+                        {
+                                return true;
+                        }
+                        if (p[-6] == 0xFF && (p[-5] & 0x38) == 0x10)
+                        {
+                                return true;
+                        }
+                        if (p[-3] == 0xFF && (p[-2] & 0x38) == 0x10)
+                        {
+                                return true;
+                        }
+                        if (p[-2] == 0xFF && (p[-1] & 0xF8) == 0xD0)
+                        {
+                                return true;
+                        }
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                }
+                return false;
+        }
+
+        void AppendMainThreadStack(std::ostringstream& oss, const SymbolApi& api)
+        {
+                const DWORD mainThread = ExitDiagnostics::MainThreadId();
+                const HANDLE handle = ExitDiagnostics::MainThreadHandle();
+                const DWORD faultingThread = g_faultingThreadId.load();
+
+                oss << "\nMain thread (" << mainThread << ") at the time of this report:\n";
+                if (mainThread == 0 || handle == nullptr)
+                {
+                        oss << "  <main thread was not recorded at startup>\n";
+                        return;
+                }
+                if (mainThread == faultingThread || mainThread == GetCurrentThreadId())
+                {
+                        oss << "  <the main thread is the faulting thread - see the stack above>\n";
+                        return;
+                }
+
+                const HMODULE game = GetModuleHandleW(nullptr);
+                HMODULE self = nullptr;
+                GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                   reinterpret_cast<LPCWSTR>(&AppendMainThreadStack), &self);
+                const uintptr_t gameBegin = reinterpret_cast<uintptr_t>(game);
+                const uintptr_t modBegin = reinterpret_cast<uintptr_t>(self);
+
+                ThreadStackCapture capture{};
+                CaptureThreadStackGuarded(handle, gameBegin, gameBegin + ImageSizeOf(game),
+                                          modBegin, modBegin + (self ? ImageSizeOf(self) : 0), capture);
+                if (!capture.haveContext)
+                {
+                        oss << "  <could not " << (capture.suspended ? "read its context" : "suspend it")
+                            << ", error " << capture.error << ">\n";
+                        return;
+                }
+
+                oss << "  eip=" << Hex32(capture.eip) << " esp=" << Hex32(capture.esp)
+                    << " ebp=" << Hex32(capture.ebp) << "\n";
+                oss << "  Frame chain (innermost first):\n";
+                for (int i = 0; i < capture.chainCount; ++i)
+                {
+                        char index[8];
+                        sprintf_s(index, "%02d", i);
+                        oss << "    #" << index << " 0x" << Hex32(static_cast<uint32_t>(capture.chain[i])) << "  "
+                            << DescribeAddress(capture.chain[i]) << DescribeSymbol(api, capture.chain[i]) << "\n";
+                }
+                oss << "  Return addresses into BBCF.exe / the mod found on its stack (innermost first;\n"
+                       "  survives frames the chain above cannot follow):\n";
+                int printed = 0;
+                uintptr_t previous = 0;
+                for (int i = 0; i < capture.scanCount; ++i)
+                {
+                        const uintptr_t value = capture.scan[i];
+                        if (value == previous || !LooksLikeReturnAddressGuarded(value))
+                        {
+                                continue;
+                        }
+                        previous = value;
+                        ++printed;
+                        oss << "    " << DescribeAddress(value) << DescribeSymbol(api, value) << "\n";
+                }
+                if (printed == 0)
+                {
+                        oss << "    <none>\n";
+                }
+        }
+
         std::string BuildContextText(PEXCEPTION_POINTERS ExPtr, const std::wstring& dumpPath, const SymbolApi& api)
         {
                 std::ostringstream oss;
@@ -726,10 +986,19 @@ namespace
                 oss << "Mod version: " << MOD_VERSION_NUM << "\n";
                 oss << "Dump file: " << ToUtf8(dumpPath) << "\n";
 
+                oss << "Host: " << DescribeHost() << "\n";
+                if (ExitDiagnostics::IsExiting())
+                {
+                        oss << "DURING SHUTDOWN: the game was already closing when this happened - see\n"
+                               "\"Process phase\" and \"Lifecycle events\" below for what closed it.\n";
+                }
+
                 AppendExceptionDetail(oss, ExPtr);
                 AppendHeapFailureDetail(oss, ExPtr);
                 AppendRegisters(oss, ExPtr);
                 AppendStackTrace(oss, ExPtr, api);
+                AppendMainThreadStack(oss, api);
+                ExitDiagnostics::AppendReport(oss);
 
                 // Just the two bases every triage starts from: without them a
                 // "BBCF.exe+0x4f350" cannot be turned back into the static address

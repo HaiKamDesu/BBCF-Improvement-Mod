@@ -1,5 +1,6 @@
 #include "ID3D9EXWrapper_Device.h"
 
+#include "Core/ExitDiagnostics.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Game/FrameStallDiagnostics.h"
@@ -74,7 +75,9 @@ ULONG APIENTRY Direct3DDevice9ExWrapper::Release()
 HRESULT APIENTRY Direct3DDevice9ExWrapper::TestCooperativeLevel()
 {
 	LOG(7, "TestCooperativeLevel\n");
-	return m_Direct3DDevice9Ex->TestCooperativeLevel();
+	const HRESULT hr = m_Direct3DDevice9Ex->TestCooperativeLevel();
+	ExitDiagnostics::OnDeviceCall("TestCooperativeLevel", hr);
+	return hr;
 }
 
 UINT APIENTRY Direct3DDevice9ExWrapper::GetAvailableTextureMem()
@@ -166,7 +169,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::Reset(D3DPRESENT_PARAMETERS* pPresent
 
 	LOG(7, "Reset\n");
 	Settings::applySettingsIni(pPresentationParameters);
-	return m_Direct3DDevice9Ex->Reset(pPresentationParameters);
+	const HRESULT hr = m_Direct3DDevice9Ex->Reset(pPresentationParameters);
+	ExitDiagnostics::OnDeviceReset("Reset", hr);
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::Present(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
@@ -175,7 +180,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::Present(CONST RECT* pSourceRect, CONS
 	// Timed so vsync/driver waiting can be separated from the rest of the
 	// frame in FrameStallIncidents.log - see FrameStallDiagnostics.h.
 	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
-	return m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+	const HRESULT hr = m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+	ExitDiagnostics::OnPresentResult("Present", hr);
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::GetBackBuffer(UINT iSwapChain, UINT iBackBuffer, D3DBACKBUFFER_TYPE Type, IDirect3DSurface9** ppBackBuffer)
@@ -900,7 +907,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::PresentEx(CONST RECT* pSourceRect, CO
 	LOG(7, "PresentEx 0x%p 0x%p\n", pSourceRect, pDestRect);
 	// Same accounting as Present() above; BBCF uses the Ex path in practice.
 	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
-	return m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	const HRESULT hr = m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	ExitDiagnostics::OnPresentResult("PresentEx", hr);
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::GetGPUThreadPriority(INT* pPriority)
@@ -942,7 +951,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::GetMaximumFrameLatency(UINT* pMaxLate
 HRESULT APIENTRY Direct3DDevice9ExWrapper::CheckDeviceState(HWND hDestinationWindow)
 {
 	LOG(7, "CheckDeviceState\n");
-	return m_Direct3DDevice9Ex->CheckDeviceState(hDestinationWindow);
+	const HRESULT hr = m_Direct3DDevice9Ex->CheckDeviceState(hDestinationWindow);
+	ExitDiagnostics::OnDeviceCall("CheckDeviceState", hr);
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::CreateRenderTargetEx(UINT Width, UINT Height, D3DFORMAT Format, D3DMULTISAMPLE_TYPE MultiSample, DWORD MultisampleQuality, BOOL Lockable, IDirect3DSurface9** ppSurface, HANDLE* pSharedHandle, DWORD Usage)
@@ -1020,6 +1031,7 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::ResetEx(D3DPRESENT_PARAMETERS* pPrese
 	WindowManager::GetInstance().InvalidateDeviceObjects();
 
 	HRESULT ret = m_Direct3DDevice9Ex->ResetEx(pPresentationParameters, pFullscreenDisplayMode);
+	ExitDiagnostics::OnDeviceReset("ResetEx", ret);
 
 	WindowManager::GetInstance().CreateDeviceObjects();
 
