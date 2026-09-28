@@ -1,7 +1,9 @@
 # Platinum item-state custom palette bug — investigation
 
-**Status:** root-caused and fixed (2026-07-26). Fix lives in
-`PaletteManager::ClearPlatinumItemPaletteLink`, called once per frame from `MatchState::OnUpdate`.
+**Status:** root-caused 2026-07-26; the per-frame link clear described below was replaced on
+2026-09-27 by keeping the eight engine palette slots themselves in sync (it flickered — see
+`PlatinumPaletteSlots.md`, which also explains the mechanism this document only found the edge of).
+`PaletteManager::UpdatePlatinumItemPalettes` is the current entry point.
 
 All addresses below are **static VAs** (image base `0x00400000`). Subtract `0x00400000` for the
 `bbcf_base_adress + RVA` form used by `GhidraDefs.h` and the hook code.

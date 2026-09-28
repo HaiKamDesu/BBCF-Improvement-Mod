@@ -40,7 +40,8 @@ No unit test suite is present; normal validation is build plus operator in-game 
 - Networking/Steam: `src/Network`, `src/SteamApiWrapper`, packet structs in `src/Network/Packet.h`.
 - Palettes: `src/Palette`, hooks in `src/Hooks/hooks_palette.*`, config in `resource/palettes.ini`.
   Character-specific palette redirection (Platinum's item states) is documented in
-  `docs/Research/PlatinumItemPaletteInvestigation.md`; addresses in `src/Game/GhidraDefs.h`.
+  `docs/Research/PlatinumPaletteSlots.md` (engine palette slots, how the mod keeps them in sync)
+  and `PlatinumItemPaletteInvestigation.md`; addresses in `src/Game/GhidraDefs.h`.
 - Web/update/replay upload: `src/Web`, `src/Network/ReplayUploadManager.*`.
 
 ## Search Strategy

@@ -327,6 +327,7 @@ void CharPaletteHandle::ReplacePalArrayInMemory(char* Dst, const void* Src)
 	// We have to overwrite both, as some characters use the duplication's address instead
 	memcpy(Dst, Src, IMPL_PALETTE_DATALEN);
 	memcpy(Dst + 0x800, Src, IMPL_PALETTE_DATALEN);
+	++m_writeGeneration;
 }
 
 void CharPaletteHandle::ReplaceAllPalFiles(IMPL_data_t* newPaletteData, int palIndex)

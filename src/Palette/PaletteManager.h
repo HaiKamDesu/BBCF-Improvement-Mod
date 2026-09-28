@@ -103,9 +103,15 @@ public:
 	// Call it ONCE per frame
 	void OnUpdate(CharPaletteHandle& P1, CharPaletteHandle& P2);
 
-	// Call it ONCE per frame, after OnUpdate. Keeps Platinum's custom palette applied while she
-	// is holding a drive item.
-	void ClearPlatinumItemPaletteLink(Player& playerOne, Player& playerTwo);
+	// Call it ONCE per frame, after OnUpdate. Keeps Platinum's item palettes (the eight engine
+	// palettes her drive items draw her from) equal to whatever the mod last wrote into her own
+	// palette storage. See docs/Research/PlatinumPaletteSlots.md.
+	void UpdatePlatinumItemPalettes(Player& playerOne, Player& playerTwo);
+
+	// Copies the player's current palette storage into every engine custom palette slot reserved
+	// by that player's entities (for Platinum: PaletteControlObj1..8). Returns false when a slot
+	// could not be resolved, in which case the caller falls back to clearing the link.
+	bool SyncOwnedCustomPaletteSlots(Player& player);
 
 	// Call it ONCE upon match start
 	void OnMatchInit(Player& playerOne, Player& playerTwo);
@@ -158,6 +164,8 @@ private:
 	std::vector<int> m_onlinePalsStartIndex;
 	bool m_loadOnlinePalettes = false;
 	bool m_PaletteArchiveDownloaded = false;
+	// CharPaletteHandle::GetWriteGeneration() value last propagated to each player's item palettes.
+	unsigned m_platinumSyncedGeneration[2] = { 0, 0 };
 
 	// Undoes UpdatePalette()'s index toggle on the in-match -> not-in-match edge, so paths that
 	// re-enter a match without passing through character select (training's matchup change) do

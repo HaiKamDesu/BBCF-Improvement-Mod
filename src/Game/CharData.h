@@ -110,11 +110,22 @@ public:
 	int32_t BoundingAddY; //0x032C do not use not sure what it is, but it's Unknown23087?
 	int32_t BoundingAddX; //0x0330
 	int32_t stageEdgeTouchTimer; //0x0334
-	char pad_0338[36]; //0x0338
+	char pad_0338[24]; //0x0338
+	// Palette source of this entity's sprites. See docs/Research/PlatinumPaletteSlots.md.
+	//   paletteColorOverride: in-game color slot to draw from, -1 = the player's chosen color.
+	//   paletteFileIndex: which of the 8 palette files of that color (0 = Character).
+	//   ownPaletteId: index into the battle scene's 40 reserved custom palettes
+	//     (0x011B6AE0+0x178, handles into the resource registry), -1 = none. Platinum's
+	//     PaletteControlObj1..8 each reserve one at spawn (FUN_00591BC0) and fill it with a COPY
+	//     of her palette (FUN_005787E0); nothing refreshes that copy afterwards, so the mod does.
+	int32_t paletteColorOverride; //0x0350
+	int16_t paletteFileIndex; //0x0354
+	int16_t paletteFileIndexIsColor; //0x0356 non-zero: paletteFileIndex is a color slot, not a file
+	int32_t ownPaletteId; //0x0358
 	// Palette this entity borrows instead of its own, as an engine palette id, or -1 for "use my
 	// own". Platinum's PT_LinkColor script command (handler at BBCF.exe 0x005B2AC3) points this at
-	// one of the PaletteControlObj1..8 objects while she holds a drive item; the same handler
-	// writes -1 when she has none. See PaletteManager::ClearPlatinumItemPaletteLink.
+	// one of the PaletteControlObj1..8 objects' ownPaletteId while she holds a drive item; the
+	// same handler writes -1 when she has none. See PaletteManager::UpdatePlatinumItemPalettes.
 	int32_t linkedPaletteId; //0x035C
 	char pad_0360[296]; //0x0360
 	int32_t typeOfAttack; //0x0488 1=normal, 2=special, 3=DD/EA, 5=AH

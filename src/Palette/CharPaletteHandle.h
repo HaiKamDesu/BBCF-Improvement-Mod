@@ -34,6 +34,10 @@ class CharPaletteHandle
 	int m_switchPalIndex2;
 	int m_selectedCustomPalIndex;
 	bool m_updateLocked;
+	// Bumped on every write into the game's palette storage. PaletteManager compares it against
+	// the value it last propagated to Platinum's item palettes, so those are re-copied exactly
+	// once per change instead of every frame.
+	unsigned m_writeGeneration = 0;
 
 public:
 	void SetPointerPalIndex(int* pPalIdx);
@@ -50,6 +54,9 @@ public:
 	// an opponent's synced palette). Content-based rather than flag-based so it stays correct no
 	// matter which path applied the palette.
 	bool IsCustomPaletteActive() const;
+
+	// Counts writes into the palette storage; see m_writeGeneration.
+	unsigned GetWriteGeneration() const { return m_writeGeneration; }
 
 private:
 	void SetPaletteIndex(int palIndex);

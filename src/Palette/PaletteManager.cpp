@@ -9,6 +9,7 @@
 #include "Core/interfaces.h"
 #include "Game/characters.h"
 #include "Game/gamestates.h"
+#include "Game/GhidraDefs.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 #include "impl_templates.cpp"
 
@@ -949,24 +950,163 @@ void PaletteManager::RestoreNativePalIndexOnMatchExit(CharPaletteHandle& P1, Cha
 	m_wasInMatch = inMatch;
 }
 
+namespace
+{
+	// The engine's custom palette slots and palette objects. Offsets and the functions they were
+	// read out of are in GhidraDefs.h; the mechanism is in docs/Research/PlatinumPaletteSlots.md.
+	struct PaletteSlotObject
+	{
+		char* data = nullptr;
+		char* dataDup = nullptr;
+		int* dirty = nullptr;
+	};
+
+	// Resolves battle scene custom palette slot -> resource handle -> palette object. Plain
+	// pointer walking with the same bounds checks the game's own lookups make
+	// (FUN_0057CAA0 -> FUN_004098F0 -> FUN_00411F90), so it can be called from the per-frame
+	// path without calling into the game.
+	bool ResolveCustomPaletteSlot(int slotId, PaletteSlotObject* out)
+	{
+		if (slotId < 0 || slotId >= BATTLE_CUSTOM_PALETTE_SLOTS)
+			return false;
+
+		const char* const base = GetBbcfBaseAdress();
+		const char* const battleScene = base + ADDR_BattleSceneSingleton;
+		if (*reinterpret_cast<const int*>(battleScene + OFFSET_BattleScene_CustomPalInUse + slotId * 4) == 0)
+			return false;
+
+		const uint32_t handle = *reinterpret_cast<const uint32_t*>(
+			battleScene + OFFSET_BattleScene_CustomPalHandles + slotId * 4);
+
+		const char* const registry = base + ADDR_ResourceRegistry;
+		char* const* const resources = *reinterpret_cast<char* const* const*>(registry);
+		const uint32_t resourceCount = *reinterpret_cast<const uint32_t*>(registry + 8);
+		if (resources == nullptr || handle >= resourceCount)
+			return false;
+
+		const char* const resource = resources[handle];
+		if (resource == nullptr)
+			return false;
+		if (*reinterpret_cast<const uint32_t*>(resource + OFFSET_Resource_SubObjectCount) == 0)
+			return false;
+		char* const* const subObjects = *reinterpret_cast<char* const* const*>(resource + OFFSET_Resource_SubObjects);
+		if (subObjects == nullptr || subObjects[0] == nullptr)
+			return false;
+
+		char* const obj = subObjects[0];
+		// 256 entries of 32 bits is the only shape a character palette has; anything else means
+		// the walk landed somewhere it should not have.
+		if (*reinterpret_cast<const int*>(obj + OFFSET_PalObj_Width) != 256 ||
+			*reinterpret_cast<const int*>(obj + OFFSET_PalObj_Bpp) != 32)
+			return false;
+
+		out->data = obj + OFFSET_PalObj_Data;
+		out->dataDup = obj + OFFSET_PalObj_DataDup;
+		out->dirty = reinterpret_cast<int*>(obj + OFFSET_PalObj_Dirty);
+		return true;
+	}
+
+	// Separate function so the SEH frame holds nothing that needs unwinding. Returns the number
+	// of slots that could not be resolved; *pWritten counts slots that actually changed.
+	int SyncSlotsGuarded(CharData* owner, char* const* srcFiles, int* pWritten)
+	{
+		int failed = 0;
+		__try
+		{
+			for (int i = 0; i < g_gameVals.entityCount; ++i)
+			{
+				CharData* const entity = reinterpret_cast<CharData*>(g_gameVals.pEntityList[i]);
+				if (entity == nullptr || entity->ownPaletteId < 0)
+					continue;
+				if (entity != owner && entity->ownerEntity != owner)
+					continue;
+
+				// The slot was filled from this file of the owner's palette (FUN_005787E0), so
+				// that is the file it has to follow.
+				int fileIndex = entity->paletteFileIndex;
+				if (entity->paletteFileIndexIsColor != 0)
+					fileIndex = PaletteFile_Character;
+				if (fileIndex < 0 || fileIndex >= TOTAL_PALETTE_FILES)
+				{
+					++failed;
+					continue;
+				}
+
+				char* const src = srcFiles[fileIndex];
+				PaletteSlotObject slot;
+				if (src == nullptr || !ResolveCustomPaletteSlot(entity->ownPaletteId, &slot))
+				{
+					++failed;
+					continue;
+				}
+
+				if (memcmp(slot.data, src, IMPL_PALETTE_DATALEN) == 0 &&
+					memcmp(slot.dataDup, src, IMPL_PALETTE_DATALEN) == 0)
+					continue;
+
+				memcpy(slot.data, src, IMPL_PALETTE_DATALEN);
+				memcpy(slot.dataDup, src, IMPL_PALETTE_DATALEN);
+				// The flag the game's own copy sets: without it the bytes change and the sprite
+				// does not.
+				*slot.dirty = 1;
+				++*pWritten;
+			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			return failed + 1;
+		}
+		return failed;
+	}
+}
+
+bool PaletteManager::SyncOwnedCustomPaletteSlots(Player& player)
+{
+	if (player.IsCharDataNullPtr() || g_gameVals.pEntityList == nullptr)
+		return false;
+
+	CharPaletteHandle& palHandle = player.GetPalHandle();
+	if (!palHandle.IsPaletteDataReady())
+		return false;
+
+	// The live storage, i.e. what the mod last wrote. Resolved here because the handle's
+	// accessors are private to PaletteManager.
+	char* srcFiles[TOTAL_PALETTE_FILES] = {};
+	for (int file = 0; file < TOTAL_PALETTE_FILES; ++file)
+	{
+		if (!palHandle.TryGetPalFileAddr(*palHandle.m_pCurPalIndex, file, &srcFiles[file]))
+			srcFiles[file] = nullptr;
+	}
+
+	int written = 0;
+	const int failed = SyncSlotsGuarded(player.GetData(), srcFiles, &written);
+	if (written > 0 || failed > 0)
+	{
+		LOG(2, "PaletteManager::SyncOwnedCustomPaletteSlots wrote %d item palette slot(s), %d unresolved\n",
+			written, failed);
+	}
+	return failed == 0;
+}
+
 // Platinum's drive lets her hold an item, and while she does, her script runs the PT_LinkColor
 // command (handler at BBCF.exe 0x005B2AC3). That command points her CharData::linkedPaletteId at
-// one of eight engine-side PaletteControlObj palettes chosen by her item type (CharData +0x1A0),
-// and the renderer then draws her from that palette instead of her own palette storage.
+// the custom palette slot of one of eight PaletteControlObj entities, chosen by her item type
+// (CharData +0x1A0), and the renderer then draws her from that slot instead of her own storage.
 //
-// Those PaletteControlObj palettes are built once, when the round loads, from whatever her color
-// slot held at that moment - and nothing refreshes them afterwards. That is the whole bug:
-//   - palettes.ini works because PaletteManager::OnMatchInit patches the palette storage before
-//     the round's palettes are built, so the copy they capture is already the custom one.
-//   - picking a palette mid-match writes the storage correctly (verified in memory), but the
-//     already-built copy keeps the original colors, so she reverts to her native color for as
-//     long as she holds an item. Re-picking the palette cannot fix it, and neither can writing
-//     the data harder: by then the stale palette only exists past the point we can reach.
+// Each of those slots was filled once, when the object spawned, with a COPY of her palette
+// storage (FUN_005787E0) - and nothing in the game refreshes it. So every palette write the mod
+// makes afterwards (menu pick, palette editor stroke, opponent's synced palette, back to Default)
+// leaves the eight copies stale, and she flips to the stale colors the moment an item is held.
 //
-// The same handler writes -1 to linkedPaletteId when she has no item, meaning "draw from my own
-// palette storage" - so clearing the link is a value the game itself uses, not an invented state.
-// We only clear it while a custom palette is actually active, so unmodified play is untouched.
-void PaletteManager::ClearPlatinumItemPaletteLink(Player& playerOne, Player& playerTwo)
+// Until 8.7 the mod papered over that by writing -1 into linkedPaletteId every frame. The script
+// re-links on some state changes, so on those frames the link won the race and one frame of the
+// stale palette showed: the "flicker while moving with an edited palette". Now the copies are
+// simply kept current: after any write to her storage, the same bytes go into every slot her
+// objects own, with the dirty flag set so the engine re-uploads them. The link is left alone,
+// so vanilla behaviour is untouched and the frame-order race no longer exists.
+//
+// The clear remains only as a fallback for the case where a slot cannot be resolved.
+void PaletteManager::UpdatePlatinumItemPalettes(Player& playerOne, Player& playerTwo)
 {
 	Player* const players[2] = { &playerOne, &playerTwo };
 
@@ -979,21 +1119,34 @@ void PaletteManager::ClearPlatinumItemPaletteLink(Player& playerOne, Player& pla
 		if (charData == nullptr || charData->charIndex != CharIndex_Platinum)
 			continue;
 
-		if (charData->linkedPaletteId == -1)
+		CharPaletteHandle& palHandle = players[i]->GetPalHandle();
+		const unsigned generation = palHandle.GetWriteGeneration();
+		if (generation == m_platinumSyncedGeneration[i])
 			continue;
 
-		if (!players[i]->GetPalHandle().IsCustomPaletteActive())
+		if (SyncOwnedCustomPaletteSlots(*players[i]))
+		{
+			m_platinumSyncedGeneration[i] = generation;
 			continue;
+		}
 
-		LOG(2, "PaletteManager::ClearPlatinumItemPaletteLink P%d dropping stale item palette link %d\n",
-			i + 1, charData->linkedPaletteId);
-
-		charData->linkedPaletteId = -1;
+		// Could not reach every slot: fall back to the old behaviour so at least her own storage
+		// is what gets drawn. Retried next frame, since the objects may simply not exist yet.
+		if (charData->linkedPaletteId != -1 && palHandle.IsCustomPaletteActive())
+		{
+			LOG(2, "PaletteManager::UpdatePlatinumItemPalettes P%d slot sync incomplete, dropping item palette link %d\n",
+				i + 1, charData->linkedPaletteId);
+			charData->linkedPaletteId = -1;
+		}
 	}
 }
 
 void PaletteManager::OnMatchInit(Player& playerOne, Player& playerTwo)
 {
+	// The round rebuilds every custom palette slot from scratch, so nothing is synced yet.
+	m_platinumSyncedGeneration[0] = 0;
+	m_platinumSyncedGeneration[1] = 0;
+
 	LOG(1, "PaletteManager::OnMatchInit -- P1 --\n");
 	playerOne.GetPalHandle().OnMatchInit();
 

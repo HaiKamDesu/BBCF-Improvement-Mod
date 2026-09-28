@@ -1034,3 +1034,51 @@ static constexpr uintptr_t ADDR_AbyssHudSingleton      = 0x00AE0338; // 0x00EE03
 static constexpr uintptr_t ADDR_SceneObjectGet         = 0x0007E860; // FUN_0047E860
 static constexpr uintptr_t OFFSET_SceneGameMode        = 0x108;
 static constexpr uintptr_t OFFSET_SceneGameState       = 0x10C;
+
+// ---------------------------------------------------------------------------------------------
+// Engine custom palette slots - the "9 palettes" of Platinum (2026-09-27).
+// Full write-up: docs/Research/PlatinumPaletteSlots.md.
+//
+// The battle scene singleton (FUN_0055C540 returns the static object at VA 0x011B6AE0) holds 40
+// reserved custom palette slots: resource handles at +0x178 (40 dwords) and in-use flags at
+// +0x218 (40 dwords). An entity reserves one with FUN_00591BC0(this, true): it finds the first
+// free flag, stores the index into CharData+0x358 (ownPaletteId) and calls FUN_005787E0, which
+// COPIES the entity's palette (FUN_0057C8B0: player container, color*8+fileIndex) into the slot's
+// palette object via FUN_004B1620 -> FUN_00452C60. A palette id resolves to (handle, sub 0)
+// through FUN_0057CAA0; FUN_005A6C80 is the render-side chooser: own id (+0x358), else the linked
+// id (+0x35C), else the player's palette container.
+//
+// Resource registry (FUN_0040E6B0 returns the static at VA 0x00A23674): +0 = pointer array,
+// +8 = count. registry[handle] is a resource whose sub-objects are at +4 (array) / +0xC (count).
+// The mod's CharPaletteHandle::m_pPalBaseAddr IS such a resource (the player's palette container):
+// its sub-object color*8+file is the palette object the mod has always patched.
+//
+// Palette object (AA_CPalette): +0xC dirty flag (1 = re-upload to the GPU), +0x1C color data,
+// +0x81C second copy of the same data (the "+0x800 duplicate"), +0x101C width (256),
+// +0x1020 bits per pixel (32). FUN_00452C60(dst, src) copies both blocks and sets the flag;
+// FUN_00452DE0(index, color) sets one entry and sets the flag. Writing the bytes WITHOUT the
+// flag is why the 2026-07 full-memory patch of the 8 mirrors changed nothing on screen.
+static constexpr uintptr_t ADDR_BattleSceneSingleton        = 0x00DB6AE0; // VA 0x011B6AE0
+static constexpr uintptr_t OFFSET_BattleScene_CustomPalHandles = 0x178;   // 40 resource handles
+static constexpr uintptr_t OFFSET_BattleScene_CustomPalInUse   = 0x218;   // 40 in-use flags
+static constexpr int       BATTLE_CUSTOM_PALETTE_SLOTS       = 40;
+static constexpr uintptr_t OFFSET_BattleScene_EntityList     = 0x62784;   // GetEntityListAddr hook stores here
+static constexpr uintptr_t ADDR_ResourceRegistry             = 0x00623674; // VA 0x00A23674
+static constexpr uintptr_t OFFSET_Resource_SubObjects        = 0x4;
+static constexpr uintptr_t OFFSET_Resource_SubObjectCount    = 0xC;
+static constexpr uintptr_t OFFSET_PalObj_Dirty               = 0x0C;
+static constexpr uintptr_t OFFSET_PalObj_Data                = 0x1C;
+static constexpr uintptr_t OFFSET_PalObj_DataDup             = 0x81C;
+static constexpr uintptr_t OFFSET_PalObj_Width               = 0x101C;
+static constexpr uintptr_t OFFSET_PalObj_Bpp                 = 0x1020;
+static constexpr uintptr_t ADDR_BattleSceneGet               = 0x0015C540; // FUN_0055C540
+static constexpr uintptr_t ADDR_ResourceRegistryGet          = 0x0000E6B0; // FUN_0040E6B0
+static constexpr uintptr_t ADDR_EntityReserveCustomPalette   = 0x00191BC0; // FUN_00591BC0(this, bool)
+static constexpr uintptr_t ADDR_EntityRefreshCustomPalette   = 0x001787E0; // FUN_005787E0(this)
+static constexpr uintptr_t ADDR_EntityPaletteSource          = 0x0017C8B0; // FUN_0057C8B0
+static constexpr uintptr_t ADDR_PaletteIdResolve             = 0x0017CAA0; // FUN_0057CAA0(id, &handle, &sub)
+static constexpr uintptr_t ADDR_PaletteCopyByHandle          = 0x000B1620; // FUN_004B1620
+static constexpr uintptr_t ADDR_PalObjCopy                   = 0x00052C60; // FUN_00452C60(dst, src)
+static constexpr uintptr_t ADDR_PalObjSetEntry               = 0x00052DE0; // FUN_00452DE0(index, color)
+static constexpr uintptr_t ADDR_RenderPaletteChooser         = 0x001A6C80; // FUN_005A6C80
+static constexpr uintptr_t ADDR_PlatLightCmdCompare          = 0x001B2B7F; // "PT_Light" - reads +0x358, writes no colors
