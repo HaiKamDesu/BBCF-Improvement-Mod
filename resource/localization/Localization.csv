@@ -1816,14 +1816,24 @@ window began,window began,empieza la ventana
 actionable (delay 0),actionable (delay 0),accionable (retraso 0)
 condition detected,condition detected,condición detectada
 action fired,action fired,acción disparada
+Training file,Training file,Archivo de entrenamiento
 "Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go.","Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go.","Todo lo de esta página en un archivo: las acciones del muñeco, posiciones y tiempos, y el retraso de input, para poder enviarle una configuración a alguien y que la cargue de una vez."
+Export...,Export...,Exportar...
+Import...,Import...,Importar...
 Writes the current setup to a file you choose.,Writes the current setup to a file you choose.,Guarda la configuración actual en un archivo que elijas.
 Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.,Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.,Sustituye la configuración actual por la de un archivo. Las grabaciones copiadas viajan dentro del archivo; un archivo de playback o una ranura CF a la que apunte una acción tiene que existir en esta máquina.
+Reset all to defaults,Reset all to defaults,Restablecer todo
 Clears every dummy action and puts every setting on this page back to how a fresh install has it.,Clears every dummy action and puts every setting on this page back to how a fresh install has it.,Borra todas las acciones del muñeco y devuelve todos los ajustes de esta página a los de una instalación nueva.
+Reset the whole training page?,Reset the whole training page?,¿Restablecer toda la página de entrenamiento?
 "This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.","This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.","Esto elimina todas las acciones del muñeco y restablece posiciones, tiempo de levantada y retraso de input. Exporta antes si quieres conservar esta configuración."
+Everything is back to defaults.,Everything is back to defaults.,Todo ha vuelto a los valores por defecto.
+Save the training file,Save the training file,Guardar el archivo de entrenamiento
+Open a training file,Open a training file,Abrir un archivo de entrenamiento
+BBCF training file,BBCF training file,Archivo de entrenamiento de BBCF
 Saved to %s,Saved to %s,Guardado en %s
 Could not write %s,Could not write %s,No se pudo escribir %s
 Loaded %s: %d trigger(s),Loaded %s: %d trigger(s),Cargado %s: %d disparador(es)
+Could not read %s,Could not read %s,No se pudo leer %s
 Remove these %d actions,Remove these %d actions,Eliminar estas %d acciones
 Remove these %d actions?,Remove these %d actions?,¿Eliminar estas %d acciones?
 Save this action as a playback file,Save this action as a playback file,Guardar esta acción como archivo de playback

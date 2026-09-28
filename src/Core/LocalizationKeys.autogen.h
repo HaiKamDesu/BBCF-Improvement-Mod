@@ -3456,8 +3456,8 @@ struct LocalizationKeysAccessor
         // The Discord is the fastest place to ask a question or report something broken.
         inline const char* The_Discord_is_the_fastest_place_to_ask_a_question_or_report_something_broken() const { return Get("The Discord is the fastest place to ask a question or report something broken."); }
 
-        // The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.
-        inline const char* The_dummy_s_move_list_could_not_be_read_This_happens_on_the_training_character_select_screen_and_in_mirror_matches() const { return Get("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches."); }
+        // The dummy's move list could not be read. This happens on the training character select screen.
+        inline const char* The_dummy_s_move_list_could_not_be_read_This_happens_on_the_training_character_select_screen() const { return Get("The dummy's move list could not be read. This happens on the training character select screen."); }
 
         // The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.
         inline const char* The_mod_cannot_read_the_pad_right_now_so_the_delay_does_nothing_It_needs_the_mod_s_controller_hooks_which_are_off_or_could_not_be_installed() const { return Get("The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed."); }
@@ -4826,6 +4826,183 @@ struct LocalizationKeysAccessor
 
         // Stale ranked room: the host still shows a previous match. Left it automatically.
         inline const char* Stale_ranked_room_the_host_still_shows_a_previous_match_Left_it_automatically() const { return Get("Stale ranked room: the host still shows a previous match. Left it automatically."); }
+
+        // Recording
+        inline const char* Recording() const { return Get("Recording"); }
+
+        // (%d frames)
+        inline const char* d_frames_2() const { return Get("(%d frames)"); }
+
+        // %d actions
+        inline const char* d_actions() const { return Get("%d actions"); }
+
+        // (off)
+        inline const char* off_2() const { return Get("(off)"); }
+
+        // in order
+        inline const char* in_order() const { return Get("in order"); }
+
+        // no repeats
+        inline const char* no_repeats() const { return Get("no repeats"); }
+
+        // random
+        inline const char* random_2() const { return Get("random"); }
+
+        // Turn this trigger on or off
+        inline const char* Turn_this_trigger_on_or_off() const { return Get("Turn this trigger on or off"); }
+
+        // Turn this action on or off
+        inline const char* Turn_this_action_on_or_off() const { return Get("Turn this action on or off"); }
+
+        // Add another action to this trigger
+        inline const char* Add_another_action_to_this_trigger() const { return Get("Add another action to this trigger"); }
+
+        // Remove this trigger and everything in it
+        inline const char* Remove_this_trigger_and_everything_in_it() const { return Get("Remove this trigger and everything in it"); }
+
+        // Remove this trigger?
+        inline const char* Remove_this_trigger() const { return Get("Remove this trigger?"); }
+
+        // Remove %s and its %d actions?
+        inline const char* Remove_s_and_its_d_actions() const { return Get("Remove %s and its %d actions?"); }
+
+        // Remove
+        inline const char* Remove() const { return Get("Remove"); }
+
+        // Remove this action
+        inline const char* Remove_this_action() const { return Get("Remove this action"); }
+
+        // Remove this action - it is the trigger's last, so the trigger goes with it
+        inline const char* Remove_this_action_it_is_the_trigger_s_last_so_the_trigger_goes_with_it() const { return Get("Remove this action - it is the trigger's last, so the trigger goes with it"); }
+
+        // Nothing to configure for a burst
+        inline const char* Nothing_to_configure_for_a_burst() const { return Get("Nothing to configure for a burst"); }
+
+        // This action is not set up enough to do anything yet.
+        inline const char* This_action_is_not_set_up_enough_to_do_anything_yet() const { return Get("This action is not set up enough to do anything yet."); }
+
+        // This removes every trigger and every action in them.
+        inline const char* This_removes_every_trigger_and_every_action_in_them() const { return Get("This removes every trigger and every action in them."); }
+
+        // How many actions this trigger holds, and how it picks one when it fires. Change the picking order in the trigger's settings.
+        inline const char* How_many_actions_this_trigger_holds_and_how_it_picks_one_when_it_fires_Change_the_picking_order_in_the_trigger_s_settings() const { return Get("How many actions this trigger holds, and how it picks one when it fires. Change the picking order in the trigger's settings."); }
+
+        // How the trigger chooses between its actions when it fires. Only actions that are on are considered.
+        inline const char* How_the_trigger_chooses_between_its_actions_when_it_fires_Only_actions_that_are_on_are_considered() const { return Get("How the trigger chooses between its actions when it fires. Only actions that are on are considered."); }
+
+        // Keep a copy of the recording
+        inline const char* Keep_a_copy_of_the_recording() const { return Get("Keep a copy of the recording"); }
+
+        // Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file.
+        inline const char* Off_plays_whatever_the_slot_holds_when_the_trigger_fires_so_re_recording_the_slot_changes_what_the_dummy_does_On_copies_the_slot_s_recording_into_this_action_now_so_it_stays_the_same_however_the_slot_changes_and_it_travels_with_the_training_file() const { return Get("Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file."); }
+
+        // Slot %d is empty. Record something into it first.
+        inline const char* Slot_d_is_empty_Record_something_into_it_first() const { return Get("Slot %d is empty. Record something into it first."); }
+
+        // Something is already playing.
+        inline const char* Something_is_already_playing() const { return Get("Something is already playing."); }
+
+        // window began
+        inline const char* window_began() const { return Get("window began"); }
+
+        // actionable (delay 0)
+        inline const char* actionable_delay_0() const { return Get("actionable (delay 0)"); }
+
+        // condition detected
+        inline const char* condition_detected() const { return Get("condition detected"); }
+
+        // action fired
+        inline const char* action_fired() const { return Get("action fired"); }
+
+        // Training file
+        inline const char* Training_file() const { return Get("Training file"); }
+
+        // Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go.
+        inline const char* Everything_on_this_page_in_one_file_the_dummy_actions_positions_and_timings_and_the_input_delay_so_a_setup_can_be_sent_to_someone_and_loaded_in_one_go() const { return Get("Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go."); }
+
+        // Export...
+        inline const char* Export_3() const { return Get("Export..."); }
+
+        // Import...
+        inline const char* Import_3() const { return Get("Import..."); }
+
+        // Writes the current setup to a file you choose.
+        inline const char* Writes_the_current_setup_to_a_file_you_choose() const { return Get("Writes the current setup to a file you choose."); }
+
+        // Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.
+        inline const char* Replaces_the_current_setup_with_the_one_in_a_file_Captured_recordings_travel_inside_the_file_a_playback_file_or_CF_slot_an_action_points_at_has_to_exist_on_this_machine() const { return Get("Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine."); }
+
+        // Reset all to defaults
+        inline const char* Reset_all_to_defaults() const { return Get("Reset all to defaults"); }
+
+        // Clears every dummy action and puts every setting on this page back to how a fresh install has it.
+        inline const char* Clears_every_dummy_action_and_puts_every_setting_on_this_page_back_to_how_a_fresh_install_has_it() const { return Get("Clears every dummy action and puts every setting on this page back to how a fresh install has it."); }
+
+        // Reset the whole training page?
+        inline const char* Reset_the_whole_training_page() const { return Get("Reset the whole training page?"); }
+
+        // This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.
+        inline const char* This_removes_every_dummy_action_and_resets_positions_wake_up_timing_and_input_delay_Export_first_if_you_want_to_keep_this_setup() const { return Get("This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup."); }
+
+        // Everything is back to defaults.
+        inline const char* Everything_is_back_to_defaults() const { return Get("Everything is back to defaults."); }
+
+        // Save the training file
+        inline const char* Save_the_training_file() const { return Get("Save the training file"); }
+
+        // Open a training file
+        inline const char* Open_a_training_file() const { return Get("Open a training file"); }
+
+        // BBCF training file
+        inline const char* BBCF_training_file() const { return Get("BBCF training file"); }
+
+        // Saved to %s
+        inline const char* Saved_to_s() const { return Get("Saved to %s"); }
+
+        // Could not write %s
+        inline const char* Could_not_write_s() const { return Get("Could not write %s"); }
+
+        // Loaded %s: %d trigger(s)
+        inline const char* Loaded_s_d_trigger_s() const { return Get("Loaded %s: %d trigger(s)"); }
+
+        // Could not read %s
+        inline const char* Could_not_read_s() const { return Get("Could not read %s"); }
+
+        // Remove these %d actions
+        inline const char* Remove_these_d_actions() const { return Get("Remove these %d actions"); }
+
+        // Remove these %d actions?
+        inline const char* Remove_these_d_actions_2() const { return Get("Remove these %d actions?"); }
+
+        // Save this action as a playback file
+        inline const char* Save_this_action_as_a_playback_file() const { return Get("Save this action as a playback file"); }
+
+        // Playback file or library
+        inline const char* Playback_file_or_library() const { return Get("Playback file or library"); }
+
+        // Playback library
+        inline const char* Playback_library_2() const { return Get("Playback library"); }
+
+        // That library file could not be read.
+        inline const char* That_library_file_could_not_be_read() const { return Get("That library file could not be read."); }
+
+        // Added %d recording(s) from the library.
+        inline const char* Added_d_recording_s_from_the_library() const { return Get("Added %d recording(s) from the library."); }
+
+        // That action has no inputs to save.
+        inline const char* That_action_has_no_inputs_to_save() const { return Get("That action has no inputs to save."); }
+
+        // That action has no inputs to send.
+        inline const char* That_action_has_no_inputs_to_send() const { return Get("That action has no inputs to send."); }
+
+        // Sent to CF slot %d.
+        inline const char* Sent_to_CF_slot_d() const { return Get("Sent to CF slot %d."); }
+
+        // On this frame: actionTime %d. Time runs left to right and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its right.
+        inline const char* On_this_frame_actionTime_d_Time_runs_left_to_right_and_each_marker_sits_on_its_own_frame_s_square_Fired_is_the_first_frame_the_inputs_are_applied_with_a_N_delay_the_first_actionable_square_is_N_squares_to_its_right() const { return Get("On this frame: actionTime %d. Time runs left to right and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its right."); }
+
+        // On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left.
+        inline const char* On_this_frame_actionTime_d_Newest_frame_on_the_left_and_each_marker_sits_on_its_own_frame_s_square_Fired_is_the_first_frame_the_inputs_are_applied_with_a_N_delay_the_first_actionable_square_is_N_squares_to_its_left() const { return Get("On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left."); }
 };
 
 

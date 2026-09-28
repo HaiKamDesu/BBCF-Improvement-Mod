@@ -539,7 +539,7 @@ void ScrWindow::DrawWakeupDelayControl() {
     ImGui::ShowHelpMarker(Messages.Wakeup_type_selection_tooltip());
     ImGui::SameLine();
     ImGui::BeginChild("tst##wakeup_delay", ImVec2(263, 100));
-    static bool selected[6] = {};
+    bool* selected = wakeup_types_selected;
     for (int i = 0; i < 6; i++)
     {
         char label[15];
@@ -610,6 +610,31 @@ void ScrWindow::check_wakeup_delay() {
 // applied while it was being drawn. Now that it lives behind a menu page, it has to work
 // with the menu closed.
 bool ScrWindow::s_wakeupOverrideEnabled = false;
+
+void ScrWindow::GetTrainingSetup(TrainingSetup* out) const
+{
+    if (!out) { return; }
+    out->swapSidesOnReset = s_swapCoordsToggle;
+    out->wakeupOverride = s_wakeupOverrideEnabled;
+    out->wakeupDelay = wakeup_delay;
+    out->wakeupSkew = wakeup_delay_skew;
+    for (int i = 0; i < 6; ++i) { out->wakeupTypes[i] = wakeup_types_selected[i]; }
+}
+
+void ScrWindow::ApplyTrainingSetup(const TrainingSetup& setup)
+{
+    s_swapCoordsToggle = setup.swapSidesOnReset;
+    s_wakeupOverrideEnabled = setup.wakeupOverride;
+    wakeup_delay = (std::max)(0, (std::min)(39, setup.wakeupDelay));
+    wakeup_delay_skew = (std::max)(-39, (std::min)(39, setup.wakeupSkew));
+    // The skew's random pick is regenerated from scratch, as when the control changes it.
+    wakeup_delay_skew_change_flag = true;
+    bool any = false;
+    for (int i = 0; i < 6; ++i) { wakeup_types_selected[i] = setup.wakeupTypes[i]; any = any || setup.wakeupTypes[i]; }
+    // The control only rewrites wakeup_type while it is drawn and something is ticked, so
+    // a setup with nothing ticked has to clear it here or the old pick would linger.
+    if (!any) { wakeup_type = 0; }
+}
 
 void ScrWindow::DrawWakeupBody() {
     if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training

@@ -101,6 +101,19 @@ public:
 	void DrawInputBufferButton();
 	void DrawComboDataButton();
 	void DrawTasComboToolButton();
+	// Everything the "Positions & timings" section holds, as one value, so the training
+	// file can carry it. The wake-up types are the six toggles of the wake-up override, in
+	// the order the control lists them (disabled, neutral, forward, backward, quick, random).
+	struct TrainingSetup
+	{
+		bool swapSidesOnReset = false;
+		bool wakeupOverride = false;
+		int wakeupDelay = 0;
+		int wakeupSkew = 0;
+		bool wakeupTypes[6] = {};
+	};
+	void GetTrainingSetup(TrainingSetup* out) const;
+	void ApplyTrainingSetup(const TrainingSetup& setup);
 
 	// Import a playback file into one of the game's four recording slots, or write a slot
 	// back out to a file. The pair that lets everything else here exchange playbacks: a
@@ -186,6 +199,10 @@ private:
 	bool dummy_naoto_en_specials_old = false;
 
 	int32_t wakeup_type = 0;
+	// The wake-up override's six toggles; wakeup_type is picked from the ticked ones each
+	// frame the control draws. A member rather than a draw-body static so a training file
+	// can save and restore them.
+	bool wakeup_types_selected[6] = {};
 	int wakeup_delay_skew = 0;
 	bool wakeup_delay_skew_change_flag = false;
 	int wakeup_delay = 0;

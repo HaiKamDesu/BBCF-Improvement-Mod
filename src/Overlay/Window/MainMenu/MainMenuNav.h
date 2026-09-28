@@ -50,6 +50,7 @@ namespace MainMenu
 		Training_Positions,
 		Training_SaveStates,
 		Training_InputDelay,
+		Training_File,
 		Training_Tas,
 
 		Overlays_Hitboxes,

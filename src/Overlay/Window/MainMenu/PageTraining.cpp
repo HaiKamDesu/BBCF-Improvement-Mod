@@ -1,6 +1,10 @@
 #include "MainMenuPages.h"
 
 #include "Core/HotkeyManager.h"
+#include "Core/NativeFileDialog.h"
+#include "Core/logger.h"
+#include "Game/Playbacks/DummyActionManager.h"
+#include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
 #include "Core/Localization.h"
@@ -14,7 +18,200 @@
 
 #include "imgui.h"
 
+#include <Windows.h>
+
+#include <algorithm>
 #include <string>
+#include <utility>
+#include <vector>
+
+namespace
+{
+	const char* kTrainingFileToken = "TrainingFile";
+	// Whether the open picker is saving or loading, since one token serves both.
+	bool g_trainingFileSaving = false;
+	// What the last export / import did, shown under the buttons until the next one.
+	std::string g_trainingFileStatus;
+	bool g_trainingFileStatusIsError = false;
+
+	std::string TrainingFileFolder()
+	{
+		const std::string folder = GamePath("BBCF_IM/training_files");
+		CreateDirectoryA(folder.c_str(), nullptr);
+		return folder;
+	}
+
+	// The part of a training file that is not the dummy: the Positions & timings section
+	// and the input delay. Written as extras of the dummy-action file, which already knows
+	// how to carry the triggers, their actions and the loop settings.
+	DummyActionManager::Extras CollectTrainingExtras(ScrWindow* scr)
+	{
+		DummyActionManager::Extras extras;
+		ScrWindow::TrainingSetup setup;
+		scr->GetTrainingSetup(&setup);
+		extras.push_back({ "swapsides", setup.swapSidesOnReset ? "1" : "0" });
+		extras.push_back({ "wakeupoverride", setup.wakeupOverride ? "1" : "0" });
+		extras.push_back({ "wakeupdelay", std::to_string(setup.wakeupDelay) });
+		extras.push_back({ "wakeupskew", std::to_string(setup.wakeupSkew) });
+		std::string types;
+		for (int i = 0; i < 6; ++i) { types += setup.wakeupTypes[i] ? '1' : '0'; }
+		extras.push_back({ "wakeuptypes", types });
+		extras.push_back({ "inputdelay", std::to_string(Settings::settingsIni.trainingInputDelay) });
+		extras.push_back({ "inputdelayignorefrozen", Settings::settingsIni.trainingInputDelayIgnoreWhenFrozen ? "1" : "0" });
+		return extras;
+	}
+
+	void ApplyTrainingExtras(ScrWindow* scr, const DummyActionManager::Extras& extras)
+	{
+		ScrWindow::TrainingSetup setup;
+		scr->GetTrainingSetup(&setup);
+		for (const auto& kv : extras)
+		{
+			const std::string& key = kv.first;
+			const std::string& value = kv.second;
+			if (key == "swapsides")            { setup.swapSidesOnReset = atoi(value.c_str()) != 0; }
+			else if (key == "wakeupoverride")  { setup.wakeupOverride = atoi(value.c_str()) != 0; }
+			else if (key == "wakeupdelay")     { setup.wakeupDelay = atoi(value.c_str()); }
+			else if (key == "wakeupskew")      { setup.wakeupSkew = atoi(value.c_str()); }
+			else if (key == "wakeuptypes")
+			{
+				for (int i = 0; i < 6; ++i) { setup.wakeupTypes[i] = i < (int)value.size() && value[i] == '1'; }
+			}
+			else if (key == "inputdelay")
+			{
+				const int delay = (std::max)(0, (std::min)(10, atoi(value.c_str())));
+				Settings::settingsIni.trainingInputDelay = delay;
+				Settings::changeSetting("TrainingInputDelay", std::to_string(delay));
+			}
+			else if (key == "inputdelayignorefrozen")
+			{
+				const bool ignore = atoi(value.c_str()) != 0;
+				Settings::settingsIni.trainingInputDelayIgnoreWhenFrozen = ignore;
+				Settings::changeSetting("TrainingInputDelayIgnoreWhenFrozen", ignore ? "1" : "0");
+			}
+		}
+		scr->ApplyTrainingSetup(setup);
+	}
+
+	void ResetTrainingToDefaults(ScrWindow* scr)
+	{
+		DummyActionManager::Instance().ResetToDefaults();
+		scr->ApplyTrainingSetup(ScrWindow::TrainingSetup{});
+		Settings::settingsIni.trainingInputDelay = 0;
+		Settings::changeSetting("TrainingInputDelay", "0");
+		Settings::settingsIni.trainingInputDelayIgnoreWhenFrozen = true;
+		Settings::changeSetting("TrainingInputDelayIgnoreWhenFrozen", "1");
+	}
+
+	void BeginTrainingFilePick(bool saving)
+	{
+		if (NativeFileDialog::IsOpen()) { return; }
+		NativeFileDialog::Request request;
+		request.save = saving;
+		request.title = saving ? L("Save the training file") : L("Open a training file");
+		request.filters.push_back({ L("BBCF training file"), "*.bbcflab" });
+		request.defaultExtension = "bbcflab";
+		request.initialPath = saving ? TrainingFileFolder() + "\\training.bbcflab" : TrainingFileFolder();
+		if (NativeFileDialog::Open(kTrainingFileToken, request))
+		{
+			g_trainingFileSaving = saving;
+		}
+	}
+
+	// The picker answers on a later frame, on a worker thread. Claimed here every frame the
+	// page is drawn.
+	void PumpTrainingFilePick(ScrWindow* scr)
+	{
+		NativeFileDialog::Result result;
+		if (!NativeFileDialog::Consume(kTrainingFileToken, &result) || !result.accepted || result.path.empty())
+		{
+			return;
+		}
+		DummyActionManager& actions = DummyActionManager::Instance();
+		if (g_trainingFileSaving)
+		{
+			const DummyActionManager::Extras extras = CollectTrainingExtras(scr);
+			const bool ok = actions.ExportTo(result.path, &extras);
+			g_trainingFileStatusIsError = !ok;
+			g_trainingFileStatus = ok
+				? FormatText(L("Saved to %s").c_str(), result.path.c_str())
+				: FormatText(L("Could not write %s").c_str(), result.path.c_str());
+			LOG(1, "[TrainingFile] export %s -> '%s'\n", ok ? "ok" : "FAILED", result.path.c_str());
+		}
+		else
+		{
+			DummyActionManager::Extras extras;
+			const bool ok = actions.ImportFrom(result.path, &extras);
+			if (ok)
+			{
+				ApplyTrainingExtras(scr, extras);
+			}
+			g_trainingFileStatusIsError = !ok;
+			g_trainingFileStatus = ok
+				? FormatText(L("Loaded %s: %d trigger(s)").c_str(), result.path.c_str(), actions.AssignedCount())
+				: FormatText(L("Could not read %s").c_str(), result.path.c_str());
+			LOG(1, "[TrainingFile] import %s <- '%s'\n", ok ? "ok" : "FAILED", result.path.c_str());
+		}
+	}
+
+	void DrawTrainingFileSection(ScrWindow* scr)
+	{
+		PumpTrainingFilePick(scr);
+
+		MainMenu::Hint(L("Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go."));
+
+		if (ImGui::Button(L("Export...").c_str()))
+		{
+			BeginTrainingFilePick(true);
+		}
+		ImGui::ShowHelpMarkerSameLine(L("Writes the current setup to a file you choose.").c_str());
+		ImGui::SameLine(0.0f, 12.0f);
+		if (ImGui::Button(L("Import...").c_str()))
+		{
+			BeginTrainingFilePick(false);
+		}
+		ImGui::ShowHelpMarkerSameLine(L("Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.").c_str());
+		ImGui::SameLine(0.0f, 12.0f);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.45f, 0.45f, 1.0f));
+		const bool resetPressed = ImGui::Button(L("Reset all to defaults").c_str());
+		ImGui::PopStyleColor();
+		ImGui::ShowHelpMarkerSameLine(L("Clears every dummy action and puts every setting on this page back to how a fresh install has it.").c_str());
+		if (resetPressed)
+		{
+			ImGui::OpenPopup(L("Reset the whole training page?").c_str());
+		}
+
+		if (!g_trainingFileStatus.empty())
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, g_trainingFileStatusIsError
+				? ImVec4(0.90f, 0.45f, 0.45f, 1.0f) : ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+			ImGui::TextWrapped("%s", g_trainingFileStatus.c_str());
+			ImGui::PopStyleColor();
+		}
+
+		// Centred on the frame it appears; see docs/ImGuiModalCentering.md.
+		const ImVec2 display = ImGui::GetIO().DisplaySize;
+		ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		if (ImGui::BeginPopupModal(L("Reset the whole training page?").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::TextUnformatted(L("This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.").c_str());
+			ImGui::VerticalSpacing(6);
+			if (ImGui::Button(L("Reset all to defaults").c_str()))
+			{
+				ResetTrainingToDefaults(scr);
+				g_trainingFileStatus = L("Everything is back to defaults.");
+				g_trainingFileStatusIsError = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(L("Cancel").c_str()))
+			{
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+	}
+}
 
 namespace MainMenu
 {
@@ -83,6 +280,13 @@ namespace MainMenu
 				Settings::changeSetting("TrainingInputDelay", std::to_string(delayFrames));
 			}
 			ImGui::ShowHelpMarkerSameLine(L("0 is the game as it ships. 2 is what online feels like. Rollback and connection hitches are not simulated - only the delay is.").c_str());
+		}
+
+		// The whole page as a file, for sharing a setup or wiping it. Last of the sections
+		// because it acts on all of the ones above it.
+		if (BeginSection(Training_File, true))
+		{
+			DrawTrainingFileSection(scr);
 		}
 
 		ImGui::VerticalSpacing(8);
