@@ -1,5 +1,5 @@
 #pragma once
-#define MOD_VERSION	"v8.7.1"
+#define MOD_VERSION	"v8.8"
 #define MOD_VERSION_NUM	MOD_VERSION " Oceanya Edition"
 #define MOD_WINDOW_TITLE "BBCF IM"
 
