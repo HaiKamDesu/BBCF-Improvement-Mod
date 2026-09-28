@@ -20,9 +20,17 @@ std::map<std::string, JonbDBEntry> JonbDBReader::parse_all_jonbins(char* bbcf_ba
 		fpac_offset = FPAC_JONBIN_OFFSET_FROM_BBCF_P2;
 		cdata = *(CharData**)(bbcf_base_addr + 0x89299C);
 	}
+	if (!cdata) {
+		return jonbin_map;
+	}
 	auto cind = cdata->charIndex;
 	bool is_jubei = cind == 35 ? true : false;
 	JonbDBIndexHeader* jonb_index_header = *((JonbDBIndexHeader**)(bbcf_base_addr + fpac_offset));
+	// Null when this slot has no pack loaded - player 2's slot in a mirror match, for one.
+	// Reading offset_to_first_full_entry through it was the 8.7.1 mirror-animation crash.
+	if (!jonb_index_header) {
+		return jonbin_map;
+	}
 	char* first_full_entry = (char*)jonb_index_header + jonb_index_header->offset_to_first_full_entry;
 	//the index header has size 32, move 32 to the first JonbDBIndexEntry
 	JonbDBIndexEntry* curr_index_addr = (JonbDBIndexEntry*)((char*)jonb_index_header + sizeof(JonbDBIndexHeader));

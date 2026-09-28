@@ -76,6 +76,17 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 	// history with no script to classify against and nothing but Idle/Special on both rows for
 	// the whole match. Player 1's slot is populated in a mirror like any other, so parsing it is
 	// no more dangerous than parsing it in a non-mirror.
+	//
+	// Removing the bail had a second caller it did not protect any more: ScrWindow's dummy
+	// script parse asks for slot 2 by number. In a mirror the game loads ONE script pack and
+	// leaves player 2's pack pointers (FPAC, pre-init, EA, jonbin index) null, and the jonbin
+	// reader dereferenced that null - the 8.7.1 "crash when picking an animation in a mirror".
+	// So the slot is resolved HERE, for every caller: player 2 in a mirror reads player 1's
+	// slot, which is the script the game itself is running the dummy off.
+	if (player_num == 2 && p1 && p2 && p1->charIndex == p2->charIndex) {
+		LOG(2, "[Scr] Mirror match: player 2's script requested, reading player 1's slot.\n");
+		player_num = 1;
+	}
 
 	const auto parseStartTime = std::chrono::steady_clock::now();
 	g_scrStats = ScrParseStats();
@@ -109,6 +120,14 @@ std::vector<scrState*> parse_scr(char* bbcf_base_addr, int player_num) {
 
 	}
 	else {
+		return std::vector<scrState*>{};
+	}
+	// Anything still null here means that slot has no script loaded (training character select,
+	// a transition, a slot the game never filled). Reading through it is a guaranteed crash and
+	// the callers already treat an empty list as "could not be read".
+	if (*fpac_load == NULL || *scr_preinit_offset == NULL || ea_scr_index == NULL || *ea_scr_preinit_offset == NULL) {
+		LOG(1, "[Scr] P%d script pack not loaded (fpac=%p preinit=%p ea=%p ea_preinit=%p); nothing parsed.\n",
+			player_num, *fpac_load, *scr_preinit_offset, ea_scr_index, *ea_scr_preinit_offset);
 		return std::vector<scrState*>{};
 	}
 	std::map<std::string, JonbDBEntry> jonbin_map = JonbDBReader().parse_all_jonbins(bbcf_base_addr, player_num);
