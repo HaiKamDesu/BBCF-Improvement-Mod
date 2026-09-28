@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+class CharData;
+
 class UnlimitedPlaybackManager {
 public:
     enum Mode {
@@ -155,6 +157,53 @@ public:
     unsigned long long GetTriggerLastFiredMs(TriggerType trigger) const {
         return m_triggers[trigger].lastFiredMs;
     }
+    // Plays one specific action of a trigger right away, ignoring the trigger's condition,
+    // cooldown and delay. Deferred to the next pre-tick like PlayEntryNow, for the same
+    // one-frame-alignment reason.
+    bool PlayActionNow(TriggerType trigger, size_t actionIndex);
+    // The raw two-bytes-per-frame buffer a recording slot holds and its facing, for copying
+    // it into an action. Reads the backup while the runtime has the slot borrowed, so it is
+    // the user's recording and never the runtime's temporary playback.
+    bool ReadSlotRecording(int slot, std::vector<char>* outRawFrames, bool* outFacingLeft) const;
+
+    // What each trigger's condition did on the most recent game frame, for the frame history
+    // bar's markers. Computed every frame of a training match whether or not the trigger is
+    // armed, so the bar can show where a wakeup begins and ends before anything is set up.
+    //
+    // The three moments, in frame order:
+    //   windowStart  the state or countdown the trigger watches began this frame. This is the
+    //                earliest frame any negative delay could ever fire on.
+    //   actionable   the delay-0 frame: the LAST frame the dummy cannot act. Inputs delivered
+    //                on it come out on the first free frame, which is the convention the block
+    //                gap has always used (blockstun == 1).
+    //   detected     the condition, with the configured delay applied, was met this frame.
+    //   fired        the action actually started this frame (after any positive delay).
+    //
+    // framesToActionable is the prediction the negative delay is measured against: 0 on the
+    // actionable frame, N when it is N frames away, -1 when the dummy is not in a window or
+    // the length of the state is not known yet. Where it comes from per trigger is in
+    // docs/Research/TriggerTimingInvestigation.md.
+    struct TriggerFrameEvents {
+        bool windowStart = false;
+        bool actionable = false;
+        bool detected = false;
+        bool fired = false;
+        int framesToActionable = -1;
+        // The dummy's state that opened the window, when the window is a state.
+        const char* stateName = nullptr;
+    };
+    const std::array<TriggerFrameEvents, Trigger_Count>& GetTriggerFrameEvents() const {
+        return m_triggerEvents;
+    }
+    // The game frame (pFrameCount) the events describe; -1 before any frame was seen.
+    int GetTriggerFrameEventsFrame() const { return m_triggerEventsFrame; }
+
+    // Whether the timing model wants the dummy's script parsed. Wakeup and throw-tech lengths
+    // are read from the dummy's own script states, so ScrWindow's parse gate asks this too.
+    // True while either of those triggers is armed, or while a consumer of the events has
+    // asked for them (the frame history bar) regardless of what is armed.
+    bool NeedsDummyScriptForTiming() const;
+    void SetTimingEventsWanted(bool wanted) { m_timingEventsWanted = wanted; }
     // Called from a hook point that runs BEFORE the game reads this tick's active-slot playback
     // input (earlier in the frame than Tick()/GetFrameCounter). Only handles the parts of
     // starting playback that have no real-time game-state dependency (i.e. "Play Now"), so that
@@ -221,6 +270,8 @@ public:
     bool RenameEntry(size_t idx, const std::string& newName);
 
     bool LoadEntryIntoSlot(size_t idx, int slot);
+    // The same for one of a trigger's actions (a playback source; animations have no frames).
+    bool LoadActionIntoSlot(TriggerType trigger, size_t actionIndex, int slot);
     bool SaveEntryFromSlot(size_t idx, int slot);
     bool ReadEntryPlayback(size_t idx, bool* outFacingLeft, std::vector<char>* outFrames);
     bool WriteEntryPlayback(size_t idx, bool facingLeft, const std::vector<char>& frames);
@@ -244,14 +295,6 @@ public:
     bool ParseLibraryFile(const std::string& resolvedPath, bool forceLoadIncompatible,
         PlaybackLibrary* out, LibraryFileExtras* extras = nullptr);
 
-    // The library a trigger draws from, loaded on demand and kept for as long as some
-    // trigger still names it. Null when the trigger is not library-backed, or the file has
-    // gone away since it was assigned.
-    const PlaybackLibrary* LibraryForTrigger(TriggerType trigger);
-
-    // Drops loaded libraries nothing names any more.
-    void PruneUnusedLibraries();
-
     // Where library files live, for the picker that assigns one to a trigger.
     std::string GetLibraryFolderPublic() const { return GetProfileFolder(); }
 
@@ -267,15 +310,6 @@ public:
     // Never null. Passing null restores the working set.
     void SetEditTarget(PlaybackLibrary* library);
     PlaybackLibrary* GetEditTarget();
-    // The library a trigger names, loaded on demand, for pointing the editor at.
-    PlaybackLibrary* MutableLibraryForTrigger(TriggerType trigger);
-    // Whether this trigger's own library holds anything, so a library built in the modal
-    // without being saved to a file still counts as configured.
-    bool TriggerLibraryHasEntries(TriggerType trigger) const;
-    // Throws away everything this trigger's library held. Called when the row is cleared, so
-    // building the trigger again starts from an empty library rather than quietly inheriting
-    // the entries the deleted one had loaded.
-    void ResetTriggerLibrary(TriggerType trigger);
 
 private:
     PlaybackLibrary& EditTarget();
@@ -320,9 +354,13 @@ private:
     bool IsReplayMatchActive() const;
     bool BuildPlaybackFramesFromReplayRange(int round, int startFrame, int endFrameExclusive, int recordedPlayer, std::vector<char>* outFrames) const;
 
-    bool PickEntryIndexForTrigger(TriggerType trigger, const PlaybackLibrary& library,
-        int selectionMode, size_t* outIndex);
-    bool ResolveTriggerAction(TriggerType trigger, ResolvedAction* out);
+    // Turns a trigger's action into something the runtime can play. With actionIndex < 0
+    // the trigger picks per its selection mode; otherwise exactly that action is used,
+    // which is what the row's "play now" button asks for.
+    bool ResolveTriggerAction(TriggerType trigger, ResolvedAction* out, int actionIndex = -1);
+    // Runs a resolved action: forces the script state, or borrows a CF slot and starts the
+    // playback. Stamps the trigger's cooldown and fired time either way.
+    bool ExecuteResolvedAction(TriggerType trigger, ResolvedAction& resolved, int currentFrame);
     bool TriggerHasSomethingToPlay(TriggerType trigger);
     // Starts anything whose delay has run out, and drops a pending fire whose trigger was
     // disarmed or reconfigured while it was counting down.
@@ -393,12 +431,6 @@ private:
     // set whenever neither had a path yet, so configuring On Wakeup edited On Block Gap's
     // list as well. Keyed by trigger, each row owns its entries, enable checkboxes,
     // ordering and picking order outright, and loading the same file into two triggers
-    // gives each its own copy to enable and reorder independently.
-    //
-    // This is also the instance the row's modal edits, so what you see configured is the
-    // exact object the trigger fires from - an edit-one-copy-fire-another split would be
-    // invisible and maddening.
-    std::array<PlaybackLibrary, Trigger_Count> m_triggerLibraries;
     std::array<TriggerConfig, Trigger_Count> m_triggers;
     bool m_autoMirrorOnSideSwap = true;
     std::array<size_t, Trigger_Count> m_sequentialIndex = {};
@@ -407,6 +439,70 @@ private:
     std::deque<ToastMessage> m_toasts;
     unsigned long long m_entrySerial = 0;
     std::string m_lastLoadedProfileFolder;
+
+    // Per-frame trigger timing. See GetTriggerFrameEvents.
+    std::array<TriggerFrameEvents, Trigger_Count> m_triggerEvents = {};
+    int m_triggerEventsFrame = -1;
+    bool m_timingEventsWanted = false;
+    // Which of the dummy's states is being timed, so a window opens on the frame the state
+    // is entered and closes when it is left. Entry is a change of currentAction only: a
+    // forced animation restarts actionTime without changing it, and re-opening on that is
+    // how the old wakeup trigger fired forever after its own move came out.
+    std::string m_timedPrevAction;
+    int m_timedPrevActionTime = 0;
+    int m_timedLastActionTime = 0;
+    int m_timedPrevBlockstun = 0;
+    int m_timedPrevHitstun = 0;
+    // The open timed-state window: which trigger, which state, and the game frame of its
+    // first actionable frame (the first frame a move can START). Kept by frame number, not
+    // by the dummy's state, so the actionable marker still lands when the dummy leaves the
+    // state before it - which it does whenever a reversal comes out early.
+    int m_timedWindowTrigger = -1;
+    const char* m_timedWindowState = nullptr;
+    int m_timedWindowStartFrame = -1;
+    int m_timedActionableFrame = -1;
+    // Same idea for the countdown triggers: the frame blockstun / hitstun reaches 0.
+    int m_gapActionableFrame = -1;
+    int m_recActionableFrame = -1;
+    // Frames of [UP][TRACE] left to write after something fired, so the frames the inputs
+    // land on are in the log too.
+    int m_traceFramesLeft = 0;
+    // The earliest frame a move was seen to start out of a timed state, keyed
+    // "<charIndex>:<state>", in that state's own actionTime. A cross-check only: every exit
+    // into a move is compared with the engine rule and a MISMATCH is logged when it came out
+    // earlier than the rule allows. It never overrides the rule.
+    std::unordered_map<std::string, int> m_learnedActionableAt;
+    // actionTime of the first frame a move can start in the named state, from the engine
+    // rule (docs/Research/TriggerTimingInvestigation.md "The first-actionable rule"). With
+    // normals=false that is the earliest move of any kind (a getup lets specials out on frame
+    // 14); normals=true is the first frame a normal, dash or jump can start (a getup: 20).
+    // outSource names the rule.
+    int PredictActionableAt(const CharData* dummy, const char* stateName, const char** outSource,
+        bool normals = false) const;
+    // TriggerTimingProbe (settings.ini, Debug): on each timed-state or block-gap window the
+    // dummy is fed A/B on alternate frames through the runtime playback, and the first frame
+    // a move starts is logged against the rule's prediction as "[UP][PROBE]".
+    void StartTimingProbe(const char* stateName, int charIndex, int currentFrame,
+        int predictedFirst, int predictedSpecials, int playFrames);
+    void UpdateTimingProbe(int currentFrame, const std::string& action, int actionTime);
+    bool m_probeActive = false;
+    std::string m_probeState;
+    int m_probeCharIndex = -1;
+    int m_probeWindowStart = -1;
+    int m_probePredicted = -1;
+    int m_probePredictedSpecials = -1;
+    int m_probeDeadline = -1;
+    // How long each of the dummy's timed states actually ran, keyed "<charIndex>:<state>".
+    // Filled on every clean exit into a neutral state. Only the neutral tech (a physics hop)
+    // uses it as its length; for every other state the script plus the engine rule is the
+    // length, this is used only while the script is unread, and a disagreement is logged as
+    // a MISMATCH.
+    std::unordered_map<std::string, int> m_learnedStateFrames;
+    void UpdateTriggerTiming(int currentFrame);
+    // Frames the dummy's named state runs for: its script (a ground roll's with the engine's
+    // cut of the held sprite applied), the measured hop for the neutral tech, what was
+    // observed when the script is unread, else -1. outSource names the source.
+    int PredictStateFrames(const CharData* dummy, const char* stateName, const char** outSource = nullptr) const;
 
     // Runtime edge tracking for game-state triggers
     bool m_prevWakeupCondition = false;
@@ -423,6 +519,11 @@ private:
     bool m_runtimeSlotRestorePending = false;
     bool m_pendingPlayNowRequested = false;
     size_t m_pendingPlayNowIndex = 0;
+    // "Play now" on a dummy-action row: which trigger's action, run on the next pre-tick
+    // for the same reason as the library's play-now.
+    bool m_pendingPlayActionRequested = false;
+    int m_pendingPlayActionTrigger = 0;
+    size_t m_pendingPlayActionIndex = 0;
     bool m_diagSlot4WasActive = false;
     int m_diagSlot4LastLoggedPosition = -2;
     bool m_runtimeSlotBackupFacingLeft = false;

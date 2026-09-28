@@ -1,4 +1,6 @@
 #include "FrameHistory.h"
+#include "Game/Playbacks/UnlimitedPlaybackManager.h"
+#include "Game/TrainingSide.h"
 #include "Overlay/Window/FrameAdvantage/PlayerExtendedData.h"
 #include <cstddef>
 #include "Core/logger.h"
@@ -308,6 +310,103 @@ void FrameHistory::updateHistory(bool resetting, bool countEmptyFrames, int maxH
     if (!getPlayerFrameStates(p1, p2, &states)) {
         return;
     }
+    ++m_columnSerial;
+
+    // The trigger markers for this frame, on the dummy's row.
+    //
+    // Which frame the events describe was established from the disassembly (2026-09-27,
+    // docs/Research/TriggerTimingInvestigation.md "Frame ordering"), not assumed:
+    //
+    //   per-tick Update FUN_0056B1F0
+    //     -> FUN_005521B0 (0x56B52D): walks the object list, FUN_005DA7A0 per object -
+    //        the players' scripts advance HERE (currentAction/actionTime/hitstun change),
+    //        then, last thing at 0x552322, steps the round-flow task container FUN_004D27D0
+    //     -> FUN_004D2400 (its only caller): the GetFrameCounter hook sits on the first two
+    //        instructions ("mov eax,[esi]; inc [esi+0Ch]"), so UnlimitedPlaybackManager::Tick
+    //        runs with the counter still at N, the players already at frame N+1's state;
+    //        then the counter becomes N+1 and the task's own update ([vtbl+0x10] ->
+    //        FUN_005613E0 / MatchInfo::update_Fight FUN_0055F780, reachable only through
+    //        that vtable) runs the round flow.
+    //   render (EndScene) -> this function: sees counter N+1 and the same N+1 state.
+    //
+    // So events stamped with frame N describe the state this column samples when
+    // *pFrameCount == N+1. The equality this used to require (events frame == current frame)
+    // could therefore never hold, which is why no marker ever appeared. Both offsets are
+    // accepted, and the one seen is logged once, so a change in the game's order would show
+    // up in DEBUG.txt rather than as silently missing markers.
+    {
+        static_assert(PlayerFrameState::kTriggerSlots == UnlimitedPlaybackManager::Trigger_Count,
+            "PlayerFrameState::triggerMarks must hold one byte per trigger");
+        const int currentFrame = g_gameVals.pFrameCount ? static_cast<int>(*g_gameVals.pFrameCount) : -1;
+        states[0].gameFrame = currentFrame;
+        states[1].gameFrame = currentFrame;
+        states[0].actionTime = p1->actionTime;
+        states[1].actionTime = p2->actionTime;
+        const UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
+        const int eventsFrame = playback.GetTriggerFrameEventsFrame();
+        const bool provenOffset = (eventsFrame >= 0 && eventsFrame == currentFrame - 1);
+        const bool sameFrame = (eventsFrame >= 0 && eventsFrame == currentFrame);
+        if (provenOffset || sameFrame) {
+            static int loggedOffset = -99;
+            const int offset = currentFrame - eventsFrame;
+            if (loggedOffset != offset) {
+                loggedOffset = offset;
+                LOG(1, "[FrameHistory] trigger events run %d frame(s) behind the counter the history sees%s\n",
+                    offset, offset == 1 ? " (as proven from the tick order)" : " (UNEXPECTED - the tick order changed?)");
+            }
+            PlayerFrameState& dummyState = states[TrainingSide::DummyIndex()];
+            const auto& events = playback.GetTriggerFrameEvents();
+            for (int i = 0; i < UnlimitedPlaybackManager::Trigger_Count; ++i) {
+                unsigned char mark = 0;
+                if (events[i].windowStart) mark |= PlayerFrameState::Mark_WindowStart;
+                if (events[i].actionable)  mark |= PlayerFrameState::Mark_Actionable;
+                if (events[i].detected)    mark |= PlayerFrameState::Mark_Detected;
+                // Fired is NOT drawn on the frame the code ran on but on the next one: the
+                // playback (or forced state) it starts is first consumed by the following
+                // tick, so that is the first frame the inputs are applied on. The marker
+                // means "inputs start here", and with a -N delay the move then starts N
+                // squares after it when it comes out on the first actionable frame.
+                static int firedTargetFrame[UnlimitedPlaybackManager::Trigger_Count] = {
+                    -1, -1, -1, -1, -1, -1, -1, -1 };
+                if (events[i].fired) {
+                    firedTargetFrame[i] = eventsFrame + 1;
+                }
+                else if (firedTargetFrame[i] >= 0 && eventsFrame >= firedTargetFrame[i]) {
+                    mark |= PlayerFrameState::Mark_Fired;
+                    if (eventsFrame != firedTargetFrame[i]) {
+                        LOG(1, "[FrameHistory] fired marker for trigger %d drawn %d frame(s) late (history skipped a frame)\n",
+                            i, eventsFrame - firedTargetFrame[i]);
+                    }
+                    firedTargetFrame[i] = -1;
+                }
+                dummyState.triggerMarks[i] = mark;
+                if (events[i].windowStart && events[i].stateName) dummyState.triggerState = events[i].stateName;
+
+                // Evidence for the marker count: which column each marker landed on, by the
+                // dummy's actionTime there, and how many history columns separate a firing
+                // from the actionable frame that follows it. Columns, not frames, because the
+                // columns are what the user counts.
+                static int columnOfFired[UnlimitedPlaybackManager::Trigger_Count] = {};
+                static bool haveFired[UnlimitedPlaybackManager::Trigger_Count] = {};
+                if (mark & PlayerFrameState::Mark_Fired) {
+                    columnOfFired[i] = m_columnSerial;
+                    haveFired[i] = true;
+                    LOG(1, "[FrameHistory] marker fired (first input applied): trigger %d on column %d (game frame %d, dummy %s actionTime %d)\n",
+                        i, m_columnSerial, eventsFrame, TrainingSide::Dummy().GetData()->currentAction, dummyState.actionTime);
+                }
+                if (events[i].actionable) {
+                    LOG(1, "[FrameHistory] marker actionable (first frame a move can start): trigger %d on column %d (game frame %d, dummy %s actionTime %d)%s\n",
+                        i, m_columnSerial, eventsFrame, TrainingSide::Dummy().GetData()->currentAction, dummyState.actionTime,
+                        haveFired[i] ? FormatText(" - %d column(s) after the fired marker", m_columnSerial - columnOfFired[i]).c_str() : "");
+                    haveFired[i] = false;
+                }
+                if (events[i].windowStart) {
+                    LOG(1, "[FrameHistory] marker window began: trigger %d on column %d (game frame %d, dummy actionTime %d)\n",
+                        i, m_columnSerial, eventsFrame, dummyState.actionTime);
+                }
+            }
+        }
+    }
 
     // sync up everything
     p1_frameCountMinus_1 = p1->frame_count_minus_1;
@@ -319,7 +418,8 @@ void FrameHistory::updateHistory(bool resetting, bool countEmptyFrames, int maxH
     // TODO: If you add attack and guardp, add them to this condition
     // Reset on completely idle frames
     bool bothIdle = (states[0].kind == FrameKind::Idle && states[0].invul == Attribute::N)
-                 && (states[1].kind == FrameKind::Idle && states[1].invul == Attribute::N);
+                 && (states[1].kind == FrameKind::Idle && states[1].invul == Attribute::N)
+                 && !states[0].HasTriggerMarks() && !states[1].HasTriggerMarks();
 
     if (bothIdle) {
         is_old = true;

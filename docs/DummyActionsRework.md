@@ -24,24 +24,49 @@ added beside them.
 
 ## The model
 
-Every one of the seven **triggers** independently holds at most one **action**. An action
-names a *source* — where its inputs come from:
+Every one of the seven **triggers** independently holds a **list of actions** (since
+2026-09-27; before that, exactly one). An action names a *source* — where its inputs come
+from:
 
 | Source | Payload | How it is delivered |
 |---|---|---|
 | From Input Notation | numpad text, parsed by `TasManager::TryParseCommand` | frames into a borrowed CF slot |
-| From Playback Library | that trigger's own library + a picking order | ditto |
 | From File | one `.playback` file | ditto |
-| From CF Recording Slot | slot 1-4 | the slot already holds it |
+| From CF Recording Slot | slot 1-4, read live when the trigger fires | the slot already holds it |
+| Recording | a copy of a CF slot taken when the action was added (hex in the ini) | frames into a borrowed CF slot |
 | From Animation | one or more of the dummy's script states, with per-entry delays | script-pointer write, no slot |
-| Burst | On Hit only | action-override name, no slot |
+| Burst | On Hitstun only | action-override name, no slot |
 
 So a wakeup DP, an on-hit burst and a looping blockstring can all be armed at once, which
 neither of the old systems allowed.
 
-A **library** is a named collection of recorded playbacks on disk — which is exactly what an
-Unlimited Playback *profile* already was, since `SaveProfile` embeds each entry's playback
-bytes as hex. Libraries therefore needed no new file format.
+A trigger with several actions **picks** one when it fires — random, in order, or random
+without repeats (`DummyActionManager::Pick`, per-trigger `selectionMode`) — over the actions
+that are switched on and runnable. Each action has an `enabled` switch (only shown, and only
+consulted, once the trigger holds more than one) and each trigger has one of its own; a
+switched-off trigger fades in the UI and `IsRunnable` is false for it. Removing a trigger's
+last action removes the trigger.
+
+That is what the **Playback Library** source used to provide, one detour further away: a
+library was a file of recorded playbacks with per-entry switches and a picking order, and a
+trigger could name one. A trigger's action list is the same thing without the file, and it
+can mix recordings with notation, animations and anything else. So the library source is
+gone from the menu (`Source_Library` survives only as a load-time value): an old file that
+names one is unpacked into `Source_Recording` actions on that trigger, switches and picking
+order carried over. The Playback Library *window* still exists for its own purposes (the
+working set, capture, export); it is simply no longer how a trigger is fed.
+
+The action rows keep everything the Playback Library's rows could do: ctrl/shift-click
+selection (per trigger), drag to reorder (within a trigger), a right-click menu with Send to
+CF Slot, Save to File, Rename (recordings), Move up/down, Set index, and Turn ALL on/off, and
+a multi-row remove behind a confirmation. "From File" also accepts a library file (`*.upl`)
+and unpacks it into recording actions, so a big library built under the old system moves
+over in one pick. Rows past `DummyActionMaxRows` (default 6) scroll inside the trigger.
+
+`UnlimitedPlaybackManager::ResolveTriggerAction(trigger, out, actionIndex)` picks (or takes
+the named action) and resolves it; `ExecuteResolvedAction` runs it. A row's ">" button goes
+through `PlayActionNow(trigger, index)`, deferred to the next pre-tick like the library's
+play-now for the same one-frame-alignment reason.
 
 ## Where the code lives
 
@@ -191,9 +216,19 @@ frame). The UI refuses a negative value on the others.
 ## Persistence
 
 `BBCF_IM/dummy_actions.ini`, rewritten whenever an action changes, read once from
-`RunDeferredSetup`. One section per armed trigger holding the action plus that trigger's
-delay, cooldown and mirror flag; a `[loop]` section for the loop's own settings; a `[sizes]`
-section for the modal sizes people have settled on.
+`RunDeferredSetup`. `[N]` is trigger N: its `enabled`, `selection` (picking order), `delay`,
+`cooldown` and `mirror`. `[N.M]` is action M of trigger N: `enabled`, `source`, then the
+payload (`notation`, `file`, `slot`, `moves`/`movedelays`/`naoto`, or for a recording
+`slot`/`name`/`facing`/`frames` as hex). A `[loop]` section holds the loop's own settings; a
+`[sizes]` section the modal sizes people have settled on; an optional `[training]` section
+holds key=value extras the caller owns — the training page uses it for positions, wake-up
+timing and input delay when it exports the page as a **training file** (`*.bbcflab`, see
+`PageTraining.cpp`). `ExportTo`/`ImportFrom` write and read that same format at any path;
+`ResetToDefaults` wipes everything.
+
+Old files (one action per `[N]` section, `source=` in the trigger section itself) still load:
+`source=` starts an action wherever it appears, and a `Source_Library` action is unpacked as
+described above.
 
 Two things are deliberately not stored as-is:
 
@@ -201,42 +236,24 @@ Two things are deliberately not stored as-is:
   layout cannot leave a stale byte buffer behind.
 - **Animations are saved by name** — see rule 7.
 
-Loading logs a line per action (`source`, `runnable`, `summary`) so a round trip that drops
-something says which part went missing.
+Loading logs a line per trigger and per action (`source`, `enabled`, `runnable`, `summary`)
+so a round trip that drops something says which part went missing.
 
-## Libraries are per trigger
+## Which side is the dummy
 
-`m_triggerLibraries` is `std::array<PlaybackLibrary, Trigger_Count>` — one per **trigger**,
-not one per file path. Keyed by path, two triggers with no file picked yet both resolved to
-the single working set, so configuring one edited the other. Loading the same file into two
-triggers now gives each its own copy to enable and reorder independently.
+Nothing may read `g_interfaces.player2` and mean "the dummy". `TrainingSide::Dummy()` /
+`Human()` (`src/Game/TrainingSide.h`) resolve from the game's own training-side index
+(BBCF.exe+0x891A38, 0 = P1 is the human), so picking Player 2 on the training character
+select or taking a replay over as P2 keeps every trigger, animation and script parse on the
+right character. Before this every dummy feature silently acted on the human when P2 was
+chosen.
 
-The row's modal edits *that same instance*, which matters: an edit-one-copy-fire-another
-split would be invisible from the UI. Clearing a row calls `ResetTriggerLibrary`, which also
-drops the sequential index and no-repeat pool — otherwise deleting a row and adding it back
-handed you the deleted one's fully loaded library.
+## Libraries are per trigger (historical, removed 2026-09-27)
 
-`UnlimitedPlaybackManager::SetEditTarget()` is how the shared library UI is pointed at
-whichever library is being edited: the manager's two dozen working-set operations all meant
-"the one library there is", so rather than threading a parameter through every one of them and
-every call site, all internal uses go through `EditTarget()`. Passing null restores the
-working set — and the modal must restore it before anything else draws.
-
-## The library UI is shared, popups included
-
-`DrawPlaybackLibraryEntriesAndAdd(listHeight)` and `DrawPlaybackPickingOrder()` were lifted
-out of `UnlimitedPlaybackWindow::Draw()` so the window and a trigger's modal draw the same
-list, context menus, ordering, enable checkboxes and add buttons.
-
-`DrawPlaybackLibraryPopups()` must be called too, and **at window/modal scope, never inside a
-child**: a popup has to be begun in the scope its flag is raised for, and a nested modal has
-to sit at the parent modal's level to be interactive. Leaving the popups (and the file-dialog
-result handling) behind in the host window is what made every button in the panel look dead
-when it was drawn from a modal.
-
-`listHeight` exists because a modal sizes itself to its content, and content that expands to
-fill whatever it is given never settles on a size. The window passes 0 (fill); a modal names
-a height.
+`m_triggerLibraries` and `SetEditTarget`-based sharing of the library UI with the trigger
+modal are gone with the library source. `SetEditTarget()` remains for the Playback Library
+window's own working set. The lesson that outlived it: UI that edits live state must copy on
+open and restore on cancel (rule 4).
 
 ## Modal sizing
 

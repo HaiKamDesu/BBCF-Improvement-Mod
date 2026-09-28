@@ -98,6 +98,32 @@ public:
     bool is_new = false;
     bool loggable = true;
 
+    // What the dummy-action triggers did on this frame, for the markers above the bar. One
+    // byte per trigger (UnlimitedPlaybackManager::Trigger_Count of them), bits as in
+    // TriggerMark. Only ever set on the dummy's row.
+    enum TriggerMark : unsigned char {
+        Mark_WindowStart = 1,   // the state / countdown the trigger watches began
+        Mark_Actionable  = 2,   // the delay-0 frame: last frame the dummy cannot act
+        Mark_Detected    = 4,   // the trigger's condition (with its delay) was met
+        Mark_Fired       = 8,   // the action actually started
+    };
+    static const int kTriggerSlots = 8;
+    unsigned char triggerMarks[kTriggerSlots] = {};
+    // *g_gameVals.pFrameCount when this column was sampled. What the trigger events are
+    // matched against - see FrameHistory::updateHistory for the proven ordering.
+    int gameFrame = -1;
+    // The player's actionTime in this column (1 on a state's first frame). Recorded so the
+    // markers can be checked against the state they describe: the actionable marker must sit
+    // on the column whose actionTime is the state's length, and a fired marker at -N on the
+    // column N before it.
+    int actionTime = -1;
+    // The dummy's state that opened a window this frame, when one did.
+    const char* triggerState = nullptr;
+    bool HasTriggerMarks() const {
+        for (int i = 0; i < kTriggerSlots; ++i) { if (triggerMarks[i]) return true; }
+        return false;
+    }
+
     PlayerFrameState(scrState* state, unsigned int frame, CharData* player, BackedUpCharData old_data);
     //PlayerFrameState(bool loggable);
     PlayerFrameState();
@@ -128,6 +154,8 @@ public:
 private:
     StatePairQueue queue;
     bool is_old = false;
+    // Counts every column produced (kept or not), for the marker-distance log lines.
+    int m_columnSerial = 0;
 
     // to check if characters changed
     int32_t p1_charIndex = -1;

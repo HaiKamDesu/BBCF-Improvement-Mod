@@ -23,6 +23,8 @@ No unit test suite is present; normal validation is build plus operator in-game 
 ## Module Routes
 - Core boot/config/logging: `src/Core/dllmain.cpp`, `Settings.*`, `settings.def`, `logger.*`, `crashdump.*`, `interfaces.*`.
 - Game memory structs/state: `src/Game`, `notes.h`, `src/Game/GhidraDefs.h`.
+  Which side is the training dummy: `src/Game/TrainingSide.h` (never read `g_interfaces.player2` for it).
+  Dummy actions (trigger -> action list) and the training file: `docs/DummyActionsRework.md`.
 - Hooks: `src/Hooks/HookManager.*` for JMP patches; `src/Hooks/hooks_detours.*` for API detours; `hooks_bbcf.*` for game behavior.
   Read `docs/HookEpilogueContract.md` before placing or editing any JMP patch: interior branch
   targets and hook epilogues have shipped two silent process-killers.

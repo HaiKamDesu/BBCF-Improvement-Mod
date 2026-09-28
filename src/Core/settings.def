@@ -42,6 +42,14 @@ SETTING(bool, checkupdates, "CheckUpdates", "1");
 // part is worth saying out loud.
 SETTING(bool, showHudWhenReplayPaused, "ShowHudWhenReplayPaused", "0");
 SETTING(bool, generateDebugLogs, "GenerateDebugLogs", "1");
+// Diagnostic only, off by default. While on, every time the training dummy enters a timed
+// state (getup, tech, roll, stagger recovery, throw escape) or starts blocking, the dummy is
+// fed a fresh A or B press on every frame (alternating, so each frame is a new press edge)
+// through the same runtime playback the dummy-action triggers use, and DEBUG.txt gets an
+// "[UP][PROBE] <state> (char N): first move started on frame X of the state, rule predicted Y"
+// line - the ground truth for the first-actionable rule in UnlimitedPlaybackManager. Armed
+// triggers do not fire while it is on. See docs/Research/TriggerTimingInvestigation.md.
+SETTING(bool, triggerTimingProbe, "TriggerTimingProbe", "0");
 // Diagnostic only. Calls the game's own "does this entity have active hitboxes" routine
 // (BBCF.exe+0x18C3E0) once per entity per frame and writes its answer, and the six fields it
 // reads, to DEBUG.txt. Used to work out why some hitboxes never draw. Off by default: it calls
@@ -278,6 +286,10 @@ SETTING(float, FrameHistorySpacing, "FrameHistorySpacing", "6.0");
 SETTING(bool, frameHistoryAutoReset, "FrameHistoryAutoReset", "1");
 SETTING(bool, frameHistoryEnabled, "FrameHistoryEnabled", "0");
 SETTING(bool, frameHistoryCountEmptyFrames, "FrameHistoryCountEmptyFrames", "0");
+// Which way time runs in the frame history bar. enum: 0 = newest frame on the left, older
+// ones shift right as they arrive (how it has always been); 1 = oldest on the left, newest
+// pinned to the right edge. Same order as SettingsIniWindow.cpp's kFrameHistoryDirectionOptions.
+SETTING(int, frameHistoryTimeDirection, "FrameHistoryTimeDirection", "0");
 SETTING(std::string, language, "Language", "en");
 // Hotkey bindings. Format is parsed by HotkeyManager (see src/Core/hotkeys.def for the
 // action list): "F6", "Ctrl+Shift+P", "Pad:5:XI0" for a controller button, empty for
@@ -297,6 +309,9 @@ SETTING(int, unlimitedPlaybackLoopRestartMode, "UnlimitedPlaybackLoopRestartMode
 // It delays the 1P side only: the dummy stays instant, so recording a playback (which is
 // driven from the 2P side) is never captured through the delay.
 SETTING(int, trainingInputDelay, "TrainingInputDelay", "0");
+// How many action rows a dummy-action trigger shows before the rest scroll. Some people
+// put a great many actions on one trigger, and the training page has to stay a page.
+SETTING(int, dummyActionMaxRows, "DummyActionMaxRows", "6");
 // Whether the training input delay above is suspended while the match is frozen with the
 // freeze-frame hotkey. On by default: the point of freezing is to hold a button and step
 // the game forward one frame at a time, and a delay line turns that into "hold the button,

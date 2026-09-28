@@ -40,6 +40,7 @@ namespace {
 		{ "CheckUpdates", "Check for updates", "Interface", "Checks once at startup whether a newer version of the mod has been released, and tells you if so. It never installs anything without asking." },
 		{ "ShowHudWhenReplayPaused", "Keep input display on replay pause", "Replay Playback", "Pausing a replay normally makes the game hide its input display - the button columns down both sides and the two stick-and-button panels - which is exactly when you most want to read them. Turn this on to leave them on screen. Only affects Replay Theater, and pausing still pauses." },
 		{ "GenerateDebugLogs", "Generate debug logs", "Debug", "Writes a detailed DEBUG.txt log next to the game. Leave this on: if anything ever goes wrong, that file is what lets the mod's developers work out why. It costs almost nothing." },
+		{ "TriggerTimingProbe", "Trigger timing probe", "Debug", "For measuring, not for play. Every time the training dummy gets up, techs, rolls, recovers from a stagger, escapes a throw or blocks, the dummy presses A and B on alternate frames and DEBUG.txt records the first frame a move came out, next to the frame the mod predicted. Dummy-action triggers do not fire while this is on. Leave it off." },
 		{ "CrashDumpDetail", "Crash dump detail", "Debug", "How much of the game's memory a crash dump captures. Medium is the right answer almost always - it keeps the registers, the stack and the objects the crash touched, and produces a file small enough to actually send. Full captures all of the game's memory, which is hundreds of megabytes of textures nobody will read; only pick it if a developer asks you to." },
 		{ "CrashReportsToKeep", "Crash reports to keep", "Debug", "Deletes the oldest crash reports so BBCF_IM\\CrashReports cannot grow forever. Set to 0 to keep every report, which is how that folder has previously reached several gigabytes." },
 		{ "DCodeAutoRecover", "Fix stuck player profiles", "Debug", "Sometimes the game gets permanently stuck fetching another player's profile, and their D-Code and stats never appear for the rest of the session. This notices that and nudges the game into trying again. Leave it on." },
@@ -106,10 +107,12 @@ namespace {
 		{ "FrameHistorySpacing", "Input display: spacing", "Input history", "How much gap there is between squares in the input history display." },
 		{ "FrameHistoryAutoReset", "Input display: clear automatically", "Input history", "Clears the input history by itself between attempts, so each try starts from a clean slate." },
 		{ "FrameHistoryEnabled", "Show input history", "Input history", "Shows a strip of your recent inputs on screen, one square per frame." },
+		{ "FrameHistoryTimeDirection", "Frame history: time direction", "Input history", "Which way time runs in the frame history bar. Newest on the left is how it has always looked; newest on the right reads like a timeline, oldest first." },
 		{ "FrameHistoryCountEmptyFrames", "Input display: count idle frames", "Input history", "Also counts frames where you pressed nothing. Off makes the display more compact; on makes the timing between inputs literal." },
 		{ "Language", "Language", "Interface", "The language the mod's own menus are shown in. This does not change the game's language." },
 		{ "TrainingInputDelay", "Input delay (frames)", "Training", "Holds your own inputs back by this many frames in training mode, so you can practise at the delay online runs at. BBCF online always adds 2 frames of input delay whatever your ping, so 2 is the setting that matches a net match. 0 turns it off, 10 is the most it will take. The dummy is never delayed." },
 		{ "TrainingInputDelayIgnoreWhenFrozen", "Ignore input delay while frozen", "Training", "While the match is frozen with the freeze-frame hotkey, your inputs skip the training input delay above, so holding a button and stepping forward a frame at a time does what you expect. Turn this off to have the delay apply frame by frame as well." },
+		{ "DummyActionMaxRows", "Dummy actions: rows before scrolling", "Training", "How many actions a trigger on the Training page shows before the rest scroll inside the trigger. Six keeps the page compact; raise it if you would rather see a long list whole." },
 		{ "UnlimitedPlaybackLoopSetupSeconds", "Loop: setup time", "Playback loop", "How many seconds of breathing room you get at the start of each loop, before playback begins, so you can get into position." },
 		{ "UnlimitedPlaybackLoopEndingSeconds", "Loop: wind-down time", "Playback loop", "How many seconds to wait at the end of each loop before it restarts." },
 		{ "UnlimitedPlaybackLoopRestartLabState", "Loop: reload training state", "Playback loop", "Reloads your saved training state every time the loop restarts, so positions and health are identical each repetition." },
@@ -298,6 +301,11 @@ namespace {
 		{ 2, "Sena" },
 	};
 
+	// Same order as the enum comment in settings.def.
+	static const SettingEnumOption kFrameHistoryDirectionOptions[] = {
+		{ 0, "Newest on the left" },
+		{ 1, "Newest on the right" },
+	};
 	// Order must match the enum comment in settings.def and ResolveResetLabAction() in
 	// hooks_system_input.cpp.
 	static const SettingEnumOption kResetLabActionOptions[] = {
@@ -337,6 +345,7 @@ namespace {
 	};
 
 	static const SettingEnumMetadata kSettingEnumMetadata[] = {
+		{ "FrameHistoryTimeDirection", kFrameHistoryDirectionOptions, _countof(kFrameHistoryDirectionOptions) },
 		{ "CrashDumpDetail", kCrashDumpDetailOptions, _countof(kCrashDumpDetailOptions) },
 		{ "AllowPaletteDownloads", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },

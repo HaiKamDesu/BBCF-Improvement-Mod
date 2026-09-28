@@ -2,9 +2,11 @@
 
 // The training page's "Dummy actions" section.
 //
-// One row per armed trigger, and a "+ Add Action" button offering the triggers that are still
-// free. Adding is two decisions: which trigger, then where its inputs come from - so the menu
-// is a trigger list of source submenus, and picking a pair opens that source's own modal.
+// One block per trigger that holds anything: the trigger row (its on/off switch, name, timing,
+// and settings / add / remove buttons), then one indented line per action in it, each with its
+// own switch once there is more than one, and play / edit / remove buttons. Adding is two
+// decisions: which trigger, then where the inputs come from - so the "+ Add Action" menu is a
+// trigger list of source submenus, and a trigger row's "+" skips the first decision.
 //
 // The rows are the whole point of the layout: what the dummy will do, and when, without
 // opening anything. See docs/DummyActionsRework.md.

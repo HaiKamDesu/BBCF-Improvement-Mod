@@ -526,6 +526,12 @@ static constexpr uintptr_t ADDR_ControllerWrapper_MaskJustPressed = 0x000640E0;
 // (engine object from FUN_0047E860, the same object whose +0x108 is gameMode)
 static constexpr uintptr_t ADDR_GetControllerWrapperById = 0x0007E7B0;
 
+// Training human side (2026-09-27): dword at RVA 0x891A38 (VA 0xC91A38) = index (0/1) of
+// the side the training player controls. Indexes the per-side training tables at
+// 0xC904D4 + side * 0x710 (see 0x4802EA), read by the training menu/reset code
+// (0x47DD85, 0x47E03D, 0x47EA2E, ...). The replay takeover writes it to hand a side to
+// the human. Consumed through Game/TrainingSide.h.
+static constexpr uintptr_t ADDR_TrainingHumanSide = 0x00891A38;
 
 // CORRECTION 2026-09-27: the three "restart variants" below are NOT the training
 // reset. Tadatys' symbol dump names them OBJ_CBase::bbcmd_30014_EndTimestopEffect

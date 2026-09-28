@@ -1328,7 +1328,7 @@ Start watching a replay to use this.,Start watching a replay to use this.,Ponte 
 Swap sides now,Swap sides now,Intercambiar lados ahora
 Swap sides on every reset,Swap sides on every reset,Intercambiar lados en cada reinicio
 The Discord is the fastest place to ask a question or report something broken.,The Discord is the fastest place to ask a question or report something broken.,El Discord es el sitio más rápido para preguntar algo o avisar de que algo está roto.
-"The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.","The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.",No se pudo leer la lista de movimientos del muñeco. Esto pasa en la pantalla de selección de personaje del entrenamiento y en los espejos.
+"The dummy's move list could not be read. This happens on the training character select screen.","The dummy's move list could not be read. This happens on the training character select screen.","No se pudo leer la lista de movimientos del muñeco. Esto pasa en la pantalla de selección de personaje del entrenamiento."
 "The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.","The mod cannot read the pad right now, so the delay does nothing. It needs the mod's controller hooks, which are off or could not be installed.","El mod no puede leer el mando ahora mismo, así que el retardo no hace nada. Necesita los hooks de mando del mod, que están desactivados o no se pudieron instalar."
 "The mod itself: settings, controllers, language, updates and help.","The mod itself: settings, controllers, language, updates and help.","El mod en sí: ajustes, mandos, idioma, actualizaciones y ayuda."
 The palette editor itself opens once you are in a match.,The palette editor itself opens once you are in a match.,El editor de paletas se abre cuando estés en una partida.
@@ -1765,8 +1765,8 @@ Unblock user (%s),Unblock user (%s),Desbloquear usuario (%s)
 no custom palette,no custom palette,sin paleta personalizada
 this player,this player,este jugador
 On Hitstun,On Hitstun,En hitstun
-"the moment the dummy is hit, once per combo - a burst goes out at once, inputs once hitstun ends","the moment the dummy is hit, once per combo - a burst goes out at once, inputs once hitstun ends","en cuanto el dummy recibe un golpe, una vez por combo: el burst sale al instante, los inputs al terminar el hitstun"
-"the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","en cuanto el dummy deja de recibir golpes y puede volver a actuar: no durante un combo, ni después de una caída"
+"the moment the dummy is hit, once per combo - a burst goes out at once, inputs once hitstun ends","the moment the dummy is hit, once per combo - a burst goes out at once, inputs once hitstun ends","en cuanto el muñeco recibe un golpe, una vez por combo: el burst sale al instante, los inputs al terminar el hitstun"
+"the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","the instant the dummy stops being hit and can act again - not during a combo, and not after a knockdown","en cuanto el muñeco deja de recibir golpes y puede volver a actuar: no durante un combo, ni después de una caída"
 Original colors,Original colors,Colores originales
 Download,Download,Descargar
 Steam uploads,Steam uploads,Subidas a Steam
@@ -1787,3 +1787,52 @@ Last synced,Last synced,Última sincronización
 "The profile server keeps dropping your sign-in and the automatic sign-in has paused. Progress may not be saving; check Steam uploads.","The profile server keeps dropping your sign-in and the automatic sign-in has paused. Progress may not be saving; check Steam uploads.","El servidor de perfiles sigue cortando tu sesión y el reinicio automático de sesión está en pausa. Puede que el progreso no se esté guardando; revisá Subidas a Steam."
 "Stale ranked room: the host still shows a previous match. Cancel and pick someone else.","Stale ranked room: the host still shows a previous match. Cancel and pick someone else.","Sala clasificatoria obsoleta: el anfitrión todavía muestra una partida anterior. Cancelá y elegí a otra persona."
 "Stale ranked room: the host still shows a previous match. Left it automatically.","Stale ranked room: the host still shows a previous match. Left it automatically.","Sala clasificatoria obsoleta: el anfitrión todavía muestra una partida anterior. Se salió automáticamente."
+Recording,Recording,Grabación
+(%d frames),(%d frames),(%d frames)
+%d actions,%d actions,%d acciones
+(off),(off),(apagado)
+in order,in order,en orden
+no repeats,no repeats,sin repetir
+random,random,aleatorio
+Turn this trigger on or off,Turn this trigger on or off,Activa o desactiva este disparador
+Turn this action on or off,Turn this action on or off,Activa o desactiva esta acción
+Add another action to this trigger,Add another action to this trigger,Añade otra acción a este disparador
+Remove this trigger and everything in it,Remove this trigger and everything in it,Elimina este disparador y todo lo que contiene
+Remove this trigger?,Remove this trigger?,¿Eliminar este disparador?
+Remove %s and its %d actions?,Remove %s and its %d actions?,¿Eliminar %s y sus %d acciones?
+Remove,Remove,Eliminar
+Remove this action,Remove this action,Elimina esta acción
+"Remove this action - it is the trigger's last, so the trigger goes with it","Remove this action - it is the trigger's last, so the trigger goes with it","Elimina esta acción; es la última del disparador, así que el disparador se va con ella"
+Nothing to configure for a burst,Nothing to configure for a burst,Un burst no tiene nada que configurar
+This action is not set up enough to do anything yet.,This action is not set up enough to do anything yet.,Esta acción aún no está configurada lo suficiente para hacer nada.
+This removes every trigger and every action in them.,This removes every trigger and every action in them.,Esto elimina todos los disparadores y todas las acciones que contienen.
+"How many actions this trigger holds, and how it picks one when it fires. Change the picking order in the trigger's settings.","How many actions this trigger holds, and how it picks one when it fires. Change the picking order in the trigger's settings.",Cuántas acciones tiene este disparador y cómo elige una al activarse. Cambia el orden de elección en los ajustes del disparador.
+How the trigger chooses between its actions when it fires. Only actions that are on are considered.,How the trigger chooses between its actions when it fires. Only actions that are on are considered.,Cómo elige el disparador entre sus acciones al activarse. Solo se consideran las acciones activadas.
+Keep a copy of the recording,Keep a copy of the recording,Guardar una copia de la grabación
+"Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file.","Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file.","Desactivado: reproduce lo que tenga la ranura cuando se active el disparador, así que volver a grabar la ranura cambia lo que hace el muñeco. Activado: copia la grabación de la ranura en esta acción ahora, para que no cambie aunque cambie la ranura, y viaja con el archivo de entrenamiento."
+Slot %d is empty. Record something into it first.,Slot %d is empty. Record something into it first.,La ranura %d está vacía. Graba algo en ella primero.
+Something is already playing.,Something is already playing.,Ya hay algo reproduciéndose.
+window began,window began,empieza la ventana
+actionable (delay 0),actionable (delay 0),accionable (retraso 0)
+condition detected,condition detected,condición detectada
+action fired,action fired,acción disparada
+"Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go.","Everything on this page in one file - the dummy actions, positions and timings, and the input delay - so a setup can be sent to someone and loaded in one go.","Todo lo de esta página en un archivo: las acciones del muñeco, posiciones y tiempos, y el retraso de input, para poder enviarle una configuración a alguien y que la cargue de una vez."
+Writes the current setup to a file you choose.,Writes the current setup to a file you choose.,Guarda la configuración actual en un archivo que elijas.
+Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.,Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.,Sustituye la configuración actual por la de un archivo. Las grabaciones copiadas viajan dentro del archivo; un archivo de playback o una ranura CF a la que apunte una acción tiene que existir en esta máquina.
+Clears every dummy action and puts every setting on this page back to how a fresh install has it.,Clears every dummy action and puts every setting on this page back to how a fresh install has it.,Borra todas las acciones del muñeco y devuelve todos los ajustes de esta página a los de una instalación nueva.
+"This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.","This removes every dummy action and resets positions, wake-up timing and input delay. Export first if you want to keep this setup.","Esto elimina todas las acciones del muñeco y restablece posiciones, tiempo de levantada y retraso de input. Exporta antes si quieres conservar esta configuración."
+Saved to %s,Saved to %s,Guardado en %s
+Could not write %s,Could not write %s,No se pudo escribir %s
+Loaded %s: %d trigger(s),Loaded %s: %d trigger(s),Cargado %s: %d disparador(es)
+Remove these %d actions,Remove these %d actions,Eliminar estas %d acciones
+Remove these %d actions?,Remove these %d actions?,¿Eliminar estas %d acciones?
+Save this action as a playback file,Save this action as a playback file,Guardar esta acción como archivo de playback
+Playback file or library,Playback file or library,Archivo de playback o biblioteca
+Playback library,Playback library,Biblioteca de playback
+That library file could not be read.,That library file could not be read.,No se pudo leer ese archivo de biblioteca.
+Added %d recording(s) from the library.,Added %d recording(s) from the library.,Se añadieron %d grabación(es) de la biblioteca.
+That action has no inputs to save.,That action has no inputs to save.,Esa acción no tiene inputs que guardar.
+That action has no inputs to send.,That action has no inputs to send.,Esa acción no tiene inputs que enviar.
+Sent to CF slot %d.,Sent to CF slot %d.,Enviado a la ranura CF %d.
+"On this frame: actionTime %d. Time runs left to right and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its right.","On this frame: actionTime %d. Time runs left to right and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its right.","En este frame: actionTime %d. El tiempo corre de izquierda a derecha y cada marcador está sobre el cuadro de su propio frame. Disparado es el primer frame en que se aplican los inputs; con un retraso de -N el primer cuadro accionable está N cuadros a su derecha."
+"On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left.","On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left.","En este frame: actionTime %d. El frame más nuevo está a la izquierda y cada marcador está sobre el cuadro de su propio frame. Disparado es el primer frame en que se aplican los inputs; con un retraso de -N el primer cuadro accionable está N cuadros a su izquierda."

@@ -183,6 +183,7 @@
     <ClCompile Include="src\Game\Player.cpp" />
     <ClCompile Include="src\Game\gamestates.cpp" />
     <ClCompile Include="src\Game\MatchState.cpp" />
+    <ClCompile Include="src\Game\TrainingSide.cpp" />
     <ClCompile Include="src\Game\FrameStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\EntityDiagnostics.cpp" />
     <ClCompile Include="src\Game\OnlineInputDelay.cpp" />
@@ -436,6 +437,7 @@
     <ClInclude Include="src\Overlay\Window\IWindow.h" />
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\MatchState.h" />
+    <ClInclude Include="src\Game\TrainingSide.h" />
     <ClInclude Include="src\Game\FrameStallDiagnostics.h" />
     <ClInclude Include="src\Game\EntityDiagnostics.h" />
     <ClInclude Include="src\Game\OnlineInputDelay.h" />

@@ -17,21 +17,22 @@
 //     on four hard-coded triggers, and nothing else.
 //   - Unlimited Playback, whose library could fire a recorded playback on any of seven
 //     triggers - but only ONE trigger at a time, because picking a trigger type in its
-//     settings cleared every other one ("Selects the single trigger type that can fire
-//     library playback").
+//     settings cleared every other one.
 //
-// The model here is a trigger-first table: every trigger independently holds at most one
-// action, and an action names WHERE its inputs come from. So a wakeup DP, an on-hit burst
+// The model here is a trigger-first table: every trigger independently holds a LIST of
+// actions, and an action names WHERE its inputs come from. So a wakeup DP, an on-hit burst
 // and a looping blockstring can all be armed at once, which neither system allowed.
 //
-// A library is a named collection of recorded playbacks on disk - which is what an Unlimited
-// Playback "profile" already is, since SaveProfile embeds every entry's playback bytes in the
-// file. Each trigger names the library it draws from, so On Wakeup and On Block Gap can pull
-// from entirely different sets, and the same library can serve several triggers.
+// A trigger with more than one action picks between them when it fires - at random, in
+// order, or at random without repeats - exactly the way a Playback Library used to pick
+// between its entries. That is why there is no library source any more: a trigger's action
+// list IS the library, without the detour through a separate file, and every kind of action
+// (notation, a file, an animation, a captured recording...) can sit in it side by side. Each
+// action and each trigger has its own on/off switch, so a set can be built once and pieces
+// of it turned off without losing them.
 //
-// That makes PlaybackEntry::triggerEnabled obsolete: which entries a trigger may use is now
-// decided by which library is assigned, not by a flag on every entry. Old library files still
-// parse, and the field is read and discarded.
+// Old files that named a library are still read: the library's entries are unpacked into
+// captured-recording actions on that trigger, so nothing the user built is lost.
 //
 // See docs/DummyActionsRework.md for the whole design.
 class DummyActionManager
@@ -39,21 +40,27 @@ class DummyActionManager
 public:
 	using TriggerType = UnlimitedPlaybackManager::TriggerType;
 
-	// Where a trigger's inputs come from. The order is the order of the "Change..." menu.
+	// Where an action's inputs come from. The order is the order of the "Add" menu.
 	enum Source
 	{
 		Source_None = -1,
 		Source_Notation = 0,  // typed numpad notation, parsed by the TAS tool's own parser
-		Source_Library,       // a named Playback Library, drawn from per its selection mode
+		Source_Library,       // LEGACY - a named Playback Library. Read from old files and
+		                      // unpacked into Source_Recording actions; never created anew.
 		Source_File,          // one playback file
 		Source_Animation,     // one or more of the dummy's own script states
-		Source_CfSlot,        // one of the game's four recording slots
+		Source_CfSlot,        // one of the game's four recording slots, read live
 		Source_Burst,         // burst out of it, On Hitstun (Trigger_OnHit) only
+		Source_Recording,     // a copy of a recording slot taken when the action was added
 		Source_Count,
 	};
 
 	struct Action
 	{
+		// Off means it stays in the list but is never picked. Only meaningful when the
+		// trigger holds more than one action; a lone action is always on.
+		bool enabled = true;
+
 		Source source = Source_None;
 
 		// Source_Notation. Kept as text so the modal can show what was typed; the parse is
@@ -74,16 +81,20 @@ public:
 		// saved to disk and what the pointers are rebuilt from after every parse.
 		std::vector<std::string> animationNames;
 
-		// Source_Library. Which library this trigger draws from, and how it picks when the
-		// library holds more than one entry. The mode lives here rather than in the library
-		// because a library is a reusable collection: two triggers can share one and still
-		// pick from it differently.
+		// Source_Library (legacy, load-time only).
 		std::string libraryPath;
 		std::string libraryName;
 		int selectionMode = UnlimitedPlaybackManager::Selection_Random;
 
-		// Source_CfSlot, 1-4.
+		// Source_CfSlot, 1-4. Also which slot a Source_Recording was captured from.
 		int cfSlot = 1;
+
+		// Source_Recording. The slot's raw two-bytes-per-frame buffer and its facing, taken
+		// at the moment the action was added, so re-recording the slot does not change it.
+		// Saved to disk as hex, so a lab of captured recordings is one file.
+		std::vector<char> recordingFrames;
+		bool recordingFacingLeft = false;
+		std::string recordingName;
 
 		// Source_Animation. Naoto's EN specials need a flag held down for his own script
 		// states to be reachable at all, so it belongs with the animation payload rather
@@ -91,6 +102,18 @@ public:
 		bool naotoEnSpecials = false;
 
 		bool IsSet() const { return source != Source_None; }
+	};
+
+	// A trigger's action list and how it picks from it.
+	struct Trigger
+	{
+		// Off means nothing in it fires, whatever the actions say. Separate from the per
+		// action switch so a whole setup can be parked without unticking every row.
+		bool enabled = true;
+		// One of UnlimitedPlaybackManager::Selection_*. Only consulted with more than one
+		// enabled action.
+		int selectionMode = UnlimitedPlaybackManager::Selection_Random;
+		std::vector<Action> actions;
 	};
 
 	static DummyActionManager& Instance();
@@ -115,34 +138,69 @@ public:
 	//     other source is. So those two triggers do not offer it.
 	static bool SourceAllowedForTrigger(Source source, TriggerType trigger);
 
-	Action& Get(TriggerType trigger);
-	const Action& Get(TriggerType trigger) const;
+	Trigger& Get(TriggerType trigger);
+	const Trigger& Get(TriggerType trigger) const;
 
+	// Whether the trigger holds anything at all. A trigger with no actions is not shown
+	// and does not exist as far as the user is concerned.
 	bool HasAction(TriggerType trigger) const;
+	// Triggers with at least one action.
 	int AssignedCount() const;
-	// True while at least one trigger is still free, i.e. while "+ Add Action" has anything
-	// left to offer.
+	// True while at least one trigger is still empty.
 	bool HasFreeTrigger() const;
 
-	// Commits a fully configured action onto a trigger. The UI edits a draft and calls this
-	// once, so a row appears only when it is actually set up and cancelling changes nothing.
-	void Set(TriggerType trigger, const Action& action);
+	// Appends a fully configured action to a trigger and returns its index. The UI edits a
+	// draft and calls this once, so a row appears only when it is actually set up and
+	// cancelling changes nothing.
+	size_t Add(TriggerType trigger, const Action& action);
+	// Overwrites one action in place, keeping its position and enable flag.
+	void Replace(TriggerType trigger, size_t index, const Action& action);
+	// Removes one action. Removing the last one removes the trigger with it.
+	void Remove(TriggerType trigger, size_t index);
+	// Removes the trigger and every action in it.
 	void Clear(TriggerType trigger);
 	void ClearAll();
 
-	// One line for the row: the notation typed, the animation picked, the library named, and
+	void SetTriggerEnabled(TriggerType trigger, bool enabled);
+	void SetActionEnabled(TriggerType trigger, size_t index, bool enabled);
+	void SetActionsEnabled(TriggerType trigger, const std::vector<size_t>& indices, bool enabled);
+	void SetAllActionsEnabled(TriggerType trigger, bool enabled);
+	void SetSelectionMode(TriggerType trigger, int mode);
+	// The list operations the Playback Library's rows had: several at once, reordered by
+	// insertion point (the same algorithm as UnlimitedPlaybackManager::MoveEntries), and
+	// a captured recording renamed.
+	void RemoveActions(TriggerType trigger, std::vector<size_t> indices);
+	bool MoveActions(TriggerType trigger, const std::vector<size_t>& fromIndicesSorted,
+		size_t insertionIndex, size_t* outInsertedAt = nullptr);
+	void SetRecordingName(TriggerType trigger, size_t index, const std::string& name);
+	// Unpacks a Playback Library file (*.upl) into captured-recording actions on the
+	// trigger, on or off as each entry was. Returns how many were added, -1 if the file
+	// could not be read. Also what an old single-library action is migrated through.
+	int AddLibraryFile(TriggerType trigger, const std::string& path, int* outSelectionMode = nullptr);
+
+	// One line for a row: the notation typed, the animation picked, the file named, and
 	// so on.
+	static std::string ActionSummary(const Action& action);
+	// For a trigger: its single action's summary, or how many it holds.
 	std::string Summary(TriggerType trigger) const;
 
-	// Whether the action is configured enough to actually do something. A trigger can sit
+	// Whether an action is configured enough to actually do something. One can sit
 	// half-configured if the user opens a modal and cancels out of it.
+	static bool IsActionRunnable(const Action& action);
+	// Whether a trigger, as a whole, will do something when it fires: it is on, and it
+	// holds at least one action that is on and runnable.
 	bool IsRunnable(TriggerType trigger) const;
+
+	// Picks the action a firing should use, per the trigger's selection mode, over the
+	// actions that are on and runnable. Null when there is nothing to pick. Advances the
+	// sequential index / no-repeat pool, so call it once per firing.
+	const Action* Pick(TriggerType trigger);
 
 	// Keeps UnlimitedPlaybackManager's per-trigger enable flags in step with this table.
 	// That flag is the gate its TryFireTrigger checks first, so it has to mean "armed" for
-	// every source, not only the library. Cheap, and called every frame rather than only on
-	// edit: a modal that finishes configuring an action changes the answer, and relying on
-	// the UI to say so is how a feature ends up only working while its menu is open.
+	// every source. Cheap, and called every frame rather than only on edit: a modal that
+	// finishes configuring an action changes the answer, and relying on the UI to say so
+	// is how a feature ends up only working while its menu is open.
 	void SyncTriggerEnable();
 
 	// Drops animation pointers when the dummy's script is re-parsed. They point into that
@@ -163,12 +221,26 @@ public:
 	// left to hang the work on and the names would sit unresolved forever.
 	bool NeedsAnimationResolve(const void* ownerCharData) const;
 
-	// The table on disk, so a lab survives a restart. Text, one section per trigger, holding
-	// the action and the trigger's own timing settings.
+	// The table on disk, so a lab survives a restart. Text, one section per trigger holding
+	// the trigger's own settings, then one section per action.
 	void Save() const;
 	void Load();
 	// Loads once, the first time it is safe to touch the disk.
 	void EnsureLoaded();
+
+	// The same file format written to / read from an arbitrary path, for sharing a lab.
+	// Importing replaces everything here. Neither touches the window sizes.
+	//
+	// The training file carries more than the dummy: extras is a flat key=value list the
+	// caller owns (positions, wake-up timing, input delay), written under a [training]
+	// section and handed back on import. This class does not interpret them.
+	using Extras = std::vector<std::pair<std::string, std::string>>;
+	bool ExportTo(const std::string& path, const Extras* extras = nullptr) const;
+	bool ImportFrom(const std::string& path, Extras* extrasOut = nullptr);
+
+	// Everything back to how a fresh install has it: no triggers, default firing settings,
+	// default loop settings. Saved.
+	void ResetToDefaults();
 
 	// Window sizes the user has settled on, saved alongside the actions. Kept here rather
 	// than in the panel because this is the thing that owns the file - ImGui only persists
@@ -179,7 +251,17 @@ public:
 private:
 	DummyActionManager() = default;
 
-	std::array<Action, UnlimitedPlaybackManager::Trigger_Count> m_actions;
+	bool WriteTo(const std::string& path, bool includeUiSizes, const Extras* extras) const;
+	bool ReadFrom(const std::string& path, bool includeUiSizes, Extras* extrasOut);
+	// Wipes the table and the per-trigger firing settings that live in
+	// UnlimitedPlaybackManager, without saving. What Load and Import start from.
+	void ResetInMemory();
+
+	std::array<Trigger, UnlimitedPlaybackManager::Trigger_Count> m_triggers;
+	// Picking bookkeeping, per trigger: where a sequential pick is up to, and which actions
+	// a no-repeat pick has not yet used this round.
+	std::array<size_t, UnlimitedPlaybackManager::Trigger_Count> m_sequentialIndex = {};
+	std::array<std::vector<size_t>, UnlimitedPlaybackManager::Trigger_Count> m_nonRepeatPools = {};
 	bool m_loaded = false;
 	// Whose parsed script the animation pointers were last matched against.
 	const void* m_resolvedForCharData = nullptr;

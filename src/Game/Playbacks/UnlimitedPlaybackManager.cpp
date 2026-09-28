@@ -1,4 +1,6 @@
 #include "UnlimitedPlaybackManager.h"
+#include "Game/TrainingSide.h"
+#include "Hooks/hooks_battle_input.h"
 
 #include "Game/Playbacks/DummyActionManager.h"
 #include "Game/Scr/ScrStateNames.h"
@@ -467,30 +469,6 @@ UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::GetEditTarg
     return &EditTarget();
 }
 
-UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::MutableLibraryForTrigger(
-    TriggerType trigger) {
-    // Loads the assignment if needed, then hands back this trigger's own slot so the editor
-    // works on exactly the object the trigger fires from.
-    LibraryForTrigger(trigger);
-    return &m_triggerLibraries[trigger];
-}
-
-void UnlimitedPlaybackManager::ResetTriggerLibrary(TriggerType trigger) {
-    m_triggerLibraries[trigger] = PlaybackLibrary{};
-    // The picking bookkeeping is per trigger too, and a sequential index or a
-    // no-repeat pool left pointing into the old entry list is meaningless now.
-    m_sequentialIndex[trigger] = 0;
-    m_nonRepeatPools[trigger].clear();
-    // Nothing has been edited in this slot yet, so the editor must not still be aimed at it.
-    if (GetEditTarget() == &m_triggerLibraries[trigger]) {
-        SetEditTarget(nullptr);
-    }
-}
-
-bool UnlimitedPlaybackManager::TriggerLibraryHasEntries(TriggerType trigger) const {
-    return !m_triggerLibraries[trigger].entries.empty();
-}
-
 UnlimitedPlaybackManager& UnlimitedPlaybackManager::Instance() {
     static UnlimitedPlaybackManager instance;
     return instance;
@@ -575,7 +553,7 @@ void UnlimitedPlaybackManager::Tick() {
         (*g_gameVals.pGameMode == GameMode_Training) &&
         (*g_gameVals.pGameState == GameState_InMatch) &&
         (GetGameSceneStatus() >= GameSceneStatus_Running) &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        !TrainingSide::Dummy().IsCharDataNullPtr();
 
     if (!inTrainingMatch) {
         if (m_runtimeSlotRestorePending || m_runtimeSlotBackupValid) {
@@ -592,6 +570,16 @@ void UnlimitedPlaybackManager::Tick() {
         m_prevOnHitCondition = false;
         m_prevOnHitRecoveryCondition = false;
         m_prevThrowTechCondition = false;
+        m_timedPrevAction.clear();
+        m_triggerEvents = {};
+        m_triggerEventsFrame = -1;
+        m_timedWindowTrigger = -1;
+        m_timedWindowState = nullptr;
+        m_timedActionableFrame = -1;
+        m_gapActionableFrame = -1;
+        m_recActionableFrame = -1;
+        m_traceFramesLeft = 0;
+        m_probeActive = false;
         StopLoop(nullptr);
         ClearLoopCustomSnapshot();
     } else {
@@ -600,6 +588,12 @@ void UnlimitedPlaybackManager::Tick() {
         // in the frame, before the game's active-slot playback input read), not here - see
         // RunPreTick() for why.
         LogSlot4PlaybackDiagnostics();
+    }
+
+    // Where every trigger's window is this frame, computed before the arming gates below so
+    // the frame history bar can show a wakeup's start and end with nothing armed at all.
+    if (inTrainingMatch && g_gameVals.pFrameCount) {
+        UpdateTriggerTiming(*g_gameVals.pFrameCount);
     }
 
     if (!inTrainingMatch || !m_triggerRuntimeEnabled || m_profileRuntimeSuppressedUntilReset) {
@@ -640,15 +634,16 @@ void UnlimitedPlaybackManager::Tick() {
     // the firing condition - rather than being silent about all three.
     {
         DummyActionManager& actions = DummyActionManager::Instance();
-        char state[Trigger_Count * 24 + 1] = {};
+        char state[Trigger_Count * 32 + 1] = {};
         int used = 0;
         for (int i = 0; i < Trigger_Count; ++i) {
-            const DummyActionManager::Action& action =
+            const DummyActionManager::Trigger& slot =
                 actions.Get(static_cast<TriggerType>(i));
-            used += sprintf_s(state + used, sizeof(state) - used, "%s%d:src%d/run%d/en%d",
+            used += sprintf_s(state + used, sizeof(state) - used, "%s%d:n%u/on%d/run%d/en%d",
                 i ? " " : "",
                 i,
-                static_cast<int>(action.source),
+                static_cast<unsigned int>(slot.actions.size()),
+                slot.enabled ? 1 : 0,
                 actions.IsRunnable(static_cast<TriggerType>(i)) ? 1 : 0,
                 m_triggers[i].enabled ? 1 : 0);
         }
@@ -738,6 +733,7 @@ void UnlimitedPlaybackManager::ResetTriggerRuntimeState(bool enableRuntime) {
     m_prevOnHitRecoveryCondition = false;
     m_prevThrowTechCondition = false;
     m_keyPressTriggerArmed = false;
+    m_timedPrevAction.clear();
     LogRuntimeGateState("ResetTriggerRuntimeState end");
 }
 
@@ -1025,6 +1021,22 @@ bool UnlimitedPlaybackManager::AddPlaybackFile(const std::string& sourcePath, co
 
     PushToast(L("Playback imported."));
     return true;
+}
+
+bool UnlimitedPlaybackManager::ReadSlotRecording(int slot, std::vector<char>* outRawFrames,
+    bool* outFacingLeft) const {
+    if (!outRawFrames || !outFacingLeft || slot < 1 || slot > 4) {
+        return false;
+    }
+    if (!TryReadBorrowedSlot(slot, outRawFrames, outFacingLeft)) {
+        PlaybackSlot pslot(slot);
+        *outRawFrames = pslot.get_slot_buffer_raw();
+        *outFacingLeft = pslot.get_facing_direction() != 0;
+    }
+    if (outRawFrames->size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
+        outRawFrames->resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
+    }
+    return !outRawFrames->empty();
 }
 
 bool UnlimitedPlaybackManager::CaptureSlotToLibrary(int slot, const std::string& displayName) {
@@ -1369,6 +1381,40 @@ bool UnlimitedPlaybackManager::RenameEntry(size_t idx, const std::string& newNam
     return true;
 }
 
+bool UnlimitedPlaybackManager::LoadActionIntoSlot(TriggerType trigger, size_t actionIndex, int slot) {
+    InitializeIfNeeded();
+    if (slot < 1 || slot > 4) {
+        return false;
+    }
+    const bool inTrainingMatch =
+        g_gameVals.pGameMode &&
+        g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_Training) &&
+        (*g_gameVals.pGameState == GameState_InMatch) &&
+        (GetGameSceneStatus() >= GameSceneStatus_Running) &&
+        !TrainingSide::Dummy().IsCharDataNullPtr();
+    if (!inTrainingMatch) {
+        PushToast(L("Sending to a CF slot works only during a training match."));
+        return false;
+    }
+    ResolvedAction resolved;
+    if (!ResolveTriggerAction(trigger, &resolved, static_cast<int>(actionIndex)) || resolved.frames.empty()) {
+        PushToast(L("That action has no inputs to send."));
+        return false;
+    }
+    int facingToLoad = resolved.facingLeft ? 1 : 0;
+    bool currentFacingLeft = false;
+    if (TryGetCurrentFacingLeft(&currentFacingLeft) && currentFacingLeft != resolved.facingLeft) {
+        if (!m_triggers[trigger].autoMirror) {
+            facingToLoad = currentFacingLeft ? 1 : 0;
+        }
+    }
+    m_runtimePlaybackManager.load_raw_into_slot(resolved.frames, facingToLoad, slot);
+    AbsorbExternalSlotWriteRaw(slot, resolved.frames, facingToLoad != 0);
+    PushToast(FormatLocalized("Sent to CF slot %d.", slot));
+    return true;
+}
+
 bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
     InitializeIfNeeded();
 
@@ -1382,7 +1428,7 @@ bool UnlimitedPlaybackManager::LoadEntryIntoSlot(size_t idx, int slot) {
         (*g_gameVals.pGameMode == GameMode_Training) &&
         (*g_gameVals.pGameState == GameState_InMatch) &&
         (GetGameSceneStatus() >= GameSceneStatus_Running) &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        !TrainingSide::Dummy().IsCharDataNullPtr();
     if (!inTrainingMatch) {
         PushToast(L("Sending to a CF slot works only during a training match."));
         return false;
@@ -1563,7 +1609,7 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
         (*g_gameVals.pGameMode == GameMode_Training) &&
         (*g_gameVals.pGameState == GameState_InMatch) &&
         (GetGameSceneStatus() >= GameSceneStatus_Running) &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        !TrainingSide::Dummy().IsCharDataNullPtr();
     if (!inTrainingMatch) {
         PushToast(L("Play now works only during a training match."));
         return false;
@@ -1587,6 +1633,21 @@ bool UnlimitedPlaybackManager::PlayEntryNow(size_t idx) {
 }
 
 void UnlimitedPlaybackManager::ExecutePendingPlayNow() {
+    if (m_pendingPlayActionRequested) {
+        m_pendingPlayActionRequested = false;
+        const TriggerType trigger = static_cast<TriggerType>(m_pendingPlayActionTrigger);
+        ResolvedAction resolved;
+        if (!ResolveTriggerAction(trigger, &resolved, static_cast<int>(m_pendingPlayActionIndex))) {
+            PushToast(L("Nothing to play for this trigger."));
+        }
+        else if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
+            PushToast(L("Something is already playing."));
+        }
+        else {
+            const int frame = g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0;
+            ExecuteResolvedAction(trigger, resolved, frame);
+        }
+    }
     if (!m_pendingPlayNowRequested) {
         return;
     }
@@ -1692,7 +1753,7 @@ void UnlimitedPlaybackManager::LogSlot4PlaybackDiagnostics() {
             p1Blockstun = p1->blockstun;
             p1Hitstun = p1->hitstun;
         }
-        if (!g_interfaces.player2.IsCharDataNullPtr()) {
+        if (!TrainingSide::Dummy().IsCharDataNullPtr()) {
             const auto* p2 = g_interfaces.player2.GetData();
             p2Action = p2->currentAction;
             p2ActionTime = p2->actionTime;
@@ -2029,50 +2090,6 @@ bool UnlimitedPlaybackManager::LoadProfile(const std::string& profilePath, bool 
     return true;
 }
 
-const UnlimitedPlaybackManager::PlaybackLibrary* UnlimitedPlaybackManager::LibraryForTrigger(
-    TriggerType trigger) {
-    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
-    if (action.source != DummyActionManager::Source_Library || action.libraryPath.empty()) {
-        return nullptr;
-    }
-
-    PlaybackLibrary& slot = m_triggerLibraries[trigger];
-
-    // Load only when the assignment names a file this slot is not already holding. Editing
-    // the slot without saving leaves the path alone, so an unchecked entry or a reorder is
-    // not undone by a reload on the next shot.
-    if (slot.path != action.libraryPath) {
-        PlaybackLibrary loaded;
-        if (!ParseLibraryFile(action.libraryPath, true, &loaded, nullptr)) {
-            LOG(1, "[UP] Library for trigger '%s' failed to load: '%s'\n",
-                TriggerDisplayName(trigger), action.libraryPath.c_str());
-            return nullptr;
-        }
-        LOG(1, "[UP] Loaded library '%s' for trigger '%s' (%u entries)\n",
-            loaded.path.c_str(), TriggerDisplayName(trigger),
-            static_cast<unsigned int>(loaded.entries.size()));
-        slot = std::move(loaded);
-        // The action's picking order wins over whatever the file was saved with: it is what
-        // the user last chose for THIS trigger, and it is the value the firing code reads.
-        // Without this the modal would show the file's mode while the trigger used another.
-        slot.selectionMode = action.selectionMode;
-    }
-    return &slot;
-}
-
-void UnlimitedPlaybackManager::PruneUnusedLibraries() {
-    // A trigger that no longer draws from a library has no use for the entries it was
-    // holding, and they would otherwise come back if it were pointed at a library again.
-    const DummyActionManager& actions = DummyActionManager::Instance();
-    for (int i = 0; i < Trigger_Count; ++i) {
-        const DummyActionManager::Action& action = actions.Get(static_cast<TriggerType>(i));
-        if (action.source != DummyActionManager::Source_Library
-            && !m_triggerLibraries[i].entries.empty()) {
-            m_triggerLibraries[i] = PlaybackLibrary{};
-        }
-    }
-}
-
 std::string UnlimitedPlaybackManager::GetActiveProfilePath() const {
     return EditTarget().path;
 }
@@ -2273,72 +2290,6 @@ bool UnlimitedPlaybackManager::WritePlaybackFile(const std::string& fullPath, bo
     return out.good();
 }
 
-bool UnlimitedPlaybackManager::PickEntryIndexForTrigger(TriggerType trigger,
-    const PlaybackLibrary& library, int selectionMode, size_t* outIndex) {
-    std::vector<size_t> candidates = BuildCandidates(library);
-    if (candidates.empty()) {
-        return false;
-    }
-    static std::mt19937 rng(static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
-
-    if (selectionMode == Selection_Sequential) {
-        const size_t pos = m_sequentialIndex[trigger] % candidates.size();
-        *outIndex = candidates[pos];
-        m_sequentialIndex[trigger] = (m_sequentialIndex[trigger] + 1) % candidates.size();
-        return true;
-    }
-
-    auto weightedPick = [&](const std::vector<size_t>& source, size_t* picked) -> bool {
-        double totalWeight = 0.0;
-        for (size_t idx : source) {
-            totalWeight += (double)library.entries[idx].weight;
-        }
-        if (totalWeight <= 0.0) {
-            return false;
-        }
-        std::uniform_real_distribution<double> dist(0.0, totalWeight);
-        const double roll = dist(rng);
-        double acc = 0.0;
-        for (size_t idx : source) {
-            acc += (double)library.entries[idx].weight;
-            if (roll <= acc) {
-                *picked = idx;
-                return true;
-            }
-        }
-        *picked = source.back();
-        return true;
-    };
-
-    if (selectionMode == Selection_NonRepeatingRandom) {
-        auto& pool = m_nonRepeatPools[trigger];
-        if (pool.empty()) {
-            pool = candidates;
-        } else {
-            std::vector<size_t> filtered;
-            for (size_t idx : pool) {
-                if (std::find(candidates.begin(), candidates.end(), idx) != candidates.end()) {
-                    filtered.push_back(idx);
-                }
-            }
-            pool.swap(filtered);
-            if (pool.empty()) {
-                pool = candidates;
-            }
-        }
-
-        size_t picked = 0;
-        if (!weightedPick(pool, &picked)) {
-            return false;
-        }
-        *outIndex = picked;
-        pool.erase(std::remove(pool.begin(), pool.end(), picked), pool.end());
-        return true;
-    }
-
-    return weightedPick(candidates, outIndex);
-}
-
 bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFrame) {
     auto& config = m_triggers[trigger];
 
@@ -2349,6 +2300,9 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
         reject = "not armed";
     } else if ((currentFrame - config.lastTriggeredFrame) < (std::max)(1, config.cooldownFrames)) {
         reject = "cooling down";
+    } else if (Settings::settingsIni.triggerTimingProbe) {
+        // The probe owns the dummy's inputs; a trigger firing on top would corrupt both.
+        reject = "the trigger timing probe is on (settings.ini TriggerTimingProbe)";
     } else if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
         reject = "a CF slot is still borrowed";
     }
@@ -2383,6 +2337,9 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
 
     LOG(1, "[UP] Trigger condition met: %s\n", TriggerDisplayName(trigger));
     PushToast(FormatLocalized("Trigger detected: %s", TriggerDisplayName(trigger)));
+    m_triggerEvents[trigger].detected = true;
+    // Trace the frames the inputs land on, whichever trigger it was.
+    m_traceFramesLeft = 12;
 
     // A delay means the condition has been met but the action is deliberately late, so the
     // cooldown starts now: the trigger must not re-detect while it is counting down.
@@ -2426,11 +2383,11 @@ bool UnlimitedPlaybackManager::PlayAnimationNow(scrState* state) {
     if (!state || !state->addr) {
         return false;
     }
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    if (TrainingSide::Dummy().IsCharDataNullPtr()) {
         return false;
     }
 
-    auto* p2 = g_interfaces.player2.GetData();
+    auto* p2 = TrainingSide::Dummy().GetData();
     memcpy(&(p2->nextScriptLineLocationInMemory), &(state->addr), 4);
     p2->frameCounterCurrentSprite = p2->frameLengthCurrentSprite2 - 1;
 
@@ -2440,33 +2397,59 @@ bool UnlimitedPlaybackManager::PlayAnimationNow(scrState* state) {
 }
 
 bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int currentFrame) {
-    TriggerConfig& config = m_triggers[trigger];
-
     ResolvedAction resolved;
     if (!ResolveTriggerAction(trigger, &resolved)) {
-        LOG(1, "[UP] Trigger '%s' fired but resolved to nothing: source=%d\n",
+        LOG(1, "[UP] Trigger '%s' fired but resolved to nothing: actions=%u\n",
             TriggerDisplayName(trigger),
-            static_cast<int>(DummyActionManager::Instance().Get(trigger).source));
+            static_cast<unsigned int>(DummyActionManager::Instance().Get(trigger).actions.size()));
         PushToast(L("Nothing to play for this trigger."));
         return false;
     }
+    return ExecuteResolvedAction(trigger, resolved, currentFrame);
+}
+
+bool UnlimitedPlaybackManager::PlayActionNow(TriggerType trigger, size_t actionIndex) {
+    InitializeIfNeeded();
+    const bool inTrainingMatch =
+        g_gameVals.pGameMode &&
+        g_gameVals.pGameState &&
+        (*g_gameVals.pGameMode == GameMode_Training) &&
+        (*g_gameVals.pGameState == GameState_InMatch) &&
+        (GetGameSceneStatus() >= GameSceneStatus_Running) &&
+        !TrainingSide::Dummy().IsCharDataNullPtr();
+    if (!inTrainingMatch) {
+        PushToast(L("Play now works only during a training match."));
+        return false;
+    }
+    if (actionIndex >= DummyActionManager::Instance().Get(trigger).actions.size()) {
+        return false;
+    }
+    m_pendingPlayActionTrigger = static_cast<int>(trigger);
+    m_pendingPlayActionIndex = actionIndex;
+    m_pendingPlayActionRequested = true;
+    return true;
+}
+
+bool UnlimitedPlaybackManager::ExecuteResolvedAction(TriggerType trigger, ResolvedAction& resolved,
+    int currentFrame) {
+    TriggerConfig& config = m_triggers[trigger];
+
     // Only the playback sources have frames. An animation or a burst carries a script state
     // instead, so checking for frames before the animation branch below rejected every one
     // of them - which is what made animations and burst look completely broken.
     if (!resolved.animation && resolved.frames.empty()) {
-        LOG(1, "[UP] Trigger '%s' resolved to an empty frame buffer (source=%d)\n",
-            TriggerDisplayName(trigger),
-            static_cast<int>(DummyActionManager::Instance().Get(trigger).source));
+        LOG(1, "[UP] Trigger '%s' resolved to an empty frame buffer (%s)\n",
+            TriggerDisplayName(trigger), resolved.sourceLabel);
         return false;
     }
 
     // An animation is not inputs: it forces the dummy's script straight to a state, so it
     // borrows no CF slot and needs no mirroring - a script state has no handedness.
     if (resolved.animation) {
-        if (g_interfaces.player2.IsCharDataNullPtr()) {
+        if (TrainingSide::Dummy().IsCharDataNullPtr()) {
             return false;
         }
-        auto* p2 = g_interfaces.player2.GetData();
+        auto* p2 = TrainingSide::Dummy().GetData();
         if (resolved.viaActionOverride) {
             // The game reads this and performs the action itself, which is what makes a
             // burst come out of hitstun rather than being cut short by it.
@@ -2478,6 +2461,7 @@ bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int curr
         }
         config.lastTriggeredFrame = currentFrame;
         config.lastFiredMs = GetTickCount64();
+        m_triggerEvents[trigger].fired = true;
         LOG(1, "[UP] Trigger forced animation '%s' trigger='%s'\n",
             resolved.name.c_str(), TriggerDisplayName(trigger));
         PushToast(FormatLocalized("Triggered [%s]: %s",
@@ -2508,6 +2492,7 @@ bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int curr
     StartRuntimePlayback(resolved.frames, facingToLoad);
     m_runtimeSlotRestorePending = true;
     config.lastFiredMs = GetTickCount64();
+    m_triggerEvents[trigger].fired = true;
     LOG(1, "[UP] Trigger started source='%s' name='%s' trigger='%s' frames=%u facing=%d mirrored=%d\n",
         resolved.sourceLabel,
         resolved.name.c_str(),
@@ -2531,32 +2516,44 @@ bool UnlimitedPlaybackManager::StartResolvedAction(TriggerType trigger, int curr
 // StartRuntimePlayback - so only one of them needs to know anything about triggers. Animation
 // is the exception and does not come through here at all: it forces a script state rather
 // than feeding inputs, so it stays with the dummy-action tick that already knows how.
-bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, ResolvedAction* out) {
+bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, ResolvedAction* out,
+    int actionIndex) {
     if (!out) {
         return false;
     }
-    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
+    DummyActionManager& actions = DummyActionManager::Instance();
+    const DummyActionManager::Action* picked = nullptr;
+    if (actionIndex >= 0) {
+        const DummyActionManager::Trigger& slot = actions.Get(trigger);
+        if (static_cast<size_t>(actionIndex) >= slot.actions.size()) {
+            return false;
+        }
+        picked = &slot.actions[static_cast<size_t>(actionIndex)];
+    }
+    else {
+        // The trigger's own picking order over the actions that are on and runnable - what
+        // a Playback Library used to do between its entries, done here between actions of
+        // any kind.
+        picked = actions.Pick(trigger);
+    }
+    if (!picked) {
+        return false;
+    }
+    const DummyActionManager::Action& action = *picked;
 
     switch (action.source) {
-    case DummyActionManager::Source_Library:
+    case DummyActionManager::Source_Recording:
     {
-        const PlaybackLibrary* library = LibraryForTrigger(trigger);
-        if (!library) {
+        // A copy of a recording slot, taken when the action was added, so it plays the
+        // same whatever has been recorded since.
+        if (action.recordingFrames.empty()) {
             return false;
         }
-        size_t chosen = 0;
-        if (!PickEntryIndexForTrigger(trigger, *library, action.selectionMode, &chosen)) {
-            return false;
-        }
-        const PlaybackEntry& entry = library->entries[chosen];
-        const auto cacheIt = library->cache.find(entry.id);
-        if (cacheIt == library->cache.end() || !cacheIt->second.loaded) {
-            return false;
-        }
-        out->frames = cacheIt->second.frames;
-        out->facingLeft = cacheIt->second.facingLeft;
-        out->name = entry.name;
-        out->sourceLabel = "library";
+        out->frames = action.recordingFrames;
+        out->facingLeft = action.recordingFacingLeft;
+        out->name = action.recordingName.empty()
+            ? FormatLocalized("CF slot %d", action.cfSlot) : action.recordingName;
+        out->sourceLabel = "recording";
         return true;
     }
 
@@ -2602,10 +2599,10 @@ bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, Resolve
     {
         // Replaces the old "Burst on hit" toggle. Ground and air bursts are separate states,
         // picked the same way that code picked them.
-        if (g_interfaces.player2.IsCharDataNullPtr()) {
+        if (TrainingSide::Dummy().IsCharDataNullPtr()) {
             return false;
         }
-        if (g_interfaces.player2.states.empty()) {
+        if (TrainingSide::Dummy().states.empty()) {
             // Nothing has parsed the dummy's script yet. ScrWindow::DummyFeaturesInUse
             // reports burst as needing it, so this is a frame or two at match start rather
             // than a permanent state - say so once instead of silently doing nothing.
@@ -2616,9 +2613,9 @@ bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, Resolve
             }
             return false;
         }
-        const bool airborne = g_interfaces.player2.GetData()->position_y > 0;
+        const bool airborne = TrainingSide::Dummy().GetData()->position_y > 0;
         const char* wanted = airborne ? "CmnActAirBurstBegin" : "CmnActBurstBegin";
-        for (scrState* state : g_interfaces.player2.states) {
+        for (scrState* state : TrainingSide::Dummy().states) {
             if (state && state->name == wanted) {
                 out->animation = state;
                 out->viaActionOverride = true;
@@ -2892,7 +2889,7 @@ void UnlimitedPlaybackManager::StopLoop(const char* reason) {
         (*g_gameVals.pGameMode == GameMode_Training) &&
         (*g_gameVals.pGameState == GameState_InMatch) &&
         (GetGameSceneStatus() >= GameSceneStatus_Running) &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        !TrainingSide::Dummy().IsCharDataNullPtr();
     if (inTrainingMatch) {
         ResetRuntimePlaybackState(false);
     }
@@ -2941,12 +2938,7 @@ bool UnlimitedPlaybackManager::TryStartLoopPlayback() {
 // work of actually resolving it. Used before starting a loop, which is a lot of setup to go
 // through only to find there was nothing to play.
 bool UnlimitedPlaybackManager::TriggerHasSomethingToPlay(TriggerType trigger) {
-    const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
-    if (action.source != DummyActionManager::Source_Library) {
-        return DummyActionManager::Instance().IsRunnable(trigger);
-    }
-    const PlaybackLibrary* library = LibraryForTrigger(trigger);
-    return library && !BuildCandidates(*library).empty();
+    return DummyActionManager::Instance().IsRunnable(trigger);
 }
 
 void UnlimitedPlaybackManager::ResetLoopPlaybackCompletionState() {
@@ -2963,8 +2955,8 @@ void UnlimitedPlaybackManager::ObserveLoopPlaybackActionState() {
         }
     }
 
-    if (!g_interfaces.player2.IsCharDataNullPtr()) {
-        const auto* p2 = g_interfaces.player2.GetData();
+    if (!TrainingSide::Dummy().IsCharDataNullPtr()) {
+        const auto* p2 = TrainingSide::Dummy().GetData();
         if (p2 && !IsLoopCompletionIdleAction(std::string(p2->currentAction))) {
             m_loopPlaybackObservedNonIdle = true;
         }
@@ -2991,8 +2983,8 @@ bool UnlimitedPlaybackManager::IsLoopPlaybackAnimationComplete(int currentFrame)
         }
     }
 
-    if (!g_interfaces.player2.IsCharDataNullPtr()) {
-        const auto* p2 = g_interfaces.player2.GetData();
+    if (!TrainingSide::Dummy().IsCharDataNullPtr()) {
+        const auto* p2 = TrainingSide::Dummy().GetData();
         if (p2) {
             anyPlayerAvailable = true;
             const bool p2Idle = IsLoopCompletionIdleAction(std::string(p2->currentAction));
@@ -3500,11 +3492,11 @@ void UnlimitedPlaybackManager::StartRuntimePlayback(const std::vector<char>& fra
 }
 
 bool UnlimitedPlaybackManager::TryGetCurrentFacingLeft(bool* outFacingLeft) const {
-    if (!outFacingLeft || g_interfaces.player2.IsCharDataNullPtr()) {
+    if (!outFacingLeft || TrainingSide::Dummy().IsCharDataNullPtr()) {
         return false;
     }
 
-    const auto* p2 = g_interfaces.player2.GetData();
+    const auto* p2 = TrainingSide::Dummy().GetData();
     if (!p2) {
         return false;
     }
@@ -3559,59 +3551,596 @@ std::vector<size_t> UnlimitedPlaybackManager::BuildCandidates(const PlaybackLibr
     return candidates;
 }
 
+// The dummy. Every trigger condition reads the dummy through this so the side it lives on
+// can be changed in one place.
+static const CharData* DummyData() {
+    return TrainingSide::Dummy().IsCharDataNullPtr() ? nullptr : TrainingSide::Dummy().GetData();
+}
+
+// Whether a state is one the dummy can act from, for deciding that a timed state ran to its
+// natural end rather than being interrupted. Only used to decide what to learn from.
+static bool IsNeutralStateName(const std::string& name) {
+    static const char* const neutral[] = {
+        "CmnActStand", "CmnActCrouch", "CmnActJump", "CmnActFWalk", "CmnActBWalk",
+        "CmnActJumpPre", "CmnActUkemiLandNLanding", "CmnActStandTurn", "CmnActCrouchTurn",
+    };
+    for (const char* n : neutral) {
+        if (name == n) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The dummy's states each trigger times itself off, and the ENGINE rule that decides the
+// first frame a move can start in each. Proven from the disassembly (2026-09-27), see
+// docs/Research/TriggerTimingInvestigation.md "The first-actionable rule":
+//
+//   - Every state entry clears the move-type mask CharData+0x2264 (EnableAll(0), vtable +0xADC,
+//     from FUN_005975C0). The move gate FUN_005D0690 lets a non-neutral state start a move only
+//     when the move's type bit is in that mask (type 1 normal -> 0x1000, type 2 special/super
+//     -> 0x2000, dashes 0x8/0x40, jumps 0x100, walks 0x4/0x20; the Whiff*Cancel setters
+//     FUN_005CE2E0..FUN_005CE7D4).
+//   - Only the common-action handler of the state sets those bits. Each CmnAct* state has one
+//     (dispatch FUN_005D18D0, vtable +0x10C0 + slot), run from FUN_00581B50 right after
+//     actionTime is incremented, and the move check (vtable +0x24, FUN_005D11F0) runs after it
+//     in the same object update (FUN_005746D0). So a bit set "at actionTime K" lets a move
+//     start ON frame K, replacing it.
+//   - A state whose handler sets nothing is left by its script end; the next state
+//     (CmnActStand) enables everything at entry, so the first move starts on frame L+1.
+enum TimingRule {
+    // CmnActF/BDown2Stand, both FUN_005BE340 (vtable +0x1158 / +0x113C), every character:
+    // actionTime 14 -> WhiffSpecialCancel (specials, distortions, astral heat);
+    // actionTime 20 -> normals, dashes, jumps, overdrive. Walks only after the script end.
+    Rule_Getup,
+    // CmnActUkemiLandN (FUN_005C0640 dir 0): enables nothing; the hop ends on landing (physics,
+    // so its length is measured) into CmnActUkemiLandNLanding.
+    Rule_NeutralTech,
+    // CmnActUkemiLandNLanding (FUN_005BD580): actionTime 2 -> specials, normals, dashes, jumps,
+    // overdrive; walks from 6.
+    Rule_TechLanding,
+    // CmnActUkemiLandF/B (FUN_005C0640 dir +-1): enables no move; the per-frame handler cuts the
+    // script's 200-frame hold to 25 - actionTime, so the next sprite starts on frame 25.
+    Rule_Roll,
+    // CmnActUkemiStagger (FUN_005BD6C0: overdrive only), CmnActLockReject / AirLockReject
+    // (FUN_005BFF10: nothing): script end.
+    Rule_ScriptEnd,
+};
+static const int kGetupSpecialsAt = 14;   // FUN_005BE340: cmp [ebx+160h],0Eh at 0x5BE3D3
+static const int kGetupNormalsAt = 20;    // FUN_005BE340: cmp eax,14h at 0x5BE40B
+static const int kTechLandingActsAt = 2;  // FUN_005BD580: actionTime == 2
+static const int kRollNextSpriteAt = 25;  // FUN_005C0640: len = 0x19 - actionTime
+
+struct TimedState {
+    const char* name;
+    UnlimitedPlaybackManager::TriggerType trigger;
+    TimingRule rule;
+    // What the old hand-tuned table fired on, used only while the state's length is unknown.
+    int fallbackActionTime;
+};
+static const TimedState kTimedStates[] = {
+    { "CmnActFDown2Stand",       UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_Getup,        14 },
+    { "CmnActBDown2Stand",       UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_Getup,        14 },
+    { "CmnActUkemiLandN",        UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_NeutralTech,   0 },
+    { "CmnActUkemiLandNLanding", UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_TechLanding,   1 },
+    { "CmnActUkemiLandF",        UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_Roll,         30 },
+    { "CmnActUkemiLandB",        UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_Roll,         30 },
+    { "CmnActUkemiStagger",      UnlimitedPlaybackManager::Trigger_Wakeup,    Rule_ScriptEnd,     7 },
+    { "CmnActLockReject",        UnlimitedPlaybackManager::Trigger_ThrowTech, Rule_ScriptEnd,    29 },
+    { "CmnActAirLockReject",     UnlimitedPlaybackManager::Trigger_ThrowTech, Rule_ScriptEnd,    29 },
+};
+
+static const TimedState* FindTimedState(const std::string& name) {
+    for (const TimedState& ts : kTimedStates) {
+        if (name == ts.name) {
+            return &ts;
+        }
+    }
+    return nullptr;
+}
+
+bool UnlimitedPlaybackManager::NeedsDummyScriptForTiming() const {
+    return m_timingEventsWanted
+        || Settings::settingsIni.triggerTimingProbe
+        || m_triggers[Trigger_Wakeup].enabled
+        || m_triggers[Trigger_ThrowTech].enabled;
+}
+
+// Neutral tech (CmnActUkemiLandN) is a hop: the engine ends the state when the character
+// lands, not when its sprites run out. Ragna's script is 20 frames and Tager's 33, and both
+// were measured at 31 frames in game (DEBUG.txt 2026-09-27, "[UP][TIMING] CmnActUkemiLandN
+// ran 31 frames (script says 20)" then "(script says 33)"). Physics, not a rule, so this one
+// state keeps using what was observed once a character's own hop has been watched.
+static const int kMeasuredNeutralTechFrames = 31;
+
+static const scrState* FindDummyScriptState(const char* stateName) {
+    for (const scrState* state : TrainingSide::Dummy().states) {
+        if (state && state->name == stateName) {
+            return state;
+        }
+    }
+    return nullptr;
+}
+
+int UnlimitedPlaybackManager::PredictStateFrames(const CharData* dummy, const char* stateName,
+    const char** outSource) const {
+    if (outSource) { *outSource = "none"; }
+    if (!dummy || !stateName) {
+        return -1;
+    }
+    char key[64];
+    sprintf_s(key, sizeof(key), "%d:%s", dummy->charIndex, stateName);
+    const auto learned = m_learnedStateFrames.find(key);
+    const TimedState* ts = FindTimedState(stateName);
+    if (ts && ts->rule == Rule_NeutralTech) {
+        if (learned != m_learnedStateFrames.end()) {
+            if (outSource) { *outSource = "measured (this character)"; }
+            return learned->second;
+        }
+        if (outSource) { *outSource = "measured"; }
+        return kMeasuredNeutralTechFrames;
+    }
+    const scrState* state = FindDummyScriptState(stateName);
+    if (state && state->frames > 0) {
+        if (ts && ts->rule == Rule_Roll && state->longest_sprite >= 100) {
+            // The held sprite starts on frame offset+1; the handler sets its length to
+            // 25 - actionTime there, so the next sprite starts on frame 25 (or the frame after,
+            // when the hold starts later than 24 and the length comes out <= 0).
+            const int offset = static_cast<int>(state->longest_sprite_offset);
+            const int after = static_cast<int>(state->frames) - offset - static_cast<int>(state->longest_sprite);
+            if (after >= 0) {
+                if (outSource) { *outSource = "script + roll rule"; }
+                return (std::max)(kRollNextSpriteAt, offset + 2) - 1 + after;
+            }
+        }
+        else if (state->longest_sprite < 100) {
+            if (outSource) { *outSource = "script"; }
+            return static_cast<int>(state->frames);
+        }
+    }
+    // No script to read (not parsed yet): what was observed, else unknown.
+    if (learned != m_learnedStateFrames.end()) {
+        if (outSource) { *outSource = "observed"; }
+        return learned->second;
+    }
+    return -1;
+}
+
+int UnlimitedPlaybackManager::PredictActionableAt(const CharData* dummy, const char* stateName,
+    const char** outSource, bool normals) const {
+    if (outSource) { *outSource = "none"; }
+    if (!dummy || !stateName) {
+        return -1;
+    }
+    const TimedState* ts = FindTimedState(stateName);
+    if (!ts) {
+        return -1;
+    }
+    if (ts->rule == Rule_TechLanding) {
+        if (outSource) { *outSource = "engine: tech landing acts on frame 2"; }
+        return kTechLandingActsAt;
+    }
+    const char* lenSource = "none";
+    const int length = PredictStateFrames(dummy, stateName, &lenSource);
+    switch (ts->rule) {
+    case Rule_Getup: {
+        const int at = normals ? kGetupNormalsAt : kGetupSpecialsAt;
+        if (length > 0 && length + 1 < at) {
+            // A getup shorter than the cancel point (Amane's 16 for normals) ends first.
+            if (outSource) { *outSource = "engine: getup ends before its cancel point"; }
+            return length + 1;
+        }
+        if (outSource) {
+            *outSource = normals ? "engine: getup normals/dash/jump from frame 20"
+                                 : "engine: getup specials from frame 14";
+        }
+        return at;
+    }
+    case Rule_NeutralTech:
+        if (length <= 0) {
+            return -1;
+        }
+        // The hop hands over to its landing on frame length+1, which acts on its own frame 2.
+        if (outSource) { *outSource = "engine: landing frame 2 after the measured hop"; }
+        return length + 1 + (kTechLandingActsAt - 1);
+    case Rule_Roll:
+    case Rule_ScriptEnd:
+    default:
+        if (length <= 0) {
+            return -1;
+        }
+        if (outSource) {
+            *outSource = (ts->rule == Rule_Roll) ? "engine: roll ends (no cancel), frame after"
+                                                 : "engine: no cancel, frame after the script end";
+        }
+        return length + 1;
+    }
+}
+
+// The probe's playback: a fresh A or B press on every frame, alternating so every frame is a
+// new press edge for one of them (the button codes need the press edge, or a press no older
+// than 5 frames that is still held - FUN_005CA700 / FUN_0057E860).
+static std::vector<char> BuildProbeFrames(int count) {
+    std::vector<char> frames;
+    frames.reserve(static_cast<size_t>(count + 4) * 2);
+    for (int i = 0; i < count; ++i) {
+        frames.push_back(static_cast<char>((i % 2) == 0 ? 0x15 : 0x25)); // 5A, 5B
+        frames.push_back(0);
+    }
+    for (int i = 0; i < 4; ++i) {
+        frames.push_back(static_cast<char>(5));
+        frames.push_back(0);
+    }
+    return frames;
+}
+
+void UnlimitedPlaybackManager::StartTimingProbe(const char* stateName, int charIndex, int currentFrame,
+    int predictedFirst, int predictedSpecials, int playFrames) {
+    if (m_probeActive) {
+        return;
+    }
+    if (m_runtimeSlotBackupValid || m_runtimeSlotRestorePending) {
+        LOG(1, "[UP][PROBE] %s window at game frame %d skipped: the playback slot is still borrowed\n",
+            stateName, currentFrame);
+        return;
+    }
+    bool facingLeft = false;
+    TryGetCurrentFacingLeft(&facingLeft);
+    const int count = (std::min)((std::max)(playFrames, 16), kMaxFramesPerPlayback - 8);
+    BackupRuntimeSlotIfNeeded();
+    StartRuntimePlayback(BuildProbeFrames(count), facingLeft ? 1 : 0);
+    m_runtimeSlotRestorePending = true;
+    m_probeActive = true;
+    m_probeState = stateName;
+    m_probeCharIndex = charIndex;
+    m_probeWindowStart = currentFrame;
+    m_probePredicted = predictedFirst;
+    m_probePredictedSpecials = predictedSpecials;
+    m_probeDeadline = currentFrame + count + 4;
+    LOG(1, "[UP][PROBE] started on %s (char %d) at game frame %d: A/B on alternate frames for %d frames, "
+        "first press on frame 2 of the state (the playback is read from the next tick); rule predicts a normal on frame %d%s\n",
+        stateName, charIndex, currentFrame, count, predictedFirst,
+        predictedSpecials > 0 && predictedSpecials != predictedFirst
+            ? FormatText(" (specials from frame %d, which A/B cannot show)", predictedSpecials).c_str() : "");
+}
+
+void UnlimitedPlaybackManager::UpdateTimingProbe(int currentFrame, const std::string& action, int actionTime) {
+    if (!m_probeActive) {
+        return;
+    }
+    // A move is any state that is not a common action: NmlAtk5A, NmlAtk5B, a special...
+    const bool moved = action.find("CmnAct") != 0;
+    const int frameOfState = currentFrame - m_probeWindowStart + 1;
+    if (moved) {
+        LOG(1, "[UP][PROBE] %s (char %d): first move started on frame %d of the state, rule predicted %d - %s (move %s at=%d)\n",
+            m_probeState.c_str(), m_probeCharIndex, frameOfState, m_probePredicted,
+            frameOfState == m_probePredicted ? "OK" : "MISMATCH", action.c_str(), actionTime);
+    }
+    else if (currentFrame > m_probeDeadline) {
+        LOG(1, "[UP][PROBE] %s (char %d): no move by frame %d of the state, rule predicted %d - MISMATCH (dummy now %s)\n",
+            m_probeState.c_str(), m_probeCharIndex, frameOfState, m_probePredicted, action.c_str());
+    }
+    else {
+        return;
+    }
+    m_probeActive = false;
+    // Stop feeding presses; TryRestoreRuntimeSlotAfterPlayback puts the slot back next tick.
+    if (m_runtimePlaybackManager.playback_control_p) {
+        m_runtimePlaybackManager.set_playback_control(0);
+    }
+}
+
+void UnlimitedPlaybackManager::UpdateTriggerTiming(int currentFrame) {
+    // The events describe one game frame. The hook can tick more than once per rendered
+    // frame, so they are cleared when the frame number moves, not on every call.
+    if (currentFrame != m_triggerEventsFrame) {
+        m_triggerEvents = {};
+        m_triggerEventsFrame = currentFrame;
+    }
+
+    const CharData* dummy = DummyData();
+    if (!dummy) {
+        m_timedPrevAction.clear();
+        m_probeActive = false;
+        return;
+    }
+    const std::string action = dummy->currentAction;
+    const int actionTime = dummy->actionTime;
+    const bool entered = (action != m_timedPrevAction);
+    const bool probeOn = Settings::settingsIni.triggerTimingProbe;
+
+    // The state being left and how far it got, captured BEFORE the bookkeeping below moves on
+    // to the new state. The first cut read m_timedPrevAction after overwriting it, so every
+    // exit was reported as "left <new state> after its frame 1 into <new state>" and the real
+    // exit (FDown2Stand -> AntiAirC) was never looked at.
+    const std::string leftState = entered ? m_timedPrevAction : std::string();
+    const int leftAfter = m_timedLastActionTime;
+
+    if (entered && !leftState.empty() && leftAfter > 0) {
+        const TimedState* left = FindTimedState(leftState);
+        if (left) {
+            const bool intoNeutral = IsNeutralStateName(action);
+            const bool intoMove = !intoNeutral && !FindTimedState(action)
+                && dummy->hitstun == 0 && dummy->blockstun == 0
+                && action.find("CmnAct") != 0;
+            char key[64];
+            sprintf_s(key, sizeof(key), "%d:%s", dummy->charIndex, leftState.c_str());
+            LOG(1, "[UP][TIMING] left %s after its frame %d into %s on game frame %d%s\n",
+                leftState.c_str(), leftAfter, action.c_str(), currentFrame,
+                intoMove ? " (a move)" : (intoNeutral ? " (neutral)" : ""));
+
+            // Clean end into neutral: the length the rule used, checked against what ran.
+            if (intoNeutral && left->rule != Rule_TechLanding) {
+                const char* source = "none";
+                const int predicted = PredictStateFrames(dummy, leftState.c_str(), &source);
+                if (left->rule == Rule_NeutralTech) {
+                    m_learnedStateFrames[key] = leftAfter; // physics: measured, not predicted
+                }
+                else {
+                    m_learnedStateFrames[key] = leftAfter; // used only while the script is unread
+                    if (predicted > 0 && predicted != leftAfter) {
+                        LOG(1, "[UP][TIMING] MISMATCH: %s (char %d) ran %d frames, the rule says %d via %s\n",
+                            leftState.c_str(), dummy->charIndex, leftAfter, predicted, source);
+                    }
+                    else {
+                        LOG(1, "[UP][TIMING] %s ran %d frames (rule says %d via %s) -> %s\n",
+                            leftState.c_str(), leftAfter, predicted, source, action.c_str());
+                    }
+                }
+            }
+            // Into a move: it replaced frame leftAfter+1. Earlier than the rule is impossible
+            // if the rule is right; later just means the input came late.
+            if (intoMove) {
+                const int startedAt = leftAfter + 1;
+                const char* source = "none";
+                const int earliest = PredictActionableAt(dummy, leftState.c_str(), &source, false);
+                const auto known = m_learnedActionableAt.find(key);
+                if (known == m_learnedActionableAt.end() || startedAt < known->second) {
+                    m_learnedActionableAt[key] = startedAt;
+                }
+                if (earliest > 0 && startedAt < earliest) {
+                    LOG(1, "[UP][TIMING] MISMATCH: %s started out of %s (char %d) on its frame %d; the rule says no move before frame %d via %s\n",
+                        action.c_str(), leftState.c_str(), dummy->charIndex, startedAt, earliest, source);
+                }
+                else {
+                    LOG(1, "[UP][TIMING] %s started on frame %d of %s (char %d); rule: first move possible on frame %d via %s\n",
+                        action.c_str(), startedAt, leftState.c_str(), dummy->charIndex, earliest, source);
+                }
+            }
+        }
+    }
+
+    if (entered) {
+        m_timedPrevAction = action;
+        m_timedPrevActionTime = actionTime;
+        m_timedLastActionTime = 0;
+    }
+    m_timedLastActionTime = (std::max)(m_timedLastActionTime, actionTime);
+
+    UpdateTimingProbe(currentFrame, action, actionTime);
+
+    // Inside a timed state: where its first actionable frame is from here.
+    const TimedState* ts = FindTimedState(action);
+    if (ts && entered) {
+        // The window opens when the game moves the dummy into the state. A forced animation
+        // restarts actionTime without changing currentAction and must not reopen it.
+        const char* source = "none";
+        const int actionableAt = PredictActionableAt(dummy, ts->name, &source, false);
+        const char* normSource = "none";
+        const int normalsAt = PredictActionableAt(dummy, ts->name, &normSource, true);
+        const char* lenSource = "none";
+        const int predicted = PredictStateFrames(dummy, ts->name, &lenSource);
+        // A neutral tech's landing continues the tech's window rather than opening another.
+        const bool continuesTech = (ts->rule == Rule_TechLanding
+            && m_timedWindowState && strcmp(m_timedWindowState, "CmnActUkemiLandN") == 0);
+        if (continuesTech) {
+            // The hop's length is physics; now that it has landed, the actionable frame is
+            // known exactly: this landing's frame 2.
+            m_timedActionableFrame = currentFrame + (kTechLandingActsAt - actionTime);
+            LOG(1, "[UP][TIMING] %s landed on game frame %d: first actionable frame is game frame %d (landing frame %d)\n",
+                m_timedWindowState, currentFrame, m_timedActionableFrame, kTechLandingActsAt);
+            if (m_probeActive && m_probeState == m_timedWindowState) {
+                m_probePredicted = m_timedActionableFrame - m_probeWindowStart + 1;
+                m_probePredictedSpecials = m_probePredicted;
+            }
+        }
+        else {
+            m_triggerEvents[ts->trigger].windowStart = true;
+            m_timedWindowTrigger = ts->trigger;
+            m_timedWindowState = ts->name;
+            m_timedWindowStartFrame = currentFrame;
+            m_timedActionableFrame = actionableAt > 0 ? currentFrame + (actionableAt - actionTime) : -1;
+            // One line per window, so a run can be checked from the log alone.
+            LOG(1, "[UP][TIMING] window opened: %s (char %d) frame=%d actionTime=%d length=%d via %s firstActionable=frame %d of the state (game frame %d) via %s; normals from frame %d\n",
+                ts->name, dummy->charIndex, currentFrame, actionTime, predicted, lenSource,
+                actionableAt, m_timedActionableFrame, source, normalsAt);
+            if (probeOn) {
+                StartTimingProbe(ts->name, dummy->charIndex, currentFrame, normalsAt, actionableAt,
+                    (normalsAt > 0 ? normalsAt : 40) + 12);
+            }
+        }
+    }
+    if (m_timedWindowTrigger >= 0) {
+        TriggerFrameEvents& ev = m_triggerEvents[m_timedWindowTrigger];
+        ev.stateName = m_timedWindowState;
+        if (m_timedActionableFrame >= 0) {
+            ev.framesToActionable = m_timedActionableFrame - currentFrame;
+            if (currentFrame == m_timedActionableFrame) {
+                ev.actionable = true;
+                LOG(1, "[UP][TIMING] first actionable frame of %s: game frame %d, dummy now in %s (actionTime %d)\n",
+                    m_timedWindowState, currentFrame, action.c_str(), actionTime);
+            }
+        }
+        // The window closes once its actionable frame has passed, or the dummy is in no
+        // timed state and nothing is predicted.
+        if ((m_timedActionableFrame >= 0 && currentFrame > m_timedActionableFrame)
+            || (m_timedActionableFrame < 0 && !ts)) {
+            m_timedWindowTrigger = -1;
+            m_timedWindowState = nullptr;
+            m_timedActionableFrame = -1;
+            ev.framesToActionable = -1;
+        }
+        else if (ev.framesToActionable < 0) {
+            ev.framesToActionable = -1;
+        }
+    }
+
+    // Per-frame trace of the dummy while a window is open and for a few frames after a
+    // firing: the state, the playback cursor our inputs are read from, the input the game
+    // took for the dummy this tick, and the CharData words the move gate FUN_005D0690 reads.
+    // f2264 is the one that decides it: the move-type mask the state's handler enables
+    // (0x2000 specials, 0x1000 normals, 0x8/0x40 dashes, 0x100 jumps, 0x4/0x20 walks).
+    if (m_timedWindowTrigger >= 0 || m_traceFramesLeft > 0 || m_probeActive) {
+        const unsigned char* raw = reinterpret_cast<const unsigned char*>(dummy);
+        const auto word = [raw](size_t offset) { return *reinterpret_cast<const unsigned int*>(raw + offset); };
+        const int pbPos = m_runtimePlaybackManager.bbcf_base_adress
+            ? *reinterpret_cast<int*>(m_runtimePlaybackManager.bbcf_base_adress + 0x13AD940) : -99;
+        LOG(1, "[UP][TRACE] f=%d %s at=%d pbPos=%d in=0x%03X f2264=%08X f25C=%08X f260=%08X f225C=%08X f516C=%d f24974=%08X\n",
+            currentFrame, action.c_str(), actionTime, pbPos,
+            static_cast<unsigned int>(GetLastObservedBattleInputPacked(static_cast<uint32_t>(TrainingSide::DummyIndex()))),
+            word(0x2264), word(0x25C), word(0x260), word(0x225C), static_cast<int>(word(0x516C)), word(0x24974));
+        if (m_traceFramesLeft > 0) { --m_traceFramesLeft; }
+    }
+
+    // Countdowns. The guard handlers (FUN_005BF1D0, the *GuardLoop states) re-enable the
+    // walk/dash/normal/special/jump masks every frame from blockstun == 0, and blockstun b
+    // means b stuck frames left including this one, so the first free frame is b frames on.
+    {
+        const int blockstun = dummy->blockstun;
+        TriggerFrameEvents& gap = m_triggerEvents[Trigger_Gap];
+        TriggerFrameEvents& onBlock = m_triggerEvents[Trigger_OnBlock];
+        if (blockstun > 0 && action.find("Guard") != std::string::npos) {
+            if (blockstun > m_timedPrevBlockstun) {
+                gap.windowStart = true;
+                // Probe the block gap too: A/B presses in blockstun do nothing (no barrier or
+                // crush trigger - those need two buttons on one frame).
+                if (probeOn && !m_probeActive && m_timedPrevBlockstun == 0) {
+                    StartTimingProbe("block gap", dummy->charIndex, currentFrame, blockstun + 1, blockstun + 1,
+                        blockstun + 12);
+                }
+                else if (m_probeActive && m_probeState == "block gap") {
+                    // Topped up by another hit: the prediction moves with it.
+                    m_probePredicted = (currentFrame - m_probeWindowStart + 1) + blockstun;
+                    m_probePredictedSpecials = m_probePredicted;
+                    m_probeDeadline = (std::max)(m_probeDeadline, currentFrame + blockstun + 8);
+                }
+            }
+            gap.framesToActionable = blockstun;
+            if (blockstun == 1) { m_gapActionableFrame = currentFrame + 1; }
+        }
+        if (currentFrame == m_gapActionableFrame) {
+            gap.actionable = true;
+            gap.framesToActionable = 0;
+            m_gapActionableFrame = -1;
+        }
+        if (blockstun > 0 && m_timedPrevBlockstun == 0) {
+            onBlock.windowStart = true;
+            onBlock.actionable = true;
+            onBlock.framesToActionable = 0;
+        }
+        m_timedPrevBlockstun = blockstun;
+    }
+    {
+        const int hitstun = dummy->hitstun;
+        TriggerFrameEvents& rec = m_triggerEvents[Trigger_OnHitRecovery];
+        TriggerFrameEvents& onHit = m_triggerEvents[Trigger_OnHit];
+        static const char* const endsInWakeup[] = { "Loop", "Bound", "CmnActBDownCrash", "CmnActBDownDown" };
+        bool knockedDown = false;
+        for (const char* token : endsInWakeup) {
+            if (action.find(token) != std::string::npos) {
+                knockedDown = true;
+                break;
+            }
+        }
+        const bool teching = action.find("CmnActUkemi") != std::string::npos;
+        if (hitstun > 0 && !knockedDown && !teching) {
+            if (hitstun > m_timedPrevHitstun) {
+                rec.windowStart = true;
+            }
+            rec.framesToActionable = hitstun;
+            if (hitstun == 1) { m_recActionableFrame = currentFrame + 1; }
+        }
+        if (currentFrame == m_recActionableFrame) {
+            rec.actionable = true;
+            rec.framesToActionable = 0;
+            m_recActionableFrame = -1;
+        }
+        if (hitstun > 0 && m_timedPrevHitstun == 0) {
+            onHit.windowStart = true;
+            onHit.actionable = true;
+            onHit.framesToActionable = 0;
+        }
+        m_timedPrevHitstun = hitstun;
+    }
+}
+
 bool UnlimitedPlaybackManager::ShouldTriggerWakeup() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* dummy = DummyData();
+    if (!dummy) {
         return false;
     }
 
-    const auto* p2 = g_interfaces.player2.GetData();
-    const std::string currentAction = p2->currentAction;
-    const std::string lastAction = p2->lastAction;
-    const int actionTime = p2->actionTime;
+    // Fires so the first input lands 'lead' frames before the state's first actionable frame
+    // - the first frame the engine lets a move start (kTimedStates: frame 14 of a getup for
+    // specials, the frame after the script end for a stagger, the landing's frame 2 for a
+    // neutral tech...). Delay 0 puts the first input ON that frame.
+    //
+    // While a state's length is not known, the old hand-tuned actionTime constants stand in,
+    // which is exactly the behaviour that only worked for some characters.
+    const std::string currentAction = dummy->currentAction;
+    const TimedState* ts = FindTimedState(currentAction);
+    if (!ts || ts->trigger != Trigger_Wakeup) {
+        m_prevWakeupCondition = false;
+        return false;
+    }
+    // The same guard the old table had: only a state the game itself moved the dummy into.
+    // Forcing an animation restarts actionTime without changing currentAction, and matching
+    // again on the way back through the same number is how this fired forever.
+    if (currentAction == dummy->lastAction) {
+        m_prevWakeupCondition = false;
+        return false;
+    }
 
-    // Taken verbatim from the old dummy-actions panel, including its notes: these frame
-    // numbers were arrived at by testing, and CmnActUkemiLandN is deliberately absent in
-    // favour of its Landing state.
-    static const std::array<std::pair<const char*, int>, 6> wakeupStates = {
-        std::make_pair("CmnActUkemiLandNLanding", 1),
-        std::make_pair("CmnActUkemiLandF", 30),
-        std::make_pair("CmnActUkemiLandB", 30),
-        std::make_pair("CmnActFDown2Stand", 14),
-        std::make_pair("CmnActBDown2Stand", 14),
-        // Really an on-hit case, but it behaves like a wakeup, so it lived here.
-        std::make_pair("CmnActUkemiStagger", 7),
-    };
-
-    // actionTime counts UP to the frame the state becomes actionable, so firing early means
-    // a SMALLER value - the same trick the block gap and throw tech use. A 623C needs its
-    // motion delivered before the dummy can act or the reversal comes out a few frames late.
-    // Clamped at 1 because some of these states become actionable on frame 1 already, and
-    // there is nothing earlier than that to ask for.
     const int lead = (std::max)(0, -m_triggers[Trigger_Wakeup].delayFrames);
-
-    bool cond = false;
-    for (const auto& ws : wakeupStates) {
-        // Exact equality, and lastAction must differ from the state we matched.
-        //
-        // That last test is not decoration: forcing an animation moves the script pointer
-        // without changing currentAction, so actionTime restarts and walks past the same
-        // number again - and the trigger fired over and over, "permanently triggering on
-        // loop" after the move came out. Substring matching made it worse by matching
-        // several states at once. Both were mine; the panel this replaced had it right.
-        const int wantTime = (std::max)(1, ws.second - lead);
-        if (currentAction == ws.first && actionTime == wantTime && lastAction != ws.first) {
-            cond = true;
-            break;
-        }
+    const TriggerFrameEvents& ev = m_triggerEvents[Trigger_Wakeup];
+    bool cond;
+    if (ev.framesToActionable >= 0) {
+        // framesToActionable counts to the first frame a move can START. The playback this
+        // starts is read from the next tick on (cursor at -1, pre-increment consumer), so
+        // firing lead+1 frames out puts the first input exactly `lead` frames before the
+        // actionable frame - and a delay of 0 puts it ON that frame.
+        cond = (ev.framesToActionable == lead + 1)
+            // A lead longer than the state is asking for a frame that does not exist; the
+            // earliest that can be honoured is the frame the state began on.
+            || (ev.windowStart && ev.framesToActionable < lead + 1);
+    }
+    else if (ts->fallbackActionTime > 0) {
+        cond = (dummy->actionTime == (std::max)(1, ts->fallbackActionTime - lead));
+    }
+    else {
+        cond = false;
     }
 
     const bool edge = (cond && !m_prevWakeupCondition);
     m_prevWakeupCondition = cond;
+    if (edge) {
+        const char* source = "none";
+        const int predicted = PredictStateFrames(dummy, ts->name, &source);
+        const char* actSource = "none";
+        const int actionableAt = PredictActionableAt(dummy, ts->name, &actSource);
+        LOG(1, "[UP][TIMING] Wakeup fires: state=%s actionTime=%d on game frame %d; first input on game frame %d; first actionable frame %d of the state (game frame %d) via %s; lead=%d (delay %d); length=%d via %s%s\n",
+            currentAction.c_str(), dummy->actionTime, m_triggerEventsFrame, m_triggerEventsFrame + 1,
+            actionableAt, m_timedActionableFrame, actSource, lead,
+            m_triggers[Trigger_Wakeup].delayFrames, predicted, source,
+            ev.framesToActionable >= 0 ? "" : " [FALLBACK CONSTANT]");
+        m_traceFramesLeft = 12;
+    }
     return edge;
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerGap() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* p2 = DummyData();
+    if (!p2) {
         return false;
     }
 
@@ -3623,7 +4152,6 @@ bool UnlimitedPlaybackManager::ShouldTriggerGap() {
     // BEFORE the gap so the button lands on the first actionable frame rather than several
     // after it. Only possible because blockstun is a countdown, i.e. the gap is knowable in
     // advance - which is why a negative delay means nothing on the other triggers.
-    const auto* p2 = g_interfaces.player2.GetData();
     const std::string currentAction = p2->currentAction;
     const int lead = (std::max)(0, -m_triggers[Trigger_Gap].delayFrames);
     const bool cond = (p2->blockstun == 1 + lead && currentAction.find("Guard") != std::string::npos);
@@ -3634,7 +4162,8 @@ bool UnlimitedPlaybackManager::ShouldTriggerGap() {
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerOnBlock() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* p2 = DummyData();
+    if (!p2) {
         return false;
     }
 
@@ -3643,7 +4172,6 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnBlock() {
     // This used to fire on the falling edge, i.e. as blockstun ended, which is the gap
     // trigger's job: the two were a frame apart and did the same thing, and the comment
     // here described gap behaviour. "On Block" now means what it says.
-    const auto* p2 = g_interfaces.player2.GetData();
     const bool cond = p2->blockstun > 0;
 
     const bool edge = (cond && !m_prevOnBlockCondition);
@@ -3652,11 +4180,11 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnBlock() {
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerOnHit() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* p2 = DummyData();
+    if (!p2) {
         return false;
     }
 
-    const auto* p2 = g_interfaces.player2.GetData();
     const bool cond = p2->hitstun > 0;
 
     // Which edge depends on how the action is delivered, and getting this wrong is what made
@@ -3696,7 +4224,8 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnHit() {
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerOnHitRecovery() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* p2 = DummyData();
+    if (!p2) {
         return false;
     }
 
@@ -3711,7 +4240,6 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnHitRecovery() {
     // A knockdown or a bounce does not end in the dummy acting - it ends on the floor, and
     // getting up from there is On Wakeup's job - so those states are left out, along with
     // a tech in progress.
-    const auto* p2 = g_interfaces.player2.GetData();
     const std::string currentAction = p2->currentAction;
     static const std::array<const char*, 4> endsInWakeup = {
         "Loop", "Bound", "CmnActBDownCrash", "CmnActBDownDown"
@@ -3733,22 +4261,46 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnHitRecovery() {
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerThrowTech() {
-    if (g_interfaces.player2.IsCharDataNullPtr()) {
+    const CharData* dummy = DummyData();
+    if (!dummy) {
         return false;
     }
 
-    // timeAfterTechIsPerformed counts up from the tech, and 29 is the frame acting on it
-    // comes out. A negative delay therefore means a SMALLER value: same idea as the block
-    // gap, so a reversal's motion can be delivered before the dummy is actionable instead
-    // of a couple of frames into it.
-    const auto* p2 = g_interfaces.player2.GetData();
-    const std::string currentAction = p2->currentAction;
+    // The escape animation (CmnActLockReject, or the air one) is 24-48 frames depending on
+    // the character, and the dummy acts on the frame after its last one. That length is read
+    // from the dummy's script, so the delay-0 frame is its last frame and a negative delay
+    // counts back from there - the single "29" this used to test timeAfterTechIsPerformed
+    // against was late for the short ones and well early for the long ones. It is kept only
+    // for the case where the script has not been parsed.
+    const std::string currentAction = dummy->currentAction;
+    const TimedState* ts = FindTimedState(currentAction);
     const int lead = (std::max)(0, -m_triggers[Trigger_ThrowTech].delayFrames);
-    const int wantTime = (std::max)(1, 29 - lead);
-    const bool cond = (p2->timeAfterTechIsPerformed == wantTime
-        && currentAction.find("LockReject") != std::string::npos);
+    bool cond = false;
+    if (ts && ts->trigger == Trigger_ThrowTech) {
+        const TriggerFrameEvents& ev = m_triggerEvents[Trigger_ThrowTech];
+        if (ev.framesToActionable >= 0) {
+            // Same convention as the wakeup: first input lands `lead` frames before the
+            // first frame a move can start.
+            cond = (ev.framesToActionable == lead + 1)
+                || (ev.windowStart && ev.framesToActionable < lead + 1);
+        }
+        else {
+            const int wantTime = (std::max)(1, ts->fallbackActionTime - lead);
+            cond = (dummy->timeAfterTechIsPerformed == wantTime);
+        }
+    }
 
     const bool edge = (cond && !m_prevThrowTechCondition);
     m_prevThrowTechCondition = cond;
+    if (edge && ts) {
+        const TriggerFrameEvents& ev = m_triggerEvents[Trigger_ThrowTech];
+        const char* source = "none";
+        const int predicted = PredictStateFrames(dummy, ts->name, &source);
+        LOG(1, "[UP][TIMING] Throw tech fires: state=%s actionTime=%d techTime=%d framesToActionable=%d lead=%d (delay %d) predicted=%d via %s%s\n",
+            currentAction.c_str(), dummy->actionTime, dummy->timeAfterTechIsPerformed,
+            ev.framesToActionable, lead, m_triggers[Trigger_ThrowTech].delayFrames, predicted, source,
+            ev.framesToActionable >= 0 ? "" : " [FALLBACK CONSTANT]");
+        m_traceFramesLeft = 12;
+    }
     return edge;
 }

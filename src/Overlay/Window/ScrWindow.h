@@ -50,10 +50,6 @@ public:
 	// whether a character swap is worth re-parsing the script for outside the menu.
 	bool DummyFeaturesInUse() const;
 
-	// Copies the animation pools out of the dummy-action table into the registers the
-	// firing conditions below read.
-	void SyncAnimationRegistersFromActions();
-
 	// Drops everything parsed for the previous dummy and, if allowed, re-parses for the
 	// current one. The registers hold scrState* whose addr points into a specific
 	// character's script, so handing one to the game after a swap is a jump into the wrong
@@ -105,6 +101,7 @@ public:
 	void DrawInputBufferButton();
 	void DrawComboDataButton();
 	void DrawTasComboToolButton();
+
 	// Import a playback file into one of the game's four recording slots, or write a slot
 	// back out to a file. The pair that lets everything else here exchange playbacks: a
 	// file exported from a replay capture or a library can be loaded straight into a slot.

@@ -57,6 +57,13 @@ struct scrState {
 	std::string name = "";
 	char* addr = NULL;
 	unsigned int frames = 0;
+	// The longest single sprite() in the state. A held sprite (a ground roll keeps one up for 200
+	// frames until the engine lands it) makes `frames` a ceiling rather than a length.
+	unsigned int longest_sprite = 0;
+	// Frames of sprite time before that longest sprite starts. For a ground roll the engine cuts
+	// the held sprite short so the next one starts on the state's frame 25 (FUN_005C0640), so
+	// the roll's real length is max(25, longest_sprite_offset + 2) - 1 + the sprites after it.
+	unsigned int longest_sprite_offset = 0;
 	unsigned int damage = 0;
 	unsigned int atk_type = 4;
 	unsigned int atk_level = 0;

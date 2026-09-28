@@ -4,23 +4,28 @@
 #include "Core/logger.h"
 #include "Core/Localization.h"
 #include "Core/NativeFileDialog.h"
+#include "Core/Settings.h"
 #include "Core/interfaces.h"
 #include "Core/utils.h"
 #include "Game/Playbacks/DummyActionManager.h"
+#include "Game/Playbacks/PlaybackManager.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
 #include "Game/Scr/ScrStateNames.h"
 #include "Game/TasManager.h"
+#include "Game/TrainingSide.h"
 #include "Game/gamestates.h"
 #include "Overlay/Window/ScrWindow.h"
 #include "Overlay/Window/UnlimitedPlaybackWindow.h"
 #include "Overlay/imgui_utils.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <Windows.h>
 
 #include <cmath>
 #include <map>
+#include <set>
 
 #include <algorithm>
 #include <string>
@@ -40,7 +45,8 @@ namespace
 	// Neutral frames appended after a notation, so a real input is never the final frame.
 	const int kNotationTailFrames = 4;
 
-	// Which trigger's source modal is open, and for which source. Trigger_Count means none.
+	// Which trigger's source modal is open, for which source, and which of the trigger's
+	// actions it is editing (-1 while adding a new one). Trigger_Count means none.
 	//
 	// Configuration happens on a DRAFT copy of the action, not on the live one. Editing in
 	// place meant Cancel had to guess what to undo: a brand new row appeared the moment you
@@ -48,27 +54,20 @@ namespace
 	// existing row destroyed it if you then cancelled. The draft is committed on Done and
 	// thrown away on Cancel, so the list only ever changes when you say so.
 	int g_modalTrigger = UnlimitedPlaybackManager::Trigger_Count;
+	int g_modalActionIndex = -1;
 	Source g_modalSource = Manager::Source_None;
 	bool g_modalNeedsOpen = false;
 	Manager::Action g_draft;
 
-	// Cancel has to undo more than the draft.
-	//
-	// The library editor works on the trigger's live library on purpose - it is the same
-	// panel the Playback Library window uses, and it has to be, or the two drift apart. So
-	// the library is copied on the way in and put back if you cancel. Saving or loading a
-	// FILE is not undone, because that already happened on disk.
-	UnlimitedPlaybackManager::PlaybackLibrary g_libraryBackup;
-	bool g_libraryBackupValid = false;
-
-	// The trigger settings modal edits its TriggerConfig live too, for the same reason: the
-	// firing code reads it every frame.
+	// The trigger settings modal edits its TriggerConfig live, because the firing code
+	// reads it every frame - so a copy is taken to put back on Cancel.
 	UnlimitedPlaybackManager::TriggerConfig g_settingsBackup;
 	bool g_settingsBackupValid = false;
 	float g_settingsLoopSetup = 0.0f;
 	float g_settingsLoopEnding = 0.0f;
 	bool g_settingsLoopRestartLab = false;
 	int g_settingsLoopRestartMode = 0;
+	int g_settingsSelectionMode = 0;
 
 	// Per-modal scratch, only meaningful while that modal is up.
 	char g_notationText[256] = "";
@@ -79,18 +78,23 @@ namespace
 	int g_animDelay = 0;
 	char g_animFilter[64] = "";
 	int g_pendingCfSlot = 1;
-	int g_librarySelected = -1;
-	int g_librarySelectionMode = UnlimitedPlaybackManager::Selection_Random;
+	bool g_pendingCfSlotKeepCopy = false;
+	std::string g_cfSlotError;
 
 	// The trigger-settings modal is separate from the source modals: it configures WHEN the
 	// trigger fires, not WHAT it plays, so it is reachable whatever the source is.
 	int g_settingsTrigger = UnlimitedPlaybackManager::Trigger_Count;
 	bool g_settingsNeedsOpen = false;
 
-	// Trigger the pending file pick belongs to, since the picker answers on a later frame.
+	// Trigger and action the pending file pick belongs to, since the picker answers on a
+	// later frame. Index -1 adds a new action.
 	int g_filePickTrigger = UnlimitedPlaybackManager::Trigger_Count;
+	int g_filePickIndex = -1;
 
-	void BeginFilePick(TriggerType trigger);
+	// A trigger whose delete needs confirming because it holds several actions.
+	int g_confirmClearTrigger = UnlimitedPlaybackManager::Trigger_Count;
+
+	void BeginFilePick(TriggerType trigger, int actionIndex);
 
 	// Centres a modal as it appears and gives it a starting size, leaving it free to be
 	// moved and resized afterwards.
@@ -293,9 +297,9 @@ namespace
 		// Measured in game rather than guessed - these are the sizes these modals were
 		// actually resized to, read back out of dummy_actions.ini.
 		case Manager::Source_Animation: return ImVec2(549.0f, 498.0f);
-		case Manager::Source_Library:   return ImVec2(607.0f, 504.0f);
 		case Manager::Source_Notation:  return ImVec2(423.0f, 160.0f);
-		case Manager::Source_CfSlot:    return ImVec2(305.0f, 146.0f);
+		case Manager::Source_CfSlot:
+		case Manager::Source_Recording: return ImVec2(420.0f, 210.0f);
 		default: break;
 		}
 		return ImVec2(400.0f, 200.0f);
@@ -330,37 +334,26 @@ namespace
 		ImGui::PopStyleColor();
 	}
 
-	void OpenModal(TriggerType trigger, Source source)
+	void OpenModal(TriggerType trigger, Source source, int actionIndex)
 	{
 		g_modalTrigger = trigger;
+		g_modalActionIndex = actionIndex;
 		g_modalSource = source;
 		g_modalNeedsOpen = true;
 		RequestModalFit();
 
-		// The draft starts from the live action when the source is unchanged, so reopening a
-		// configured row shows what is set; changing source starts clean, since none of the
-		// old payload means anything to the new one.
-		const Manager::Action& live = Manager::Instance().Get(trigger);
-		if (live.source == source)
+		// The draft starts from the live action when one is being edited, so reopening a
+		// configured row shows what is set; adding starts clean.
+		const Manager::Trigger& slot = Manager::Instance().Get(trigger);
+		if (actionIndex >= 0 && static_cast<size_t>(actionIndex) < slot.actions.size()
+			&& slot.actions[actionIndex].source == source)
 		{
-			g_draft = live;
+			g_draft = slot.actions[actionIndex];
 		}
 		else
 		{
 			g_draft = Manager::Action{};
 			g_draft.source = source;
-		}
-
-		// A library is edited in place, so take a copy to restore if this is cancelled.
-		g_libraryBackupValid = false;
-		if (source == Manager::Source_Library)
-		{
-			if (const UnlimitedPlaybackManager::PlaybackLibrary* live =
-					UnlimitedPlaybackManager::Instance().MutableLibraryForTrigger(trigger))
-			{
-				g_libraryBackup = *live;
-				g_libraryBackupValid = true;
-			}
 		}
 
 		// Seed the scratch from the draft, so the form shows what is set rather than blank.
@@ -378,11 +371,10 @@ namespace
 			g_animFilter[0] = '\0';
 			break;
 		case Manager::Source_CfSlot:
+		case Manager::Source_Recording:
 			g_pendingCfSlot = action.cfSlot;
-			break;
-		case Manager::Source_Library:
-			g_librarySelected = -1;
-			g_librarySelectionMode = action.selectionMode;
+			g_pendingCfSlotKeepCopy = source == Manager::Source_Recording;
+			g_cfSlotError.clear();
 			break;
 		default:
 			break;
@@ -392,45 +384,34 @@ namespace
 	void ClearModalState()
 	{
 		g_modalTrigger = UnlimitedPlaybackManager::Trigger_Count;
+		g_modalActionIndex = -1;
 		g_modalSource = Manager::Source_None;
 		g_draft = Manager::Action{};
-		g_libraryBackup = UnlimitedPlaybackManager::PlaybackLibrary{};
-		g_libraryBackupValid = false;
 	}
 
-	// Commits the draft onto the live action. The only path by which the trigger list
-	// changes.
+	// Commits the draft onto the live table: appended as a new action, or written over the
+	// one being edited. The only path by which the trigger list changes from a modal.
 	void CommitModal()
 	{
 		if (g_modalTrigger < UnlimitedPlaybackManager::Trigger_Count)
 		{
-			Manager::Instance().Set(static_cast<TriggerType>(g_modalTrigger), g_draft);
+			const TriggerType trigger = static_cast<TriggerType>(g_modalTrigger);
+			if (g_modalActionIndex >= 0)
+			{
+				Manager::Instance().Replace(trigger, static_cast<size_t>(g_modalActionIndex), g_draft);
+			}
+			else
+			{
+				Manager::Instance().Add(trigger, g_draft);
+			}
 		}
 		ClearModalState();
 		ImGui::CloseCurrentPopup();
 	}
 
-	// Throws the draft away. The live action is left exactly as it was, whether that is a
-	// fully configured row or no row at all.
-	// Puts the library back the way it was found. Without this, entries added, deleted,
-	// reordered or unticked while the modal was open stayed applied after Cancel.
-	void RevertLibraryIfBackedUp()
-	{
-		if (!g_libraryBackupValid || g_modalTrigger >= UnlimitedPlaybackManager::Trigger_Count)
-		{
-			return;
-		}
-		UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
-		if (UnlimitedPlaybackManager::PlaybackLibrary* live =
-				playback.MutableLibraryForTrigger(static_cast<TriggerType>(g_modalTrigger)))
-		{
-			*live = g_libraryBackup;
-		}
-	}
-
+	// Throws the draft away. The live table is left exactly as it was.
 	void CancelModal()
 	{
-		RevertLibraryIfBackedUp();
 		ClearModalState();
 		ImGui::CloseCurrentPopup();
 	}
@@ -440,10 +421,10 @@ namespace
 		switch (source)
 		{
 		case Manager::Source_Notation:  return "Input Notation##dummyaction";
-		case Manager::Source_Library:   return "Playback Library##dummyaction";
 		case Manager::Source_File:      return "From File##dummyaction";
 		case Manager::Source_Animation: return "Animation##dummyaction";
-		case Manager::Source_CfSlot:    return "CF Recording Slot##dummyaction";
+		case Manager::Source_CfSlot:
+		case Manager::Source_Recording: return "CF Recording Slot##dummyaction";
 		default: break;
 		}
 		return "##dummyaction_none";
@@ -701,6 +682,23 @@ namespace
 			ImGui::ShowHelpMarker(L("Blocks this trigger from firing again for this many frames after it activates.").c_str());
 		}
 
+		// With more than one action, how the trigger chooses between them - the same three
+		// orders the Playback Library offered, since a trigger's list is what a library was.
+		if (Manager::Instance().Get(trigger).actions.size() > 1)
+		{
+			ImGui::VerticalSpacing(4);
+			ImGui::TextUnformatted(L("Picking order").c_str());
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(L("How the trigger chooses between its actions when it fires. Only actions that are on are considered.").c_str());
+			int mode = Manager::Instance().Get(trigger).selectionMode;
+			const char* modes[] = { L("Random").c_str(), L("Sequential").c_str(), L("Non-repeating Random").c_str() };
+			ImGui::SetNextItemWidth(220.0f);
+			if (ImGui::Combo("##trigger_picking", &mode, modes, IM_ARRAYSIZE(modes)))
+			{
+				Manager::Instance().SetSelectionMode(trigger, mode);
+			}
+		}
+
 		ImGui::VerticalSpacing(4);
 		ImGui::Checkbox(L("Mirror for the other side").c_str(), &config.autoMirror);
 		ImGui::SameLine();
@@ -792,6 +790,7 @@ namespace
 				playback.SetLoopEndingSeconds(g_settingsLoopEnding);
 				playback.SetLoopRestartLabState(g_settingsLoopRestartLab);
 				playback.SetLoopRestartMode(g_settingsLoopRestartMode);
+				Manager::Instance().SetSelectionMode(trigger, g_settingsSelectionMode);
 				g_settingsBackupValid = false;
 			}
 			g_settingsTrigger = UnlimitedPlaybackManager::Trigger_Count;
@@ -802,13 +801,15 @@ namespace
 		ImGui::EndPopup();
 	}
 
-	// ---- source pickers, shared by "+ Add Action" and a row's "Change..." ----
+	// ---- source pickers, shared by "+ Add Action" and a trigger row's "+" ----
 
+	// Offers every source the trigger accepts and starts configuring the chosen one as a NEW
+	// action of that trigger. Nothing is written until the modal is saved.
 	void DrawSourceMenuItems(TriggerType trigger)
 	{
 		ContextMenuHeader(L("Take its inputs from").c_str());
 		static const Source kSources[] = {
-			Manager::Source_Notation, Manager::Source_Library, Manager::Source_File,
+			Manager::Source_Notation, Manager::Source_File,
 			Manager::Source_Animation, Manager::Source_CfSlot, Manager::Source_Burst,
 		};
 		for (Source source : kSources)
@@ -821,25 +822,23 @@ namespace
 			}
 			if (ImGui::MenuItem(L(Manager::SourceLabel(source)).c_str()))
 			{
-				// Nothing is written to the trigger yet - the row appears when the choice is
-				// saved, not when a source is picked.
 				if (source == Manager::Source_Burst)
 				{
 					// Nothing to configure, so no modal - the row appears straight away.
 					Manager::Action burst;
 					burst.source = Manager::Source_Burst;
-					Manager::Instance().Set(trigger, burst);
+					Manager::Instance().Add(trigger, burst);
 				}
 				else if (source == Manager::Source_File)
 				{
 					// A file has exactly one thing to choose, so a window to host a "pick a
 					// file" button is a step for nothing. Straight to the OS picker; the
 					// answer commits the row when it arrives.
-					BeginFilePick(trigger);
+					BeginFilePick(trigger, -1);
 				}
 				else
 				{
-					OpenModal(trigger, source);
+					OpenModal(trigger, source, -1);
 				}
 			}
 		}
@@ -850,26 +849,20 @@ namespace
 		Manager& manager = Manager::Instance();
 		const bool anyConfigured = manager.AssignedCount() > 0;
 
-		if (manager.HasFreeTrigger())
+		// The Selectable is drawn first and the label painted back over it, so its
+		// highlight covers the plus as well. Drawing the plus first and the Selectable
+		// after left the lit area starting after the plus, cutting it in half.
+		if (DrawFaintSelectable("##dummy_add_action_btn", "+", L("Add Action").c_str(),
+				ImVec4(0.35f, 0.80f, 0.35f, 1.0f)))
 		{
-			// The Selectable is drawn first and the label painted back over it, so its
-			// highlight covers the plus as well. Drawing the plus first and the Selectable
-			// after left the lit area starting after the plus, cutting it in half.
-			if (DrawFaintSelectable("##dummy_add_action_btn", "+", L("Add Action").c_str(),
-					ImVec4(0.35f, 0.80f, 0.35f, 1.0f)))
-			{
-				ImGui::OpenPopup("##dummy_add_action");
-			}
+			ImGui::OpenPopup("##dummy_add_action");
 		}
 
 		// Only worth offering when there is something to clear. Behind a confirmation
-		// because it throws away every row and their libraries at once.
+		// because it throws away every trigger and every action in them at once.
 		if (anyConfigured)
 		{
-			if (manager.HasFreeTrigger())
-			{
-				ImGui::SameLine(0.0f, 12.0f);
-			}
+			ImGui::SameLine(0.0f, 12.0f);
 			if (DrawFaintSelectable("##dummy_clear_all_btn", nullptr, L("Clear All").c_str(),
 					ImVec4(0.90f, 0.35f, 0.35f, 1.0f)))
 			{
@@ -882,7 +875,7 @@ namespace
 				ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			ImGui::TextUnformatted(
-				L("This removes every trigger and the libraries they were using.").c_str());
+				L("This removes every trigger and every action in them.").c_str());
 			ImGui::VerticalSpacing(6);
 			if (ImGui::Button(L("Clear All").c_str()))
 			{
@@ -897,22 +890,19 @@ namespace
 			ImGui::EndPopup();
 		}
 
-		if (!manager.HasFreeTrigger())
-		{
-			// Every trigger is armed, so there is nothing left to add.
-			return;
-		}
-
 		if (ImGui::BeginPopup("##dummy_add_action"))
 		{
 			ContextMenuHeader(L("Trigger type").c_str());
+			// Every trigger, not only the empty ones: adding to a trigger that already has
+			// actions is how a set is built, and the count says which ones those are.
 			for (TriggerType trigger : Manager::TriggerOrder())
 			{
-				if (manager.HasAction(trigger))
-				{
-					continue;
-				}
-				if (ImGui::BeginMenu(L(Manager::TriggerLabel(trigger)).c_str()))
+				const size_t count = manager.Get(trigger).actions.size();
+				const std::string label = count == 0
+					? L(Manager::TriggerLabel(trigger))
+					: FormatText("%s  (%d)", L(Manager::TriggerLabel(trigger)).c_str(),
+						static_cast<int>(count));
+				if (ImGui::BeginMenu(label.c_str()))
 				{
 					DrawSourceMenuItems(trigger);
 					ImGui::EndMenu();
@@ -922,42 +912,486 @@ namespace
 		}
 	}
 
-	void DrawActionRow(TriggerType trigger)
+	// Colours shared by the rows, so on and off read the same everywhere.
+	const ImVec4 kDetailColor(0.72f, 0.72f, 0.72f, 1.0f);
+	const ImVec4 kDetailOffColor(0.45f, 0.45f, 0.45f, 1.0f);
+	const ImVec4 kBrokenColor(0.85f, 0.65f, 0.35f, 1.0f);
+	const ImVec4 kFiredColor(0.45f, 0.92f, 0.45f, 1.0f);
+	const ImVec4 kDeleteColor(0.90f, 0.35f, 0.35f, 1.0f);
+	// How far the action rows sit in from the trigger row, so they read as its contents.
+	const float kActionIndent = 26.0f;
+	const char* kActionDragPayload = "BBCFIM_DUMMY_ACTIONS";
+
+	// Row selection, per trigger: ctrl-click toggles, shift-click ranges, plain click picks
+	// one - the Playback Library's rows had exactly this, and a set of thirty recordings
+	// is unmanageable without it.
+	std::map<int, std::set<int>> g_selection;
+	std::map<int, int> g_selectionAnchor;
+
+	void ApplySelectionClick(std::set<int>& selection, int& anchor, int clicked, bool ctrl, bool shift)
+	{
+		if (ctrl)
+		{
+			if (selection.count(clicked)) { selection.erase(clicked); } else { selection.insert(clicked); }
+			anchor = clicked;
+		}
+		else if (shift && anchor >= 0)
+		{
+			selection.clear();
+			for (int k = (std::min)(anchor, clicked); k <= (std::max)(anchor, clicked); ++k) { selection.insert(k); }
+		}
+		else
+		{
+			selection.clear();
+			selection.insert(clicked);
+			anchor = clicked;
+		}
+	}
+
+	// The indices a row operation applies to: the selection when the row is part of one,
+	// otherwise just the row.
+	std::vector<size_t> RowGroup(TriggerType trigger, int index)
+	{
+		const std::set<int>& selection = g_selection[trigger];
+		std::vector<size_t> group;
+		if (selection.size() > 1 && selection.count(index))
+		{
+			for (int i : selection) { group.push_back(static_cast<size_t>(i)); }
+		}
+		else
+		{
+			group.push_back(static_cast<size_t>(index));
+		}
+		std::sort(group.begin(), group.end());
+		return group;
+	}
+
+	// Drag payload: which trigger's rows, and which.
+	struct ActionDragPayload
+	{
+		int trigger = 0;
+		int count = 0;
+		int indices[64] = {};
+	};
+
+	// What a row asks the block to do once the list is no longer being walked.
+	struct RowRequest
+	{
+		std::vector<size_t> remove;
+		int editIndex = -1;
+		int renameIndex = -1;
+		int sendIndex = -1;
+		int saveIndex = -1;
+		int setIndexOf = -1;
+		std::vector<size_t> moveFrom;
+		int moveInsertion = -1;
+	};
+
+	// Modals raised from a row, drawn at block scope (they cannot live inside the scrolling
+	// child). Which trigger they belong to is g_rowModalTrigger; the index is inside.
+	int g_rowModalTrigger = UnlimitedPlaybackManager::Trigger_Count;
+	int g_rowModalIndex = -1;
+	int g_rowModalSlot = 1;
+	int g_rowModalNewIndex = 1;
+	char g_rowModalName[128] = "";
+	std::vector<size_t> g_rowModalRemove;
+	enum RowModal { RowModal_None, RowModal_Send, RowModal_Rename, RowModal_SetIndex, RowModal_ConfirmRemove };
+	RowModal g_rowModal = RowModal_None;
+	bool g_rowModalNeedsOpen = false;
+
+	// The pending "save this action to a playback file" pick.
+	const char* kSaveDialogToken = "DummyActionsPanelSave";
+	int g_saveTrigger = UnlimitedPlaybackManager::Trigger_Count;
+	int g_saveIndex = -1;
+
+	// Which actions carry a frame buffer of their own that can be sent to a slot or written
+	// to a file. A CF slot action IS a slot, an animation has no inputs.
+	bool ActionHasOwnFrames(const Manager::Action& action)
+	{
+		return action.source == Manager::Source_Recording || action.source == Manager::Source_Notation
+			|| action.source == Manager::Source_File;
+	}
+
+	void BeginActionSave(TriggerType trigger, int index)
+	{
+		if (NativeFileDialog::IsOpen()) { return; }
+		const Manager::Trigger& slot = Manager::Instance().Get(trigger);
+		if (index < 0 || static_cast<size_t>(index) >= slot.actions.size()) { return; }
+		NativeFileDialog::Request request;
+		request.save = true;
+		request.title = L("Save this action as a playback file");
+		request.filters.push_back({ L("Playback file"), "*.playback" });
+		request.defaultExtension = "playback";
+		std::string name = Manager::ActionSummary(slot.actions[index]);
+		for (char& ch : name) { if (strchr("\\/:*?\"<>|", ch)) { ch = '_'; } }
+		request.initialPath = UnlimitedPlaybackManager::Instance().GetLibraryFolderPublic() + "\\" + name + ".playback";
+		if (NativeFileDialog::Open(kSaveDialogToken, request))
+		{
+			g_saveTrigger = trigger;
+			g_saveIndex = index;
+		}
+	}
+
+	// One action of a trigger: its switch (when there is more than one), what it is, and
+	// the play / edit / remove buttons the Playback Library's rows have - plus that list's
+	// selection, drag reordering and right-click menu.
+	void DrawActionLine(TriggerType trigger, size_t index, bool multi, bool triggerOn,
+		bool inTrainingMatch, RowRequest* request)
 	{
 		Manager& manager = Manager::Instance();
-		const Manager::Action& action = manager.Get(trigger);
+		const Manager::Trigger& slot = manager.Get(trigger);
+		const Manager::Action& action = slot.actions[index];
+		const bool actionOn = !multi || action.enabled;
+		const bool runnable = Manager::IsActionRunnable(action);
+		std::set<int>& selection = g_selection[trigger];
+		int& anchor = g_selectionAnchor.emplace(static_cast<int>(trigger), -1).first->second;
+		const int i = static_cast<int>(index);
+
+		ImGui::PushID(i);
+
+		if (multi)
+		{
+			bool on = action.enabled;
+			if (ImGui::Checkbox("##action_on", &on))
+			{
+				// Ticking one of a selection ticks the selection.
+				manager.SetActionsEnabled(trigger, RowGroup(trigger, i), on);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", L("Turn this action on or off").c_str());
+			}
+			ImGui::SameLine(0.0f, 6.0f);
+		}
+		else
+		{
+			// A lone action has no switch: it is the trigger's whole content.
+			ImGui::TextDisabled("-");
+			ImGui::SameLine(0.0f, 6.0f);
+		}
+
+		// Buttons pinned to the right; the row's label takes the rest.
+		const float buttonsWidth = 78.0f;
+		const float buttonsAt = ImGui::GetContentRegionMax().x - buttonsWidth;
+		const float labelStart = ImGui::GetCursorPosX();
+		const float labelWidth = (std::max)(60.0f, buttonsAt - labelStart - 8.0f);
+
+		std::string detail = L(Manager::SourceLabel(action.source));
+		const std::string summary = Manager::ActionSummary(action);
+		if (!summary.empty()) { detail += "  -  " + summary; }
+		if (multi && !action.enabled) { detail += "  "; detail += L("(off)"); }
+
+		// A Selectable the label is painted over, so the row can be picked and dragged and
+		// still show its text in the row's own colour.
+		ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.07f));
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive,  ImVec4(1.0f, 1.0f, 1.0f, 0.14f));
+		const ImVec2 rowMin = ImGui::GetCursorScreenPos();
+		if (ImGui::Selectable("##row", selection.count(i) != 0, ImGuiSelectableFlags_AllowOverlap,
+				ImVec2(labelWidth, 0.0f)))
+		{
+			ApplySelectionClick(selection, anchor, i, ImGui::GetIO().KeyCtrl, ImGui::GetIO().KeyShift);
+		}
+		ImGui::PopStyleColor(3);
+		const ImVec2 rowMax = ImGui::GetItemRectMax();
+		if (ImGui::IsItemHovered() && !runnable)
+		{
+			ImGui::SetTooltip("%s", L("This action is not set up enough to do anything yet.").c_str());
+		}
+
+		// Drag to reorder, within this trigger. A multi-selection drags as one.
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+		{
+			ActionDragPayload payload;
+			payload.trigger = static_cast<int>(trigger);
+			std::vector<size_t> group = RowGroup(trigger, i);
+			if (group.size() == 1) { selection.clear(); selection.insert(i); anchor = i; }
+			for (size_t k = 0; k < group.size() && payload.count < 64; ++k) { payload.indices[payload.count++] = static_cast<int>(group[k]); }
+			ImGui::SetDragDropPayload(kActionDragPayload, &payload, sizeof(payload));
+			ImGui::TextUnformatted(payload.count > 1
+				? FormatText(L("Dragged %d slots").c_str(), payload.count).c_str()
+				: summary.c_str());
+			ImGui::EndDragDropSource();
+		}
+		if (ImGui::BeginDragDropTarget())
+		{
+			const ImGuiDragDropFlags flags = ImGuiDragDropFlags_AcceptBeforeDelivery | ImGuiDragDropFlags_AcceptNoDrawDefaultRect;
+			if (const ImGuiPayload* dropped = ImGui::AcceptDragDropPayload(kActionDragPayload, flags))
+			{
+				const ActionDragPayload* from = static_cast<const ActionDragPayload*>(dropped->Data);
+				if (dropped->DataSize == sizeof(ActionDragPayload) && from->trigger == static_cast<int>(trigger) && from->count > 0)
+				{
+					const bool after = ImGui::GetIO().MousePos.y >= (rowMin.y + rowMax.y) * 0.5f;
+					const float y = after ? rowMax.y : rowMin.y;
+					ImGui::GetWindowDrawList()->AddLine(ImVec2(rowMin.x, y), ImVec2(rowMax.x, y), IM_COL32(120, 200, 255, 220), 1.5f);
+					if (dropped->IsDelivery())
+					{
+						request->moveFrom.assign(from->indices, from->indices + from->count);
+						request->moveInsertion = i + (after ? 1 : 0);
+					}
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		// The label, over the Selectable.
+		{
+			ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 0.88f);
+			const ImVec4 color = !runnable ? kBrokenColor : (actionOn && triggerOn) ? kDetailColor : kDetailOffColor;
+			ImGui::PushStyleColor(ImGuiCol_Text, color);
+			const ImVec2 textPos(rowMin.x + 4.0f, rowMin.y + (rowMax.y - rowMin.y - ImGui::GetTextLineHeight()) * 0.5f);
+			// Clipped with an ellipsis rather than wrapped, so a row is always one line and
+			// the buttons stay on it.
+			ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), textPos, ImVec2(rowMax.x - 2.0f, rowMax.y),
+				rowMax.x - 2.0f, detail.c_str(), nullptr, nullptr);
+			ImGui::PopStyleColor();
+			ImGui::PopFont();
+		}
+
+		// Right-click: the Playback Library's row menu, for actions.
+		if (ImGui::BeginPopupContextItem("action_context"))
+		{
+			ContextMenuHeader(summary.empty() ? L(Manager::SourceLabel(action.source)).c_str() : summary.c_str());
+			const bool hasFrames = ActionHasOwnFrames(action);
+			if (ImGui::MenuItem(L("Send to CF Slot").c_str(), nullptr, false, inTrainingMatch && hasFrames))
+			{
+				request->sendIndex = i;
+			}
+			if (ImGui::MenuItem(L("Save to File").c_str(), nullptr, false,
+					action.source == Manager::Source_Recording || action.source == Manager::Source_Notation))
+			{
+				request->saveIndex = i;
+			}
+			if (ImGui::MenuItem(L("Rename").c_str(), nullptr, false, action.source == Manager::Source_Recording))
+			{
+				request->renameIndex = i;
+			}
+			ImGui::Separator();
+			const std::vector<size_t> group = RowGroup(trigger, i);
+			const int groupMin = static_cast<int>(group.front());
+			const int groupMax = static_cast<int>(group.back());
+			const int count = static_cast<int>(slot.actions.size());
+			if (ImGui::MenuItem(L("Move up").c_str(), nullptr, false, count > 1 && groupMin > 0))
+			{
+				request->moveFrom = group;
+				request->moveInsertion = groupMin - 1;
+			}
+			if (ImGui::MenuItem(L("Move down").c_str(), nullptr, false, count > 1 && groupMax < count - 1))
+			{
+				request->moveFrom = group;
+				request->moveInsertion = groupMax + 2;
+			}
+			if (ImGui::MenuItem(L("Set index...").c_str(), nullptr, false, count > 1))
+			{
+				request->setIndexOf = i;
+			}
+			if (multi)
+			{
+				ImGui::Separator();
+				if (ImGui::MenuItem(L("Turn ALL slots off").c_str())) { manager.SetAllActionsEnabled(trigger, false); }
+				if (ImGui::MenuItem(L("Turn ALL slots on").c_str()))  { manager.SetAllActionsEnabled(trigger, true); }
+			}
+			ImGui::EndPopup();
+		}
+
+		// The three buttons.
+		ImGui::SameLine(buttonsAt > labelStart + 60.0f ? buttonsAt : 0.0f);
+		{
+			const bool canPlay = inTrainingMatch && runnable;
+			if (!canPlay) { ImGui::BeginDisabled(); }
+			if (ImGui::SmallButton(">") && canPlay)
+			{
+				UnlimitedPlaybackManager::Instance().PlayActionNow(trigger, index);
+			}
+			if (!canPlay) { ImGui::EndDisabled(); }
+			ImGui::HoverTooltipEvenDisabled(inTrainingMatch
+				? L("Play now").c_str()
+				: L("Play (Disabled due to not being in lab)").c_str());
+		}
+		ImGui::SameLine();
+		{
+			const bool editable = action.source != Manager::Source_Burst;
+			if (!editable) { ImGui::BeginDisabled(); }
+			if (ImGui::SmallButton("/") && editable)
+			{
+				request->editIndex = i;
+			}
+			if (!editable) { ImGui::EndDisabled(); }
+			ImGui::HoverTooltipEvenDisabled(editable
+				? L("Edit").c_str()
+				: L("Nothing to configure for a burst").c_str());
+		}
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, kDeleteColor);
+		if (ImGui::SmallButton("X"))
+		{
+			request->remove = RowGroup(trigger, i);
+		}
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered())
+		{
+			const std::vector<size_t> group = RowGroup(trigger, i);
+			ImGui::SetTooltip("%s", group.size() > 1
+				? FormatText(L("Remove these %d actions").c_str(), static_cast<int>(group.size())).c_str()
+				: multi ? L("Remove this action").c_str()
+				: L("Remove this action - it is the trigger's last, so the trigger goes with it").c_str());
+		}
+
+		ImGui::PopID();
+	}
+
+	void OpenRowModal(TriggerType trigger, int index, RowModal which)
+	{
+		g_rowModalTrigger = trigger;
+		g_rowModalIndex = index;
+		g_rowModal = which;
+		g_rowModalNeedsOpen = true;
+		const Manager::Trigger& slot = Manager::Instance().Get(trigger);
+		if (index >= 0 && static_cast<size_t>(index) < slot.actions.size())
+		{
+			strncpy_s(g_rowModalName, slot.actions[index].recordingName.c_str(), sizeof(g_rowModalName) - 1);
+			g_rowModalNewIndex = index + 1;
+		}
+	}
+
+	// The row modals, drawn once at panel scope. Titles are fixed, so one of each exists.
+	void DrawRowModals()
+	{
+		if (g_rowModal == RowModal_None || g_rowModalTrigger >= UnlimitedPlaybackManager::Trigger_Count)
+		{
+			return;
+		}
+		Manager& manager = Manager::Instance();
+		const TriggerType trigger = static_cast<TriggerType>(g_rowModalTrigger);
+		const int count = static_cast<int>(manager.Get(trigger).actions.size());
+		const char* title = nullptr;
+		switch (g_rowModal)
+		{
+		case RowModal_Send:          title = "Send to CF Slot##dummyrow"; break;
+		case RowModal_Rename:        title = "Rename##dummyrow"; break;
+		case RowModal_SetIndex:      title = "Set index##dummyrow"; break;
+		case RowModal_ConfirmRemove: title = "Remove actions?##dummyrow"; break;
+		default: return;
+		}
+		if (g_rowModalNeedsOpen)
+		{
+			ImGui::OpenPopup(title);
+			g_rowModalNeedsOpen = false;
+		}
+		CenterModalOnAppearing();
+		if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			g_rowModal = RowModal_None;
+			return;
+		}
+		bool close = false;
+		switch (g_rowModal)
+		{
+		case RowModal_Send:
+			ImGui::TextUnformatted(L("CF Slot").c_str());
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(90.0f);
+			ImGui::InputInt("##send_slot", &g_rowModalSlot);
+			g_rowModalSlot = (std::max)(1, (std::min)(4, g_rowModalSlot));
+			ImGui::VerticalSpacing(4);
+			if (ImGui::Button(L("Send").c_str()))
+			{
+				UnlimitedPlaybackManager::Instance().LoadActionIntoSlot(trigger, static_cast<size_t>(g_rowModalIndex), g_rowModalSlot);
+				close = true;
+			}
+			break;
+		case RowModal_Rename:
+			ImGui::SetNextItemWidth(300.0f);
+			ImGui::InputText("##rename", g_rowModalName, IM_ARRAYSIZE(g_rowModalName));
+			ImGui::VerticalSpacing(4);
+			if (ImGui::Button(L("Done").c_str()))
+			{
+				manager.SetRecordingName(trigger, static_cast<size_t>(g_rowModalIndex), g_rowModalName);
+				close = true;
+			}
+			break;
+		case RowModal_SetIndex:
+			ImGui::SetNextItemWidth(110.0f);
+			ImGui::InputInt(L("Index").c_str(), &g_rowModalNewIndex);
+			g_rowModalNewIndex = (std::max)(1, (std::min)(count, g_rowModalNewIndex));
+			ImGui::TextDisabled(L("Valid range: 1-%d").c_str(), count);
+			ImGui::VerticalSpacing(4);
+			if (ImGui::Button(L("Move").c_str()))
+			{
+				const int from = g_rowModalIndex;
+				const int to = g_rowModalNewIndex - 1;
+				if (from >= 0 && from < count && to != from)
+				{
+					manager.MoveActions(trigger, { static_cast<size_t>(from) }, static_cast<size_t>(to > from ? to + 1 : to));
+					g_selection[trigger].clear();
+				}
+				close = true;
+			}
+			break;
+		case RowModal_ConfirmRemove:
+			ImGui::TextUnformatted(FormatText(L("Remove these %d actions?").c_str(),
+				static_cast<int>(g_rowModalRemove.size())).c_str());
+			ImGui::VerticalSpacing(4);
+			if (ImGui::Button(L("Remove").c_str()))
+			{
+				manager.RemoveActions(trigger, g_rowModalRemove);
+				g_selection[trigger].clear();
+				close = true;
+			}
+			break;
+		default: break;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(L("Cancel").c_str())) { close = true; }
+		if (close)
+		{
+			g_rowModal = RowModal_None;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	// A trigger and everything in it: the trigger row (switch, name, timing, its own three
+	// buttons), then one indented line per action.
+	void DrawTriggerBlock(TriggerType trigger, bool inTrainingMatch)
+	{
+		Manager& manager = Manager::Instance();
+		const Manager::Trigger& slot = manager.Get(trigger);
+		if (slot.actions.empty())
+		{
+			g_selection[trigger].clear();
+			return;
+		}
+		const bool multi = slot.actions.size() > 1;
+		const bool triggerOn = slot.enabled;
+		// A selection that outlived its rows is dropped.
+		{
+			std::set<int>& selection = g_selection[trigger];
+			for (auto it = selection.begin(); it != selection.end();)
+			{
+				if (*it < 0 || static_cast<size_t>(*it) >= slot.actions.size()) { it = selection.erase(it); } else { ++it; }
+			}
+		}
 
 		ImGui::PushID(static_cast<int>(trigger));
 
-		// Two lines rather than three columns. The summary can be anything from "623C" to a
-		// list of animations with per-move delays, and squeezing that between a label and a
-		// row of buttons meant it either collided with them or had nowhere to wrap. Giving
-		// it its own line under the trigger name lets it wrap to the full width, and keeps
-		// the buttons on a fixed baseline whatever the summary says.
-		// Configures the trigger itself - when it fires - as opposed to Set.../Change...,
-		// which are about what it plays.
-		if (ImGui::SmallButton("*"))
+		// ---- trigger row ----
 		{
-			g_settingsTrigger = trigger;
-			g_settingsNeedsOpen = true;
-			RequestModalFit();
-
-			// Copied so Cancel can put it back: the firing code reads this config every
-			// frame, so the modal has nowhere to edit but the live object.
-			UnlimitedPlaybackManager& snapshotOf = UnlimitedPlaybackManager::Instance();
-			g_settingsBackup = snapshotOf.GetTrigger(trigger);
-			g_settingsLoopSetup = snapshotOf.GetLoopSetupSeconds();
-			g_settingsLoopEnding = snapshotOf.GetLoopEndingSeconds();
-			g_settingsLoopRestartLab = snapshotOf.GetLoopRestartLabState();
-			g_settingsLoopRestartMode = snapshotOf.GetLoopRestartMode();
-			g_settingsBackupValid = true;
+			bool on = slot.enabled;
+			if (ImGui::Checkbox("##trigger_on", &on))
+			{
+				manager.SetTriggerEnabled(trigger, on);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", L("Turn this trigger on or off").c_str());
+			}
 		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", L("Configure when this trigger fires").c_str());
-		}
+		ImGui::SameLine(0.0f, 6.0f);
 
-		ImGui::SameLine();
+		// Everything but the switch fades when the trigger is off, so on and off can be
+		// told apart from across the room.
+		if (!triggerOn) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.45f); }
 
 		// Flashes green for half a second when the trigger goes off, so you can see THAT it
 		// fired and exactly when - a toast tells you the same thing but scrolls away and
@@ -965,18 +1399,17 @@ namespace
 		UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
 		const unsigned long long firedMs = playback.GetTriggerLastFiredMs(trigger);
 		const bool justFired = firedMs != 0 && (GetTickCount64() - firedMs) < 500;
-		if (justFired)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.92f, 0.45f, 1.0f));
-		}
+		if (justFired) { ImGui::PushStyleColor(ImGuiCol_Text, kFiredColor); }
 		ImGui::TextUnformatted(L(Manager::TriggerLabel(trigger)).c_str());
-		if (justFired)
+		if (justFired) { ImGui::PopStyleColor(); }
+		if (ImGui::IsItemHovered())
 		{
-			ImGui::PopStyleColor();
+			ImGui::SetTooltip("%s", FormatText(L("Runs %s.").c_str(),
+				L(Manager::TriggerWhen(trigger)).c_str()).c_str());
 		}
 
 		// The delay, when there is one. Worth stating on the row because it changes what the
-		// trigger does and is otherwise two clicks away inside the gear.
+		// trigger does and is otherwise two clicks away inside the settings.
 		const int delayFrames = playback.GetTrigger(trigger).delayFrames;
 		if (delayFrames != 0)
 		{
@@ -986,75 +1419,25 @@ namespace
 				: FormatText(L("%df early").c_str(), -delayFrames).c_str());
 		}
 
-		// The loop is the one trigger with a state worth showing at rest: it either is or is
-		// not going, and nothing else on the page says so.
-		if (trigger == UnlimitedPlaybackManager::Trigger_OnLoop)
+		// With several actions, how it picks between them.
+		if (multi)
 		{
+			const char* mode = "random";
+			switch (slot.selectionMode)
+			{
+			case UnlimitedPlaybackManager::Selection_Sequential:         mode = "in order"; break;
+			case UnlimitedPlaybackManager::Selection_NonRepeatingRandom: mode = "no repeats"; break;
+			default: break;
+			}
 			ImGui::SameLine();
-			if (playback.IsLoopActive())
+			ImGui::TextDisabled("%s", FormatText("%d, %s",
+				static_cast<int>(slot.actions.size()), L(mode).c_str()).c_str());
+			if (ImGui::IsItemHovered())
 			{
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.92f, 0.45f, 1.0f));
-				ImGui::TextUnformatted(L("(looping)").c_str());
-				ImGui::PopStyleColor();
-			}
-			else
-			{
-				ImGui::TextDisabled("%s", L("(stopped)").c_str());
+				ImGui::SetTooltip("%s", L("How many actions this trigger holds, and how it picks one when it fires. Change the picking order in the trigger's settings.").c_str());
 			}
 		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", FormatText(L("Runs %s.").c_str(),
-				L(Manager::TriggerWhen(trigger)).c_str()).c_str());
-		}
 
-		// Buttons pinned to the right of the first line.
-		const float buttons = 190.0f;
-		const float buttonsAt = ImGui::GetContentRegionMax().x - buttons;
-		if (buttonsAt > 160.0f) { ImGui::SameLine(buttonsAt); } else { ImGui::SameLine(); }
-
-		if (ImGui::SmallButton(L("Edit").c_str()))
-		{
-			OpenModal(trigger, action.source);
-		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", L("Reopen this action's configuration").c_str());
-		}
-		ImGui::SameLine();
-		if (ImGui::SmallButton(L("Change Source").c_str()))
-		{
-			ImGui::OpenPopup("##row_change");
-		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", L("Take this trigger's inputs from somewhere else").c_str());
-		}
-		if (ImGui::BeginPopup("##row_change"))
-		{
-			DrawSourceMenuItems(trigger);
-			ImGui::EndPopup();
-		}
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.35f, 0.35f, 1.0f));
-		const bool cleared = ImGui::SmallButton("X");
-		ImGui::PopStyleColor();
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", L("Clear").c_str());
-		}
-
-		// Second line: what it will do, in the same quiet grey and smaller type the context
-		// menu captions use, indented under the trigger it belongs to.
-		ImGui::Indent(20.0f);
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
-		ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 0.86f);
-		std::string detail = L(Manager::SourceLabel(action.source));
-		const std::string summary = manager.Summary(trigger);
-		if (!summary.empty())
-		{
-			detail += "  -  " + summary;
-		}
 		// The two triggers you press yourself say which key does it, since there is no other
 		// way to tell from the row what you bound.
 		if (trigger == UnlimitedPlaybackManager::Trigger_KeyPress
@@ -1065,34 +1448,196 @@ namespace
 					? HotkeyManager::Hotkey_UnlimitedPlaybackTrigger
 					: HotkeyManager::Hotkey_UnlimitedPlaybackLoop;
 			const std::string key = HotkeyManager::DisplayString(HotkeyManager::GetBinding(bind));
-			detail += "  -  ";
-			detail += FormatText(L("press %s").c_str(), key.empty() ? L("nothing").c_str() : key.c_str());
+			ImGui::SameLine();
+			ImGui::TextDisabled("%s", FormatText(L("press %s").c_str(),
+				key.empty() ? L("nothing").c_str() : key.c_str()).c_str());
 		}
-		// Wrapped short of the buttons above, so a long summary never runs under them.
-		ImGui::PushTextWrapPos((std::max)(200.0f, ImGui::GetContentRegionMax().x - 30.0f));
-		if (manager.IsRunnable(trigger))
-		{
-			ImGui::TextUnformatted(detail.c_str());
-		}
-		else
-		{
-			ImGui::PopStyleColor();
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.65f, 0.35f, 1.0f));
-			ImGui::TextUnformatted(detail.c_str());
-		}
-		ImGui::PopTextWrapPos();
-		ImGui::PopFont();
-		ImGui::PopStyleColor();
-		ImGui::Unindent(20.0f);
 
-		// A faint rule under each row, so a list of them reads as rows rather than a wall.
+		// The loop is the one trigger with a state worth showing at rest: it either is or is
+		// not going, and nothing else on the page says so.
+		if (trigger == UnlimitedPlaybackManager::Trigger_OnLoop)
+		{
+			ImGui::SameLine();
+			if (playback.IsLoopActive())
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, kFiredColor);
+				ImGui::TextUnformatted(L("(looping)").c_str());
+				ImGui::PopStyleColor();
+			}
+			else
+			{
+				ImGui::TextDisabled("%s", L("(stopped)").c_str());
+			}
+		}
+
+		if (!triggerOn)
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("%s", L("(off)").c_str());
+		}
+
+		// Buttons pinned to the right of the trigger row: settings, add, remove.
+		const float buttonsWidth = 78.0f;
+		const float buttonsAt = ImGui::GetContentRegionMax().x - buttonsWidth;
+		if (buttonsAt > 200.0f) { ImGui::SameLine(buttonsAt); } else { ImGui::SameLine(); }
+
+		if (ImGui::SmallButton("*"))
+		{
+			g_settingsTrigger = trigger;
+			g_settingsNeedsOpen = true;
+			RequestModalFit();
+
+			// Copied so Cancel can put it back: the firing code reads this config every
+			// frame, so the modal has nowhere to edit but the live object.
+			g_settingsBackup = playback.GetTrigger(trigger);
+			g_settingsLoopSetup = playback.GetLoopSetupSeconds();
+			g_settingsLoopEnding = playback.GetLoopEndingSeconds();
+			g_settingsLoopRestartLab = playback.GetLoopRestartLabState();
+			g_settingsLoopRestartMode = playback.GetLoopRestartMode();
+			g_settingsSelectionMode = slot.selectionMode;
+			g_settingsBackupValid = true;
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", L("Configure when this trigger fires").c_str());
+		}
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 0.80f, 0.35f, 1.0f));
+		const bool addPressed = ImGui::SmallButton("+");
+		ImGui::PopStyleColor();
+		if (addPressed)
+		{
+			ImGui::OpenPopup("##trigger_add");
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", L("Add another action to this trigger").c_str());
+		}
+		if (ImGui::BeginPopup("##trigger_add"))
+		{
+			DrawSourceMenuItems(trigger);
+			ImGui::EndPopup();
+		}
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, kDeleteColor);
+		const bool clearPressed = ImGui::SmallButton("X");
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", L("Remove this trigger and everything in it").c_str());
+		}
+
+		// ---- action rows ----
+		RowRequest request;
+		ImGui::Indent(kActionIndent);
+		{
+			// Past the configured number of rows the list scrolls rather than growing:
+			// some people put a great many actions on one trigger, and the page has to
+			// stay a page.
+			const int maxRows = (std::max)(1, Settings::settingsIni.dummyActionMaxRows);
+			const bool scrolls = static_cast<int>(slot.actions.size()) > maxRows;
+			if (scrolls)
+			{
+				const float rowHeight = ImGui::GetFrameHeightWithSpacing();
+				ImGui::BeginChild("##trigger_actions",
+					ImVec2(0.0f, rowHeight * maxRows + ImGui::GetStyle().ItemSpacing.y),
+					false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+			}
+			for (size_t i = 0; i < slot.actions.size(); ++i)
+			{
+				DrawActionLine(trigger, i, multi, triggerOn, inTrainingMatch, &request);
+			}
+			if (scrolls)
+			{
+				ImGui::EndChild();
+			}
+		}
+		ImGui::Unindent(kActionIndent);
+
+		if (!triggerOn) { ImGui::PopStyleVar(); }
+
+		// A faint rule under each block, so a list of them reads as blocks rather than a wall.
 		ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(1.0f, 1.0f, 1.0f, 0.06f));
 		ImGui::Separator();
 		ImGui::PopStyleColor();
 
-		if (cleared)
+		// Mutations last, once nothing is reading the list any more.
+		if (request.editIndex >= 0 && static_cast<size_t>(request.editIndex) < slot.actions.size())
 		{
-			manager.Clear(trigger);
+			const Manager::Action& action = slot.actions[request.editIndex];
+			if (action.source == Manager::Source_File)
+			{
+				BeginFilePick(trigger, request.editIndex);
+			}
+			else
+			{
+				OpenModal(trigger, action.source, request.editIndex);
+			}
+		}
+		if (request.sendIndex >= 0)   { OpenRowModal(trigger, request.sendIndex, RowModal_Send); }
+		if (request.renameIndex >= 0) { OpenRowModal(trigger, request.renameIndex, RowModal_Rename); }
+		if (request.setIndexOf >= 0)  { OpenRowModal(trigger, request.setIndexOf, RowModal_SetIndex); }
+		if (request.saveIndex >= 0)   { BeginActionSave(trigger, request.saveIndex); }
+		if (!request.moveFrom.empty() && request.moveInsertion >= 0)
+		{
+			std::vector<size_t> from = request.moveFrom;
+			std::sort(from.begin(), from.end());
+			size_t insertedAt = 0;
+			if (manager.MoveActions(trigger, from, static_cast<size_t>(request.moveInsertion), &insertedAt))
+			{
+				std::set<int>& selection = g_selection[trigger];
+				selection.clear();
+				for (size_t k = 0; k < from.size(); ++k) { selection.insert(static_cast<int>(insertedAt + k)); }
+				g_selectionAnchor[trigger] = static_cast<int>(insertedAt);
+			}
+		}
+		if (!request.remove.empty())
+		{
+			if (request.remove.size() > 1)
+			{
+				g_rowModalRemove = request.remove;
+				OpenRowModal(trigger, static_cast<int>(request.remove.front()), RowModal_ConfirmRemove);
+			}
+			else
+			{
+				manager.Remove(trigger, request.remove.front());
+				g_selection[trigger].clear();
+			}
+		}
+		if (clearPressed)
+		{
+			if (multi)
+			{
+				g_confirmClearTrigger = trigger;
+				ImGui::OpenPopup(L("Remove this trigger?").c_str());
+			}
+			else
+			{
+				manager.Clear(trigger);
+			}
+		}
+
+		CenterModalOnAppearing();
+		if (ImGui::BeginPopupModal(L("Remove this trigger?").c_str(), nullptr,
+				ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			const int count = static_cast<int>(manager.Get(trigger).actions.size());
+			ImGui::TextUnformatted(FormatText(L("Remove %s and its %d actions?").c_str(),
+				L(Manager::TriggerLabel(trigger)).c_str(), count).c_str());
+			ImGui::VerticalSpacing(6);
+			if (ImGui::Button(L("Remove").c_str()))
+			{
+				manager.Clear(trigger);
+				g_confirmClearTrigger = UnlimitedPlaybackManager::Trigger_Count;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button(L("Cancel").c_str()))
+			{
+				g_confirmClearTrigger = UnlimitedPlaybackManager::Trigger_Count;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
 		}
 
 		ImGui::PopID();
@@ -1198,13 +1743,54 @@ namespace
 		for (int slot = 1; slot <= 4; ++slot)
 		{
 			if (slot > 1) { ImGui::SameLine(); }
-			ImGui::RadioButton(FormatText(L("Slot %d").c_str(), slot).c_str(), &g_pendingCfSlot, slot);
+			if (ImGui::RadioButton(FormatText(L("Slot %d").c_str(), slot).c_str(), &g_pendingCfSlot, slot))
+			{
+				g_cfSlotError.clear();
+			}
 		}
+		ImGui::VerticalSpacing(4);
+		ImGui::Checkbox(L("Keep a copy of the recording").c_str(), &g_pendingCfSlotKeepCopy);
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file.").c_str());
+		if (!g_cfSlotError.empty())
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.45f, 0.45f, 1.0f));
+			ImGui::TextWrapped("%s", g_cfSlotError.c_str());
+			ImGui::PopStyleColor();
+		}
+
 		EndModalBodyAndSeparate();
 		if (ImGui::Button(L("Done").c_str()))
 		{
 			g_draft.cfSlot = g_pendingCfSlot;
-			CommitModal();
+			if (g_pendingCfSlotKeepCopy)
+			{
+				std::vector<char> frames;
+				bool facingLeft = false;
+				if (!UnlimitedPlaybackManager::Instance().ReadSlotRecording(g_pendingCfSlot, &frames, &facingLeft)
+					|| frames.empty())
+				{
+					g_cfSlotError = FormatText(L("Slot %d is empty. Record something into it first.").c_str(),
+						g_pendingCfSlot);
+				}
+				else
+				{
+					g_draft.source = Manager::Source_Recording;
+					g_draft.recordingFrames = frames;
+					g_draft.recordingFacingLeft = facingLeft;
+					if (g_draft.recordingName.empty())
+					{
+						g_draft.recordingName = FormatText(L("Slot %d").c_str(), g_pendingCfSlot);
+					}
+					CommitModal();
+				}
+			}
+			else
+			{
+				g_draft.source = Manager::Source_CfSlot;
+				g_draft.recordingFrames.clear();
+				CommitModal();
+			}
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(L("Cancel").c_str()))
@@ -1213,7 +1799,7 @@ namespace
 		}
 	}
 
-	void BeginFilePick(TriggerType trigger)
+	void BeginFilePick(TriggerType trigger, int actionIndex)
 	{
 		if (NativeFileDialog::IsOpen())
 		{
@@ -1221,114 +1807,21 @@ namespace
 		}
 		NativeFileDialog::Request request;
 		request.title = L("Choose a playback file");
+		request.filters.push_back({ L("Playback file or library"), "*.playback;*.upl" });
 		request.filters.push_back({ L("Playback file"), "*.playback" });
+		request.filters.push_back({ L("Playback library"), "*.upl" });
 		request.defaultExtension = "playback";
 		if (NativeFileDialog::Open(kFileDialogToken, request))
 		{
 			g_filePickTrigger = trigger;
+			g_filePickIndex = actionIndex;
 		}
-	}
-
-
-	// Libraries are the files Unlimited Playback already writes: self-contained, with every
-	// entry's playback bytes embedded, so one of them is portable on its own.
-	// Win32 rather than <filesystem>: this project builds at the toolset's default language
-	// level, where <filesystem> is not available, and the rest of the mod enumerates this way.
-	std::vector<std::string> ListLibraryFiles()
-	{
-		std::vector<std::string> found;
-		const std::string folder = UnlimitedPlaybackManager::Instance().GetLibraryFolderPublic();
-		if (folder.empty())
-		{
-			return found;
-		}
-		WIN32_FIND_DATAA findData = {};
-		const HANDLE handle = FindFirstFileA((folder + "\\*").c_str(), &findData);
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			return found;
-		}
-		do
-		{
-			if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) { continue; }
-			found.push_back(folder + "\\" + findData.cFileName);
-		} while (FindNextFileA(handle, &findData));
-		FindClose(handle);
-		std::sort(found.begin(), found.end());
-		return found;
-	}
-
-	// Leaf name without its extension, for showing a path as a library name.
-	std::string StemOf(const std::string& path)
-	{
-		const size_t slash = path.find_last_of("/\\");
-		std::string leaf = slash == std::string::npos ? path : path.substr(slash + 1);
-		const size_t dot = leaf.find_last_of('.');
-		return dot == std::string::npos ? leaf : leaf.substr(0, dot);
 	}
 
 	std::string LeafOf(const std::string& path)
 	{
 		const size_t slash = path.find_last_of("/\\");
 		return slash == std::string::npos ? path : path.substr(slash + 1);
-	}
-
-	void DrawLibraryModal(TriggerType trigger)
-	{
-		Manager::Action& action = g_draft;
-		UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
-
-		// This trigger's own library, loaded from whatever file was last saved or loaded into
-		// it. There is no library picker here on purpose: libraries are files, and loading or
-		// saving one is what the buttons in the panel below already do.
-		// This trigger's OWN library, not the shared working set. Pointing at the working
-		// set whenever no file had been picked yet meant configuring one trigger edited
-		// every other trigger's list at the same time.
-		playback.SetEditTarget(playback.MutableLibraryForTrigger(trigger));
-
-		BeginModalBody();
-
-		// Picking order first: it is the one thing that is about this trigger rather than
-		// about the collection, so it reads as the setting and the list as its contents.
-		DrawPlaybackPickingOrder();
-		ImGui::VerticalSpacing(4);
-		ImGui::Separator();
-		ImGui::VerticalSpacing(4);
-
-		// The real library UI - same list, context menus, ordering, enable checkboxes and
-		// add buttons as the Playback Library window.
-		// A named height rather than "fill": the modal fits itself to its content, and
-		// content that expands to fill whatever it is given would never settle on a size.
-		DrawPlaybackLibraryEntriesAndAdd(300.0f);
-
-		EndModalBodyAndSeparate();
-
-		// At modal scope, outside the scrolling body: these are the popups the buttons above
-		// raise, and a nested modal has to be begun at this level to be usable.
-		DrawPlaybackLibraryPopups();
-
-		action.selectionMode = playback.GetSelectionMode();
-		if (const UnlimitedPlaybackManager::PlaybackLibrary* edited = playback.GetEditTarget())
-		{
-			// Remember whatever the panel loaded or saved, so the trigger keeps pointing at
-			// the file the user just worked with.
-			action.libraryPath = edited->path;
-			action.libraryName = StemOf(edited->path);
-		}
-
-		// Back to the working set before anything else draws, so the Playback Library window
-		// is never left editing a trigger's library behind the user's back.
-		playback.SetEditTarget(nullptr);
-
-		if (ImGui::Button(L("Done").c_str()))
-		{
-			CommitModal();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(L("Cancel").c_str()))
-		{
-			CancelModal();
-		}
 	}
 
 	void DrawAnimationModal(TriggerType trigger)
@@ -1341,11 +1834,11 @@ namespace
 		// side effect of the old panel drawing itself. Ask for it explicitly, or the modal
 		// opens empty for anyone who never visited that panel.
 		ScrWindow::EnsureDummyScriptLoadedForUi();
-		const std::vector<scrState*>& states = g_interfaces.player2.states;
+		const std::vector<scrState*>& states = TrainingSide::Dummy().states;
 
 		if (states.empty())
 		{
-			ImGui::TextWrapped("%s", L("The dummy's move list could not be read. This happens on the training character select screen, and in mirror matches.").c_str());
+			ImGui::TextWrapped("%s", L("The dummy's move list could not be read. This happens on the training character select screen.").c_str());
 			ImGui::VerticalSpacing(4);
 			if (ImGui::Button(L("Cancel").c_str())) { CancelModal(); }
 			return;
@@ -1472,7 +1965,7 @@ namespace
 		// Trying a move is how you find out it was the wrong one. Without this, seeing a move meant
 		// assigning it to a trigger, closing the window, and arranging for that trigger to fire -
 		// so the picker is where the button belongs, next to the move you are looking at.
-		const bool canPlayNow = selected != nullptr && !g_interfaces.player2.IsCharDataNullPtr();
+		const bool canPlayNow = selected != nullptr && !TrainingSide::Dummy().IsCharDataNullPtr();
 		if (!canPlayNow) { ImGui::BeginDisabled(); }
 		if (ImGui::Button(L("Play now").c_str()) && canPlayNow)
 		{
@@ -1519,11 +2012,9 @@ namespace
 		BeginCenteredModalLayout(title, startSize.x, startSize.y);
 		if (!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoScrollbar))
 		{
-			// Dismissed by clicking away rather than through a button. That is a cancel, so
-			// it reverts exactly what Cancel reverts - and it has to clear the state, or the
-			// row could never be reconfigured: the modal would be gone but still considered
-			// open.
-			RevertLibraryIfBackedUp();
+			// Dismissed by clicking away rather than through a button. That is a cancel,
+			// and it has to clear the state, or the row could never be reconfigured: the
+			// modal would be gone but still considered open.
 			ClearModalState();
 			return;
 		}
@@ -1538,9 +2029,9 @@ namespace
 		switch (g_modalSource)
 		{
 		case Manager::Source_Notation:  DrawNotationModal(trigger); break;
-		case Manager::Source_Library:   DrawLibraryModal(trigger); break;
 		case Manager::Source_Animation: DrawAnimationModal(trigger); break;
-		case Manager::Source_CfSlot:    DrawCfSlotModal(trigger); break;
+		case Manager::Source_CfSlot:
+		case Manager::Source_Recording: DrawCfSlotModal(trigger); break;
 		default: CancelModal(); break;
 		}
 
@@ -1557,11 +2048,40 @@ namespace
 			return;
 		}
 		const int pending = g_filePickTrigger;
+		const int index = g_filePickIndex;
 		g_filePickTrigger = UnlimitedPlaybackManager::Trigger_Count;
+		g_filePickIndex = -1;
 		if (!result.accepted || pending >= UnlimitedPlaybackManager::Trigger_Count)
 		{
 			// Cancelled the picker: the trigger keeps whatever it had, which for a new row
 			// is nothing at all.
+			return;
+		}
+
+		const TriggerType trigger = static_cast<TriggerType>(pending);
+
+		// A Playback Library file is unpacked into one recording action per entry, so a big
+		// library built under the old system lands in a trigger in one go.
+		std::string lower = result.path;
+		for (char& ch : lower) { ch = static_cast<char>(tolower(static_cast<unsigned char>(ch))); }
+		if (lower.size() > 4 && lower.compare(lower.size() - 4, 4, ".upl") == 0)
+		{
+			int selectionMode = UnlimitedPlaybackManager::Selection_Random;
+			const int added = Manager::Instance().AddLibraryFile(trigger, result.path, &selectionMode);
+			if (added < 0)
+			{
+				UnlimitedPlaybackManager::Instance().PushToast(L("That library file could not be read."));
+			}
+			else
+			{
+				if (Manager::Instance().Get(trigger).actions.size() == static_cast<size_t>(added))
+				{
+					// The library was the whole trigger, so its picking order comes along.
+					Manager::Instance().SetSelectionMode(trigger, selectionMode);
+				}
+				UnlimitedPlaybackManager::Instance().PushToast(
+					FormatText(L("Added %d recording(s) from the library.").c_str(), added));
+			}
 			return;
 		}
 
@@ -1570,7 +2090,53 @@ namespace
 		action.source = Manager::Source_File;
 		action.filePath = result.path;
 		action.fileName = LeafOf(result.path);
-		Manager::Instance().Set(static_cast<TriggerType>(pending), action);
+		if (index >= 0)
+		{
+			Manager::Instance().Replace(trigger, static_cast<size_t>(index), action);
+		}
+		else
+		{
+			Manager::Instance().Add(trigger, action);
+		}
+	}
+
+	// The "save this action as a playback file" picker's answer.
+	void PumpSaveDialog()
+	{
+		NativeFileDialog::Result result;
+		if (!NativeFileDialog::Consume(kSaveDialogToken, &result))
+		{
+			return;
+		}
+		const int trigger = g_saveTrigger;
+		const int index = g_saveIndex;
+		g_saveTrigger = UnlimitedPlaybackManager::Trigger_Count;
+		g_saveIndex = -1;
+		if (!result.accepted || result.path.empty() || trigger >= UnlimitedPlaybackManager::Trigger_Count)
+		{
+			return;
+		}
+		const Manager::Trigger& slot = Manager::Instance().Get(static_cast<TriggerType>(trigger));
+		if (index < 0 || static_cast<size_t>(index) >= slot.actions.size())
+		{
+			return;
+		}
+		const Manager::Action& action = slot.actions[index];
+		std::vector<char> raw;
+		bool facingLeft = false;
+		if (action.source == Manager::Source_Recording) { raw = action.recordingFrames; facingLeft = action.recordingFacingLeft; }
+		else if (action.source == Manager::Source_Notation) { raw = action.notationFrames; facingLeft = false; }
+		if (raw.empty())
+		{
+			UnlimitedPlaybackManager::Instance().PushToast(L("That action has no inputs to save."));
+			return;
+		}
+		// Same on-disk layout as every other playback file: one facing byte, one byte per frame.
+		const bool ok = PlaybackManager::save_playback_to_path(result.path,
+			PlaybackManager::raw_to_trimmed(raw), facingLeft ? 1 : 0);
+		UnlimitedPlaybackManager::Instance().PushToast(ok
+			? FormatText(L("Saved to %s").c_str(), result.path.c_str())
+			: FormatText(L("Could not write %s").c_str(), result.path.c_str()));
 	}
 }
 
@@ -1582,8 +2148,15 @@ void DummyActionsPanel::OnDummyScriptReloaded()
 void DummyActionsPanel::Draw()
 {
 	PumpFileDialog();
+	PumpSaveDialog();
 
 	Manager& manager = Manager::Instance();
+	const bool inTrainingMatch =
+		g_gameVals.pGameMode && g_gameVals.pGameState &&
+		(*g_gameVals.pGameMode == GameMode_Training) &&
+		(*g_gameVals.pGameState == GameState_InMatch) &&
+		(GetGameSceneStatus() >= GameSceneStatus_Running) &&
+		!TrainingSide::Dummy().IsCharDataNullPtr();
 
 	// Above the rows: it is the thing you reach for on an empty list, and it should not walk
 	// down the page as rows are added.
@@ -1599,12 +2172,10 @@ void DummyActionsPanel::Draw()
 	}
 	for (TriggerType trigger : Manager::TriggerOrder())
 	{
-		if (manager.HasAction(trigger))
-		{
-			DrawActionRow(trigger);
-		}
+		DrawTriggerBlock(trigger, inTrainingMatch);
 	}
 
 	DrawOpenModal();
 	DrawTriggerSettingsModal();
+	DrawRowModals();
 }

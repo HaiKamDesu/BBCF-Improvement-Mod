@@ -286,6 +286,10 @@ int parse_state(char* addr,
 
 			prev_frames = (unsigned int)s->frame_activity_status.size();
 			g_scrStats.spriteCmds++;
+			if (frames != 0xffffffff && frames > s->longest_sprite) {
+				s->longest_sprite = frames;
+				s->longest_sprite_offset = prev_frames;
+			}
 
 			// A sprite that is held indefinitely (32767 / -1), or one long enough that its length is
 			// clearly not a real animation, contributes a single frame flagged non-deterministic.

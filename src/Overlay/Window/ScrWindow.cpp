@@ -14,6 +14,7 @@
 #include "Core/NativeFileDialog.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
+#include "Game/TrainingSide.h"
 #include "Game/ReplayStates/FrameState.h"
 #include "Game/ReplayFiles/ReplayFile.h"
 #include "Game/ReplayFiles/ReplayList.h"
@@ -575,8 +576,8 @@ void ScrWindow::DrawWakeupDelayControl() {
 void ScrWindow::check_wakeup_delay() {
     TrainingSetupMenu* menu = (TrainingSetupMenu*)(ScrWindow::bbcf_base_adress + 0x902BDC);
     menu->emergency_roll = 0;
-    auto current_action = std::string(g_interfaces.player2.GetData()->currentAction);
-    auto action_time = g_interfaces.player2.GetData()->actionTime;
+    auto current_action = std::string(TrainingSide::Dummy().GetData()->currentAction);
+    auto action_time = TrainingSide::Dummy().GetData()->actionTime;
     /*finds the random "skew" both for positiveand negative "skews".Yes I know this doesnt fit 
     the true statistical definition of skew but I couldn't think of a better name fuck off*/
     static int wakeup_delay_random_skew = 0;
@@ -1054,39 +1055,6 @@ void ScrWindow::DrawPositionsBody()
     ImGui::ShowHelpMarkerSameLine(L("Always swap coordinates help").c_str());
 }
 
-void ScrWindow::SyncAnimationRegistersFromActions()
-{
-    DummyActionManager& actions = DummyActionManager::Instance();
-
-    struct Wiring {
-        DummyActionManager::TriggerType trigger;
-        std::vector<scrState*>* pool;
-        std::vector<int>* delays;
-    };
-    const Wiring wiring[] = {
-        { UnlimitedPlaybackManager::Trigger_Wakeup,    &wakeup_register,    &wakeup_register_delays },
-        { UnlimitedPlaybackManager::Trigger_Gap,       &gap_register,       &gap_register_delays },
-        { UnlimitedPlaybackManager::Trigger_OnHit,     &onhit_register,     &onhit_register_delays },
-        { UnlimitedPlaybackManager::Trigger_ThrowTech, &throwtech_register, &throwtech_register_delays },
-    };
-
-    for (const Wiring& w : wiring) {
-        const DummyActionManager::Action& action = actions.Get(w.trigger);
-        if (action.source != DummyActionManager::Source_Animation) {
-            if (!w.pool->empty()) {
-                w.pool->clear();
-                w.delays->clear();
-            }
-            continue;
-        }
-        if (*w.pool == action.animations) {
-            continue;
-        }
-        *w.pool = action.animations;
-        *w.delays = action.animationDelays;
-    }
-}
-
 void ScrWindow::EnsureDummyScriptLoadedForUi()
 {
     if (!g_gameVals.pGameMode || *g_gameVals.pGameMode != GameMode_Training) {
@@ -1116,19 +1084,21 @@ bool ScrWindow::DummyFeaturesInUse() const
     // every burst resolved to nothing. The log said so plainly once it was asked:
     // "Trigger 'On Hit' fired but resolved to nothing: source=5".
     for (DummyActionManager::TriggerType trigger : DummyActionManager::TriggerOrder()) {
-        const DummyActionManager::Source source =
-            DummyActionManager::Instance().Get(trigger).source;
-        if (source == DummyActionManager::Source_Animation
-            || source == DummyActionManager::Source_Burst) {
-            return true;
+        for (const DummyActionManager::Action& action : DummyActionManager::Instance().Get(trigger).actions) {
+            if (action.source == DummyActionManager::Source_Animation
+                || action.source == DummyActionManager::Source_Burst) {
+                return true;
+            }
         }
     }
-    return false;
+    // The wakeup and throw-tech triggers time themselves off the length of the dummy's own
+    // getup and tech states, which only the parsed script knows.
+    return UnlimitedPlaybackManager::Instance().NeedsDummyScriptForTiming();
 }
 
 bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
 {
-    if (p2_old_char_data == (void*)g_interfaces.player2.GetData()) {
+    if (p2_old_char_data == (void*)TrainingSide::Dummy().GetData()) {
         return true;
     }
 
@@ -1161,10 +1131,10 @@ bool ScrWindow::EnsureDummyScriptFresh(bool allowReparse)
         return false;
     }
 
-    std::vector<scrState*> states = parse_scr(GetBbcfBaseAdress(), 2);
-    g_interfaces.player2.SetScrStates(states);
-    g_interfaces.player2.states = states;
-    p2_old_char_data = (void*)g_interfaces.player2.GetData();
+    std::vector<scrState*> states = parse_scr(GetBbcfBaseAdress(), TrainingSide::DummyPlayerNum());
+    TrainingSide::Dummy().SetScrStates(states);
+    TrainingSide::Dummy().states = states;
+    p2_old_char_data = (void*)TrainingSide::Dummy().GetData();
     for (auto& state : states) {
         if (state->name == "CmnActBurstBegin") {
             burst_action = state;
@@ -1207,10 +1177,10 @@ void ScrWindow::TickDummyActions()
     // because a character without the saved move must not be retried forever.
     {
         DummyActionManager& actions = DummyActionManager::Instance();
-        const void* charData = static_cast<const void*>(g_interfaces.player2.GetData());
-        if (!g_interfaces.player2.states.empty() && actions.NeedsAnimationResolve(charData))
+        const void* charData = static_cast<const void*>(TrainingSide::Dummy().GetData());
+        if (!TrainingSide::Dummy().states.empty() && actions.NeedsAnimationResolve(charData))
         {
-            actions.ResolveAnimations(g_interfaces.player2.states, charData);
+            actions.ResolveAnimations(TrainingSide::Dummy().states, charData);
         }
     }
 
@@ -1224,17 +1194,19 @@ void ScrWindow::TickDummyActions()
     // asks for it, rather than a loose toggle on a panel that no longer exists.
     bool wantNaotoEn = false;
     for (DummyActionManager::TriggerType trigger : DummyActionManager::TriggerOrder()) {
-        const DummyActionManager::Action& action = DummyActionManager::Instance().Get(trigger);
-        if (action.source == DummyActionManager::Source_Animation && action.naotoEnSpecials) {
-            wantNaotoEn = true;
-            break;
+        for (const DummyActionManager::Action& action : DummyActionManager::Instance().Get(trigger).actions) {
+            if (action.source == DummyActionManager::Source_Animation && action.naotoEnSpecials) {
+                wantNaotoEn = true;
+                break;
+            }
         }
+        if (wantNaotoEn) { break; }
     }
     if (wantNaotoEn) {
-        memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0x00000018, 4);
+        memset(&TrainingSide::Dummy().GetData()->slot2_or_slot4, 0x00000018, 4);
     }
     else if (wantNaotoEn != dummy_naoto_en_specials_old) {
-        memset(&g_interfaces.player2.GetData()->slot2_or_slot4, 0, 4);
+        memset(&TrainingSide::Dummy().GetData()->slot2_or_slot4, 0, 4);
     }
     dummy_naoto_en_specials_old = wantNaotoEn;
 

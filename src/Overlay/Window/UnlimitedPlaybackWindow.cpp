@@ -10,6 +10,7 @@
 #include "Core/HotkeyManager.h"
 #include "Overlay/Widget/HotkeyBindWidget.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
+#include "Game/TrainingSide.h"
 #include "Game/gamestates.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/Widget/TasPlaybackEditorView.h"
@@ -359,7 +360,7 @@ bool TrainingMatchAvailable() {
         (*g_gameVals.pGameMode == GameMode_Training) &&
         (*g_gameVals.pGameState == GameState_InMatch) &&
         (GetGameSceneStatus() >= GameSceneStatus_Running) &&
-        !g_interfaces.player2.IsCharDataNullPtr();
+        !TrainingSide::Dummy().IsCharDataNullPtr();
 }
 }
 
