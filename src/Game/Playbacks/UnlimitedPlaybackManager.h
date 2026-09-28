@@ -68,6 +68,12 @@ public:
         int lastTriggeredFrame = -999999;
         // Set when a delayed trigger is counting down; -1 when nothing is pending.
         int pendingFireFrame = -1;
+        // An animation action's own delay, which starts once the trigger has fired and
+        // picked it. Held by name and owner rather than as a scrState*, because the move
+        // list it came from can be re-parsed (or belong to someone else) by the time it runs.
+        int pendingAnimationFrame = -1;
+        std::string pendingAnimationName;
+        const void* pendingAnimationOwner = nullptr;
         // Flip the inputs when the dummy is on the other side from the one the action was
         // authored or recorded on. Per trigger, because one trigger may hold a
         // side-agnostic motion and another a corner-specific setup.
@@ -165,6 +171,9 @@ public:
     // it into an action. Reads the backup while the runtime has the slot borrowed, so it is
     // the user's recording and never the runtime's temporary playback.
     bool ReadSlotRecording(int slot, std::vector<char>* outRawFrames, bool* outFacingLeft) const;
+    // The same for a playback file on disk: its raw frames and facing, capped at what a slot
+    // can play. What the training file export embeds, so the file does not have to travel.
+    bool ReadPlaybackFileRecording(const std::string& path, std::vector<char>* outRawFrames, bool* outFacingLeft);
 
     // What each trigger's condition did on the most recent game frame, for the frame history
     // bar's markers. Computed every frame of a training match whether or not the trigger is
@@ -365,6 +374,9 @@ private:
     // Starts anything whose delay has run out, and drops a pending fire whose trigger was
     // disarmed or reconfigured while it was counting down.
     void ProcessPendingTriggerDelays(int currentFrame);
+    void ProcessPendingAnimationDelays(int currentFrame);
+    // The script jump an animation action performs, on whoever the dummy is now.
+    bool ForceDummyAnimation(const scrState* state);
     bool StartResolvedAction(TriggerType trigger, int currentFrame);
     bool TryFireTrigger(TriggerType trigger, int currentFrame);
     void ProcessLoopTick(int currentFrame);

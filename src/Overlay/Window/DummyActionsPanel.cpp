@@ -76,6 +76,9 @@ namespace
 	int g_animSelected = -1;
 	int g_animCategory = 3;   // 0 normals, 1 specials, 2 common, 3 all
 	int g_animDelay = 0;
+	// Set when the modal opens on an existing action: the first frame that has the move list
+	// highlights that action's move, so Done without touching the list keeps it.
+	bool g_animSelectFromDraft = false;
 	char g_animFilter[64] = "";
 	int g_pendingCfSlot = 1;
 	bool g_pendingCfSlotKeepCopy = false;
@@ -366,8 +369,11 @@ namespace
 			g_notationFrameCount = static_cast<int>(action.notationFrames.size());
 			break;
 		case Manager::Source_Animation:
+			// Highlighted from the saved name once the modal can see the move list; see
+			// g_animSelectFromDraft.
 			g_animSelected = -1;
-			g_animDelay = action.animationDelays.empty() ? 0 : action.animationDelays.back();
+			g_animSelectFromDraft = true;
+			g_animDelay = action.animationDelays.empty() ? 0 : action.animationDelays.front();
 			g_animFilter[0] = '\0';
 			break;
 		case Manager::Source_CfSlot:
@@ -1857,6 +1863,22 @@ namespace
 			ImGui::RadioButton(L(kCategories[i]).c_str(), &g_animCategory, i);
 		}
 
+		if (g_animSelectFromDraft)
+		{
+			g_animSelectFromDraft = false;
+			if (!action.animationNames.empty())
+			{
+				for (int i = 0; i < static_cast<int>(states.size()); ++i)
+				{
+					if (states[i] && states[i]->name == action.animationNames.front())
+					{
+						g_animSelected = i;
+						break;
+					}
+				}
+			}
+		}
+
 		std::vector<int> shown;
 		shown.reserve(states.size());
 		for (int i = 0; i < static_cast<int>(states.size()); ++i)
@@ -1909,26 +1931,6 @@ namespace
 		DrawStateDetails(selected);
 		ImGui::EndChild();
 
-		// What is already assigned, so building a random set is visible while you build it.
-		if (!action.animations.empty())
-		{
-			std::string current;
-			for (size_t i = 0; i < action.animations.size(); ++i)
-			{
-				if (i) { current += ", "; }
-				current += ScrStateNames::Display(action.animations[i]->name);
-				const int delay = i < action.animationDelays.size() ? action.animationDelays[i] : 0;
-				if (delay) { current += "+" + std::to_string(delay) + "f"; }
-			}
-			ImGui::TextUnformatted(FormatText(L("Set: %s").c_str(), current.c_str()).c_str());
-			ImGui::SameLine();
-			if (ImGui::SmallButton(L("Remove all").c_str()))
-			{
-				action.animations.clear();
-				action.animationDelays.clear();
-			}
-		}
-
 		// Lives here because it is what makes some of Naoto's own script states reachable at
 		// all, so it is part of choosing an animation rather than a setting of its own.
 		ImGui::Checkbox(L("Naoto: enable EN specials").c_str(), &action.naotoEnSpecials);
@@ -1943,24 +1945,9 @@ namespace
 			g_animDelay = 0;
 		}
 		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Frames to wait after the trigger before the dummy acts. Stored per move, so each move of a random set can wait a different amount.").c_str());
+		ImGui::ShowHelpMarker(L("Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.").c_str());
 
 		ImGui::VerticalSpacing(4);
-		if (!selected) { ImGui::BeginDisabled(); }
-		if (ImGui::Button(L("Use only this").c_str()) && selected)
-		{
-			action.animations.assign(1, selected);
-			action.animationDelays.assign(1, g_animDelay);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(L("Add to random set").c_str()) && selected)
-		{
-			action.animations.push_back(selected);
-			action.animationDelays.push_back(g_animDelay);
-		}
-		if (!selected) { ImGui::EndDisabled(); }
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("With more than one move in the set the dummy picks one at random every time the trigger fires.").c_str());
 
 		// Trying a move is how you find out it was the wrong one. Without this, seeing a move meant
 		// assigning it to a trigger, closing the window, and arranging for that trigger to fire -
@@ -1979,13 +1966,16 @@ namespace
 
 		EndModalBodyAndSeparate();
 		ImGui::VerticalSpacing(4);
-		const bool haveAny = !action.animations.empty();
-		if (!haveAny) { ImGui::BeginDisabled(); }
-		if (ImGui::Button(L("Done").c_str()) && haveAny)
+		// The highlighted move is the action; there is nothing to add it to first.
+		const bool haveMove = selected != nullptr;
+		if (!haveMove) { ImGui::BeginDisabled(); }
+		if (ImGui::Button(L("Done").c_str()) && haveMove)
 		{
+			action.animations.assign(1, selected);
+			action.animationDelays.assign(1, g_animDelay);
 			CommitModal();
 		}
-		if (!haveAny) { ImGui::EndDisabled(); }
+		if (!haveMove) { ImGui::EndDisabled(); }
 		ImGui::SameLine();
 		if (ImGui::Button(L("Cancel").c_str()))
 		{

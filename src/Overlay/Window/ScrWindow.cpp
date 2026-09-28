@@ -15,6 +15,7 @@
 #include "Core/utils.h"
 #include "Game/gamestates.h"
 #include "Game/TrainingSide.h"
+#include "Game/characters.h"
 #include "Game/ReplayStates/FrameState.h"
 #include "Game/ReplayFiles/ReplayFile.h"
 #include "Game/ReplayFiles/ReplayList.h"
@@ -1217,6 +1218,11 @@ void ScrWindow::TickDummyActions()
     // Naoto's EN specials need the flag held down, not toggled, so it is rewritten every
     // frame while on and cleared once on the way off. Driven by whichever animation action
     // asks for it, rather than a loose toggle on a panel that no longer exists.
+    //
+    // Only for Naoto. The field is his EN flag but it is the dash buffer on everyone else, so
+    // a Naoto lab loaded with another dummy must not write it - neither the flag nor the
+    // clear on the way off, which would land on whoever replaced him.
+    const bool dummyIsNaoto = TrainingSide::Dummy().GetData()->charIndex == CharIndex_Naoto;
     bool wantNaotoEn = false;
     for (DummyActionManager::TriggerType trigger : DummyActionManager::TriggerOrder()) {
         for (const DummyActionManager::Action& action : DummyActionManager::Instance().Get(trigger).actions) {
@@ -1227,10 +1233,11 @@ void ScrWindow::TickDummyActions()
         }
         if (wantNaotoEn) { break; }
     }
+    wantNaotoEn = wantNaotoEn && dummyIsNaoto;
     if (wantNaotoEn) {
         memset(&TrainingSide::Dummy().GetData()->slot2_or_slot4, 0x00000018, 4);
     }
-    else if (wantNaotoEn != dummy_naoto_en_specials_old) {
+    else if (wantNaotoEn != dummy_naoto_en_specials_old && dummyIsNaoto) {
         memset(&TrainingSide::Dummy().GetData()->slot2_or_slot4, 0, 4);
     }
     dummy_naoto_en_specials_old = wantNaotoEn;

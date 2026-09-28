@@ -573,6 +573,12 @@ void UnlimitedPlaybackManager::Tick() {
         m_timedPrevAction.clear();
         m_triggerEvents = {};
         m_triggerEventsFrame = -1;
+        // A move waiting out its delay belongs to the match that just ended.
+        for (TriggerConfig& config : m_triggers) {
+            config.pendingAnimationFrame = -1;
+            config.pendingAnimationName.clear();
+            config.pendingAnimationOwner = nullptr;
+        }
         m_timedWindowTrigger = -1;
         m_timedWindowState = nullptr;
         m_timedActionableFrame = -1;
@@ -655,6 +661,7 @@ void UnlimitedPlaybackManager::Tick() {
     }
 
     ProcessPendingTriggerDelays(frame);
+    ProcessPendingAnimationDelays(frame);
 
     // The loop used to be gated on Trigger_OnLoop being *armed* and then returned, so
     // merely having a loop action configured silently disabled all six other triggers -
@@ -724,6 +731,9 @@ void UnlimitedPlaybackManager::ResetTriggerRuntimeState(bool enableRuntime) {
         // A countdown left over from before the reset would fire into a match that has
         // moved on, so it goes with the rest of the runtime state.
         m_triggers[i].pendingFireFrame = -1;
+        m_triggers[i].pendingAnimationFrame = -1;
+        m_triggers[i].pendingAnimationName.clear();
+        m_triggers[i].pendingAnimationOwner = nullptr;
     }
 
     m_prevWakeupCondition = false;
@@ -1033,6 +1043,25 @@ bool UnlimitedPlaybackManager::ReadSlotRecording(int slot, std::vector<char>* ou
         *outRawFrames = pslot.get_slot_buffer_raw();
         *outFacingLeft = pslot.get_facing_direction() != 0;
     }
+    if (outRawFrames->size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
+        outRawFrames->resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
+    }
+    return !outRawFrames->empty();
+}
+
+bool UnlimitedPlaybackManager::ReadPlaybackFileRecording(const std::string& path,
+    std::vector<char>* outRawFrames, bool* outFacingLeft) {
+    if (!outRawFrames || !outFacingLeft || path.empty()) {
+        return false;
+    }
+    CachedPlayback playback;
+    // Forced, as when a File action plays it: the user already accepted any version
+    // mismatch when they picked the file.
+    if (!ReadPlaybackFile(path, &playback, true) || !playback.loaded) {
+        return false;
+    }
+    *outRawFrames = playback.frames;
+    *outFacingLeft = playback.facingLeft;
     if (outRawFrames->size() > static_cast<size_t>(kMaxFramesPerPlayback) * 2) {
         outRawFrames->resize(static_cast<size_t>(kMaxFramesPerPlayback) * 2);
     }
@@ -2300,6 +2329,9 @@ bool UnlimitedPlaybackManager::TryFireTrigger(TriggerType trigger, int currentFr
         reject = "not armed";
     } else if ((currentFrame - config.lastTriggeredFrame) < (std::max)(1, config.cooldownFrames)) {
         reject = "cooling down";
+    } else if (config.pendingAnimationFrame >= 0) {
+        // Firing again would replace the move that is still waiting out its delay.
+        reject = "an animation is still waiting on its delay";
     } else if (Settings::settingsIni.triggerTimingProbe) {
         // The probe owns the dummy's inputs; a trigger firing on top would corrupt both.
         reject = "the trigger timing probe is on (settings.ini TriggerTimingProbe)";
@@ -2375,21 +2407,63 @@ void UnlimitedPlaybackManager::ProcessPendingTriggerDelays(int currentFrame) {
     }
 }
 
+void UnlimitedPlaybackManager::ProcessPendingAnimationDelays(int currentFrame) {
+    for (int i = 0; i < Trigger_Count; ++i) {
+        TriggerConfig& config = m_triggers[i];
+        if (config.pendingAnimationFrame < 0 || currentFrame < config.pendingAnimationFrame) {
+            continue;
+        }
+        const std::string name = config.pendingAnimationName;
+        const void* owner = config.pendingAnimationOwner;
+        config.pendingAnimationFrame = -1;
+        config.pendingAnimationName.clear();
+        config.pendingAnimationOwner = nullptr;
+
+        // The dummy the move was picked for has to still be the dummy: a side swap or a
+        // replay takeover during the wait would otherwise send one character to a state
+        // looked up in someone else's script.
+        if (TrainingSide::Dummy().IsCharDataNullPtr()
+            || static_cast<const void*>(TrainingSide::Dummy().GetData()) != owner) {
+            LOG(1, "[UP] Dropped delayed animation '%s' on '%s': the dummy changed while it waited.\n",
+                name.c_str(), TriggerDisplayName(static_cast<TriggerType>(i)));
+            continue;
+        }
+        // Looked up again rather than kept as a pointer, for the same reason.
+        const scrState* state = nullptr;
+        for (const scrState* candidate : TrainingSide::Dummy().states) {
+            if (candidate && candidate->name == name) {
+                state = candidate;
+                break;
+            }
+        }
+        if (!ForceDummyAnimation(state)) {
+            LOG(1, "[UP] Dropped delayed animation '%s' on '%s': the move is no longer in the dummy's list.\n",
+                name.c_str(), TriggerDisplayName(static_cast<TriggerType>(i)));
+            continue;
+        }
+        LOG(1, "[UP] Delayed animation '%s' played on '%s'.\n",
+            name.c_str(), TriggerDisplayName(static_cast<TriggerType>(i)));
+    }
+}
+
+bool UnlimitedPlaybackManager::ForceDummyAnimation(const scrState* state) {
+    if (!state || !state->addr || TrainingSide::Dummy().IsCharDataNullPtr()) {
+        return false;
+    }
+    auto* dummy = TrainingSide::Dummy().GetData();
+    memcpy(&(dummy->nextScriptLineLocationInMemory), &(state->addr), 4);
+    dummy->frameCounterCurrentSprite = dummy->frameLengthCurrentSprite2 - 1;
+    return true;
+}
+
 // Preview one animation immediately. Deliberately not routed through StartResolvedAction: that
 // belongs to a trigger, updates its bookkeeping and reads its configured action. This is the bare
 // script jump - the same pair of writes the animation branch of StartResolvedAction performs - so
 // picking a move in the animation config window can show it without saving anything first.
 bool UnlimitedPlaybackManager::PlayAnimationNow(scrState* state) {
-    if (!state || !state->addr) {
+    if (!ForceDummyAnimation(state)) {
         return false;
     }
-    if (TrainingSide::Dummy().IsCharDataNullPtr()) {
-        return false;
-    }
-
-    auto* p2 = TrainingSide::Dummy().GetData();
-    memcpy(&(p2->nextScriptLineLocationInMemory), &(state->addr), 4);
-    p2->frameCounterCurrentSprite = p2->frameLengthCurrentSprite2 - 1;
 
     LOG(1, "[UP] Previewed animation '%s' on the dummy.\n", state->name.c_str());
     PushToast(FormatLocalized("Playing: %s", ScrStateNames::Display(state->name).c_str()));
@@ -2455,9 +2529,24 @@ bool UnlimitedPlaybackManager::ExecuteResolvedAction(TriggerType trigger, Resolv
             // burst come out of hitstun rather than being cut short by it.
             memcpy(&(p2->set_action_override), &(resolved.animation->name[0]), 20);
         }
+        else if (resolved.animationDelayFrames > 0) {
+            // The action's own delay starts now that the trigger has fired and picked it,
+            // after any delay the trigger itself has. The move is played by
+            // ProcessPendingAnimationDelays.
+            config.pendingAnimationFrame = currentFrame + resolved.animationDelayFrames;
+            config.pendingAnimationName = resolved.animation->name;
+            config.pendingAnimationOwner = static_cast<const void*>(p2);
+            config.lastTriggeredFrame = currentFrame;
+            config.lastFiredMs = GetTickCount64();
+            m_triggerEvents[trigger].fired = true;
+            LOG(1, "[UP] Trigger queued animation '%s' in %d frame(s) trigger='%s'\n",
+                resolved.name.c_str(), resolved.animationDelayFrames, TriggerDisplayName(trigger));
+            PushToast(FormatLocalized("Triggered [%s]: %s in %df",
+                TriggerDisplayName(trigger), resolved.name.c_str(), resolved.animationDelayFrames));
+            return true;
+        }
         else {
-            memcpy(&(p2->nextScriptLineLocationInMemory), &(resolved.animation->addr), 4);
-            p2->frameCounterCurrentSprite = p2->frameLengthCurrentSprite2 - 1;
+            ForceDummyAnimation(resolved.animation);
         }
         config.lastTriggeredFrame = currentFrame;
         config.lastFiredMs = GetTickCount64();
@@ -2630,6 +2719,14 @@ bool UnlimitedPlaybackManager::ResolveTriggerAction(TriggerType trigger, Resolve
     case DummyActionManager::Source_Animation:
     {
         if (action.animations.empty()) {
+            return false;
+        }
+        // The pointers belong to whichever dummy they were last matched against. The re-match
+        // after a side swap runs from the overlay's tick, not this one, so for a frame they
+        // can still point into the other character's script - refuse rather than use them.
+        if (!actions.AnimationsResolvedFor(TrainingSide::Dummy().GetData())) {
+            LOG(1, "[UP] Animation on '%s' skipped: its moves are not matched against this dummy yet.\n",
+                TriggerDisplayName(trigger));
             return false;
         }
         // More than one and the dummy picks at random, which is what the old panel did for

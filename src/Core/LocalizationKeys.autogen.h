@@ -4929,9 +4929,6 @@ struct LocalizationKeysAccessor
         // Writes the current setup to a file you choose.
         inline const char* Writes_the_current_setup_to_a_file_you_choose() const { return Get("Writes the current setup to a file you choose."); }
 
-        // Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.
-        inline const char* Replaces_the_current_setup_with_the_one_in_a_file_Captured_recordings_travel_inside_the_file_a_playback_file_or_CF_slot_an_action_points_at_has_to_exist_on_this_machine() const { return Get("Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine."); }
-
         // Reset all to defaults
         inline const char* Reset_all_to_defaults() const { return Get("Reset all to defaults"); }
 
@@ -5003,6 +5000,36 @@ struct LocalizationKeysAccessor
 
         // On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left.
         inline const char* On_this_frame_actionTime_d_Newest_frame_on_the_left_and_each_marker_sits_on_its_own_frame_s_square_Fired_is_the_first_frame_the_inputs_are_applied_with_a_N_delay_the_first_actionable_square_is_N_squares_to_its_left() const { return Get("On this frame: actionTime %d. Newest frame on the left, and each marker sits on its own frame's square. Fired is the first frame the inputs are applied; with a -N delay the first actionable square is N squares to its left."); }
+
+        // Replaces the current setup with the one in a file. Everything an action plays travels inside the file - playback files and CF slots are packed in as recordings when it is exported.
+        inline const char* Replaces_the_current_setup_with_the_one_in_a_file_Everything_an_action_plays_travels_inside_the_file_playback_files_and_CF_slots_are_packed_in_as_recordings_when_it_is_exported() const { return Get("Replaces the current setup with the one in a file. Everything an action plays travels inside the file - playback files and CF slots are packed in as recordings when it is exported."); }
+
+        // Triggered [%s]: %s in %df
+        inline const char* Triggered_s_s_in_df() const { return Get("Triggered [%s]: %s in %df"); }
+
+        // (picked on %s)
+        inline const char* picked_on_s() const { return Get("(picked on %s)"); }
+
+        // %s: could not read %s
+        inline const char* s_could_not_read_s() const { return Get("%s: could not read %s"); }
+
+        // %s: slot %d is empty
+        inline const char* s_slot_d_is_empty() const { return Get("%s: slot %d is empty"); }
+
+        // Packed in: %d playback file(s) and %d CF slot(s), so the file works on its own.
+        inline const char* Packed_in_d_playback_file_s_and_d_CF_slot_s_so_the_file_works_on_its_own() const { return Get("Packed in: %d playback file(s) and %d CF slot(s), so the file works on its own."); }
+
+        // Left out, nothing to pack in:
+        inline const char* Left_out_nothing_to_pack_in() const { return Get("Left out, nothing to pack in:"); }
+
+        // Animations in this file were picked on: %s.
+        inline const char* Animations_in_this_file_were_picked_on_s() const { return Get("Animations in this file were picked on: %s."); }
+
+        // Your dummy is %s, so those moves may be missing or be %s's version.
+        inline const char* Your_dummy_is_s_so_those_moves_may_be_missing_or_be_s_s_version() const { return Get("Your dummy is %s, so those moves may be missing or be %s's version."); }
+
+        // Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.
+        inline const char* Frames_to_wait_once_the_trigger_has_fired_and_picked_this_action_before_the_dummy_does_the_move_Comes_on_top_of_the_trigger_s_own_delay_For_several_moves_on_one_trigger_add_one_action_per_move() const { return Get("Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move."); }
 };
 
 

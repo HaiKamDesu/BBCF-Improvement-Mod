@@ -10,6 +10,8 @@
 #include "Core/Localization.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
+#include "Game/TrainingSide.h"
+#include "Game/characters.h"
 #include "Overlay/imgui_utils.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 #include "Overlay/Window/DummyActionsPanel.h"
@@ -103,6 +105,32 @@ namespace
 		Settings::changeSetting("TrainingInputDelayIgnoreWhenFrozen", "1");
 	}
 
+	// Which characters the file's animation actions were picked on, and whether the dummy is
+	// one of them. A heads-up only: a lab can hold moves for several characters on purpose,
+	// and a move a dummy does not have is simply skipped. The one that matters is a shared
+	// name like 5B, which plays on anyone - the row says whose it was too.
+	std::string AnimationCharacterNote(const std::vector<std::string>& characters)
+	{
+		if (characters.empty()) { return std::string(); }
+		std::string list;
+		for (size_t i = 0; i < characters.size(); ++i)
+		{
+			if (i) { list += ", "; }
+			list += characters[i];
+		}
+		std::string note = "\n" + FormatText(L("Animations in this file were picked on: %s.").c_str(), list.c_str());
+		if (!TrainingSide::Dummy().IsCharDataNullPtr())
+		{
+			const std::string& dummy = getCharacterNameByIndexA(TrainingSide::Dummy().GetData()->charIndex);
+			if (std::find(characters.begin(), characters.end(), dummy) == characters.end())
+			{
+				note += " " + FormatText(L("Your dummy is %s, so those moves may be missing or be %s's version.").c_str(),
+					dummy.c_str(), dummy.c_str());
+			}
+		}
+		return note;
+	}
+
 	void BeginTrainingFilePick(bool saving)
 	{
 		if (NativeFileDialog::IsOpen()) { return; }
@@ -131,12 +159,34 @@ namespace
 		if (g_trainingFileSaving)
 		{
 			const DummyActionManager::Extras extras = CollectTrainingExtras(scr);
-			const bool ok = actions.ExportTo(result.path, &extras);
-			g_trainingFileStatusIsError = !ok;
-			g_trainingFileStatus = ok
-				? FormatText(L("Saved to %s").c_str(), result.path.c_str())
-				: FormatText(L("Could not write %s").c_str(), result.path.c_str());
-			LOG(1, "[TrainingFile] export %s -> '%s'\n", ok ? "ok" : "FAILED", result.path.c_str());
+			DummyActionManager::ExportReport report;
+			const bool ok = actions.ExportTo(result.path, &extras, &report);
+			g_trainingFileStatusIsError = !ok || !report.skipped.empty();
+			if (!ok)
+			{
+				g_trainingFileStatus = FormatText(L("Could not write %s").c_str(), result.path.c_str());
+			}
+			else
+			{
+				g_trainingFileStatus = FormatText(L("Saved to %s").c_str(), result.path.c_str());
+				if (report.embeddedFiles + report.frozenSlots > 0)
+				{
+					g_trainingFileStatus += "\n" + FormatText(
+						L("Packed in: %d playback file(s) and %d CF slot(s), so the file works on its own.").c_str(),
+						report.embeddedFiles, report.frozenSlots);
+				}
+				if (!report.skipped.empty())
+				{
+					g_trainingFileStatus += "\n" + L("Left out, nothing to pack in:");
+					for (const std::string& line : report.skipped)
+					{
+						g_trainingFileStatus += "\n  " + line;
+					}
+				}
+			}
+			LOG(1, "[TrainingFile] export %s -> '%s' files=%d slots=%d skipped=%u\n", ok ? "ok" : "FAILED",
+				result.path.c_str(), report.embeddedFiles, report.frozenSlots,
+				static_cast<unsigned int>(report.skipped.size()));
 		}
 		else
 		{
@@ -150,6 +200,10 @@ namespace
 			g_trainingFileStatus = ok
 				? FormatText(L("Loaded %s: %d trigger(s)").c_str(), result.path.c_str(), actions.AssignedCount())
 				: FormatText(L("Could not read %s").c_str(), result.path.c_str());
+			if (ok)
+			{
+				g_trainingFileStatus += AnimationCharacterNote(actions.AnimationCharacters());
+			}
 			LOG(1, "[TrainingFile] import %s <- '%s'\n", ok ? "ok" : "FAILED", result.path.c_str());
 		}
 	}
@@ -170,7 +224,7 @@ namespace
 		{
 			BeginTrainingFilePick(false);
 		}
-		ImGui::ShowHelpMarkerSameLine(L("Replaces the current setup with the one in a file. Captured recordings travel inside the file; a playback file or CF slot an action points at has to exist on this machine.").c_str());
+		ImGui::ShowHelpMarkerSameLine(L("Replaces the current setup with the one in a file. Everything an action plays travels inside the file - playback files and CF slots are packed in as recordings when it is exported.").c_str());
 		ImGui::SameLine(0.0f, 12.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.45f, 0.45f, 1.0f));
 		const bool resetPressed = ImGui::Button(L("Reset all to defaults").c_str());

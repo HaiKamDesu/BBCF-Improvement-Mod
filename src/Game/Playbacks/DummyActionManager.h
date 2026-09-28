@@ -48,7 +48,7 @@ public:
 		Source_Library,       // LEGACY - a named Playback Library. Read from old files and
 		                      // unpacked into Source_Recording actions; never created anew.
 		Source_File,          // one playback file
-		Source_Animation,     // one or more of the dummy's own script states
+		Source_Animation,     // one of the dummy's own script states
 		Source_CfSlot,        // one of the game's four recording slots, read live
 		Source_Burst,         // burst out of it, On Hitstun (Trigger_OnHit) only
 		Source_Recording,     // a copy of a recording slot taken when the action was added
@@ -72,14 +72,23 @@ public:
 		std::string filePath;
 		std::string fileName;
 
-		// Source_Animation. A pool, matching what the old panel could do: more than one and
-		// the dummy picks at random. Delays are per entry.
+		// Source_Animation. One move and the frames to wait, once the trigger has fired and
+		// picked this action, before forcing it. Several moves on one trigger are several
+		// actions, picked between like any other list; a file from when an action could hold
+		// a random set of its own is split into one action per move on load. Kept as vectors
+		// so that load can read the old layout, but the picker only ever writes one entry.
 		std::vector<scrState*> animations;
 		std::vector<int> animationDelays;
 		// The same moves by name. A scrState* points into one character's script memory, so
 		// it cannot survive a character swap, let alone a restart - the names are what is
 		// saved to disk and what the pointers are rebuilt from after every parse.
 		std::vector<std::string> animationNames;
+		// Who the dummy was when the move was picked, by name. Move names are shared across
+		// the cast ("NmlAtk5B" is everyone's 5B), so a name matching is not proof it is the
+		// move that was meant - this is what lets a row or an import say "picked on Kokonoe".
+		// Only a warning: a lab can hold moves for several characters on purpose. Empty for
+		// actions saved before it was recorded.
+		std::string animationCharacter;
 
 		// Source_Library (legacy, load-time only).
 		std::string libraryPath;
@@ -207,6 +216,14 @@ public:
 	// character's script memory, so they cannot outlive it. The names are kept.
 	void InvalidateAnimations();
 
+	// Whether the animation pointers were last matched against this dummy. False for the
+	// frame or so between the dummy changing and the re-match, when they still point into
+	// the previous character's script.
+	bool AnimationsResolvedFor(const void* charData) const { return charData && m_resolvedForCharData == charData; }
+
+	// Every character an animation action was picked on, once each, in trigger order.
+	std::vector<std::string> AnimationCharacters() const;
+
 	// Rebuilds those pointers from the saved names against a parsed state list. A move the
 	// current character does not have is dropped, along with its delay.
 	//
@@ -234,8 +251,21 @@ public:
 	// The training file carries more than the dummy: extras is a flat key=value list the
 	// caller owns (positions, wake-up timing, input delay), written under a [training]
 	// section and handed back on import. This class does not interpret them.
+	//
+	// An export is self-contained: an action that reads a playback file or a CF slot on
+	// this machine is written as a captured recording of what that file or slot holds right
+	// now, so the recipient plays exactly what the author did and nothing points at a path
+	// or a slot of theirs. The live table is not changed. One that cannot be read (a file
+	// that is gone, an empty slot) is left out and named in the report.
 	using Extras = std::vector<std::pair<std::string, std::string>>;
-	bool ExportTo(const std::string& path, const Extras* extras = nullptr) const;
+	struct ExportReport
+	{
+		int embeddedFiles = 0;
+		int frozenSlots = 0;
+		// "On Wakeup: slot 2 is empty", one per action left out.
+		std::vector<std::string> skipped;
+	};
+	bool ExportTo(const std::string& path, const Extras* extras = nullptr, ExportReport* report = nullptr) const;
 	bool ImportFrom(const std::string& path, Extras* extrasOut = nullptr);
 
 	// Everything back to how a fresh install has it: no triggers, default firing settings,
@@ -251,13 +281,14 @@ public:
 private:
 	DummyActionManager() = default;
 
-	bool WriteTo(const std::string& path, bool includeUiSizes, const Extras* extras) const;
+	using TriggerTable = std::array<Trigger, UnlimitedPlaybackManager::Trigger_Count>;
+	bool WriteTo(const std::string& path, const TriggerTable& triggers, bool includeUiSizes, const Extras* extras) const;
 	bool ReadFrom(const std::string& path, bool includeUiSizes, Extras* extrasOut);
 	// Wipes the table and the per-trigger firing settings that live in
 	// UnlimitedPlaybackManager, without saving. What Load and Import start from.
 	void ResetInMemory();
 
-	std::array<Trigger, UnlimitedPlaybackManager::Trigger_Count> m_triggers;
+	TriggerTable m_triggers;
 	// Picking bookkeeping, per trigger: where a sequential pick is up to, and which actions
 	// a no-repeat pick has not yet used this round.
 	std::array<size_t, UnlimitedPlaybackManager::Trigger_Count> m_sequentialIndex = {};

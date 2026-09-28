@@ -4,6 +4,8 @@
 #include "Core/utils.h"
 #include "Game/Scr/ScrStateNames.h"
 #include "Game/TasManager.h"
+#include "Game/TrainingSide.h"
+#include "Game/characters.h"
 #include "Core/logger.h"
 
 #include <algorithm>
@@ -160,6 +162,9 @@ namespace
 	// yet - deriving from an empty list wiped exactly the names that had just been read,
 	// which is why a saved animation action came back as "no move picked" and would have
 	// been written back out empty on the next save.
+	//
+	// The same moment says whose moves they are: they came out of the dummy's list, so the
+	// dummy is who they were picked on.
 	void DeriveAnimationNames(DummyActionManager::Action& stored)
 	{
 		if (stored.source == DummyActionManager::Source_Animation && !stored.animations.empty())
@@ -170,7 +175,22 @@ namespace
 			{
 				stored.animationNames.push_back(state ? state->name : std::string());
 			}
+			if (!TrainingSide::Dummy().IsCharDataNullPtr())
+			{
+				stored.animationCharacter = getCharacterNameByIndexA(TrainingSide::Dummy().GetData()->charIndex);
+			}
 		}
+	}
+
+	// Who the dummy is right now, by the same name animationCharacter is stored under.
+	// Empty when there is no dummy to ask.
+	std::string CurrentDummyCharacter()
+	{
+		if (TrainingSide::Dummy().IsCharDataNullPtr())
+		{
+			return std::string();
+		}
+		return getCharacterNameByIndexA(TrainingSide::Dummy().GetData()->charIndex);
 	}
 }
 
@@ -501,7 +521,12 @@ std::string DummyActionManager::ActionSummary(const Action& action)
 				if (i) { missing += ", "; }
 				missing += ScrStateNames::Display(action.animationNames[i]);
 			}
-			return missing + "  " + L("(this character has no such move)");
+			missing += "  " + L("(this character has no such move)");
+			if (!action.animationCharacter.empty())
+			{
+				missing += "  " + FormatText(L("(picked on %s)").c_str(), action.animationCharacter.c_str());
+			}
+			return missing;
 		}
 		std::string summary;
 		for (size_t i = 0; i < action.animations.size(); ++i)
@@ -511,10 +536,12 @@ std::string DummyActionManager::ActionSummary(const Action& action)
 			const int delay = i < action.animationDelays.size() ? action.animationDelays[i] : 0;
 			if (delay) { summary += "+" + std::to_string(delay) + "f"; }
 		}
-		if (action.animations.size() > 1)
+		// The name matched, but a shared name like a 5B matches on anyone - say whose it was
+		// meant to be, so a lab loaded onto another dummy does not pass for the real thing.
+		const std::string current = CurrentDummyCharacter();
+		if (!action.animationCharacter.empty() && !current.empty() && action.animationCharacter != current)
 		{
-			summary += "  ";
-			summary += L("(random)");
+			summary += "  " + FormatText(L("(picked on %s)").c_str(), action.animationCharacter.c_str());
 		}
 		return summary;
 	}
@@ -703,6 +730,19 @@ namespace
 		return at == std::string::npos ? path : path.substr(at + 1);
 	}
 
+	// One line of any length, newline included. False at the end of the file.
+	bool ReadWholeLine(FILE* file, std::string* out)
+	{
+		out->clear();
+		char chunk[4096];
+		while (fgets(chunk, sizeof(chunk), file))
+		{
+			out->append(chunk);
+			if (!out->empty() && out->back() == '\n') { return true; }
+		}
+		return !out->empty();
+	}
+
 	// Notation is re-parsed rather than stored as bytes, so a change to the parser cannot
 	// leave a stale buffer behind.
 	void ReparseNotation(DummyActionManager::Action& action)
@@ -741,12 +781,98 @@ void DummyActionManager::Save() const
 		// it would be pointless at best.
 		return;
 	}
-	WriteTo(DummyActionsFilePath(), true, nullptr);
+	WriteTo(DummyActionsFilePath(), m_triggers, true, nullptr);
 }
 
-bool DummyActionManager::ExportTo(const std::string& path, const Extras* extras) const
+bool DummyActionManager::ExportTo(const std::string& path, const Extras* extras, ExportReport* report) const
 {
-	return WriteTo(path, false, extras);
+	ExportReport local;
+	ExportReport& out = report ? *report : local;
+	out = ExportReport{};
+
+	// A copy, so turning file and slot actions into recordings for the file leaves the lab
+	// here exactly as it was.
+	TriggerTable portable = m_triggers;
+	UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
+	for (TriggerType trigger : TriggerOrder())
+	{
+		std::vector<Action>& actions = portable[trigger].actions;
+		for (size_t i = 0; i < actions.size();)
+		{
+			Action& action = actions[i];
+			if (action.source != Source_File && action.source != Source_CfSlot)
+			{
+				++i;
+				continue;
+			}
+
+			std::vector<char> frames;
+			bool facingLeft = false;
+			bool read = false;
+			std::string name;
+			if (action.source == Source_File)
+			{
+				read = playback.ReadPlaybackFileRecording(action.filePath, &frames, &facingLeft);
+				name = action.fileName.empty() ? LeafOf(action.filePath) : action.fileName;
+				if (!read)
+				{
+					out.skipped.push_back(FormatText(L("%s: could not read %s").c_str(),
+						TriggerLabel(trigger), name.c_str()));
+				}
+			}
+			else
+			{
+				read = playback.ReadSlotRecording(action.cfSlot, &frames, &facingLeft);
+				name = FormatText(L("Slot %d").c_str(), action.cfSlot);
+				if (!read)
+				{
+					out.skipped.push_back(FormatText(L("%s: slot %d is empty").c_str(),
+						TriggerLabel(trigger), action.cfSlot));
+				}
+			}
+
+			if (!read)
+			{
+				LOG(1, "[DummyActions] export: leaving out %s action on %s - nothing to embed\n",
+					SourceLabel(action.source), TriggerLabel(trigger));
+				actions.erase(actions.begin() + i);
+				continue;
+			}
+
+			(action.source == Source_File ? out.embeddedFiles : out.frozenSlots)++;
+			const int slot = action.source == Source_CfSlot ? action.cfSlot : 1;
+			const bool enabled = action.enabled;
+			action = Action{};
+			action.enabled = enabled;
+			action.source = Source_Recording;
+			action.cfSlot = slot;
+			action.recordingFrames = std::move(frames);
+			action.recordingFacingLeft = facingLeft;
+			action.recordingName = name;
+			++i;
+		}
+		// Every action left out: the trigger has nothing to carry, so it is not written.
+		if (actions.empty()) { portable[trigger] = Trigger{}; }
+	}
+
+	return WriteTo(path, portable, false, extras);
+}
+
+std::vector<std::string> DummyActionManager::AnimationCharacters() const
+{
+	std::vector<std::string> names;
+	for (TriggerType trigger : TriggerOrder())
+	{
+		for (const Action& action : Get(trigger).actions)
+		{
+			if (action.source != Source_Animation || action.animationCharacter.empty()) { continue; }
+			if (std::find(names.begin(), names.end(), action.animationCharacter) == names.end())
+			{
+				names.push_back(action.animationCharacter);
+			}
+		}
+	}
+	return names;
 }
 
 void DummyActionManager::ResetToDefaults()
@@ -761,7 +887,8 @@ void DummyActionManager::ResetToDefaults()
 	Save();
 }
 
-bool DummyActionManager::WriteTo(const std::string& path, bool includeUiSizes, const Extras* extras) const
+bool DummyActionManager::WriteTo(const std::string& path, const TriggerTable& triggers, bool includeUiSizes,
+	const Extras* extras) const
 {
 	FILE* file = nullptr;
 	if (fopen_s(&file, path.c_str(), "w") != 0 || !file)
@@ -777,7 +904,7 @@ bool DummyActionManager::WriteTo(const std::string& path, bool includeUiSizes, c
 	const UnlimitedPlaybackManager& playback = UnlimitedPlaybackManager::Instance();
 	for (TriggerType trigger : TriggerOrder())
 	{
-		const Trigger& slot = Get(trigger);
+		const Trigger& slot = triggers[trigger];
 		if (slot.actions.empty()) { continue; }
 
 		const UnlimitedPlaybackManager::TriggerConfig& config = playback.GetTrigger(trigger);
@@ -823,6 +950,10 @@ bool DummyActionManager::WriteTo(const std::string& path, bool includeUiSizes, c
 				}
 				fprintf(file, "movedelays=%s\n", JoinList(delays).c_str());
 				fprintf(file, "naoto=%d\n", action.naotoEnSpecials ? 1 : 0);
+				if (!action.animationCharacter.empty())
+				{
+					fprintf(file, "character=%s\n", action.animationCharacter.c_str());
+				}
 				break;
 			}
 			default:
@@ -954,14 +1085,33 @@ bool DummyActionManager::ReadFrom(const std::string& path, bool includeUiSizes, 
 		{
 			action.fileName = LeafOf(action.filePath);
 		}
+		if (action.source == Source_Animation && action.animationNames.size() > 1)
+		{
+			// From when one action held a random set of moves. The trigger's own list is
+			// that set now, so each move becomes an action of its own with its own delay;
+			// the trigger's selection defaults to random, which is what the set did.
+			LOG(1, "[DummyActions] splitting a %u-move animation action on %s into one action per move\n",
+				static_cast<unsigned int>(action.animationNames.size()), TriggerLabel(trigger));
+			for (size_t m = 0; m < action.animationNames.size(); ++m)
+			{
+				Action one = action;
+				one.animationNames.assign(1, action.animationNames[m]);
+				one.animationDelays.assign(1, m < action.animationDelays.size() ? action.animationDelays[m] : 0);
+				Add(trigger, one);
+			}
+			action = Action{};
+			return;
+		}
 		Add(trigger, action);
 		action = Action{};
 	};
 
-	char line[8192];
-	while (fgets(line, sizeof(line), file))
+	// Read whole lines however long they are. A captured recording is one hex line, and a
+	// fixed buffer cut long ones short without a word - the rest of the line was then read
+	// as a line of its own, had no '=', and was dropped.
+	std::string text;
+	while (ReadWholeLine(file, &text))
 	{
-		std::string text(line);
 		while (!text.empty() && (text.back() == '\n' || text.back() == '\r'))
 		{
 			text.pop_back();
@@ -1082,6 +1232,7 @@ bool DummyActionManager::ReadFrom(const std::string& path, bool includeUiSizes, 
 		else if (key == "facing")   { action.recordingFacingLeft = atoi(value.c_str()) != 0; }
 		else if (key == "frames")   { action.recordingFrames = FromHex(value); }
 		else if (key == "naoto")    { action.naotoEnSpecials = atoi(value.c_str()) != 0; }
+		else if (key == "character"){ action.animationCharacter = value; }
 		else if (key == "moves")    { action.animationNames = SplitList(value); }
 		else if (key == "movedelays")
 		{
