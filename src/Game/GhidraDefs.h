@@ -498,6 +498,8 @@ static constexpr uintptr_t ADDR_InputDevice_PackBattleWord = 0x000968E0;
 // re-read and transcribed in full 2026-09-12). ActionIDs are the small ints
 // pushed to the check wrappers below (5=menu confirm 0x4000000, 6=reset
 // positions 0x8000000, 7-10=up/down/left/right 1/4/8/2, 11=B 0x8000,
+// (8=down/9=left/10=right confirmed 2026-09-27 by FUN_006D2D40, the training
+// reset's direction rule: it treats ID 8 as centre and mirrors IDs 9/10 for P2 side),
 // 12=D 0x1000, 13=C 0x2000, 14=A 0x4000, 16=taunt 0x20000, 18=special 0x80000,
 // replay-shortcut ids 0x0B-0x14 map to 0x10000..0x200000 range; ids 21-24 are a
 // second direction group at bits 8-11, unbound on keyboard).
@@ -524,17 +526,64 @@ static constexpr uintptr_t ADDR_ControllerWrapper_MaskJustPressed = 0x000640E0;
 // (engine object from FUN_0047E860, the same object whose +0x108 is gameMode)
 static constexpr uintptr_t ADDR_GetControllerWrapperById = 0x0007E7B0;
 
-// Training/round reset execution (verified, binding-agnostic hook points):
-// OBJ_CBase/OBJ_CCharBase script-command vtable slot 1066 (byte offset 0x10A8;
-// vtables at .rdata 0x9509E4 / 0x9565F4). FUN_0058F390 / FUN_0058F4D0 /
-// FUN_0058F610 are three restart variants; each first clears flag bit
-// 0x4000000 in *(battleScene+0x62B7C) (battleScene from FUN_0055C540), then
-// restarts the round-flow task container at 0xEC2F98 (task base class:
-// +0x8=state, +0xC=frame counter - FUN_004D23E0 sets state=2/frame=0, which
-// is why the in-match frame counter jumps back on training reset).
-static constexpr uintptr_t ADDR_RoundRestart_VariantA = 0x0018F390;
-static constexpr uintptr_t ADDR_RoundRestart_VariantB = 0x0018F4D0;
-static constexpr uintptr_t ADDR_RoundRestart_VariantC = 0x0018F610; // vtable slot 1066
+
+// CORRECTION 2026-09-27: the three "restart variants" below are NOT the training
+// reset. Tadatys' symbol dump names them OBJ_CBase::bbcmd_30014_EndTimestopEffect
+// (0x18F390), bbcmd_30015_StopTimestopEffect (0x18F4D0) and
+// bbcmd_30013_TimestopEffect (0x18F610); they are only referenced from the
+// script-command vtables (.rdata 0x951A8C.. / 0x95769C..) and the task at
+// 0xEC2F98 they restart is the timestop effect's. Kept so old notes still
+// resolve; do not hook them for reset work. The real reset path is below.
+static constexpr uintptr_t ADDR_TimestopEffect_End = 0x0018F390;   // was ADDR_RoundRestart_VariantA
+static constexpr uintptr_t ADDR_TimestopEffect_Stop = 0x0018F4D0;  // was ADDR_RoundRestart_VariantB
+static constexpr uintptr_t ADDR_TimestopEffect_Begin = 0x0018F610; // was ADDR_RoundRestart_VariantC
+
+// Training "reset positions" (RE 2026-09-27, docs/Research/ResetLabOverride.md).
+// MatchInfo::update_Fight (FUN_0055F780) -> training branch FUN_00560FC0 ->
+// FUN_0055EF40 "reset requested?": for P1 and P2 it tests the reset action bit
+// (0x8000000, just-pressed) on that player's controller via FUN_00496620 and,
+// if any pressed, calls FUN_006D2D40 and then starts the reset fade.
+// FUN_006D2D40 is the WHOLE held-direction rule: it reads action IDs 9/10/8
+// (left/right/down; 9 and 10 swapped when localPlayer(engine+0x1688) is P2 XOR
+// sides are swapped (FUN_0047E790)) with FUN_004966A0 and writes the training
+// menu item "TRI_ResetPosition" (= 2 for ID 9, 1 for ID 10, 0 = centre for ID
+// 8; nothing when no direction is held, so the previous value is sticky) via
+// FUN_006CD5C0(nameHandle, value) -> FUN_006CD700. Up (ID 7) is never read.
+static constexpr uintptr_t ADDR_TrainingResetRequested = 0x0015EF40;       // FUN_0055EF40
+static constexpr uintptr_t ADDR_TrainingResetDirectionToMenu = 0x002D2D40; // FUN_006D2D40, hooked at entry (6 bytes)
+// How FUN_006D2D40 reads a direction (RE 2026-09-27, ResetDirectionSourceGhidraReport.txt):
+// FUN_004966A0(ctrlId, actionId, keyconfigName) -> FUN_0047E7B0(ctrlId) = one of the two
+// GAME_SynthKeyControler wrappers (FUN_00464410; index 0/1) -> FUN_00464170(actionId):
+// for each of the wrapper's devices, FUN_004964E0 = maskTable[actionId] & [device+0x20]->+0xC,
+// ORed. The mod's hook reads directions with exactly that chain for the training player's
+// controller (engine[0x25F4 + (engine+0x1688)*4]). The packed battle-input word
+// (BattleInputWrite hook, FUN_00559FE0 <- task FUN_0056AFF0, vtable 0x94FC78) is NOT usable
+// at the hook: it was neutral on every logged reset press (docs/Research/ResetLabOverride.md).
+// Training menu-item table walked by FUN_006CD5C0: entries of 0x38 bytes. An entry's
+// BASE is 0x17AE3A8 + i*0x38 (the "this" both the setter and the reader get: see the
+// `lea ecx,[eax*8+017AE3A8h]` at 0x6CD628 and `lea eax,[ecx*8+017AE3A8h]` at 0x6D369B).
+// Relative to that base: +0x00 int "in use" (must be 1), +0x04 flag word, +0x14 the
+// C-string item name ("TRI_ResetPosition"; the walk compares names at 0x17AE3BC + i*0x38),
+// +0x34 value-slot index. FUN_006CD700 (thiscall this=BASE, value) is the setter: it writes
+// optData(FUN_004B9700)+0xA568+idx*4, or +0xBBB8/BC/C0/C4 when flag 4/8/0x10/0x20 is set.
+// FUN_006CC0F0 is the matching reader (same offsets, same this).
+// CORRECTION 2026-09-27: an earlier note put the flags and index relative to the NAME
+// (name+4, name+0x34). The mod's first write used that and passed the name as "this", so
+// [this+4] was the string's "Rese" - 'R' = 0x52 has bit 0x10 - and the value landed in
+// optData+0xBBC0, a different option, never in TRI_ResetPosition. Do not walk the table
+// ourselves: call FUN_006CD5C0 / FUN_006CBF90 with the 32-byte name, as the game does.
+static constexpr uintptr_t ADDR_TrainingMenuItemTable = 0x013AE3BC;     // first NAME, not base
+static constexpr uintptr_t ADDR_TrainingMenuItemTableEnd = 0x013B009B;
+static constexpr uintptr_t TRAINING_MENU_ITEM_STRIDE = 0x38;
+static constexpr uintptr_t ADDR_TrainingMenuItem_SetValue = 0x002CD700;   // FUN_006CD700 thiscall(base, value)
+// FUN_006CD5C0 __stdcall(const char name[32], int value): find by name, call the setter.
+// This is exactly the call FUN_006D2D40 makes (0x6D2E13..0x6D2E1C).
+static constexpr uintptr_t ADDR_TrainingMenuItem_SetByName = 0x002CD5C0;
+// FUN_006CBF90 __stdcall(const char name[32]) -> int: read by name (sorted lookup
+// FUN_006D3510, then FUN_006CC0F0). What FUN_006CBFE0 uses to read TRI_ResetPosition.
+static constexpr uintptr_t ADDR_TrainingMenuItem_GetByName = 0x002CBF90;
+// FUN_006CBFE0 is the reader that turns TRI_ResetPosition into a side at reset.
+static constexpr uintptr_t ADDR_TrainingResetPositionApply = 0x002CBFE0;
 // Round-end/reset fade flag word: *(battleScene+0x62B7C) bit 0x4000000 is set
 // at FUN_0055F780+0x7EA (RVA 0x15FF6A "or [ebx],0x4000000") when the
 // round-transition fade starts, cleared by the restart variants above.

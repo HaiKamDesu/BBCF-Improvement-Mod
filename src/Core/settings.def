@@ -175,6 +175,29 @@ SETTING(int, d3d9IatFallbackHook, "D3D9IatFallbackHook", "1");
 // there for details. See docs/Research/PlatinumVoiceChoiceInvestigation.md for the full RE writeup.
 SETTING(int, platinumVoiceChoice, "PlatinumVoiceChoice", "0");
 
+// What holding Up / Down while pressing the training "reset positions" bind does. Left and
+// right always reset to that corner (the game's own behaviour, untouched). Enum, rendered by
+
+// What holding a direction while pressing the training "Reset Positions" button does.
+// One setting per direction; the value is an enum rendered as a dropdown by
+// SettingsIniWindow.cpp's kSettingEnumMetadata - keep the order in step:
+//   0 = Default: what happens today (Up swaps sides - the mod's own feature; Down resets
+//       to the middle and Left/Right to that corner - the game's own rule)
+//   1 = Nothing (a plain reset, the previous reset position stays)
+//   2 = Reset to the middle of the stage
+//   3 = Reset to the left corner
+//   4 = Reset to the right corner
+//   5 = Swap sides
+// The game reads the held direction in one function (FUN_006D2D40, hooked in
+// hooks_system_input.cpp) and writes the "TRI_ResetPosition" training-menu value from it,
+// so remapping means either letting that run, skipping it, or writing the value ourselves -
+// never both, which is why Down=swap does not also drag the reset to the middle.
+// See docs/Research/ResetLabOverride.md.
+SETTING(int, resetLabUpAction, "ResetLabUpAction", "0");
+SETTING(int, resetLabDownAction, "ResetLabDownAction", "0");
+SETTING(int, resetLabLeftAction, "ResetLabLeftAction", "0");
+SETTING(int, resetLabRightAction, "ResetLabRightAction", "0");
+
 // Wave-bank format the custom-music converter writes into its .pac files.
 // enum: 0 = Auto, 1 = WMA, 2 = PCM - keep in step with kMusicWaveBankFormatOptions
 // in SettingsIniWindow.cpp and with ChooseBankFormat() in CustomMusicConverter.cpp.

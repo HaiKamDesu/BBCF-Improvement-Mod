@@ -1,0 +1,133 @@
+----- DECOMPILE 00560fc0  -----
+Function: FUN_00560fc0
+
+undefined4 __fastcall FUN_00560fc0(uint *param_1)
+
+{
+  int iVar1;
+  
+  if (param_1[0xd] == 0) {
+    iVar1 = FUN_0055ef40();
+    if (iVar1 == 0) {
+      return 1;
+    }
+    param_1[0xd] = 1;
+    *param_1 = *param_1 & 0xffffff7f | 0x20000;
+    FUN_004c97b0(0x1e);
+    return 0;
+  }
+  if (param_1[0xd] != 1) {
+    *param_1 = *param_1 | 0x80;
+    return 1;
+  }
+  if ((*param_1 & 0x20000) != 0) {
+    iVar1 = FUN_005f93c0();
+    if (iVar1 != 0) goto LAB_00560ff9;
+    *param_1 = *param_1 & 0xfffdffff;
+  }
+  FUN_00562b40();
+LAB_00560ff9:
+  *param_1 = *param_1 & 0xffffff7f;
+  return 0;
+}
+
+
+
+  callers of FUN_00560fc0:
+    0055f780 FUN_0055f780
+
+----- DECOMPILE 00561030  -----
+Function: FUN_00561030
+
+undefined4 __fastcall FUN_00561030(uint *param_1)
+
+{
+  uint uVar1;
+  int iVar2;
+  
+  FUN_0049a400();
+  iVar2 = FUN_0049aba0();
+  uVar1 = param_1[0xd];
+  if (uVar1 == 0) {
+    if (iVar2 != 0) {
+      param_1[0xd] = 1;
+      *param_1 = *param_1 & 0xffffff7f | 0x20000;
+      FUN_004c97b0(0x1e);
+      param_1[0x12] = 0x1e;
+      FUN_0049a400();
+      iVar2 = FUN_0049a340();
+      if (iVar2 == 1) {
+        iVar2 = param_1[2] + 1;
+        FUN_0049a400(iVar2);
+        FUN_0049d830(iVar2);
+      }
+      return 0;
+    }
+  }
+  else {
+    if (uVar1 == 1) {
+      if (param_1[0x12] != 0) {
+        param_1[0x12] = param_1[0x12] - 1;
+      }
+      if (param_1[0x12] == 0) {
+        iVar2 = param_1[2] + 1;
+        FUN_0049a400(iVar2);
+        FUN_004a0600(iVar2);
+        param_1[0xd] = 2;
+      }
+      return 0;
+    }
+    if (uVar1 == 2) {
+      FUN_00562b40();
+      *param_1 = *param_1 & 0xffffff7f;
+      return 0;
+    }
+    *param_1 = *param_1 | 0x80;
+  }
+  return 1;
+}
+
+
+
+  callers of FUN_00561030:
+    0055f780 FUN_0055f780
+
+----- DECOMPILE 00560f50  -----
+Function: FUN_00560f50
+
+undefined4 __fastcall FUN_00560f50(uint *param_1)
+
+{
+  int iVar1;
+  
+  if (param_1[0xd] == 0) {
+    iVar1 = FUN_0055ee70();
+    if (iVar1 == 0) {
+      return 1;
+    }
+    param_1[0xd] = 1;
+    *param_1 = *param_1 & 0xffffff7f | 0x20000;
+    FUN_004c97b0(0x1e);
+    return 0;
+  }
+  if (param_1[0xd] != 1) {
+    *param_1 = *param_1 | 0x80;
+    return 1;
+  }
+  if ((*param_1 & 0x20000) != 0) {
+    iVar1 = FUN_005f93c0();
+    if (iVar1 != 0) goto LAB_00560f89;
+    *param_1 = *param_1 & 0xfffdffff;
+  }
+  FUN_00562b40();
+LAB_00560f89:
+  *param_1 = *param_1 & 0xffffff7f;
+  return 0;
+}
+
+
+
+  callers of FUN_00560f50:
+    0055f780 FUN_0055f780
+
+===== CALLERS / XREFS OF RESTART VARIANTS =====

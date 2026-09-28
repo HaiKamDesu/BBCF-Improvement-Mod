@@ -330,6 +330,14 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	ForceLog("[Init] InstallSystemInputHook failed; continuing without system input override.\n");
 }
 
+	// Reads the same controller objects the SystemInputWrite hook captures, so it is only
+	// useful under the same gate.
+	if (IsControllerHooksRuntimeAllowed() && !InstallTrainingResetDirectionHook())
+	{
+	LOG(2, "BBCF_IM_Start: InstallTrainingResetDirectionHook failed; reset-direction remap disabled.\n");
+	ForceLog("[Init] InstallTrainingResetDirectionHook failed; Up/Down reset remap unavailable.\n");
+}
+
 	LOG(1, "GetBbcfBaseAdress() = 0x%p\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
 	ForceLog("[Init] Hooks installed; base address resolved to 0x%p.\n", reinterpret_cast<void*>(GetBbcfBaseAdress()));
 

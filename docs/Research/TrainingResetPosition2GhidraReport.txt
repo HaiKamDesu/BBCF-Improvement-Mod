@@ -1,0 +1,62 @@
+----- DECOMPILE 006cc520  -----
+Function: FUN_006cc520
+
+bool FUN_006cc520(void)
+
+{
+  int iVar1;
+  
+  iVar1 = FUN_0047e860();
+  return *(int *)(iVar1 + 0x108) == 6;
+}
+
+
+
+  callers of FUN_006cc520:
+    0047f150 FUN_0047f150
+    005c3ef0 FUN_005c3ef0
+    0055c120 FUN_0055c120
+    005c2400 FUN_005c2400
+    0055bc90 FUN_0055bc90
+    0055b520 FUN_0055b520
+    005c3400 FUN_005c3400
+    005c4460 FUN_005c4460
+    005d2df0 FUN_005d2df0
+    00593b60 FUN_00593b60
+    00593e40 FUN_00593e40
+    0050ff10 FUN_0050ff10
+    0057e640 FUN_0057e640
+    0056b1f0 FUN_0056b1f0
+    0055f780 FUN_0055f780
+    005a8620 FUN_005a8620
+    00510120 FUN_00510120
+    005cc490 FUN_005cc490
+    00576ac0 FUN_00576ac0
+    005ae5c0 FUN_005ae5c0
+    005c2880 FUN_005c2880
+    005c29d0 FUN_005c29d0
+    004e6130 FUN_004e6130
+    005c17f0 FUN_005c17f0
+    00578900 FUN_00578900
+    00510250 FUN_00510250
+    005c1410 FUN_005c1410
+    0057d020 FUN_0057d020
+    0059ed50 FUN_0059ed50
+    005c2c30 FUN_005c2c30
+
+===== CALLERS / XREFS OF RESTART VARIANTS =====
+--- 0058f390 (FUN_0058f390) ---
+  ref from 00951a90 type=DATA in ?
+  ref from 009576a0 type=DATA in ?
+
+--- 0058f4d0 (FUN_0058f4d0) ---
+  ref from 00951a94 type=DATA in ?
+  ref from 009576a4 type=DATA in ?
+
+--- 0058f610 (FUN_0058f610) ---
+  ref from 00951a8c type=DATA in ?
+  ref from 0095769c type=DATA in ?
+
+--- 004d23e0 (FUN_004d23e0) ---
+  ref from 004d271e type=UNCONDITIONAL_CALL in FUN_004d2710
+

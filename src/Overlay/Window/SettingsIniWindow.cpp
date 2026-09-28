@@ -116,6 +116,10 @@ namespace {
 		{ "UnlimitedPlaybackLoopRestartMode", "Loop: restart position", "Playback loop", "Where the characters are put when the loop restarts - middle of the stage, a corner, or your own saved snapshot." },
 		{ "D3D9IatFallbackHook", "Overlay rescue mode", "Graphics", "For the rare PC where the mod loads but no mod window ever appears, usually a dual-graphics laptop where NVIDIA's software gets in the way first. Automatic fixes it on affected PCs and does nothing on all the others - leave it there. Requires a restart." },
 		{ "PlatinumVoiceChoice", "Platinum voice choice", "Audio", "Picks whether YOUR Platinum speaks as Sena or Luna instead of the game rolling for it. Offline only (training, versus CPU, replays, local versus) - it is switched off in online matches while a reported desync is investigated. Only affects the Platinum you control." },
+		{ "ResetLabUpAction", "Reset positions + Up", "Training", "What happens when you hold Up while pressing the training Reset Positions button. Default is the mod's side swap. The game itself ignores Up." },
+		{ "ResetLabDownAction", "Reset positions + Down", "Training", "What happens when you hold Down while pressing the training Reset Positions button. Default is the game's own reset to the middle. Pick Swap sides to make Down the side-swap instead." },
+		{ "ResetLabLeftAction", "Reset positions + Left", "Training", "What happens when you hold Left while pressing the training Reset Positions button. Default is the game's own reset to the left corner (mirrored when you play on the P2 side, as the game does)." },
+		{ "ResetLabRightAction", "Reset positions + Right", "Training", "What happens when you hold Right while pressing the training Reset Positions button. Default is the game's own reset to the right corner (mirrored when you play on the P2 side, as the game does)." },
 		{ "LogFrameStalls", "Log frame stalls", "Debug", "Records every frame that took longer than the threshold below, with a breakdown of how much of the delay was the mod's own code and how much was the game, your graphics driver or Windows. Writes to BBCF_IM\\FrameStallIncidents.log, one file per launch. Leave it off unless someone is looking into stuttering on your PC. Requires a restart." },
 		{ "FrameStallThresholdMs", "Frame stall threshold", "Debug", "How slow a frame has to be, in milliseconds, before it is worth logging as a stall. 33 is about two missed frames at 60fps. Only used while frame stall logging is on." },
 		{ "OverlayAbTestSeconds", "Overlay cost A/B test", "Debug", "Turns the mod's overlay drawing off and on again every this many seconds and logs the framerate for each, so a report can show whether the overlay itself is costing you frames. 0 is off, which is what you want unless you are measuring something. Needs frame stall logging on to be any use." },
@@ -294,6 +298,17 @@ namespace {
 		{ 2, "Sena" },
 	};
 
+	// Order must match the enum comment in settings.def and ResolveResetLabAction() in
+	// hooks_system_input.cpp.
+	static const SettingEnumOption kResetLabActionOptions[] = {
+		{ 0, "Default" },
+		{ 1, "Nothing (plain reset)" },
+		{ 2, "Reset to middle" },
+		{ 3, "Left corner" },
+		{ 4, "Right corner" },
+		{ 5, "Swap sides" },
+	};
+
 	// Order must match the enum comment in settings.def and ChooseBankFormat().
 	static const SettingEnumOption kMusicWaveBankFormatOptions[] = {
 		{ 0, "Auto (WMA if available, else PCM)" },
@@ -327,6 +342,10 @@ namespace {
 		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },
 		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
+		{ "ResetLabUpAction", kResetLabActionOptions, _countof(kResetLabActionOptions) },
+		{ "ResetLabDownAction", kResetLabActionOptions, _countof(kResetLabActionOptions) },
+		{ "ResetLabLeftAction", kResetLabActionOptions, _countof(kResetLabActionOptions) },
+		{ "ResetLabRightAction", kResetLabActionOptions, _countof(kResetLabActionOptions) },
 		{ "MusicWaveBankFormat", kMusicWaveBankFormatOptions, _countof(kMusicWaveBankFormatOptions) },
 		{ "D3D9IatFallbackHook", kD3D9IatFallbackHookOptions, _countof(kD3D9IatFallbackHookOptions) },
 	};

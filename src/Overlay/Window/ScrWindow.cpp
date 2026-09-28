@@ -952,54 +952,18 @@ void ScrWindow::RunPendingSaveStateRequests()
 
 bool ScrWindow::s_swapCoordsToggle = false;
 
-namespace {
-
-// True while the 1P battle input slot is holding an up direction (packed digits 7/8/9).
-//
-// 1P only. Reading both slots used to be the wider, safer answer, but the 2P side is the
-// training dummy, and a dummy action that jumps holds Up for as long as it is in the air -
-// so every reset landed on a held Up and flipped "Swap sides on every reset" back and
-// forth on its own. The dummy is not a person asking for a side swap. Everything the mod
-// drives the dummy with lives on 2P, so 1P is the only slot a human reset can come from.
-bool IsAnyPlayerHoldingUp()
-{
-    if (!IsBattleInputHookInstalled()) {
-        // Without the battle-input hook there is no trustworthy source for the player's
-        // direction, and the action words are exactly the thing that misreports it. Fail
-        // closed - the "Swap sides on every reset" checkbox still works by hand.
-        static bool logged = false;
-        if (!logged) {
-            logged = true;
-            LOG(1, "[ResetSwap] battle input hook unavailable - Up+reset toggle disabled\n");
-        }
-        return false;
-    }
-
-    return GetLastObservedBattleInput(0).up;
-}
-
-} // namespace
-
 void ScrWindow::TickTrainingResetSwap() {
-    // "Hold Up while pressing the reset bind" toggles the always-swap ("P2 mode")
-    // checkbox, mirroring how the native reset treats directions: only what's held at
-    // the PRESS moment matters, releasing during the fadeout is fine.
+    // Holding a direction while pressing the reset bind, where that direction is set to
+    // "Swap sides" (ResetLab*Action settings - Up by default), toggles the always-swap
+    // ("P2 mode") checkbox, mirroring how the native reset treats directions: only what's
+    // held at the PRESS moment matters, releasing during the fadeout is fine.
     //
-    // The reset press itself is read from the game's own keyconfig-resolved logical
-    // action words (PollTrainingResetPressed - reset action edge bit, identified via
-    // the [ResetProbe] runs of 2026-07-19). This fires on the exact press frame, for
-    // any rebound key or controller button.
-    //
-    // "Up" is NOT read from those action words. Their Up bit lies on a keyboard: the
-    // captured controller set includes the two GAMESTEAM_SystemKeyControler objects
-    // (sysMgr+0x0C/+0x18), whose Up action is fed by BBCF's second key config set -
-    // untouched, and therefore still default W/D/S/A, for anyone who only rebound the
-    // other one - plus the hardcoded VK_SPACE and VK_UP fallbacks in FUN_00469750.
-    // Someone playing a Q/W/E+Space layout toggles this on every single reset, because
-    // their "down" key is the other config set's "up". See the SystemKeyControler block
-    // in GhidraDefs.h. So take the direction from the packed battle input word instead:
-    // that is the player's real, in-match direction under their own battle key config,
-    // identical for pad and keyboard, and it never carries the menu-side bits.
+    // The press edge is read here from the game's logical action words
+    // (PollTrainingResetPressed). The DIRECTION is not read here at all: the
+    // TrainingResetDirection hook (hooks_system_input.cpp) runs inside the game's own reset
+    // step on the same frame, reads the direction with the game's own controller call, and
+    // leaves its decision for ConsumeLastResetPressDecision. That hook is also what keeps
+    // Down from resetting to the middle when it is the swap key.
     //
     // The toggle is then applied only when the reset actually executes (frame counter
     // drops), armed for a few seconds from the press: this keeps the visual change in
@@ -1020,25 +984,30 @@ void ScrWindow::TickTrainingResetSwap() {
 
     static int last_frame_count = -1;
     static ULONGLONG armed_at_ms = 0;
-    static bool armed_up = false;
+    static bool armed_swap = false;
 
     int current_frame_count = *g_gameVals.pFrameCount;
 
     if (PollTrainingResetPressed()) {
         armed_at_ms = GetTickCount64();
-        armed_up = IsAnyPlayerHoldingUp();
+        // The direction was read by the TrainingResetDirection hook inside the game's own
+        // reset step this frame, with the game's own controller read; this is its verdict.
+        // Without the hook (controller gate off) there is no trustworthy direction, so no
+        // swap - the game then does exactly what it always did.
+        ResetLabDecision decision;
+        armed_swap = ConsumeLastResetPressDecision(&decision) && decision.swapSides;
     }
 
     if (last_frame_count != -1 && current_frame_count < last_frame_count) {
-        // The reset actually executed. Honor the Up state captured at press time.
+        // The reset actually executed. Honor the direction captured at press time.
         constexpr ULONGLONG kArmWindowMs = 3000;
-        if (armed_at_ms != 0 && GetTickCount64() - armed_at_ms <= kArmWindowMs && armed_up) {
+        if (armed_at_ms != 0 && GetTickCount64() - armed_at_ms <= kArmWindowMs && armed_swap) {
             s_swapCoordsToggle = !s_swapCoordsToggle;
-            LOG(1, "[ResetSwap] Up+reset detected - always-swap-coordinates toggled %s\n",
+            LOG(1, "[ResetSwap] swap-direction+reset detected - always-swap-coordinates toggled %s\n",
                 s_swapCoordsToggle ? "ON" : "OFF");
         }
         armed_at_ms = 0;
-        armed_up = false;
+        armed_swap = false;
     }
 
     last_frame_count = current_frame_count;
