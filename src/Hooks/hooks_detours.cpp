@@ -834,8 +834,56 @@ namespace
 
 	void CheckD3DWatchdogs()
 	{
+		// Two callers now (the early eviction watch and the device watchdog) and their
+		// lifetimes can overlap; each check rewrites watch.expected.
+		static SRWLOCK lock = SRWLOCK_INIT;
+		AcquireSRWLockExclusive(&lock);
 		CheckWatchdog(g_watchedD3DCreate9Ex);
 		CheckWatchdog(g_watchedD3DCreate9);
+		ReleaseSRWLockExclusive(&lock);
+	}
+
+	// Catches an eviction while it can still be acted on.
+	//
+	// The device watchdog below only starts when the game window appears and ticks every
+	// 500 ms, so it notices an eviction after the game has already created its device -
+	// too late for the import-table fallback to matter. That is exactly how the Optimus
+	// fix regressed (Dizarine, 8.8): b079319 moved our factory detour ahead of
+	// nvd3d9wrap's, the "already foreign-owned at startup" check stopped seeing it,
+	// nvd3d9wrap evicted us 86 ms later, the game window came up at +690 ms, and the
+	// watchdog installed the fallback at +1200 ms, after the game had called
+	// Direct3DCreate9Ex through Optimus instead of us. No device wrapper, no overlay.
+	//
+	// So from the moment the detour lands, poll fast until either the device exists (we
+	// were called; nothing left to protect) or the fallback is in. A 5-byte compare every
+	// few ms for a few seconds; it exits on its own and never runs on a machine where the
+	// fallback was installed up front.
+	DWORD WINAPI EarlyEvictionWatchThread(LPVOID)
+	{
+		const ULONGLONG start = GetTickCount64();
+		for (;;)
+		{
+			const ULONGLONG elapsed = GetTickCount64() - start;
+			CheckD3DWatchdogs();
+
+			if (g_iatHookInstalled || g_interfaces.pD3D9ExWrapper != nullptr || elapsed > 20000)
+			{
+				LOG(2, "[HookDiag] Early eviction watch done after %llu ms (fallback=%d, device=%d)\n",
+					elapsed, g_iatHookInstalled ? 1 : 0, g_interfaces.pD3D9ExWrapper != nullptr ? 1 : 0);
+				return 0;
+			}
+
+			Sleep(elapsed < 3000 ? 2 : 10);
+		}
+	}
+
+	// NVIDIA Optimus: nvinit.dll is the AppInit injector for CoProcManager, and
+	// nvd3d9wrap.dll is the module that re-patches the d3d9 factory exports shortly after
+	// process start. Either being loaded means the export detour is going to be evicted,
+	// whatever its prologue happens to look like at the moment we hook it.
+	bool OptimusInjectorLoaded()
+	{
+		return GetModuleHandleA("nvd3d9wrap.dll") != nullptr || GetModuleHandleA("nvinit.dll") != nullptr;
 	}
 
 	// Captures the failure that has so far left no evidence at all.
@@ -1715,10 +1763,27 @@ bool placeD3D9FactoryHooks_detours()
 	{
 		InstallD3DIatHook("export already owned by a foreign module at startup");
 	}
+	else if (iatMode == 1 && OptimusInjectorLoaded())
+	{
+		// Since b079319 we hook before nvd3d9wrap does, so the export is not foreign-owned
+		// yet - its prologue is only NVIDIA's heap stub, which also looks like the
+		// harmless overlay trampolines seen on most machines. The injector being loaded is
+		// the signal that survives the ordering.
+		InstallD3DIatHook("NVIDIA Optimus injector loaded (nvinit/nvd3d9wrap)");
+	}
 	else
 	{
 		LOG(2, "[HookDiag][IAT] Fallback not needed at startup (mode=%d, foreignOwner=%d)\n",
 			iatMode, foreignOwnerAtStartup ? 1 : 0);
+	}
+
+	if (iatMode == 1 && !g_iatHookInstalled)
+	{
+		const HANDLE watcher = CreateThread(nullptr, 0, EarlyEvictionWatchThread, nullptr, 0, nullptr);
+		if (watcher != nullptr)
+		{
+			CloseHandle(watcher);
+		}
 	}
 
 	return true;
