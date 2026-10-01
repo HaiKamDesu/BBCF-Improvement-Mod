@@ -1854,4 +1854,6 @@ Triggered [%s]: %s in %df,Triggered [%s]: %s in %df,Activado [%s]: %s en %df
 "Left out, nothing to pack in:","Left out, nothing to pack in:","Omitido, no había nada que empaquetar:"
 Animations in this file were picked on: %s.,Animations in this file were picked on: %s.,Las animaciones de este archivo se eligieron con: %s.
 "Your dummy is %s, so those moves may be missing or be %s's version.","Your dummy is %s, so those moves may be missing or be %s's version.","Tu dummy es %s, así que esos movimientos pueden faltar o ser la versión de %s."
-"Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.","Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.","Frames a esperar, una vez que el trigger se activa y elige esta acción, antes de que el dummy haga el movimiento. Se suma al retraso propio del trigger. Para varios movimientos en un trigger, agrega una acción por movimiento."
+Set delay...,Set delay...,Fijar retraso...
+For these %d actions,For these %d actions,Para estas %d acciones
++%df,+%df,+%df

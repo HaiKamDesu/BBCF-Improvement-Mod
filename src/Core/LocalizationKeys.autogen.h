@@ -5028,8 +5028,14 @@ struct LocalizationKeysAccessor
         // Your dummy is %s, so those moves may be missing or be %s's version.
         inline const char* Your_dummy_is_s_so_those_moves_may_be_missing_or_be_s_s_version() const { return Get("Your dummy is %s, so those moves may be missing or be %s's version."); }
 
-        // Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.
-        inline const char* Frames_to_wait_once_the_trigger_has_fired_and_picked_this_action_before_the_dummy_does_the_move_Comes_on_top_of_the_trigger_s_own_delay_For_several_moves_on_one_trigger_add_one_action_per_move() const { return Get("Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move."); }
+        // Set delay...
+        inline const char* Set_delay() const { return Get("Set delay..."); }
+
+        // For these %d actions
+        inline const char* For_these_d_actions() const { return Get("For these %d actions"); }
+
+        // +%df
+        inline const char* df() const { return Get("+%df"); }
 };
 
 

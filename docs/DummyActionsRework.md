@@ -34,7 +34,7 @@ from:
 | From File | one `.playback` file | ditto |
 | From CF Recording Slot | slot 1-4, read live when the trigger fires | the slot already holds it |
 | Recording | a copy of a CF slot taken when the action was added (hex in the ini) | frames into a borrowed CF slot |
-| From Animation | one or more of the dummy's script states, with per-entry delays | script-pointer write, no slot |
+| From Animation | one of the dummy's script states | script-pointer write, no slot |
 | Burst | On Hitstun only | action-override name, no slot |
 
 So a wakeup DP, an on-hit burst and a looping blockstring can all be armed at once, which
@@ -203,6 +203,17 @@ Two subtleties that are easy to undo by accident:
   because that is what lets a reversal or a burst come out of hitstun at all — inputs
   delivered then are buffered by the game.
 
+### Per-action delay
+
+Every action, whatever its source, has its own `delayFrames` (0 or more). It starts once the
+trigger has fired, waited out its own delay, and picked that action. While it counts down the
+trigger holds `pendingActionIndex` and the dummy it was picked for, not the resolved action:
+when the wait ends, `ProcessPendingActionDelays` resolves the action again by index, so a burst
+picks ground or air for the moment it plays and a CF slot is read then. A dummy swap during the
+wait drops it. The trigger cannot re-fire while one is pending. Set in each source's modal, or
+from a row's right-click "Set delay..." (the only way for File and Burst, which have no modal;
+applies to the whole selection).
+
 ### Negative delay ("fire early")
 
 `TriggerConfig::delayFrames` is one signed field. Positive waits; **negative fires early**,
@@ -217,8 +228,8 @@ frame). The UI refuses a negative value on the others.
 
 `BBCF_IM/dummy_actions.ini`, rewritten whenever an action changes, read once from
 `RunDeferredSetup`. `[N]` is trigger N: its `enabled`, `selection` (picking order), `delay`,
-`cooldown` and `mirror`. `[N.M]` is action M of trigger N: `enabled`, `source`, then the
-payload (`notation`, `file`, `slot`, `moves`/`movedelays`/`naoto`, or for a recording
+`cooldown` and `mirror`. `[N.M]` is action M of trigger N: `enabled`, `source`, `actiondelay`
+(omitted when 0), then the payload (`notation`, `file`, `slot`, `moves`/`naoto`, or for a recording
 `slot`/`name`/`facing`/`frames` as hex). A `[loop]` section holds the loop's own settings; a
 `[sizes]` section the modal sizes people have settled on; an optional `[training]` section
 holds key=value extras the caller owns — the training page uses it for positions, wake-up

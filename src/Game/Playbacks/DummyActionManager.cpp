@@ -306,6 +306,22 @@ void DummyActionManager::SetActionsEnabled(TriggerType trigger, const std::vecto
 	Save();
 }
 
+void DummyActionManager::SetActionsDelay(TriggerType trigger, const std::vector<size_t>& indices, int delayFrames)
+{
+	delayFrames = (std::max)(0, delayFrames);
+	Trigger& slot = Get(trigger);
+	bool changed = false;
+	for (size_t index : indices)
+	{
+		if (index < slot.actions.size() && slot.actions[index].delayFrames != delayFrames)
+		{
+			slot.actions[index].delayFrames = delayFrames;
+			changed = true;
+		}
+	}
+	if (changed) { Save(); }
+}
+
 void DummyActionManager::SetAllActionsEnabled(TriggerType trigger, bool enabled)
 {
 	std::vector<size_t> all;
@@ -483,6 +499,16 @@ const DummyActionManager::Action* DummyActionManager::Pick(TriggerType trigger)
 
 std::string DummyActionManager::ActionSummary(const Action& action)
 {
+	std::string summary = ActionSourceSummary(action);
+	if (action.delayFrames > 0)
+	{
+		summary += "  " + FormatText(L("+%df").c_str(), action.delayFrames);
+	}
+	return summary;
+}
+
+std::string DummyActionManager::ActionSourceSummary(const Action& action)
+{
 	switch (action.source)
 	{
 	case Source_Notation:
@@ -533,8 +559,6 @@ std::string DummyActionManager::ActionSummary(const Action& action)
 		{
 			if (i) { summary += ", "; }
 			summary += ScrStateNames::Display(action.animations[i]->name);
-			const int delay = i < action.animationDelays.size() ? action.animationDelays[i] : 0;
-			if (delay) { summary += "+" + std::to_string(delay) + "f"; }
 		}
 		// The name matched, but a shared name like a 5B matches on anyone - say whose it was
 		// meant to be, so a lab loaded onto another dummy does not pass for the real thing.
@@ -626,7 +650,6 @@ void DummyActionManager::ResolveAnimations(const std::vector<scrState*>& states,
 			}
 
 			std::vector<scrState*> resolved;
-			std::vector<int> delays;
 			for (size_t i = 0; i < action.animationNames.size(); ++i)
 			{
 				for (scrState* state : states)
@@ -634,14 +657,11 @@ void DummyActionManager::ResolveAnimations(const std::vector<scrState*>& states,
 					if (state && state->name == action.animationNames[i])
 					{
 						resolved.push_back(state);
-						delays.push_back(i < action.animationDelays.size()
-							? action.animationDelays[i] : 0);
 						break;
 					}
 				}
 			}
 			action.animations = resolved;
-			action.animationDelays = delays;
 
 			if (resolved.size() != action.animationNames.size())
 			{
@@ -921,6 +941,10 @@ bool DummyActionManager::WriteTo(const std::string& path, const TriggerTable& tr
 			fprintf(file, "\n[%d.%d]\n", static_cast<int>(trigger), static_cast<int>(i));
 			fprintf(file, "enabled=%d\n", action.enabled ? 1 : 0);
 			fprintf(file, "source=%d\n", static_cast<int>(action.source));
+			if (action.delayFrames > 0)
+			{
+				fprintf(file, "actiondelay=%d\n", action.delayFrames);
+			}
 
 			switch (action.source)
 			{
@@ -942,13 +966,6 @@ bool DummyActionManager::WriteTo(const std::string& path, const TriggerTable& tr
 			case Source_Animation:
 			{
 				fprintf(file, "moves=%s\n", JoinList(action.animationNames).c_str());
-				std::vector<std::string> delays;
-				for (size_t d = 0; d < action.animationNames.size(); ++d)
-				{
-					delays.push_back(std::to_string(
-						d < action.animationDelays.size() ? action.animationDelays[d] : 0));
-				}
-				fprintf(file, "movedelays=%s\n", JoinList(delays).c_str());
 				fprintf(file, "naoto=%d\n", action.naotoEnSpecials ? 1 : 0);
 				if (!action.animationCharacter.empty())
 				{
@@ -1050,10 +1067,19 @@ bool DummyActionManager::ReadFrom(const std::string& path, bool includeUiSizes, 
 	bool inActionSection = false;
 	Action action;
 	bool actionPending = false;
+	// "movedelays=" - the per-move delays of an animation action, from before every action
+	// had a delay of its own. Folded into delayFrames by commit().
+	std::vector<int> legacyMoveDelays;
 
 	const auto commit = [&]() {
 		if (!actionPending) { return; }
 		actionPending = false;
+		const std::vector<int> moveDelays = legacyMoveDelays;
+		legacyMoveDelays.clear();
+		if (action.source == Source_Animation && !moveDelays.empty() && action.delayFrames == 0)
+		{
+			action.delayFrames = (std::max)(0, moveDelays.front());
+		}
 		if (currentTrigger < 0 || currentTrigger >= UnlimitedPlaybackManager::Trigger_Count
 			|| !action.IsSet())
 		{
@@ -1096,7 +1122,7 @@ bool DummyActionManager::ReadFrom(const std::string& path, bool includeUiSizes, 
 			{
 				Action one = action;
 				one.animationNames.assign(1, action.animationNames[m]);
-				one.animationDelays.assign(1, m < action.animationDelays.size() ? action.animationDelays[m] : 0);
+				one.delayFrames = m < moveDelays.size() ? (std::max)(0, moveDelays[m]) : 0;
 				Add(trigger, one);
 			}
 			action = Action{};
@@ -1234,12 +1260,13 @@ bool DummyActionManager::ReadFrom(const std::string& path, bool includeUiSizes, 
 		else if (key == "naoto")    { action.naotoEnSpecials = atoi(value.c_str()) != 0; }
 		else if (key == "character"){ action.animationCharacter = value; }
 		else if (key == "moves")    { action.animationNames = SplitList(value); }
+		else if (key == "actiondelay") { action.delayFrames = (std::max)(0, atoi(value.c_str())); }
 		else if (key == "movedelays")
 		{
-			action.animationDelays.clear();
+			legacyMoveDelays.clear();
 			for (const std::string& one : SplitList(value))
 			{
-				action.animationDelays.push_back(atoi(one.c_str()));
+				legacyMoveDelays.push_back(atoi(one.c_str()));
 			}
 		}
 	}

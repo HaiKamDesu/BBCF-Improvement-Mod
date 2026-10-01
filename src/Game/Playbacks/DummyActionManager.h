@@ -63,6 +63,11 @@ public:
 
 		Source source = Source_None;
 
+		// Frames to wait, once the trigger has fired (and waited out its own delay) and
+		// picked this action, before the action plays. Any source. Lets one trigger hold
+		// the same reversal at several timings, or a recording that starts a beat late.
+		int delayFrames = 0;
+
 		// Source_Notation. Kept as text so the modal can show what was typed; the parse is
 		// redone on assignment and the result cached in frames.
 		std::string notation;
@@ -72,13 +77,12 @@ public:
 		std::string filePath;
 		std::string fileName;
 
-		// Source_Animation. One move and the frames to wait, once the trigger has fired and
-		// picked this action, before forcing it. Several moves on one trigger are several
-		// actions, picked between like any other list; a file from when an action could hold
-		// a random set of its own is split into one action per move on load. Kept as vectors
-		// so that load can read the old layout, but the picker only ever writes one entry.
+		// Source_Animation. One move. Several moves on one trigger are several actions,
+		// picked between like any other list; a file from when an action could hold a random
+		// set of its own is split into one action per move on load. Kept as a vector so that
+		// load can read the old layout, but the picker only ever writes one entry. (The
+		// per-move delays of that layout are delayFrames now.)
 		std::vector<scrState*> animations;
-		std::vector<int> animationDelays;
 		// The same moves by name. A scrState* points into one character's script memory, so
 		// it cannot survive a character swap, let alone a restart - the names are what is
 		// saved to disk and what the pointers are rebuilt from after every parse.
@@ -182,6 +186,7 @@ public:
 	bool MoveActions(TriggerType trigger, const std::vector<size_t>& fromIndicesSorted,
 		size_t insertionIndex, size_t* outInsertedAt = nullptr);
 	void SetRecordingName(TriggerType trigger, size_t index, const std::string& name);
+	void SetActionsDelay(TriggerType trigger, const std::vector<size_t>& indices, int delayFrames);
 	// Unpacks a Playback Library file (*.upl) into captured-recording actions on the
 	// trigger, on or off as each entry was. Returns how many were added, -1 if the file
 	// could not be read. Also what an old single-library action is migrated through.
@@ -190,6 +195,8 @@ public:
 	// One line for a row: the notation typed, the animation picked, the file named, and
 	// so on.
 	static std::string ActionSummary(const Action& action);
+	// The same without the delay suffix.
+	static std::string ActionSourceSummary(const Action& action);
 	// For a trigger: its single action's summary, or how many it holds.
 	std::string Summary(TriggerType trigger) const;
 

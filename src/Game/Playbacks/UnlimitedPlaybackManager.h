@@ -58,6 +58,10 @@ public:
         // Wall clock of the last time this trigger fired, so the UI can flash the row. Not
         // a frame number: the row is drawn whether or not the game is advancing.
         unsigned long long lastFiredMs = 0;
+        // Which of the trigger's actions went off last, and when (wall clock, like
+        // lastFiredMs), so the panel can light that action's row too.
+        int lastFiredActionIndex = -1;
+        unsigned long long lastFiredActionMs = 0;
         // Frames between the condition and the action. Positive waits, so a reversal can be
         // made late on purpose. NEGATIVE fires early, which only means anything for a
         // condition the game counts down to - the block gap, via blockstun - and is how a
@@ -68,12 +72,13 @@ public:
         int lastTriggeredFrame = -999999;
         // Set when a delayed trigger is counting down; -1 when nothing is pending.
         int pendingFireFrame = -1;
-        // An animation action's own delay, which starts once the trigger has fired and
-        // picked it. Held by name and owner rather than as a scrState*, because the move
-        // list it came from can be re-parsed (or belong to someone else) by the time it runs.
-        int pendingAnimationFrame = -1;
-        std::string pendingAnimationName;
-        const void* pendingAnimationOwner = nullptr;
+        // An action's own delay, which starts once the trigger has fired and picked it.
+        // Held as the action's index and the dummy it was picked for, and resolved again
+        // when the wait is over: a move list can be re-parsed, a burst has to look at
+        // whether the dummy is airborne THEN, and a CF slot is read when it plays.
+        int pendingActionFrame = -1;
+        int pendingActionIndex = -1;
+        const void* pendingActionOwner = nullptr;
         // Flip the inputs when the dummy is on the other side from the one the action was
         // authored or recorded on. Per trigger, because one trigger may hold a
         // side-agnostic motion and another a corner-specific setup.
@@ -124,7 +129,10 @@ public:
         // An animation instead forces one of the dummy's own script states, so it carries a
         // state rather than inputs and skips the CF slot entirely.
         scrState* animation = nullptr;
-        int animationDelayFrames = 0;
+        // The action's own delay, any source, and which action of the trigger it was - so
+        // a delayed one can be resolved again once the wait is over.
+        int delayFrames = 0;
+        int actionIndex = -1;
         // A burst is not a script jump: the game consumes an action-override name instead,
         // which is how the old burst-on-hit toggle did it.
         bool viaActionOverride = false;
@@ -162,6 +170,11 @@ public:
     // currently running, so a row can show that it just went off.
     unsigned long long GetTriggerLastFiredMs(TriggerType trigger) const {
         return m_triggers[trigger].lastFiredMs;
+    }
+    // The same for one action of the trigger: 0 unless it is the one that went off last.
+    unsigned long long GetActionLastFiredMs(TriggerType trigger, size_t actionIndex) const {
+        const TriggerConfig& config = m_triggers[trigger];
+        return config.lastFiredActionIndex == static_cast<int>(actionIndex) ? config.lastFiredActionMs : 0;
     }
     // Plays one specific action of a trigger right away, ignoring the trigger's condition,
     // cooldown and delay. Deferred to the next pre-tick like PlayEntryNow, for the same
@@ -374,7 +387,8 @@ private:
     // Starts anything whose delay has run out, and drops a pending fire whose trigger was
     // disarmed or reconfigured while it was counting down.
     void ProcessPendingTriggerDelays(int currentFrame);
-    void ProcessPendingAnimationDelays(int currentFrame);
+    void ProcessPendingActionDelays(int currentFrame);
+    static void MarkActionFired(TriggerConfig& config, int actionIndex);
     // The script jump an animation action performs, on whoever the dummy is now.
     bool ForceDummyAnimation(const scrState* state);
     bool StartResolvedAction(TriggerType trigger, int currentFrame);

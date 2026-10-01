@@ -75,7 +75,9 @@ namespace
 	int g_notationFrameCount = 0;
 	int g_animSelected = -1;
 	int g_animCategory = 3;   // 0 normals, 1 specials, 2 common, 3 all
-	int g_animDelay = 0;
+	// The action's own delay, for every source with a modal. File and Burst have none, so
+	// theirs is set from the row's right-click menu ("Set delay...").
+	int g_actionDelay = 0;
 	// Set when the modal opens on an existing action: the first frame that has the move list
 	// highlights that action's move, so Done without touching the list keeps it.
 	bool g_animSelectFromDraft = false;
@@ -300,9 +302,9 @@ namespace
 		// Measured in game rather than guessed - these are the sizes these modals were
 		// actually resized to, read back out of dummy_actions.ini.
 		case Manager::Source_Animation: return ImVec2(549.0f, 498.0f);
-		case Manager::Source_Notation:  return ImVec2(423.0f, 160.0f);
+		case Manager::Source_Notation:  return ImVec2(423.0f, 190.0f);
 		case Manager::Source_CfSlot:
-		case Manager::Source_Recording: return ImVec2(420.0f, 210.0f);
+		case Manager::Source_Recording: return ImVec2(420.0f, 235.0f);
 		default: break;
 		}
 		return ImVec2(400.0f, 200.0f);
@@ -361,6 +363,7 @@ namespace
 
 		// Seed the scratch from the draft, so the form shows what is set rather than blank.
 		const Manager::Action& action = g_draft;
+		g_actionDelay = action.delayFrames;
 		switch (source)
 		{
 		case Manager::Source_Notation:
@@ -373,7 +376,6 @@ namespace
 			// g_animSelectFromDraft.
 			g_animSelected = -1;
 			g_animSelectFromDraft = true;
-			g_animDelay = action.animationDelays.empty() ? 0 : action.animationDelays.front();
 			g_animFilter[0] = '\0';
 			break;
 		case Manager::Source_CfSlot:
@@ -399,6 +401,7 @@ namespace
 	// one being edited. The only path by which the trigger list changes from a modal.
 	void CommitModal()
 	{
+		g_draft.delayFrames = (std::max)(0, g_actionDelay);
 		if (g_modalTrigger < UnlimitedPlaybackManager::Trigger_Count)
 		{
 			const TriggerType trigger = static_cast<TriggerType>(g_modalTrigger);
@@ -923,6 +926,9 @@ namespace
 	const ImVec4 kDetailOffColor(0.45f, 0.45f, 0.45f, 1.0f);
 	const ImVec4 kBrokenColor(0.85f, 0.65f, 0.35f, 1.0f);
 	const ImVec4 kFiredColor(0.45f, 0.92f, 0.45f, 1.0f);
+	// The action that went off, under its trigger: the same flash, a darker green, so the
+	// trigger row and the action row read as one event without looking identical.
+	const ImVec4 kActionFiredColor(0.28f, 0.70f, 0.28f, 1.0f);
 	const ImVec4 kDeleteColor(0.90f, 0.35f, 0.35f, 1.0f);
 	// How far the action rows sit in from the trigger row, so they read as its contents.
 	const float kActionIndent = 26.0f;
@@ -989,6 +995,7 @@ namespace
 		int sendIndex = -1;
 		int saveIndex = -1;
 		int setIndexOf = -1;
+		int setDelayOf = -1;
 		std::vector<size_t> moveFrom;
 		int moveInsertion = -1;
 	};
@@ -999,9 +1006,11 @@ namespace
 	int g_rowModalIndex = -1;
 	int g_rowModalSlot = 1;
 	int g_rowModalNewIndex = 1;
+	int g_rowModalDelay = 0;
+	std::vector<size_t> g_rowModalDelayGroup;
 	char g_rowModalName[128] = "";
 	std::vector<size_t> g_rowModalRemove;
-	enum RowModal { RowModal_None, RowModal_Send, RowModal_Rename, RowModal_SetIndex, RowModal_ConfirmRemove };
+	enum RowModal { RowModal_None, RowModal_Send, RowModal_Rename, RowModal_SetIndex, RowModal_SetDelay, RowModal_ConfirmRemove };
 	RowModal g_rowModal = RowModal_None;
 	bool g_rowModalNeedsOpen = false;
 
@@ -1028,7 +1037,7 @@ namespace
 		request.title = L("Save this action as a playback file");
 		request.filters.push_back({ L("Playback file"), "*.playback" });
 		request.defaultExtension = "playback";
-		std::string name = Manager::ActionSummary(slot.actions[index]);
+		std::string name = Manager::ActionSourceSummary(slot.actions[index]);
 		for (char& ch : name) { if (strchr("\\/:*?\"<>|", ch)) { ch = '_'; } }
 		request.initialPath = UnlimitedPlaybackManager::Instance().GetLibraryFolderPublic() + "\\" + name + ".playback";
 		if (NativeFileDialog::Open(kSaveDialogToken, request))
@@ -1143,7 +1152,10 @@ namespace
 		// The label, over the Selectable.
 		{
 			ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 0.88f);
-			const ImVec4 color = !runnable ? kBrokenColor : (actionOn && triggerOn) ? kDetailColor : kDetailOffColor;
+			const unsigned long long firedMs = UnlimitedPlaybackManager::Instance().GetActionLastFiredMs(trigger, index);
+			const bool justFired = firedMs != 0 && (GetTickCount64() - firedMs) < 500;
+			const ImVec4 color = !runnable ? kBrokenColor : justFired ? kActionFiredColor
+				: (actionOn && triggerOn) ? kDetailColor : kDetailOffColor;
 			ImGui::PushStyleColor(ImGuiCol_Text, color);
 			const ImVec2 textPos(rowMin.x + 4.0f, rowMin.y + (rowMax.y - rowMin.y - ImGui::GetTextLineHeight()) * 0.5f);
 			// Clipped with an ellipsis rather than wrapped, so a row is always one line and
@@ -1171,6 +1183,10 @@ namespace
 			if (ImGui::MenuItem(L("Rename").c_str(), nullptr, false, action.source == Manager::Source_Recording))
 			{
 				request->renameIndex = i;
+			}
+			if (ImGui::MenuItem(L("Set delay...").c_str()))
+			{
+				request->setDelayOf = i;
 			}
 			ImGui::Separator();
 			const std::vector<size_t> group = RowGroup(trigger, i);
@@ -1257,6 +1273,7 @@ namespace
 		{
 			strncpy_s(g_rowModalName, slot.actions[index].recordingName.c_str(), sizeof(g_rowModalName) - 1);
 			g_rowModalNewIndex = index + 1;
+			g_rowModalDelay = slot.actions[index].delayFrames;
 		}
 	}
 
@@ -1276,6 +1293,7 @@ namespace
 		case RowModal_Send:          title = "Send to CF Slot##dummyrow"; break;
 		case RowModal_Rename:        title = "Rename##dummyrow"; break;
 		case RowModal_SetIndex:      title = "Set index##dummyrow"; break;
+		case RowModal_SetDelay:      title = "Set delay##dummyrow"; break;
 		case RowModal_ConfirmRemove: title = "Remove actions?##dummyrow"; break;
 		default: return;
 		}
@@ -1331,6 +1349,24 @@ namespace
 					manager.MoveActions(trigger, { static_cast<size_t>(from) }, static_cast<size_t>(to > from ? to + 1 : to));
 					g_selection[trigger].clear();
 				}
+				close = true;
+			}
+			break;
+		case RowModal_SetDelay:
+			if (g_rowModalDelayGroup.size() > 1)
+			{
+				ImGui::TextUnformatted(FormatText(L("For these %d actions").c_str(),
+					static_cast<int>(g_rowModalDelayGroup.size())).c_str());
+			}
+			ImGui::SetNextItemWidth(110.0f);
+			ImGui::InputInt(L("Frames").c_str(), &g_rowModalDelay);
+			g_rowModalDelay = (std::max)(0, g_rowModalDelay);
+			ImGui::SameLine();
+			ImGui::ShowHelpMarker(L("Frames to wait, once the trigger has fired and picked this action, before the action plays. Comes on top of the trigger's own delay, and each action on a trigger has its own.").c_str());
+			ImGui::VerticalSpacing(4);
+			if (ImGui::Button(L("Done").c_str()))
+			{
+				manager.SetActionsDelay(trigger, g_rowModalDelayGroup, g_rowModalDelay);
 				close = true;
 			}
 			break;
@@ -1583,6 +1619,12 @@ namespace
 		if (request.sendIndex >= 0)   { OpenRowModal(trigger, request.sendIndex, RowModal_Send); }
 		if (request.renameIndex >= 0) { OpenRowModal(trigger, request.renameIndex, RowModal_Rename); }
 		if (request.setIndexOf >= 0)  { OpenRowModal(trigger, request.setIndexOf, RowModal_SetIndex); }
+		if (request.setDelayOf >= 0)
+		{
+			// A multi-selection gets one delay for all of it, like the on/off switch.
+			g_rowModalDelayGroup = RowGroup(trigger, request.setDelayOf);
+			OpenRowModal(trigger, request.setDelayOf, RowModal_SetDelay);
+		}
 		if (request.saveIndex >= 0)   { BeginActionSave(trigger, request.saveIndex); }
 		if (!request.moveFrom.empty() && request.moveInsertion >= 0)
 		{
@@ -1651,6 +1693,20 @@ namespace
 
 	// ---- the source modals ----
 
+	// The action's own delay. The same field in every source's modal.
+	void DrawActionDelayField()
+	{
+		ImGui::Text("%s", L("Delay").c_str());
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(90.0f);
+		if (ImGui::InputInt("##action_delay", &g_actionDelay) && g_actionDelay < 0)
+		{
+			g_actionDelay = 0;
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Frames to wait, once the trigger has fired and picked this action, before the action plays. Comes on top of the trigger's own delay, and each action on a trigger has its own.").c_str());
+	}
+
 	void DrawNotationModal(TriggerType trigger)
 	{
 		BeginModalBody();
@@ -1695,6 +1751,8 @@ namespace
 			ImGui::TextWrapped("%s", L("That is not notation this can read. Directions are the numpad 1-9, buttons are A B C D, and ap is the taunt button.").c_str());
 			ImGui::PopStyleColor();
 		}
+		ImGui::VerticalSpacing(4);
+		DrawActionDelayField();
 
 		EndModalBodyAndSeparate();
 		ImGui::VerticalSpacing(4);
@@ -1758,6 +1816,7 @@ namespace
 		ImGui::Checkbox(L("Keep a copy of the recording").c_str(), &g_pendingCfSlotKeepCopy);
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Off: plays whatever the slot holds when the trigger fires, so re-recording the slot changes what the dummy does. On: copies the slot's recording into this action now, so it stays the same however the slot changes - and it travels with the training file.").c_str());
+		DrawActionDelayField();
 		if (!g_cfSlotError.empty())
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.45f, 0.45f, 1.0f));
@@ -1937,15 +1996,7 @@ namespace
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Holds the flag Naoto's EN specials need while this action is armed. Does nothing for any other character.").c_str());
 
-		ImGui::Text("%s", L("Delay").c_str());
-		ImGui::SameLine();
-		ImGui::SetNextItemWidth(90.0f);
-		if (ImGui::InputInt("##anim_delay", &g_animDelay) && g_animDelay < 0)
-		{
-			g_animDelay = 0;
-		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Frames to wait, once the trigger has fired and picked this action, before the dummy does the move. Comes on top of the trigger's own delay. For several moves on one trigger, add one action per move.").c_str());
+		DrawActionDelayField();
 
 		ImGui::VerticalSpacing(4);
 
@@ -1972,7 +2023,6 @@ namespace
 		if (ImGui::Button(L("Done").c_str()) && haveMove)
 		{
 			action.animations.assign(1, selected);
-			action.animationDelays.assign(1, g_animDelay);
 			CommitModal();
 		}
 		if (!haveMove) { ImGui::EndDisabled(); }
@@ -2082,6 +2132,11 @@ namespace
 		action.fileName = LeafOf(result.path);
 		if (index >= 0)
 		{
+			const Manager::Trigger& slot = Manager::Instance().Get(trigger);
+			if (static_cast<size_t>(index) < slot.actions.size())
+			{
+				action.delayFrames = slot.actions[index].delayFrames;
+			}
 			Manager::Instance().Replace(trigger, static_cast<size_t>(index), action);
 		}
 		else
