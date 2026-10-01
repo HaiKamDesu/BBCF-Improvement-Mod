@@ -123,3 +123,23 @@ Two things this settles:
   That identifies it from any normal match rather than waiting for a stale one.
 
 No stale room occurred this session (0 detections).
+
+## 2026-09-30 — false positive in a player room (Karren)
+
+A joiner in an ordinary **player room** (Network → room list) got the stale-ranked
+notice and then sat in a room where everything was invisible. The dump was a
+perfectly normal player room: host at matchPlayer 2 (not playing), two players
+in a match at 0/1, us appended at member 3 / matchPlayer 3 as a spectator. The
+detector only checked `matchPlayerIndex >= 2`, and `OnJoinLobbyAttempt` tracked
+every `JoinLobby` call, ranked or not.
+
+The invisibility was ours too: `MarkUnreachable` closes the P2P session with the
+peer, and here it closed it with the host whose room we were still in, so the
+room's traffic stopped while the game kept showing it.
+
+Fixed by gating everything on the ranked side of the Network menu (network
+struct `state == 4`; the room list sits at 6, 7 once joined):
+`OnLobbyListRequestIssued` leaves non-ranked lists alone (no proxy/sort/hide),
+`OnJoinLobbyAttempt` does not track non-ranked joins, and `InspectRoomAfterJoin`
+also requires `Room::roomType == RoomType_Ranked`. The stale verdict no longer
+closes the P2P session unless `RankedStaleRoomAutoLeave` is leaving the room.

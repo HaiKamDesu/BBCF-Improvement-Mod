@@ -142,6 +142,26 @@ namespace
 	// IsRankedPostSearchBackState - see IsLobbyListLikelyOpen().
 	constexpr uintptr_t kRankedNetworkStructRva = 0x008F7958;
 
+	// True only on the RANKED side of the Network menu (state==4). The player
+	// room list sits on the same Steam matchmaking calls (observed at state 6
+	// while browsing, 7 once joined), so every list, join and room decision in
+	// this file is gated on this - the ranked filter must never touch a player
+	// room. Unreadable struct = not ranked.
+	bool IsInRankedNetworkFlow()
+	{
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (moduleBase == 0)
+		{
+			return false;
+		}
+		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
+		if (IsBadReadPtr(network, sizeof(int32_t)))
+		{
+			return false;
+		}
+		return *reinterpret_cast<const int32_t*>(network) == 4;
+	}
+
 	// Game's ranked-search row array layout (RVA/offsets confirmed via
 	// FUN_004AAAD0 / FUN_004A8AB0 / FUN_004A6620). See RebuildGameMeasuredRttMap.
 	constexpr uintptr_t kRowContainerRva = 0x0065D270;
@@ -447,7 +467,7 @@ void RankedListConnectionFilter::OnP2PSessionConnectFail(P2PSessionConnectFail_t
 	}
 }
 
-void RankedListConnectionFilter::MarkUnreachable(uint64_t steamId, const char* reason)
+void RankedListConnectionFilter::MarkUnreachable(uint64_t steamId, const char* reason, bool closeSession)
 {
 	if (steamId == 0)
 	{
@@ -474,7 +494,7 @@ void RankedListConnectionFilter::MarkUnreachable(uint64_t steamId, const char* r
 	LOG(1, "[RankedListFilter] %s steamId=%llu name=\"%s\" - fail #%d (hidden temporarily)\n",
 		reason, static_cast<unsigned long long>(steamId), name, verdict.reactiveFailCount);
 
-	if (g_interfaces.pSteamNetworkingWrapper != nullptr)
+	if (closeSession && g_interfaces.pSteamNetworkingWrapper != nullptr)
 	{
 		g_interfaces.pSteamNetworkingWrapper->CloseP2PSessionWithUser(CSteamID(steamId));
 	}
@@ -501,6 +521,16 @@ void RankedListConnectionFilter::OnLobbyListRequestIssued(uint64_t apiCallHandle
 	m_lastListRecheckTickMs = 0;
 	m_restoreExemptions.clear();
 	m_liveHiddenPeers.clear();
+
+	// The player room list requests lobbies through the same call; leave it to
+	// the game untouched (no proxy, no remap, no sort, no hiding).
+	if (!IsInRankedNetworkFlow())
+	{
+		LOG(1, "[RankedListFilter] lobby-list request outside the ranked screens - not filtered\n");
+		m_pipelineState = PipelineState::Idle;
+		m_pendingApiCall = 0;
+		return;
+	}
 
 	if (!IsPipelineActive() || apiCallHandle == 0)
 	{
@@ -2557,6 +2587,20 @@ bool RankedListConnectionFilter::TryGetRemappedLobby(int index, uint64_t* outLob
 
 void RankedListConnectionFilter::OnJoinLobbyAttempt(uint64_t lobbyId, uint64_t lobbyOwnerSteamId)
 {
+	// Only ranked joins are judged. A player room (room list, invite link) has
+	// spectators and a running match by design, so neither its slot layout nor
+	// a back-out says anything about the host's reachability.
+	if (!IsInRankedNetworkFlow())
+	{
+		LOG(1, "[RankedListFilter] join outside the ranked screens: lobby=%llu owner=%llu - not tracked\n",
+			static_cast<unsigned long long>(lobbyId),
+			static_cast<unsigned long long>(lobbyOwnerSteamId));
+		m_pendingLobbyId = 0;
+		m_pendingConnectionTarget = 0;
+		m_pendingJoinTickMs = 0;
+		return;
+	}
+
 	m_pendingLobbyId = lobbyId;
 	m_pendingConnectionTarget = lobbyOwnerSteamId;
 	m_pendingJoinTickMs = GetTickCount64();
@@ -3373,6 +3417,18 @@ void RankedListConnectionFilter::InspectRoomAfterJoin()
 	}
 	m_roomInspectedLobbyId = m_pendingLobbyId;
 
+	// Second gate behind OnJoinLobbyAttempt's: the room itself must be a ranked
+	// room. In a player room a joiner landing past the match pair is just a
+	// spectator - flagging it (2026-09-30, Karren) also closed the P2P session
+	// with the host we were still sitting with, and the room rendered empty.
+	RoomType roomType = RoomType_Ranked;
+	if (!g_interfaces.pRoomManager->TryGetRoomType(&roomType) || roomType != RoomType_Ranked)
+	{
+		LOG(1, "[RankedListFilter] room after join is not ranked (type 0x%02X) - stale-room check skipped\n",
+			static_cast<unsigned int>(roomType));
+		return;
+	}
+
 	const unsigned long long now = GetTickCount64();
 	const unsigned long long sinceJoinMs = m_pendingJoinTickMs != 0 ? now - m_pendingJoinTickMs : 0ull;
 
@@ -3395,11 +3451,13 @@ void RankedListConnectionFilter::InspectRoomAfterJoin()
 
 	const uint64_t lobbyId = m_pendingLobbyId;
 	const uint64_t owner = m_pendingConnectionTarget;
-	MarkLobbyBroken(lobbyId, owner, reason);
-	MarkUnreachable(owner, reason);
-
 	const bool autoLeave = Settings::settingsIni.rankedStaleRoomAutoLeave &&
 		g_interfaces.pSteamMatchmakingWrapper != nullptr;
+	MarkLobbyBroken(lobbyId, owner, reason);
+	// We are still in the host's room until the player cancels (or the auto
+	// leave below runs); closing the P2P session here would cut the room's
+	// traffic out from under the game while it is still on screen.
+	MarkUnreachable(owner, reason, autoLeave);
 	if (g_notificationBar != nullptr)
 	{
 		g_notificationBar->AddNotification(autoLeave

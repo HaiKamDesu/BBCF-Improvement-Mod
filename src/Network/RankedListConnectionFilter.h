@@ -70,7 +70,9 @@ class RankedListConnectionFilter
 public:
 	static RankedListConnectionFilter& GetInstance();
 
-	void MarkUnreachable(uint64_t steamId, const char* reason);
+	// closeSession=false keeps the P2P session to the peer open - for when we
+	// are still inside that peer's room.
+	void MarkUnreachable(uint64_t steamId, const char* reason, bool closeSession = true);
 
 	// Called from SteamMatchmakingWrapper::RequestLobbyList with the async call
 	// handle - arms the proxy for the game's imminent RegisterCallResult.
