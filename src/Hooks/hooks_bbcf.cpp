@@ -9532,6 +9532,37 @@ void __declspec(naked) CrtFastFailCookieHook()
 	}
 }
 
+// ---------------------------------------------------------------------------------------
+// WinMain catch(...).
+//
+// BBCF's WinMain (static 0x0044EB10) wraps the game in catch(...) whose funclet is
+//   0044EDD3: mov eax, 0044EDD9h   ; continuation: or eax,-1 -> WinMain returns -1
+//   0044EDD8: ret
+// Its SE translator routes SEH faults through the filter hooked above, but a plain C++
+// throw never touches the translator, so it lands here and the game closes as if it had
+// been quit: no WER, no bundle, a clean log ending in "BBCF exit(-1): WinMain RETURNED".
+// That is how a ranked loading screen "crashed" with nothing to show on 2026-09-29.
+//
+// The patch takes the 5-byte mov; the funclet is only reached through the EH tables and
+// nothing branches into 0x44EDD4..0x44EDD8 (checked against the disassembly). The hook
+// reports, then does the original mov and jumps to the original ret.
+// ---------------------------------------------------------------------------------------
+DWORD WinMainCatchAllJmpBackAddr = 0;
+DWORD WinMainCatchAllContinuation = 0;
+void __declspec(naked) WinMainCatchAllHook()
+{
+	__asm pushad
+	ReportCxxExceptionSwallowedByGame("BBCF's WinMain catch(...)");
+	__asm popad
+
+	// ORIGINAL instruction: mov eax, <continuation>
+	__asm
+	{
+		mov eax, WinMainCatchAllContinuation
+		jmp[WinMainCatchAllJmpBackAddr]
+	}
+}
+
 void __declspec(naked)SetDumpfileCommentString()
 {
 	__asm
@@ -9844,6 +9875,29 @@ bool placeHooks_bbcf()
 	else
 	{
 		LOG(1, "[Crash] CRT stack-cookie fastfail site not found; those crashes stay invisible.\n");
+	}
+
+	// WinMain's catch(...) funclet. The signature starts 12 bytes early, at the tail of the
+	// normal return path, because `mov eax,imm32; ret` alone is everywhere; the imm32s are
+	// relocated by ASLR and wildcarded. The continuation is read before patching and must
+	// be the byte after the funclet, or this is not the site we think it is.
+	const DWORD winMainCatchSite = HookManager::RegisterHook(
+		"WinMainCatchAllSite",
+		"\x8D\x4D\xBC\xE8\x00\x00\x00\x00\x8B\xC6\xEB\x18\xB8\x00\x00\x00\x00\xC3\xC7\x45\xFC\xFF\xFF\xFF\xFF\x8D\x4D\xBC\xE8\x00\x00\x00\x00\x83\xC8\xFF",
+		"xxxx????xxxxx????xxxxxxxxxxxx????xxx",
+		5);
+	const DWORD winMainCatchFunclet = winMainCatchSite != 0 ? winMainCatchSite + 12 : 0;
+	const DWORD winMainCatchContinuation = winMainCatchFunclet != 0 ? *reinterpret_cast<DWORD*>(winMainCatchFunclet + 1) : 0;
+	if (winMainCatchFunclet != 0 && winMainCatchContinuation == winMainCatchFunclet + 6)
+	{
+		WinMainCatchAllContinuation = winMainCatchContinuation;
+		WinMainCatchAllJmpBackAddr = HookManager::SetHook(
+			"WinMainCatchAll", winMainCatchFunclet, 5, WinMainCatchAllHook);
+	}
+	else
+	{
+		LOG(1, "[Crash] WinMain catch(...) site not found (site=0x%08X continuation=0x%08X); a C++ "
+		       "throw out of the main loop stays a silent exit(-1).\n", winMainCatchSite, winMainCatchContinuation);
 	}
 
 	//HookManager::RegisterHook

@@ -19,6 +19,12 @@ void WriteCrashBundle(const char* reason, PEXCEPTION_POINTERS ExPtr, bool showDi
 // shows who called it. See docs/CrashCapture.md.
 void WriteCrashBundleForCurrentContext(const char* reason, DWORD pseudoExceptionCode, bool showDialog = false);
 
+// For BBCF's WinMain catch(...) (static 0x0044EDD3), which turns any C++ throw escaping the
+// main loop into a silent "exit(-1)". Logs the last C++ throw the vectored handler recorded
+// on the calling thread (type, throwing module, stack) plus an address-space summary, then
+// writes a bundle and shows the crash dialog. Never throws.
+void ReportCxxExceptionSwallowedByGame(const char* where);
+
 
 // Last resort for a crash handler that HANGS rather than faults.
 //

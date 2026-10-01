@@ -1780,6 +1780,281 @@ LONG WINAPI UnhandledExFilter(PEXCEPTION_POINTERS ExPtr)
         return FinishCrashHandling("UnhandledExFilter");
 }
 
+// ---------------------------------------------------------------------------------------
+// C++ throw tracking.
+//
+// BBCF's WinMain wraps the whole game in catch(...) and returns -1 (funclet at static
+// 0x0044EDD3). The SE translator it installs (0x0044E740, where our game-filter hook sits)
+// only sees SEH faults - the CRT never runs a translator for a C++ throw - so a throw that
+// escapes the main loop exits the game through the normal path: no WER report, no bundle,
+// a clean-shutdown log and "BBCF exit(-1): WinMain RETURNED". Seen 2026-09-29 on a ranked
+// loading screen. By the time that catch runs the exception object is out of reach, so the
+// vectored handler notes every first-chance C++ throw here and the catch hook reads the
+// last one on its thread.
+//
+// Runs on every C++ throw in the process, including the ones the thrower catches itself,
+// so recording allocates nothing, takes no lock and never logs.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+        constexpr DWORD kMsvcCxxExceptionCode = 0xE06D7363;
+        constexpr int kCxxThrowRingSize = 16;
+        constexpr int kCxxThrowFrames = 24;
+
+        struct CxxThrowRecord
+        {
+                LONG sequence = 0; // 0 = never written
+                DWORD threadId = 0;
+                DWORD tick = 0;
+                uintptr_t throwInfo = 0;
+                char typeName[96] = {};
+                int frameCount = 0;
+                uintptr_t frames[kCxxThrowFrames] = {};
+        };
+
+        CxxThrowRecord g_cxxThrows[kCxxThrowRingSize];
+        std::atomic<LONG> g_cxxThrowCount{ 0 };
+
+        // ThrowInfo -> CatchableTypeArray -> first CatchableType -> TypeDescriptor name.
+        // On x86 these are absolute pointers. The first entry is the thrown type itself.
+        void ReadCxxTypeName(uintptr_t throwInfo, char* out, size_t size)
+        {
+                out[0] = '\0';
+                if (throwInfo == 0)
+                {
+                        strncpy_s(out, size, "<rethrow>", _TRUNCATE);
+                        return;
+                }
+
+                __try
+                {
+                        const uintptr_t catchableTypes = *reinterpret_cast<const uintptr_t*>(throwInfo + 0x0C);
+                        if (catchableTypes == 0 || *reinterpret_cast<const int*>(catchableTypes) <= 0)
+                        {
+                                return;
+                        }
+                        const uintptr_t catchableType = *reinterpret_cast<const uintptr_t*>(catchableTypes + 4);
+                        const uintptr_t typeDescriptor = *reinterpret_cast<const uintptr_t*>(catchableType + 4);
+                        const char* name = reinterpret_cast<const char*>(typeDescriptor + 8);
+                        size_t i = 0;
+                        for (; i + 1 < size && name[i] != '\0'; ++i)
+                        {
+                                out[i] = name[i];
+                        }
+                        out[i] = '\0';
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                        strncpy_s(out, size, "<unreadable>", _TRUNCATE);
+                }
+        }
+
+        // Frame-pointer walk from the raise context, bounded by this thread's stack. BBCF
+        // and the mod both keep frame pointers, so this reaches the thrower and its callers.
+        int WalkFramesFromContext(const CONTEXT* context, uintptr_t* frames, int maxFrames)
+        {
+                const NT_TIB* tib = reinterpret_cast<const NT_TIB*>(NtCurrentTeb());
+                const uintptr_t stackLow = reinterpret_cast<uintptr_t>(tib->StackLimit);
+                const uintptr_t stackHigh = reinterpret_cast<uintptr_t>(tib->StackBase);
+
+                int count = 0;
+                frames[count++] = static_cast<uintptr_t>(context->Eip);
+                uintptr_t ebp = static_cast<uintptr_t>(context->Ebp);
+                while (count < maxFrames &&
+                       ebp >= stackLow && ebp + 8 <= stackHigh && (ebp & 3) == 0)
+                {
+                        const uintptr_t next = *reinterpret_cast<const uintptr_t*>(ebp);
+                        const uintptr_t ret = *reinterpret_cast<const uintptr_t*>(ebp + 4);
+                        if (ret == 0)
+                        {
+                                break;
+                        }
+                        frames[count++] = ret;
+                        if (next <= ebp)
+                        {
+                                break;
+                        }
+                        ebp = next;
+                }
+                return count;
+        }
+
+        void RecordCxxThrow(PEXCEPTION_POINTERS ExPtr)
+        {
+                const EXCEPTION_RECORD* record = ExPtr->ExceptionRecord;
+                if (record->NumberParameters < 3)
+                {
+                        return;
+                }
+
+                const LONG sequence = g_cxxThrowCount.fetch_add(1) + 1;
+                CxxThrowRecord& slot = g_cxxThrows[(sequence - 1) % kCxxThrowRingSize];
+                slot.sequence = 0;
+                slot.threadId = GetCurrentThreadId();
+                slot.tick = GetTickCount();
+                slot.throwInfo = static_cast<uintptr_t>(record->ExceptionInformation[2]);
+                ReadCxxTypeName(slot.throwInfo, slot.typeName, sizeof(slot.typeName));
+                slot.frameCount = ExPtr->ContextRecord
+                        ? WalkFramesFromContext(ExPtr->ContextRecord, slot.frames, kCxxThrowFrames)
+                        : 0;
+                slot.sequence = sequence;
+        }
+
+        bool FindLastCxxThrowOnThread(DWORD threadId, CxxThrowRecord* out, LONG* totalThrows)
+        {
+                const LONG total = g_cxxThrowCount.load();
+                *totalThrows = total;
+                for (LONG seq = total; seq > 0 && seq > total - kCxxThrowRingSize; --seq)
+                {
+                        const CxxThrowRecord& slot = g_cxxThrows[(seq - 1) % kCxxThrowRingSize];
+                        if (slot.sequence == seq && slot.threadId == threadId)
+                        {
+                                *out = slot;
+                                return true;
+                        }
+                }
+                return false;
+        }
+
+        // ".?AVbad_alloc@std@@" -> "std::bad_alloc". Templates and other decorations are
+        // left as they are; the raw name is still unambiguous.
+        std::string UndecorateTypeName(const char* raw)
+        {
+                std::string name(raw);
+                if (name.size() < 7 ||
+                    (name.compare(0, 4, ".?AV") != 0 && name.compare(0, 4, ".?AU") != 0) ||
+                    name.find_first_of("?$", 4) != std::string::npos ||
+                    name.compare(name.size() - 2, 2, "@@") != 0)
+                {
+                        return name;
+                }
+
+                std::vector<std::string> parts;
+                std::string body = name.substr(4, name.size() - 6);
+                size_t start = 0;
+                for (;;)
+                {
+                        const size_t at = body.find('@', start);
+                        parts.push_back(body.substr(start, at - start));
+                        if (at == std::string::npos) break;
+                        start = at + 1;
+                }
+
+                std::string result;
+                for (auto it = parts.rbegin(); it != parts.rend(); ++it)
+                {
+                        if (!result.empty()) result += "::";
+                        result += *it;
+                }
+                return result;
+        }
+
+        // The 32-bit game has 2 GB of address space, and a failed large allocation is the
+        // prime suspect for a throw on a loading screen (see the char-select atlas OOM).
+        // "largest free" is the number that decides whether a big allocation can succeed.
+        void DescribeAddressSpace(char* out, size_t size)
+        {
+                SYSTEM_INFO info{};
+                GetSystemInfo(&info);
+                const uintptr_t limit = reinterpret_cast<uintptr_t>(info.lpMaximumApplicationAddress);
+
+                uintptr_t address = 0;
+                SIZE_T freeTotal = 0, largestFree = 0, committed = 0, reserved = 0;
+                MEMORY_BASIC_INFORMATION mbi{};
+                while (address < limit &&
+                       VirtualQuery(reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi)) == sizeof(mbi))
+                {
+                        if (mbi.State == MEM_FREE)
+                        {
+                                freeTotal += mbi.RegionSize;
+                                largestFree = std::max(largestFree, mbi.RegionSize);
+                        }
+                        else if (mbi.State == MEM_COMMIT)
+                        {
+                                committed += mbi.RegionSize;
+                        }
+                        else
+                        {
+                                reserved += mbi.RegionSize;
+                        }
+
+                        const uintptr_t next = reinterpret_cast<uintptr_t>(mbi.BaseAddress) + mbi.RegionSize;
+                        if (next <= address) break;
+                        address = next;
+                }
+
+                sprintf_s(out, size,
+                          "address space: %u MB committed, %u MB reserved, %u MB free, largest free "
+                          "block %.2f MB (user limit %u MB)",
+                          static_cast<unsigned>(committed >> 20), static_cast<unsigned>(reserved >> 20),
+                          static_cast<unsigned>(freeTotal >> 20), largestFree / (1024.0 * 1024.0),
+                          static_cast<unsigned>((limit + 1) >> 20));
+        }
+}
+
+static void ReportCxxExceptionSwallowedByGameImpl(const char* where);
+
+// Called from inside the game's catch funclet. If the report itself throws (the likely
+// culprit is running out of memory, and the report allocates), the throw must not leave
+// this function: a second exception in flight inside a catch block ends in terminate().
+void ReportCxxExceptionSwallowedByGame(const char* where)
+{
+        try
+        {
+                ReportCxxExceptionSwallowedByGameImpl(where);
+        }
+        catch (...)
+        {
+                ForceLog("[Crash] The report for a swallowed C++ exception threw; writing a bundle without it.\n");
+                ArmCrashWatchdog("WinMain catch(...) crash handling");
+                WriteCrashBundleForCurrentContext("Game's WinMain catch(...) swallowed a C++ exception "
+                                                  "(details unavailable - the report itself failed)",
+                                                  kMsvcCxxExceptionCode, true);
+                DisarmCrashWatchdog();
+        }
+}
+
+static void ReportCxxExceptionSwallowedByGameImpl(const char* where)
+{
+        const DWORD threadId = GetCurrentThreadId();
+        CxxThrowRecord last;
+        LONG totalThrows = 0;
+        const bool found = FindLastCxxThrowOnThread(threadId, &last, &totalThrows);
+
+        char addressSpace[192] = {};
+        DescribeAddressSpace(addressSpace, sizeof(addressSpace));
+
+        std::ostringstream reason;
+        reason << where << " swallowed a C++ exception and the game is closing with exit code -1.\n";
+        if (found)
+        {
+                reason << "Last C++ throw on this thread (" << (GetTickCount() - last.tick) << " ms ago, "
+                       << totalThrows << " throws this session): type=" << UndecorateTypeName(last.typeName)
+                       << " (" << last.typeName << "), type info in " << DescribeAddress(last.throwInfo) << "\n"
+                       << "Throw stack (raise site first):\n";
+                for (int i = 0; i < last.frameCount; ++i)
+                {
+                        reason << "  #" << i << " " << DescribeAddress(last.frames[i]) << "\n";
+                }
+        }
+        else
+        {
+                reason << "No C++ throw on this thread was recorded (" << totalThrows
+                       << " this session). It may have been older than the last " << kCxxThrowRingSize
+                       << " throws, or thrown before the vectored handler was installed.\n";
+        }
+        reason << addressSpace << "\n";
+
+        const std::string text = reason.str();
+        LOG(0, "[Crash] %s", text.c_str());
+
+        // The game exits on its own once the catch returns, so the watchdog only guards the
+        // bundle write. The dialog is shown because this used to be a completely silent exit.
+        ArmCrashWatchdog("WinMain catch(...) crash handling");
+        WriteCrashBundleForCurrentContext(text.c_str(), kMsvcCxxExceptionCode, true);
+        DisarmCrashWatchdog();
+}
+
 static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
 {
         if (!ExPtr || !ExPtr->ExceptionRecord)
@@ -1788,6 +2063,12 @@ static LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS ExPtr)
         }
 
         const DWORD code = ExPtr->ExceptionRecord->ExceptionCode;
+
+        if (code == kMsvcCxxExceptionCode)
+        {
+                RecordCxxThrow(ExPtr);
+                return EXCEPTION_CONTINUE_SEARCH;
+        }
 
         // Catch heap corruption and other fail-fast style exceptions that may bypass
         // the standard unhandled filter.

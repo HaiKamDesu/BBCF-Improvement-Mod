@@ -288,9 +288,19 @@ namespace
 		const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 		if (caller == base + kAfterWinMainExitReturnRva)
 		{
-			ExitDiagnostics::Note("BBCF exit(%d): WinMain RETURNED - the game's main loop ended and the game is "
-				"closing normally. Static destructors run next; anything that crashes from here on is a "
-				"shutdown side effect. What ended the loop is in the events just before this one.", exitCode);
+			if (exitCode == -1)
+			{
+				// WinMain only returns -1 from its catch(...) (see WinMainCatchAllHook).
+				ExitDiagnostics::Note("BBCF exit(-1): WinMain RETURNED through its catch(...) - a C++ "
+					"exception escaped the game's main loop and the game swallowed it. This is a crash, "
+					"not a quit; the [Crash] WinMain catch(...) report just before this names the throw.");
+			}
+			else
+			{
+				ExitDiagnostics::Note("BBCF exit(%d): WinMain RETURNED - the game's main loop ended and the game is "
+					"closing normally. Static destructors run next; anything that crashes from here on is a "
+					"shutdown side effect. What ended the loop is in the events just before this one.", exitCode);
+			}
 		}
 		else
 		{
