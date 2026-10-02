@@ -222,6 +222,72 @@ static bool IsNativeGameTrackId(int trackId) {
 		MusicManager::GetBgmFilename(trackId) != nullptr;
 }
 
+// The Character Select BGM menu - the object GetMusicSelectAddr hooks (0x004E9300 is its
+// reset). musicSelect_X/_Y are that menu's CURSOR: X is a row and Y a column. Neither is a
+// track id. This was read and written as one, and the two only agree for rows 0-35:
+//
+//   - Rows are built at runtime by 0x004E6990, one per song the player has, so a row number
+//     depends on what is unlocked and bought. Up to 0x47 rows of 0x14 bytes from +0x08:
+//     {+0x08 song key, +0x0C/+0x10 track id for column 0/1 (-1 = none), +0x14 in use}. The
+//     second column is a bought older version. The row count is at +0x594.
+//   - 0x004E9200 resolves the pick as id = [base + (X*5 + Y)*4 + 0x0C] and stores it at
+//     +0x5AC.
+//
+// With every song available Fatal Judge (track 89) is row 59, and 59 is in JUSTICE's track
+// id: picking Fatal Judge and hearing in JUSTICE (2026-10) is that confusion.
+namespace MusicSelectMenu {
+	constexpr int kMaxRows = 0x47;
+	constexpr int kColumns = 2;
+	constexpr int kRowStride = 0x14;
+	constexpr int kFirstCell = 0x0C;
+	constexpr int kRowCount = 0x594;
+
+	const unsigned char* Base() {
+		const unsigned char* base = reinterpret_cast<const unsigned char*>(MusicManager::s_musicSelectX);
+		if (!base || IsBadReadPtr(base, kRowCount + 4)) return nullptr;
+		return base;
+	}
+
+	int RowCount(const unsigned char* base) {
+		const int rows = *reinterpret_cast<const int*>(base + kRowCount);
+		return (rows > 0 && rows <= kMaxRows) ? rows : 0;
+	}
+
+	int TrackAt(const unsigned char* base, int row, int column) {
+		return *reinterpret_cast<const int*>(base + kFirstCell + row * kRowStride + column * 4);
+	}
+
+	// The track under the cursor, or -1 when the menu has not been built or the cursor is
+	// off it (it is reset to 0,0 before the rows exist).
+	int SelectedTrackId() {
+		const unsigned char* base = Base();
+		if (!base) return -1;
+		const int x = MusicManager::s_musicSelectX ? *MusicManager::s_musicSelectX : -1;
+		const int y = MusicManager::s_musicSelectY ? *MusicManager::s_musicSelectY : 0;
+		if (x < 0 || x >= RowCount(base) || y < 0 || y >= kColumns) return -1;
+		return TrackAt(base, x, y);
+	}
+
+	// Puts the cursor on the row and column holding this track. Leaves it alone when the
+	// track is not in the menu - a cursor past the rows is what the game cannot handle.
+	bool SelectTrack(int trackId) {
+		const unsigned char* base = Base();
+		if (!base || trackId < 0 || !MusicManager::s_musicSelectX) return false;
+		const int rows = RowCount(base);
+		for (int row = 0; row < rows; ++row) {
+			for (int column = 0; column < kColumns; ++column) {
+				if (TrackAt(base, row, column) != trackId) continue;
+				*MusicManager::s_musicSelectX = row;
+				if (MusicManager::s_musicSelectY) *MusicManager::s_musicSelectY = column;
+				return true;
+			}
+		}
+		LogMusic("MusicManager: track %d is not in the Character Select BGM menu (%d rows); cursor left as is\n",
+			trackId, rows);
+		return false;
+	}
+}
+
 // Precomputed EXACT track durations in seconds, generated offline from the
 // game's own audio data (tools/validate_durations.py: parse each .pac's FPAC
 // table -> wave bank -> Duration field). Used as a fallback when a track's
@@ -286,6 +352,68 @@ std::string MusicManager::GetSongTimeString() const {
 	return oss.str();
 }
 
+// The battle tracks' titles as the game itself shows them on Character Select, keyed by
+// track id. The game names only these (ids 0-94); system and story tracks have no title
+// anywhere in its data, so those labels below are ours, set by ear.
+//
+// Source: data/localize/<lang>_idlist.txt, UTF-16LE, one string per line, where a line
+// "BGM_<id>_<FILE>" is followed by that track's title (the keys are BBCF.exe's table at
+// 0x9DC4D0). English is read because the Jukebox UI is not in the game's languages and the
+// titles are English in every one of them anyway.
+static std::map<int, std::string> ReadGameBattleTrackTitles() {
+    std::map<int, std::string> titles;
+    std::ifstream file(GetGameDirectoryW() + L"\\data\\localize\\eng_idlist.txt", std::ios::binary);
+    if (!file) {
+        LogMusic("MusicManager: eng_idlist.txt not readable; keeping built-in track titles\n");
+        return titles;
+    }
+    std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    size_t start = (bytes.size() >= 2 && (unsigned char)bytes[0] == 0xFF && (unsigned char)bytes[1] == 0xFE) ? 2 : 0;
+    std::wstring text;
+    text.reserve(bytes.size() / 2);
+    for (size_t i = start; i + 1 < bytes.size(); i += 2) {
+        text.push_back(static_cast<wchar_t>((unsigned char)bytes[i] | ((unsigned char)bytes[i + 1] << 8)));
+    }
+
+    std::wistringstream lines(text);
+    std::wstring line;
+    int pendingId = -1;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == L'\r') line.pop_back();
+        if (pendingId >= 0) {
+            // A full-width space sits in "Plastic Night II"; the overlay font has no glyph.
+            std::replace(line.begin(), line.end(), L'\x3000', L' ');
+            const int size = WideCharToMultiByte(CP_UTF8, 0, line.c_str(), (int)line.size(), nullptr, 0, nullptr, nullptr);
+            std::string utf8(size, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, line.c_str(), (int)line.size(), &utf8[0], size, nullptr, nullptr);
+            if (!utf8.empty()) titles[pendingId] = utf8;
+            pendingId = -1;
+            continue;
+        }
+        if (line.size() > 8 && line.compare(0, 4, L"BGM_") == 0 && iswdigit(line[4])) {
+            pendingId = _wtoi(line.c_str() + 4);
+        }
+    }
+    LogMusic("MusicManager: read %d battle track titles from the game\n", (int)titles.size());
+    return titles;
+}
+
+// Replaces the title part of each battle track's label with the game's, keeping our
+// "(who it belongs to)" suffix - unless the game's title already has a parenthesis of its
+// own, like "Bang! Bang! Bigbang! (short)".
+static void ApplyGameBattleTrackTitles(std::vector<MusicTrack>& tracks) {
+    const std::map<int, std::string> titles = ReadGameBattleTrackTitles();
+    for (MusicTrack& track : tracks) {
+        if (track.id >= 100) continue;
+        const auto found = titles.find(track.id);
+        if (found == titles.end()) continue;
+        const size_t suffixAt = track.name.rfind(" (");
+        const std::string suffix = (suffixAt != std::string::npos && found->second.find('(') == std::string::npos)
+            ? track.name.substr(suffixAt) : std::string();
+        track.name = found->second + suffix;
+    }
+}
+
 void MusicManager::BuildTrackList() {
     // BBCF Central Fiction BGM tracks
     // Track IDs match the numeric prefix of BGM filenames:
@@ -305,7 +433,7 @@ void MusicManager::BuildTrackList() {
     m_tracks.push_back({ 12, "Condemnation Wings II (Tsubaki)", "btl" });
     m_tracks.push_back({ 13, "Gluttony Fang II (Hazama)", "btl" });
     m_tracks.push_back({ 14, "Sword of Doom II (Mu-12)", "btl" });
-    m_tracks.push_back({ 15, "Alexandrite II (Makoto)", "btl" });
+    m_tracks.push_back({ 15, "Alexandrite-II- (Makoto)", "btl" });
     m_tracks.push_back({ 16, "Howling Moon II (Valkenhayn)", "btl" });
     m_tracks.push_back({ 17, "Active Angel II (Platinum)", "btl" });
     m_tracks.push_back({ 18, "Plastic Night II (Relius)", "btl" });
@@ -340,26 +468,26 @@ void MusicManager::BuildTrackList() {
     m_tracks.push_back({ 61, "Reincarnation (Nine vs Celica/Kokonoe/Jubei)", "vs" });
     m_tracks.push_back({ 62, "Bloodline (Ragna/Jin vs Izanami)", "vs" });
     m_tracks.push_back({ 63, "God of War (Hakumen vs Susano'o)", "vs" });
-    m_tracks.push_back({ 80, "Endless Despair (Boss Hazama)", "boss" });
-    m_tracks.push_back({ 81, "Black Onslaught (Boss Ragna)", "boss" });
-    m_tracks.push_back({ 82, "Blood Pain (Mirror Match)", "boss" });
-    m_tracks.push_back({ 83, "Bang! Bang! Bigbang! (Bang)", "boss" });
-    m_tracks.push_back({ 84, "Bang! Bang! Bigbang! (Short)", "boss" });
-    m_tracks.push_back({ 85, "Sector7 (Sector 7)", "boss" });
+    m_tracks.push_back({ 80, "Endless Despair II (Boss Hazama)", "boss" });
+    m_tracks.push_back({ 81, "Black Onslaught II (Boss Ragna)", "boss" });
+    m_tracks.push_back({ 82, "Blood Pain II (Mirror Match)", "boss" });
+    m_tracks.push_back({ 83, "OMAE NO TETTUI NI KUGI WO UTE (Bang)", "boss" });
+    m_tracks.push_back({ 84, "OMAE NO TETTUI NI KUGI WO UTE (Short)", "boss" });
+    m_tracks.push_back({ 85, "sector7 (Sector Seven)", "boss" });
     m_tracks.push_back({ 86, "SIX-HEROES (Six Heroes)", "boss" });
-    m_tracks.push_back({ 87, "OMAE NO TETTUI NI KUGI WO UTE (Bang)", "boss" });
-    m_tracks.push_back({ 88, "OMAE NO TETTUI NI KUGI WO UTE (Short)", "boss" });
-    m_tracks.push_back({ 89, "Boss Theme (Arcade Boss)", "boss" });
+    m_tracks.push_back({ 87, "Bang! Bang! Bigbang! (Bang)", "boss" });
+    m_tracks.push_back({ 88, "Bang! Bang! Bigbang! (short)", "boss" });
+    m_tracks.push_back({ 89, "Fatal Judge (Arcade Boss)", "boss" });
     m_tracks.push_back({ 90, "THE HIGHLANDER (Bullet)", "boss" });
     m_tracks.push_back({ 91, "THE WORLD END (Boss Izanami)", "boss" });
     m_tracks.push_back({ 92, "HAKAISHIN (Boss Susano'o)", "boss" });
     m_tracks.push_back({ 94, "END GAZER (Es vs Celica/Nine)", "boss" });
     m_tracks.push_back({ 100, "CENTRALFICTION (Arcade Opening)", "sys" });
     m_tracks.push_back({ 101, "Twilight tear (Credits)", "sys" });
-    m_tracks.push_back({ 102, "Ending", "sys" });
-    m_tracks.push_back({ 103, "TRUE-BLUE (Console Opening)", "sys" });
+    m_tracks.push_back({ 102, "Ending (Astral Finish C jingle)", "sys" });
+    m_tracks.push_back({ 103, "CHRONORISE Ver 2.0 (Opening 2)", "sys" });
     m_tracks.push_back({ 104, "Staffroll 2", "sys" });
-    m_tracks.push_back({ 150, "CS Opening", "sys" });
+    m_tracks.push_back({ 150, "TRUE-BLUE (CS Opening)", "sys" });
     m_tracks.push_back({ 152, "CS Credits", "sys" });
     m_tracks.push_back({ 200, "a drop (Title Screen)", "sys" });
     m_tracks.push_back({ 201, "Next force (Character Select)", "sys" });
@@ -464,7 +592,7 @@ void MusicManager::BuildTrackList() {
     m_tracks.push_back({ 456, "Story: Master Unit", "story" });
     m_tracks.push_back({ 500, "Pandora Tears", "story" });
     m_tracks.push_back({ 501, "Story: Truth", "story" });
-    m_tracks.push_back({ 502, "Stardust Memory ~eternal days~", "story" });
+    m_tracks.push_back({ 502, "TRUE-BLUE (Story)", "story" });
 
     m_tracks.push_back({ 600, "Astral Finish (A)", "astral" });
     m_tracks.push_back({ 601, "Astral Finish (B)", "astral" });
@@ -478,6 +606,8 @@ void MusicManager::BuildTrackList() {
     m_tracks.push_back({ 609, "Astral Finish (A)", "astral" });
     m_tracks.push_back({ 610, "Astral Finish (B)", "astral" });
     m_tracks.push_back({ 611, "Astral Finish (C)", "astral" });
+
+    ApplyGameBattleTrackTitles(m_tracks);
 
     for (auto& track : m_tracks) {
         m_trackEnabled[track.id] = true;
@@ -718,8 +848,9 @@ void MusicManager::Initialize() {
     s_musicSelectX = g_gameVals.musicSelect_X;
     s_musicSelectY = g_gameVals.musicSelect_Y;
 
-    if (s_musicSelectX && IsNativeGameTrackId(*s_musicSelectX)) {
-        m_gameMusicId = *s_musicSelectX;
+    const int selectedId = MusicSelectMenu::SelectedTrackId();
+    if (IsNativeGameTrackId(selectedId)) {
+        m_gameMusicId = selectedId;
         m_currentTrackId = m_gameMusicId;
 
         for (const auto& track : m_tracks) {
@@ -734,7 +865,7 @@ void MusicManager::Initialize() {
             LogMusic("MusicManager: Initial track = \"%s\"\n", m_currentTrack->name.c_str());
         }
     } else {
-        LogMusic("MusicManager: WARNING - musicSelect_X not available! Music rotation will not work.\n");
+        LogMusic("MusicManager: no track picked in the Character Select BGM menu yet\n");
     }
 
     LoadPreferences();
@@ -872,8 +1003,8 @@ void MusicManager::Update() {
         LogMusic("MusicManager: Acquired musicSelect_X at frame level\n");
 
         if (s_musicSelectX) {
-            int startupId = *s_musicSelectX;
-            if (IsNativeGameTrackId(startupId)) { // ignore non-track garbage values
+            const int startupId = MusicSelectMenu::SelectedTrackId();
+            if (IsNativeGameTrackId(startupId)) { // the menu may not be built yet
                 m_gameMusicId = startupId;
                 m_currentTrackId = startupId;
                 for (const auto& track : m_tracks) {
@@ -938,8 +1069,9 @@ void MusicManager::Update() {
     static int logTimer = 0;
     logTimer++;
     if (logTimer % 600 == 0) {
-        LogMusic("MusicManager: musicSelect_X=%p, val=%d, currentTrackId=%d\n",
-            (void*)s_musicSelectX, s_musicSelectX ? *s_musicSelectX : -1, m_currentTrackId);
+        LogMusic("MusicManager: BGM menu cursor=(%d,%d) -> track %d, currentTrackId=%d\n",
+            s_musicSelectX ? *s_musicSelectX : -1, s_musicSelectY ? *s_musicSelectY : -1,
+            MusicSelectMenu::SelectedTrackId(), m_currentTrackId);
     }
 
     UpdateMusicState();
@@ -2146,9 +2278,9 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 		LogMusic("MusicManager: Failed to write presentedId to audioManager + 0x1690\n");
 	}
 
-	// Sync game menu cursor state (also the supported anchor, never a raw vs/old id)
-	if (MusicManager::s_musicSelectX) *MusicManager::s_musicSelectX = presentedId;
-	if (MusicManager::s_musicSelectY) *MusicManager::s_musicSelectY = 0;
+	// Sync the game's menu cursor to the supported anchor (never a raw vs/old id). The
+	// cursor is a row/column, so it is moved to wherever that track sits.
+	MusicSelectMenu::SelectTrack(presentedId);
 
 	// Restore audioManager BGM slot 0 to its native (active) state.
 	// We deactivated it in STEP 1 to prevent race conditions during loading/registration.
@@ -2235,6 +2367,7 @@ bool MusicManager::PlayTrack(int trackId, bool force) {
 	if (m_currentTrack) {
 		LogMusic("MusicManager: Track = \"%s\"\n", m_currentTrack->name.c_str());
 	}
+	return true;
 }
 
 bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string& cueName) {
@@ -2424,9 +2557,8 @@ void MusicManager::UnloadCustomBgm() {
         }
     }
 
-    // Reset music-select cursors to the initially-selected anchor track.
-    if (s_musicSelectX) *s_musicSelectX = m_anchorTrackId;
-    if (s_musicSelectY) *s_musicSelectY = 0;
+    // Put the music-select cursor back on the initially-selected anchor track.
+    MusicSelectMenu::SelectTrack(m_anchorTrackId);
 
     // Reset internal rotation state so re-entering the match re-arms cleanly.
     m_customBgmLoaded = false;
@@ -2574,8 +2706,7 @@ void MusicManager::ClearBgmForSceneExit() {
         LogMusic("MusicManager: Exception during ClearBgmForSceneExit (continuing)\n");
     }
 
-    if (s_musicSelectX) *s_musicSelectX = m_anchorTrackId;
-    if (s_musicSelectY) *s_musicSelectY = 0;
+    MusicSelectMenu::SelectTrack(m_anchorTrackId);
 
     m_customBgmLoaded = false;
     m_modControllingBgm = false;
