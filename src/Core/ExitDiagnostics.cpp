@@ -1,5 +1,6 @@
 #include "ExitDiagnostics.h"
 
+#include "Core/crashdump.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 
@@ -395,6 +396,63 @@ namespace
 		return CallNextHookEx(g_callWndProcHook, code, wParam, lParam);
 	}
 
+	// The game closing without ever finishing. 2026-10-01, dev machine: closed from the
+	// taskbar while alt-tabbed, the window was destroyed and WM_QUIT reached the main loop -
+	// and then nothing. No exit(), no message box, no WER report: the game sat in its own
+	// teardown (inside 0x00482C00, which WinMain calls and which runs the loop) with no window
+	// for three hours, Steam still showing it as running, until it was killed by hand.
+	//
+	// So once WM_QUIT is in, a thread waits for exit(). BBCF's teardown takes a few seconds at
+	// most - its longest known wait, the thread pool's 3 s, is inside exit() and so already
+	// past the line this checks. Past the deadline the main thread is stuck: a crash bundle
+	// records where (the bundle walks the suspended main thread's stack, and the dump holds
+	// every thread), and the process is ended, since nothing is left to show or save.
+	constexpr DWORD kQuitToExitDeadlineMs = 15000;
+	constexpr DWORD kQuitWatchStepMs = 250;
+	constexpr DWORD kExitHangPseudoCode = 0xE0484E47; // "HNG"
+	std::atomic<bool> g_quitWatchStarted{ false };
+
+	DWORD WINAPI QuitWatchdogThread(LPVOID)
+	{
+		for (DWORD waited = 0; waited < kQuitToExitDeadlineMs; waited += kQuitWatchStepMs)
+		{
+			if (g_exiting.load())
+			{
+				return 0;
+			}
+			Sleep(kQuitWatchStepMs);
+		}
+		if (g_exiting.load())
+		{
+			return 0;
+		}
+		ExitDiagnostics::Note("CLOSE HUNG: WM_QUIT was %lu s ago and the game never reached exit(). Writing a "
+			"crash bundle (main thread stack + dump), then ending the process so it does not linger windowless.",
+			kQuitToExitDeadlineMs / 1000);
+		WriteCrashBundleForCurrentContext("The game hung while closing (WM_QUIT, never reached exit())",
+			kExitHangPseudoCode, false);
+		ExitDiagnostics::Note("CLOSE HUNG: bundle written, terminating");
+		TerminateProcess(GetCurrentProcess(), 0);
+		return 0;
+	}
+
+	void StartQuitWatchdog()
+	{
+		if (g_quitWatchStarted.exchange(true))
+		{
+			return;
+		}
+		HANDLE thread = CreateThread(nullptr, 0, QuitWatchdogThread, nullptr, 0, nullptr);
+		if (thread)
+		{
+			CloseHandle(thread);
+		}
+		else
+		{
+			g_quitWatchStarted.store(false);
+		}
+	}
+
 	LRESULT CALLBACK GetMessageHook(int code, WPARAM wParam, LPARAM lParam)
 	{
 		if (code == HC_ACTION && wParam == PM_REMOVE && lParam != 0)
@@ -404,6 +462,7 @@ namespace
 			{
 				ExitDiagnostics::Note("WM_QUIT retrieved by the main loop (exit code %d) - the game is about to close",
 					static_cast<int>(message->wParam));
+				StartQuitWatchdog();
 			}
 			else if (message->message == WM_CLOSE)
 			{
