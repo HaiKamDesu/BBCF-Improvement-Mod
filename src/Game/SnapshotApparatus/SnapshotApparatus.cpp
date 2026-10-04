@@ -3,6 +3,8 @@
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Core/Localization.h"
+#include "Overlay/NotificationBar/NotificationBar.h"
 #include "Game/gamestates.h"
 #include "Game/EntityData.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
@@ -2230,6 +2232,51 @@ SnapshotApparatus::SnapshotApparatus() {
 		LOG(1, "[Snapshot] ctor end this=%p snapshot_count=%u last_saved_snapshot_size=%d\n", this, this->snapshot_count, this->last_saved_snapshot_size);
 	}
 
+int SnapshotApparatus::GetNetSessionKind() {
+	// The game's own getter, FUN_0049A340. It reads netUserData (0xCAD0C0) + 0x23218, which
+	// points at this client's own entry in the room-member table (slot 0 at +0x22D58 when
+	// hosting, slot 1 at +0x22DF0 when joined), and that entry's flags at +0x2C:
+	//   -1   no entry: not in any lobby
+	//   1, 2 in a lobby and seated as a fighter (bit 1), on side bit 0
+	//   3    in a lobby but not seated
+	// A ranked entry set from training hosts a lobby in the background and waits there,
+	// leaving now and then to try joining someone else's - so it is 3 for most of the time
+	// and -1 only in the gaps. Measured 2026-10-04: stays of 1 s to 15 s with short gaps,
+	// and once a single stay of 11 minutes that found no opponent at all.
+	//
+	// The one-time init branches on this. 3 builds a spectator session and reads a null
+	// [ctx+0x534] at BBCF+0xe57f2 (the crash on 2026-10-04); 1/2 build a real P2P session
+	// with the other member. Only -1 builds the offline local session savestates need.
+	typedef int(__cdecl* get_net_session_kind_decl)();
+	return reinterpret_cast<get_net_session_kind_decl>(GetBbcfBaseAdress() + 0x9a340)();
+}
+
+bool SnapshotApparatus::IsWaitingOnNetSession() {
+	const int initDone = *(int*)(GetBbcfBaseAdress() + 0x612888);
+	return initDone == 0 && GetNetSessionKind() != -1;
+}
+
+void SnapshotApparatus::ReportRefused(const char* who) {
+	// Callers other than TAS just get false back and retry on their own schedule (replay
+	// rewind saves every few frames), so both the log line and the notification are
+	// rate-limited.
+	static DWORD s_lastReportMs = 0;
+	const DWORD now = GetTickCount();
+	if (s_lastReportMs != 0 && now - s_lastReportMs < 10000) {
+		return;
+	}
+	s_lastReportMs = now;
+	const bool waitingOnSession = IsWaitingOnNetSession();
+	LOG(1, "[Snapshot] %s refused: %s\n", who ? who : "?",
+		waitingOnSession ? "the game's ranked search is sitting in a lobby"
+		                 : "the game's savestate machinery is not set up");
+	if (waitingOnSession && g_notificationBar != nullptr) {
+		g_notificationBar->AddLocalizedNotification([]() {
+			return L("The ranked search is waiting in a lobby right now. Try again in a few seconds, or remove the ranked entry.");
+		});
+	}
+}
+
 bool SnapshotApparatus::EnsureNetInit() {
 	// At most one successful init per apparatus, as when this lived in the constructor.
 	if (this->net_init_ready) {
@@ -2245,22 +2292,23 @@ bool SnapshotApparatus::EnsureNetInit() {
 	}
 
 	void** SCENE_CBattle_probe = (void**)(base_addr + 0x8929B4);
-	// The game's net-session kind, from its own getter (FUN_0049A340): -1 = no session
-	// object, 1/2 = a session with the player bit set, 3 = a session object without it -
-	// which is what a ranked search started from training leaves behind. The init below
-	// reads per-kind objects that are null outside a real match: kind 3 dereferenced a null
-	// [ctx+0x534] at BBCF+0xe57f2 on 2026-10-04 (Save base state during a training ranked
-	// search). Plain offline (-1) is the only kind this init has ever been run under, so it
-	// is the only kind allowed; everything else waits until the session is gone.
-	typedef int(__cdecl* get_net_session_kind_decl)();
-	const int netSessionKind = reinterpret_cast<get_net_session_kind_decl>(base_addr + 0x9a340)();
-	LOG(1, "[Snapshot] one-time net init: flag(base+0x612888)=%d SCENE_CBattle=%p netSessionKind=%d\n",
-		*(int*)DAT_01292888, SCENE_CBattle_probe ? *SCENE_CBattle_probe : nullptr, netSessionKind);
+	// Only plain offline (-1) is allowed; see GetNetSessionKind for what the others are and
+	// why the init below crashes on them. A waiting caller polls this every frame, so the
+	// refusal is logged when the kind changes rather than on every call.
+	const int netSessionKind = GetNetSessionKind();
+	static int s_lastRefusedKind = -1;
 	if (netSessionKind != -1) {
-		LOG(1, "[Snapshot] net init REFUSED: a net session (kind %d) is active, e.g. a ranked "
-		       "search from training. Savestates stay unavailable until it ends.\n", netSessionKind);
+		if (netSessionKind != s_lastRefusedKind) {
+			LOG(1, "[Snapshot] net init REFUSED: netSessionKind=%d - the game is inside a net "
+			       "session (a ranked search sitting in a matchmaking lobby). Savestates wait until "
+			       "it leaves.\n", netSessionKind);
+			s_lastRefusedKind = netSessionKind;
+		}
 		return false;
 	}
+	s_lastRefusedKind = -1;
+	LOG(1, "[Snapshot] one-time net init: flag(base+0x612888)=%d SCENE_CBattle=%p netSessionKind=%d\n",
+		*(int*)DAT_01292888, SCENE_CBattle_probe ? *SCENE_CBattle_probe : nullptr, netSessionKind);
 
 	///PRELUDE
 	auto mem_offset_1 = 0xe5701;//2 bytes
@@ -2360,7 +2408,7 @@ bool SnapshotApparatus::save_into_slot(int target_slot, Snapshot** pbuf_mine)
 	LOG(1, "[Snapshot] save_snapshot begin this=%p snapshot_count=%u pbuf_mine=%p\n", this, this->snapshot_count, pbuf_mine);
 	LogSnapshotRuntimeContext("save_snapshot");
 	if (!this->EnsureNetInit()) {
-		LOG(1, "[Snapshot] save_snapshot refused: the game's savestate machinery is not set up\n");
+		ReportRefused("save_snapshot");
 		return false;
 	}
 	char* base_addr = GetBbcfBaseAdress();
@@ -2465,7 +2513,7 @@ bool SnapshotApparatus::load_snapshot_sized(const void* buf, size_t buf_size)
 		this->snapshot_count);
 	LogSnapshotRuntimeContext("load_snapshot_sized");
 	if (!this->EnsureNetInit()) {
-		LOG(1, "[Snapshot] load_snapshot_sized refused: the game's savestate machinery is not set up\n");
+		ReportRefused("load_snapshot_sized");
 		return false;
 	}
 	char* base_addr = GetBbcfBaseAdress();
@@ -2687,7 +2735,7 @@ bool SnapshotApparatus::load_snapshot_index(int index) {
 	LOG(1, "[Snapshot] load_snapshot_index begin this=%p index=%d snapshot_count=%u\n", this, index, this->snapshot_count);
 	LogSnapshotRuntimeContext("load_snapshot_index");
 	if (!this->EnsureNetInit()) {
-		LOG(1, "[Snapshot] load_snapshot_index refused: the game's savestate machinery is not set up\n");
+		ReportRefused("load_snapshot_index");
 		return false;
 	}
 	char* base_addr = GetBbcfBaseAdress();
@@ -2896,7 +2944,7 @@ void SnapshotApparatus::clear_count()
 bool SnapshotApparatus::clear_framecounts() {
 	LOG(1, "[Snapshot] clear_framecounts this=%p\n", this);
 	if (!this->EnsureNetInit()) {
-		LOG(1, "[Snapshot] clear_framecounts refused: the game's savestate machinery is not set up\n");
+		ReportRefused("clear_framecounts");
 		return false;
 	}
 	char* base_addr = GetBbcfBaseAdress();

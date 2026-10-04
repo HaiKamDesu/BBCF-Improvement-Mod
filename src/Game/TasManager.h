@@ -19,6 +19,9 @@ struct TasSection {
 enum class TasRunState {
     Idle,
     PausedAtMovieFrame,
+    // Save base state was asked for while BBCF's ranked search sits in a lobby, where the
+    // game cannot set savestates up. Starts by itself once the search leaves it.
+    WaitingForNetSession,
     WaitingBaseLeadInBoundary,
     PreparingBaseLeadIn,
     PresentationLeadIn,
@@ -34,7 +37,8 @@ public:
     bool IsActive() const { return m_active; }
     bool HasBaseSnapshot() const { return m_playbackBaseReady && !IsPreparingBase() && m_snapshotOwner != nullptr && m_snapshotOwner->snapshot_count > 0 && m_snapshotSize > 0; }
     bool IsPreparingBase() const {
-        return m_runState == TasRunState::WaitingBaseLeadInBoundary ||
+        return m_runState == TasRunState::WaitingForNetSession ||
+            m_runState == TasRunState::WaitingBaseLeadInBoundary ||
             m_runState == TasRunState::PreparingBaseLeadIn;
     }
     bool IsInTrainingMatch() const;
@@ -104,6 +108,12 @@ public:
 
     // Requests A -> 60 hidden neutral frames -> B. Editing starts at B.
     bool SaveBaseSnapshot();
+    // Drives a base save that is waiting on the ranked search; call every rendered frame
+    // (the match frame counter may not be advancing). Cancel drops the request.
+    void PollPendingBaseSave();
+    void CancelPendingBaseSave();
+    bool IsWaitingForNetSession() const { return m_runState == TasRunState::WaitingForNetSession; }
+    unsigned int GetNetSessionWaitSeconds() const;
     // Called only after the game increments its frame counter.
     void FinalizeFrameAfterIncrement();
     bool LoadBaseSnapshot();
@@ -233,6 +243,7 @@ private:
     int m_snapshotSize = 0;
     unsigned int m_baseFrame = 0;
     unsigned int m_playbackBaseFrame = 0;
+    unsigned long m_netSessionWaitStartMs = 0;
     bool m_playbackBaseReady = false;
     unsigned int m_baseLeadInRemaining = 0;
     bool m_capturePlaybackBaseAfterIncrement = false;

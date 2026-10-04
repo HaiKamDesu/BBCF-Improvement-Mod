@@ -65,8 +65,17 @@ public:
 	// once; every save and load tries again, so savestates come back by themselves once the
 	// session ends. Callers wanting to tell the user why can check it up front.
 	bool EnsureNetInit();
+	// The game's net-session kind: -1 not in any lobby, 3 in one but not seated, 1/2 seated.
+	static int GetNetSessionKind();
+	// True when EnsureNetInit would refuse only because the game is in a lobby - the case
+	// that clears by itself once the ranked search moves on - rather than for good.
+	static bool IsWaitingOnNetSession();
 
 private:
+	// Logs a refused save/load and, when it is the lobby case, tells the user why. Both are
+	// rate-limited, since callers other than TAS retry every few frames.
+	static void ReportRefused(const char* who);
+
 	bool save_into_slot(int target_slot, Snapshot** pbuf_mine);
 
 	bool net_init_ready = false;

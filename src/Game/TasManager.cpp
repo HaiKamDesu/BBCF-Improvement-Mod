@@ -570,6 +570,10 @@ void TasManager::StartPlayback(bool presentationMode) {
 }
 
 void TasManager::StopPlayback(bool completed) {
+    if (m_runState == TasRunState::WaitingForNetSession) {
+        CancelPendingBaseSave();
+        return;
+    }
     if (IsPreparingBase()) {
         SetError(L("Wait for the base state to finish saving.").c_str());
         return;
@@ -1115,6 +1119,10 @@ void TasManager::SampleLiveRecordingFrame() {
 }
 
 void TasManager::ResumeGame() {
+    if (m_runState == TasRunState::WaitingForNetSession) {
+        CancelPendingBaseSave();
+        return;
+    }
     if (IsPreparingBase()) {
         SetError(L("Wait for the base state to finish saving.").c_str());
         return;
@@ -1156,8 +1164,22 @@ bool TasManager::SaveBaseSnapshot() {
         }
     }
     if (!m_snapshotOwner->EnsureNetInit()) {
-        SetError(L("Savestates are unavailable during a ranked search or online session. Stop it and try again.").c_str());
-        return false;
+        if (!SnapshotApparatus::IsWaitingOnNetSession()) {
+            SetError(L("Base-state save failed.").c_str());
+            return false;
+        }
+        // BBCF cannot set its savestates up while its ranked search sits in a matchmaking
+        // lobby, and the search moves between lobbies on its own. So rather than fail, hold
+        // the request and let PollPendingBaseSave start it in the next gap. The match keeps
+        // running meanwhile: the search is driven by the game, and freezing the match is not
+        // something to risk while waiting on it.
+        m_runState = TasRunState::WaitingForNetSession;
+        m_netSessionWaitStartMs = GetTickCount();
+        m_error.clear();
+        m_status = L("Waiting for the game's ranked search to leave its lobby...");
+        LOG(1, "[TAS] base save waiting: netSessionKind=%d (ranked search in a lobby)\n",
+            SnapshotApparatus::GetNetSessionKind());
+        return true;
     }
     ClearInputOverride();
     ClearKeyframes();
@@ -1178,6 +1200,41 @@ bool TasManager::SaveBaseSnapshot() {
     m_error.clear();
     m_status = L("Saving the base state...");
     return true;
+}
+
+void TasManager::PollPendingBaseSave() {
+    if (m_runState != TasRunState::WaitingForNetSession) {
+        return;
+    }
+    if (!m_active || !IsInTrainingMatch()) {
+        CancelPendingBaseSave();
+        return;
+    }
+    if (SnapshotApparatus::IsWaitingOnNetSession()) {
+        return;
+    }
+    LOG(1, "[TAS] ranked search left its lobby after %lu ms; saving the base state\n",
+        static_cast<unsigned long>(GetTickCount() - m_netSessionWaitStartMs));
+    // SaveBaseSnapshot redoes every check (the players may have changed while waiting) and
+    // now finds the init possible, so it goes straight on to the lead-in.
+    m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
+    SaveBaseSnapshot();
+}
+
+void TasManager::CancelPendingBaseSave() {
+    if (m_runState != TasRunState::WaitingForNetSession) {
+        return;
+    }
+    LOG(1, "[TAS] base save cancelled while waiting for the ranked search\n");
+    m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
+    m_status.clear();
+}
+
+unsigned int TasManager::GetNetSessionWaitSeconds() const {
+    if (m_runState != TasRunState::WaitingForNetSession) {
+        return 0;
+    }
+    return static_cast<unsigned int>((GetTickCount() - m_netSessionWaitStartMs) / 1000);
 }
 
 bool TasManager::LoadBaseSnapshot() {

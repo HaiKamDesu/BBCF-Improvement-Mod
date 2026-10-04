@@ -164,6 +164,7 @@ void TasWindow::Update() {
         }
         return;
     }
+    manager.PollPendingBaseSave();
 
     if (manager.IsPlaying() && manager.IsPlaybackUiHidden()) {
         if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_TasParse)) {
@@ -325,6 +326,9 @@ void TasWindow::DrawStatusStrip(TasManager& manager) const {
     } else if (state == TasRunState::ReplayingMovie) {
         colour = kColLive;
         label = L("Replaying");
+    } else if (manager.IsWaitingForNetSession()) {
+        colour = kColWarn;
+        label = L("Waiting for the ranked search");
     } else if (!manager.HasBaseSnapshot()) {
         colour = kColWarn;
         label = L("No base state");
@@ -351,6 +355,24 @@ void TasWindow::DrawStatusStrip(TasManager& manager) const {
 
 void TasWindow::DrawBaseStateSection(TasManager& manager) {
     SectionHeader(L("Base state"));
+
+    if (manager.IsWaitingForNetSession()) {
+        // Worded so a long wait reads as what it is: the game's matchmaking, not the mod.
+        const unsigned int seconds = manager.GetNetSessionWaitSeconds();
+        TextColoredWrapped(kColWarn, L("Waiting for the game's ranked search to leave its lobby..."));
+        ImGui::SameLine();
+        ImGui::TextDisabled("%us", seconds);
+        TextDisabledWrapped(L("BBCF cannot set up savestates while its ranked search is sitting in a matchmaking lobby. This is a limitation of the game, not the mod. The base state saves by itself as soon as the search leaves the lobby, usually within seconds."));
+        if (seconds >= 30) {
+            ImGui::VerticalSpacing(2);
+            TextColoredWrapped(kColWarn, L("This is taking unusually long. BBCF's ranked search sometimes gets stuck in one lobby and stops finding opponents altogether. Removing the ranked entry and setting it again fixes both."));
+        }
+        ImGui::VerticalSpacing(2);
+        if (ImGui::Button(L("Cancel").c_str())) {
+            manager.CancelPendingBaseSave();
+        }
+        return;
+    }
 
     if (!manager.HasBaseSnapshot()) {
         TextColoredWrapped(kColWarn, L("Set the match up the way you want the combo to start, then save a base state."));

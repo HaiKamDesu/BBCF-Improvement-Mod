@@ -2379,8 +2379,20 @@ struct LocalizationKeysAccessor
         // Base-state save failed.
         inline const char* Base_state_save_failed() const { return Get("Base-state save failed."); }
 
-        // Savestates are unavailable during a ranked search or online session. Stop it and try again.
-        inline const char* Savestates_are_unavailable_during_a_ranked_search_or_online_session_Stop_it_and_try_again() const { return Get("Savestates are unavailable during a ranked search or online session. Stop it and try again."); }
+        // The ranked search is waiting in a lobby right now. Try again in a few seconds, or remove the ranked entry.
+        inline const char* The_ranked_search_is_waiting_in_a_lobby_right_now_Try_again_in_a_few_seconds_or_remove_the_ranked_entry() const { return Get("The ranked search is waiting in a lobby right now. Try again in a few seconds, or remove the ranked entry."); }
+
+        // Waiting for the game's ranked search to leave its lobby...
+        inline const char* Waiting_for_the_game_s_ranked_search_to_leave_its_lobby() const { return Get("Waiting for the game's ranked search to leave its lobby..."); }
+
+        // Waiting for the ranked search
+        inline const char* Waiting_for_the_ranked_search() const { return Get("Waiting for the ranked search"); }
+
+        // BBCF cannot set up savestates while its ranked search is sitting in a matchmaking lobby. This is a limitation of the game, not the mod. The base state saves by itself as soon as the search leaves the lobby, usually within seconds.
+        inline const char* BBCF_cannot_set_up_savestates_while_its_ranked_search_is_sitting_in_a_matchmaking_lobby_This_is_a_limitation_of_the_game_not_the_mod_The_base_state_saves_by_itself_as_soon_as_the_search_leaves_the_lobby_usually_within_seconds() const { return Get("BBCF cannot set up savestates while its ranked search is sitting in a matchmaking lobby. This is a limitation of the game, not the mod. The base state saves by itself as soon as the search leaves the lobby, usually within seconds."); }
+
+        // This is taking unusually long. BBCF's ranked search sometimes gets stuck in one lobby and stops finding opponents altogether. Removing the ranked entry and setting it again fixes both.
+        inline const char* This_is_taking_unusually_long_BBCF_s_ranked_search_sometimes_gets_stuck_in_one_lobby_and_stops_finding_opponents_altogether_Removing_the_ranked_entry_and_setting_it_again_fixes_both() const { return Get("This is taking unusually long. BBCF's ranked search sometimes gets stuck in one lobby and stops finding opponents altogether. Removing the ranked entry and setting it again fixes both."); }
 
         // No native base state is available.
         inline const char* No_native_base_state_is_available() const { return Get("No native base state is available."); }
