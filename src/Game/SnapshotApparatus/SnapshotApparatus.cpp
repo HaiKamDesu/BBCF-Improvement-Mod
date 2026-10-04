@@ -2224,56 +2224,84 @@ SnapshotApparatus::SnapshotApparatus() {
 		initialize_ggpo_callbacks_struct(this->callbacks_ptr);
 		LOG(1, "[Snapshot] ctor callbacks initialized callbacks_ptr=%p snapshotManager=%p\n", this->callbacks_ptr, snap_manager);
 
-		void* DAT_01292888 = base_addr + 0x612888;
-		void** SCENE_CBattle_probe = (void**)(base_addr + 0x8929B4);
-		LOG(1, "[Snapshot] ctor one-time net init: flag(base+0x612888)=%d SCENE_CBattle=%p\n",
-			*(int*)DAT_01292888, SCENE_CBattle_probe ? *SCENE_CBattle_probe : nullptr);
-		if (*(int*)DAT_01292888 == 0) {
-
-			///PRELUDE
-			auto mem_offset_1 = 0xe5701;//2 bytes
-			auto mem_offset_2 = 0xe577d;//2 bytes
-			auto mem_offset_3 = 0xe5a9c;//6 bytes
-			char nops[] = "\x90\x90\x90\x90\x90\x90\x90\x90";
-			char oldmem_1[2];
-			char oldmem_2[2];
-			char oldmem_3[6];
-			void* ptr_oldmem_1 = base_addr + mem_offset_1;
-			void* ptr_oldmem_2 = base_addr + mem_offset_2;
-			void* ptr_oldmem_3 = base_addr + mem_offset_3;
-			memcpy(oldmem_1, ptr_oldmem_1, 2);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, nops, 2);
-			memcpy(oldmem_2, ptr_oldmem_2, 2);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, nops, 2);
-			memcpy(oldmem_3, ptr_oldmem_3, 6);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, nops, 6);
-			//memcpy(ptr_oldmem_1, nops, 2);
-			///PRELUDE_END
-
-			//this is copied from "maybe_network_stuff_init
-			void** SCENE_CBattle_static_ptr = (void**)(base_addr + 0x8929B4);
-			void* maybe_network_stuff_init_ptr = base_addr + 0xe56f0;
-			typedef void (*maybe_network_stuff_init_decl)(void*);
-			maybe_network_stuff_init_decl maybe_network_stuff_init = reinterpret_cast<maybe_network_stuff_init_decl>(maybe_network_stuff_init_ptr);
-			if (*SCENE_CBattle_static_ptr == nullptr) {
-				// Restore the patched bytes before bailing, or the game is left running with
-				// three NOP'd sites for the rest of the session.
-				WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
-				WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);
-				WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, oldmem_3, 6);
-				LOG(1, "[Snapshot] ctor ABORTED one-time net init: SCENE_CBattle is null\n");
-				return;
-			}
-			maybe_network_stuff_init(*SCENE_CBattle_static_ptr);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);
-			WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, oldmem_3, 6);
-			//memcpy(ptr_oldmem_1, oldmem_1, 2);
-		}
+		this->EnsureNetInit();
 		//this->p_snapshot_reseve = new Snapshot;
 		//this->pp_snapshot_reseve = &this->p_snapshot_reseve;
 		LOG(1, "[Snapshot] ctor end this=%p snapshot_count=%u last_saved_snapshot_size=%d\n", this, this->snapshot_count, this->last_saved_snapshot_size);
 	}
+
+bool SnapshotApparatus::EnsureNetInit() {
+	// At most one successful init per apparatus, as when this lived in the constructor.
+	if (this->net_init_ready) {
+		return true;
+	}
+	char* base_addr = GetBbcfBaseAdress();
+	void* DAT_01292888 = base_addr + 0x612888;
+	// Once the game's savestate machinery exists it stays for the session, so this is one
+	// read on every call after the first success.
+	if (*(int*)DAT_01292888 != 0) {
+		this->net_init_ready = true;
+		return true;
+	}
+
+	void** SCENE_CBattle_probe = (void**)(base_addr + 0x8929B4);
+	// The game's net-session kind, from its own getter (FUN_0049A340): -1 = no session
+	// object, 1/2 = a session with the player bit set, 3 = a session object without it -
+	// which is what a ranked search started from training leaves behind. The init below
+	// reads per-kind objects that are null outside a real match: kind 3 dereferenced a null
+	// [ctx+0x534] at BBCF+0xe57f2 on 2026-10-04 (Save base state during a training ranked
+	// search). Plain offline (-1) is the only kind this init has ever been run under, so it
+	// is the only kind allowed; everything else waits until the session is gone.
+	typedef int(__cdecl* get_net_session_kind_decl)();
+	const int netSessionKind = reinterpret_cast<get_net_session_kind_decl>(base_addr + 0x9a340)();
+	LOG(1, "[Snapshot] one-time net init: flag(base+0x612888)=%d SCENE_CBattle=%p netSessionKind=%d\n",
+		*(int*)DAT_01292888, SCENE_CBattle_probe ? *SCENE_CBattle_probe : nullptr, netSessionKind);
+	if (netSessionKind != -1) {
+		LOG(1, "[Snapshot] net init REFUSED: a net session (kind %d) is active, e.g. a ranked "
+		       "search from training. Savestates stay unavailable until it ends.\n", netSessionKind);
+		return false;
+	}
+
+	///PRELUDE
+	auto mem_offset_1 = 0xe5701;//2 bytes
+	auto mem_offset_2 = 0xe577d;//2 bytes
+	auto mem_offset_3 = 0xe5a9c;//6 bytes
+	char nops[] = "\x90\x90\x90\x90\x90\x90\x90\x90";
+	char oldmem_1[2];
+	char oldmem_2[2];
+	char oldmem_3[6];
+	void* ptr_oldmem_1 = base_addr + mem_offset_1;
+	void* ptr_oldmem_2 = base_addr + mem_offset_2;
+	void* ptr_oldmem_3 = base_addr + mem_offset_3;
+	memcpy(oldmem_1, ptr_oldmem_1, 2);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, nops, 2);
+	memcpy(oldmem_2, ptr_oldmem_2, 2);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, nops, 2);
+	memcpy(oldmem_3, ptr_oldmem_3, 6);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, nops, 6);
+	///PRELUDE_END
+
+	//this is copied from "maybe_network_stuff_init
+	void** SCENE_CBattle_static_ptr = (void**)(base_addr + 0x8929B4);
+	void* maybe_network_stuff_init_ptr = base_addr + 0xe56f0;
+	typedef void (*maybe_network_stuff_init_decl)(void*);
+	maybe_network_stuff_init_decl maybe_network_stuff_init = reinterpret_cast<maybe_network_stuff_init_decl>(maybe_network_stuff_init_ptr);
+	if (*SCENE_CBattle_static_ptr == nullptr) {
+		// Restore the patched bytes before bailing, or the game is left running with
+		// three NOP'd sites for the rest of the session.
+		WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
+		WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);
+		WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, oldmem_3, 6);
+		LOG(1, "[Snapshot] ABORTED one-time net init: SCENE_CBattle is null\n");
+		return false;
+	}
+	maybe_network_stuff_init(*SCENE_CBattle_static_ptr);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_1, oldmem_1, 2);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_2, oldmem_2, 2);
+	WriteToProtectedMemory((uintptr_t)ptr_oldmem_3, oldmem_3, 6);
+	this->net_init_ready = true;
+	return true;
+}
 
 SnapshotApparatus::~SnapshotApparatus() {
 	if (slots_reserved) {
@@ -2331,6 +2359,10 @@ bool SnapshotApparatus::save_into_slot(int target_slot, Snapshot** pbuf_mine)
 {
 	LOG(1, "[Snapshot] save_snapshot begin this=%p snapshot_count=%u pbuf_mine=%p\n", this, this->snapshot_count, pbuf_mine);
 	LogSnapshotRuntimeContext("save_snapshot");
+	if (!this->EnsureNetInit()) {
+		LOG(1, "[Snapshot] save_snapshot refused: the game's savestate machinery is not set up\n");
+		return false;
+	}
 	char* base_addr = GetBbcfBaseAdress();
 	//memcpy(&temp_savestate_loc, savedstate_mine[savegame_index], 4);
 	//callbacks_ptr->load_game_state((unsigned char*)temp_savestate_loc);
@@ -2432,6 +2464,10 @@ bool SnapshotApparatus::load_snapshot_sized(const void* buf, size_t buf_size)
 		static_cast<unsigned int>(buf_size),
 		this->snapshot_count);
 	LogSnapshotRuntimeContext("load_snapshot_sized");
+	if (!this->EnsureNetInit()) {
+		LOG(1, "[Snapshot] load_snapshot_sized refused: the game's savestate machinery is not set up\n");
+		return false;
+	}
 	char* base_addr = GetBbcfBaseAdress();
 	
 	//memcpy(&temp_savestate_loc, savedstate_mine[savegame_index], 4);
@@ -2650,6 +2686,10 @@ bool SnapshotApparatus::load_snapshot_index(int index) {
 	/* leave buf as zero to not involve our own buffers and just the "built in" snapshot buffer of 10*/
 	LOG(1, "[Snapshot] load_snapshot_index begin this=%p index=%d snapshot_count=%u\n", this, index, this->snapshot_count);
 	LogSnapshotRuntimeContext("load_snapshot_index");
+	if (!this->EnsureNetInit()) {
+		LOG(1, "[Snapshot] load_snapshot_index refused: the game's savestate machinery is not set up\n");
+		return false;
+	}
 	char* base_addr = GetBbcfBaseAdress();
 
 	//memcpy(&temp_savestate_loc, savedstate_mine[savegame_index], 4);
@@ -2855,6 +2895,10 @@ void SnapshotApparatus::clear_count()
 }
 bool SnapshotApparatus::clear_framecounts() {
 	LOG(1, "[Snapshot] clear_framecounts this=%p\n", this);
+	if (!this->EnsureNetInit()) {
+		LOG(1, "[Snapshot] clear_framecounts refused: the game's savestate machinery is not set up\n");
+		return false;
+	}
 	char* base_addr = GetBbcfBaseAdress();
 	static_DAT_of_PTR_on_load_4* DAT_on_load_4_addr = (static_DAT_of_PTR_on_load_4*)(base_addr + 0x612718);
 	SnapshotManager* snap_manager = 0;

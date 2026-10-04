@@ -1155,6 +1155,10 @@ bool TasManager::SaveBaseSnapshot() {
             return false;
         }
     }
+    if (!m_snapshotOwner->EnsureNetInit()) {
+        SetError(L("Savestates are unavailable during a ranked search or online session. Stop it and try again.").c_str());
+        return false;
+    }
     ClearInputOverride();
     ClearKeyframes();
     m_snapshotSize = 0;

@@ -59,8 +59,17 @@ public:
 	int get_nearest_prealloc_frame(int current_frame, std::map<int, Snapshot*> frame_snap_map);
 	int get_last_saved_snapshot_size() const;
 
+	// Sets up the game's savestate machinery (its one-time netplay init) if this session has
+	// not yet. Refuses - returns false, nothing touched - while a net session exists, such as
+	// a ranked search from training, because the init crashes on it. The constructor tries
+	// once; every save and load tries again, so savestates come back by themselves once the
+	// session ends. Callers wanting to tell the user why can check it up front.
+	bool EnsureNetInit();
+
 private:
 	bool save_into_slot(int target_slot, Snapshot** pbuf_mine);
+
+	bool net_init_ready = false;
 
 	int slot_base = 0;
 	int slot_count = SnapshotSlotPool::kSlotCount;

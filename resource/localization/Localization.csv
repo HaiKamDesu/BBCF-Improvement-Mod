@@ -969,6 +969,7 @@ Rewound to base and truncated the movie.,Rewound to base and truncated the movie
 Rewinding and truncating the movie.,Rewinding and truncating the movie.,Retrocediendo y recortando la película.
 Enter a training match and enable TAS mode first.,Enter a training match and enable TAS mode first.,Entra primero en una partida de entrenamiento y activa el modo TAS.
 Base-state save failed.,Base-state save failed.,No se pudo guardar el estado base.
+Savestates are unavailable during a ranked search or online session. Stop it and try again.,Savestates are unavailable during a ranked search or online session. Stop it and try again.,Los savestates no están disponibles durante una búsqueda de ranked o una sesión online. Detenla e inténtalo de nuevo.
 No native base state is available.,No native base state is available.,No hay ningún estado base nativo disponible.
 Native base-state load failed.,Native base-state load failed.,No se pudo cargar el estado base nativo.
 Could not open the TAS file for writing.,Could not open the TAS file for writing.,No se pudo abrir el archivo TAS para escritura.

@@ -2379,6 +2379,9 @@ struct LocalizationKeysAccessor
         // Base-state save failed.
         inline const char* Base_state_save_failed() const { return Get("Base-state save failed."); }
 
+        // Savestates are unavailable during a ranked search or online session. Stop it and try again.
+        inline const char* Savestates_are_unavailable_during_a_ranked_search_or_online_session_Stop_it_and_try_again() const { return Get("Savestates are unavailable during a ranked search or online session. Stop it and try again."); }
+
         // No native base state is available.
         inline const char* No_native_base_state_is_available() const { return Get("No native base state is available."); }
 
