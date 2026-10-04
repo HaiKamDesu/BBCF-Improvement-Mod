@@ -9283,6 +9283,14 @@ void __declspec(naked)GetFrameCounter()
 		// original code
 		mov eax, [esi]
 		inc dword ptr[esi + 0Ch]
+	}
+	__asm pushfd
+	__asm pushad
+	TasManager::Instance().FinalizeFrameAfterIncrement();
+	__asm popad
+	__asm popfd
+	_asm
+	{
 		jmp[GetFrameCounterJmpBackAddr]
 	}
 }

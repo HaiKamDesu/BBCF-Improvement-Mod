@@ -26,8 +26,11 @@ namespace {
 // every kKeyframeInterval frames make a nearby seek cheap; anything further back replays
 // from the base state, which is correct either way, just slower.
 constexpr unsigned int kKeyframeInterval = 60;
-constexpr int kTasBaseSlot = 0;
-constexpr int kTasSlotRequest = 5; // base + four keyframes
+constexpr int kTasBaseSlot = 0;          // editing base B, after 60 neutral frames
+constexpr int kTasPlaybackBaseSlot = 1;  // playback base A, before the lead-in
+constexpr int kTasFirstKeyframeSlot = 2;
+constexpr int kTasKeyframeSlotCount = 4;
+constexpr int kTasSlotRequest = kTasFirstKeyframeSlot + kTasKeyframeSlotCount;
 // Deep enough to walk back a bad editing session, small enough to stay trivial in memory:
 // a 10,000 frame movie is 40 KB, so this ceiling is a couple of megabytes at worst.
 constexpr size_t kUndoDepth = 64;
@@ -164,8 +167,9 @@ void TasManager::InvalidateSectionCheckpointsBefore(size_t frame) {
 }
 
 void TasManager::ClearKeyframes() {
-    // One logical slot goes to the base state; the rest become the keyframe ring.
-    m_keyframes.assign(kTasSlotRequest > 1 ? kTasSlotRequest - 1 : 0, Keyframe{});
+    // A/B occupy slots 1/0; keyframes occupy slots 2..5.
+    m_keyframes.assign(static_cast<size_t>(kTasKeyframeSlotCount), Keyframe{});
+    m_pendingKeyframeSlot = -1;
     m_nextKeyframeSlot = 0;
 }
 
@@ -185,7 +189,7 @@ int TasManager::FindKeyframeFor(size_t targetFrame) const {
     return best;
 }
 
-void TasManager::CaptureKeyframeIfDue() {
+void TasManager::CaptureKeyframeIfDue(bool deferUntilFrameIncrement) {
     if (m_keyframes.empty() || !m_snapshotOwner || m_playhead == 0) {
         return;
     }
@@ -216,7 +220,6 @@ void TasManager::CaptureKeyframeIfDue() {
             }
         }
     } else {
-        slot = m_nextKeyframeSlot % m_keyframes.size();
         for (size_t offset = 0; offset < m_keyframes.size(); ++offset) {
             const size_t candidate = (m_nextKeyframeSlot + offset) % m_keyframes.size();
             if (!m_keyframes[candidate].sectionCheckpoint) {
@@ -229,7 +232,13 @@ void TasManager::CaptureKeyframeIfDue() {
         return;
     }
 
-    if (!m_snapshotOwner->save_snapshot_index(static_cast<int>(slot) + 1)) {
+    if (deferUntilFrameIncrement) {
+        m_pendingKeyframeSlot = static_cast<int>(slot);
+        m_pendingKeyframeFrame = m_playhead;
+        m_pendingKeyframeIsSection = atSection;
+        return;
+    }
+    if (!m_snapshotOwner->save_snapshot_index(kTasFirstKeyframeSlot + static_cast<int>(slot))) {
         LOG(1, "[TAS] keyframe capture failed at frame %u\n", static_cast<unsigned int>(m_playhead));
         return;
     }
@@ -252,6 +261,13 @@ void TasManager::ClearSnapshot() {
     delete m_snapshotOwner;
     m_snapshotOwner = nullptr;
     m_baseFrame = 0;
+    m_playbackBaseReady = false;
+    m_playbackBaseFrame = 0;
+    m_baseLeadInRemaining = 0;
+    m_capturePlaybackBaseAfterIncrement = false;
+    m_finalizeBasePairAfterIncrement = false;
+    m_finalizePresentationLeadInAfterIncrement = false;
+    m_finishMovieAfterIncrement = false;
 }
 
 void TasManager::Enter() {
@@ -417,17 +433,38 @@ void TasManager::Update() {
     }
 
     const unsigned int currentFrame = *g_gameVals.pFrameCount;
-    if (m_runState == TasRunState::PresentationLeadIn ||
-        m_runState == TasRunState::PresentationLeadOut) {
+    if (m_runState == TasRunState::WaitingBaseLeadInBoundary) {
+        m_runState = TasRunState::PreparingBaseLeadIn;
+        m_capturePlaybackBaseAfterIncrement = true;
+        return;
+    }
+    if (m_runState == TasRunState::PreparingBaseLeadIn) {
+        if (m_baseLeadInRemaining > 0) --m_baseLeadInRemaining;
+        if (m_baseLeadInRemaining == 0) {
+            m_finalizeBasePairAfterIncrement = true;
+            ClearInputOverride();
+        } else {
+            ScheduleNeutralFrame();
+        }
+        return;
+    }
+    if (m_runState == TasRunState::PresentationLeadIn) {
+        if (m_baseLeadInRemaining > 0) --m_baseLeadInRemaining;
+        if (m_baseLeadInRemaining == 0) {
+            m_finalizePresentationLeadInAfterIncrement = true;
+            ClearInputOverride();
+        } else {
+            ScheduleNeutralFrame();
+        }
+        return;
+    }
+    if (m_runState == TasRunState::PresentationLeadOut) {
         if (m_presentationFramesRemaining > 0) {
             --m_presentationFramesRemaining;
         }
         if (m_presentationFramesRemaining == 0) {
-            if (m_runState == TasRunState::PresentationLeadIn) {
-                StartMovieFrames();
-            } else {
-                StopPlayback(true);
-            }
+            m_finishMovieAfterIncrement = true;
+            m_finishMovieCompleted = true;
             return;
         }
         ScheduleNeutralFrame();
@@ -442,21 +479,10 @@ void TasManager::Update() {
 
     ++m_playhead;
     m_lastScheduledFrame = currentFrame + 1;
-    CaptureKeyframeIfDue();
+    CaptureKeyframeIfDue(true);
     if (m_playhead >= m_runTarget || m_playhead >= m_movie.size()) {
-        const bool completed = m_runState == TasRunState::PlayingMovie && m_playhead >= m_movie.size();
-        if (completed) {
-            if (m_presentationMode) {
-                StartPresentationLeadOut();
-            } else {
-                // Preview is an editing pass. Freeze on the resulting state so
-                // the next frame can be authored without losing the combo.
-                StopPlayback(false);
-                m_status = L("Preview finished and paused at the movie end.");
-            }
-        } else {
-            FinishMovieRun(false);
-        }
+        m_finishMovieAfterIncrement = true;
+        m_finishMovieCompleted = m_runState == TasRunState::PlayingMovie && m_playhead >= m_movie.size();
         return;
     }
 
@@ -494,6 +520,14 @@ void TasManager::StartPresentationLeadOut() {
 }
 
 void TasManager::StartPlayback(bool presentationMode) {
+    if (IsPlaybackRunning() || m_liveRecording) {
+        SetError(L("Stop the current run before starting playback.").c_str());
+        return;
+    }
+    if (!HasBaseSnapshot()) {
+        SetError(L("Save a base state before playback.").c_str());
+        return;
+    }
     if (!m_active || m_movie.empty()) {
         SetError(L("Edit movie input first.").c_str());
         return;
@@ -504,7 +538,7 @@ void TasManager::StartPlayback(bool presentationMode) {
     // from the very end has nowhere to go, so both of those restart from the base state.
     const bool restartFromBase = presentationMode || m_playhead >= m_movie.size();
     if (restartFromBase) {
-        if (!LoadBaseSnapshot()) {
+        if (presentationMode ? !LoadPlaybackBaseSnapshot() : !LoadBaseSnapshot()) {
             return;
         }
         m_playhead = 0;
@@ -523,7 +557,7 @@ void TasManager::StartPlayback(bool presentationMode) {
         ClearInputOverride();
         m_runState = TasRunState::PresentationLeadIn;
         m_runTarget = m_movie.size();
-        m_presentationFramesRemaining = kPresentationLeadInFrames;
+        m_baseLeadInRemaining = kPresentationLeadInFrames;
         ScheduleNeutralFrame();
         g_gameVals.isFrameFrozen = false;
         g_gameVals.framesToReach = 0;
@@ -536,6 +570,15 @@ void TasManager::StartPlayback(bool presentationMode) {
 }
 
 void TasManager::StopPlayback(bool completed) {
+    if (IsPreparingBase()) {
+        SetError(L("Wait for the base state to finish saving.").c_str());
+        return;
+    }
+    const bool restoreB = m_runState == TasRunState::PresentationLeadIn;
+    m_baseLeadInRemaining = 0;
+    m_finalizePresentationLeadInAfterIncrement = false;
+    m_pendingKeyframeSlot = -1;
+    m_finishMovieAfterIncrement = false;
     m_playbackUiHidden = false;
     m_presentationFramesRemaining = 0;
     m_presentationMode = false;
@@ -545,6 +588,11 @@ void TasManager::StopPlayback(bool completed) {
         frameHistory->Open();
     }
     m_frameHistoryWasOpenBeforePlayback = false;
+    if (restoreB) {
+        m_runState = TasRunState::PausedAtMovieFrame;
+        LoadBaseSnapshot();
+        return;
+    }
     FinishMovieRun(completed);
 }
 
@@ -863,7 +911,7 @@ bool TasManager::SeekToFrame(size_t targetFrame) {
     const int keyframe = FindKeyframeFor(targetFrame);
     if (keyframe >= 0 && m_keyframes[keyframe].movieFrame > 0) {
         // Restart from the nearest keyframe and re-simulate only the remainder.
-        if (m_snapshotOwner->load_snapshot_index(keyframe + 1)) {
+        if (m_snapshotOwner->load_snapshot_index(kTasFirstKeyframeSlot + keyframe)) {
             ClearInputOverride();
             m_playhead = m_keyframes[keyframe].movieFrame;
             m_runTarget = m_playhead;
@@ -1067,6 +1115,14 @@ void TasManager::SampleLiveRecordingFrame() {
 }
 
 void TasManager::ResumeGame() {
+    if (IsPreparingBase()) {
+        SetError(L("Wait for the base state to finish saving.").c_str());
+        return;
+    }
+    if (m_runState == TasRunState::PresentationLeadIn) {
+        StopPlayback(false);
+        return;
+    }
     ClearInputOverride();
     m_presentationFramesRemaining = 0;
     m_presentationMode = false;
@@ -1081,35 +1137,52 @@ bool TasManager::SaveBaseSnapshot() {
         SetError(L("Enter a training match and enable TAS mode first.").c_str());
         return false;
     }
+    if (IsPlaybackRunning() || m_liveRecording) {
+        SetError(L("Finish the current run before saving a base state.").c_str());
+        return false;
+    }
     if (!m_snapshotOwner || !m_snapshotOwner->check_if_valid(
         g_interfaces.player1.GetData(), g_interfaces.player2.GetData())) {
         delete m_snapshotOwner;
         m_snapshotOwner = new SnapshotApparatus();
-        m_snapshotOwner->ReserveSlots("tas_editor", kTasSlotRequest);
-        ClearKeyframes();
+        if (!m_snapshotOwner->ReserveSlots("tas_editor", kTasSlotRequest)) {
+            delete m_snapshotOwner;
+            m_snapshotOwner = nullptr;
+            m_snapshotSize = 0;
+            m_playbackBaseReady = false;
+            ClearKeyframes();
+            SetError(L("Could not reserve the TAS snapshot slots.").c_str());
+            return false;
+        }
     }
-    if (!m_snapshotOwner->save_snapshot_index(kTasBaseSlot)) {
-        SetError(L("Base-state save failed.").c_str());
-        return false;
-    }
-
-    m_snapshotSize = m_snapshotOwner->get_last_saved_snapshot_size();
+    ClearInputOverride();
     ClearKeyframes();
-    m_baseFrame = GetCurrentFrame();
+    m_snapshotSize = 0;
+    m_playbackBaseReady = false;
+    m_capturePlaybackBaseAfterIncrement = false;
+    m_finalizeBasePairAfterIncrement = false;
+    m_finalizePresentationLeadInAfterIncrement = false;
+    m_finishMovieAfterIncrement = false;
+    m_baseLeadInRemaining = 0;
     m_playhead = 0;
     m_runTarget = 0;
-    m_presentationFramesRemaining = 0;
     m_presentationMode = false;
-    ClearInputOverride();
-    g_gameVals.isFrameFrozen = true;
-    g_gameVals.framesToReach = m_baseFrame;
+    m_presentationFramesRemaining = 0;
+    m_runState = TasRunState::WaitingBaseLeadInBoundary;
+    g_gameVals.isFrameFrozen = false;
+    g_gameVals.framesToReach = 0;
     m_error.clear();
+    m_status = L("Saving the base state...");
     return true;
 }
 
 bool TasManager::LoadBaseSnapshot() {
     if (!m_active || !IsInTrainingMatch() || !HasBaseSnapshot()) {
         SetError(L("No native base state is available.").c_str());
+        return false;
+    }
+    if (IsPlaybackRunning() || m_liveRecording) {
+        SetError(L("Stop the current run before restoring the base state.").c_str());
         return false;
     }
     ClearInputOverride();
@@ -1122,6 +1195,7 @@ bool TasManager::LoadBaseSnapshot() {
     m_playhead = 0;
     m_runTarget = 0;
     m_lastScheduledFrame = GetCurrentFrame();
+    m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
     g_gameVals.isFrameFrozen = true;
     g_gameVals.framesToReach = GetCurrentFrame();
     m_error.clear();
@@ -1476,4 +1550,101 @@ TasFrameInput TasManager::GetLastRecordedInput() const {
 
 unsigned int TasManager::GetCurrentFrame() const {
     return g_gameVals.pFrameCount ? *g_gameVals.pFrameCount : 0;
+}
+
+
+bool TasManager::LoadPlaybackBaseSnapshot() {
+    if (!HasBaseSnapshot() || !IsInTrainingMatch() || IsPlaybackRunning()) return false;
+    ClearInputOverride();
+    if (!m_snapshotOwner->load_snapshot_index(kTasPlaybackBaseSlot)) {
+        SetError(L("Playback base-state load failed.").c_str());
+        return false;
+    }
+    m_playhead = 0;
+    m_lastScheduledFrame = GetCurrentFrame();
+    return true;
+}
+
+void TasManager::AbortBaseLeadIn() {
+    ClearInputOverride();
+    m_snapshotSize = 0;
+    m_playbackBaseReady = false;
+    m_baseLeadInRemaining = 0;
+    m_capturePlaybackBaseAfterIncrement = false;
+    m_finalizeBasePairAfterIncrement = false;
+    m_runState = TasRunState::Idle;
+    g_gameVals.isFrameFrozen = false;
+    g_gameVals.framesToReach = 0;
+    SetError(L("Base-state save failed.").c_str());
+}
+
+void TasManager::FinalizeFrameAfterIncrement() {
+    if (!m_active) return;
+    if (m_capturePlaybackBaseAfterIncrement) {
+        m_capturePlaybackBaseAfterIncrement = false;
+        if (!m_snapshotOwner || !m_snapshotOwner->save_snapshot_index(kTasPlaybackBaseSlot) ||
+            m_snapshotOwner->get_last_saved_snapshot_size() <= 0) {
+            AbortBaseLeadIn();
+            return;
+        }
+        m_playbackBaseFrame = GetCurrentFrame();
+        m_playbackBaseReady = true;
+        m_baseLeadInRemaining = kPresentationLeadInFrames;
+        ScheduleNeutralFrame();
+    }
+    if (m_finalizeBasePairAfterIncrement) {
+        m_finalizeBasePairAfterIncrement = false;
+        if (!m_playbackBaseReady || GetCurrentFrame() - m_playbackBaseFrame != kPresentationLeadInFrames ||
+            !m_snapshotOwner->save_snapshot_index(kTasBaseSlot)) {
+            AbortBaseLeadIn();
+            return;
+        }
+        m_snapshotSize = m_snapshotOwner->get_last_saved_snapshot_size();
+        if (m_snapshotSize <= 0) {
+            AbortBaseLeadIn();
+            return;
+        }
+        m_baseFrame = GetCurrentFrame();
+        m_playhead = 0;
+        m_runTarget = 0;
+        m_lastScheduledFrame = m_baseFrame;
+        m_runState = TasRunState::PausedAtMovieFrame;
+        g_gameVals.isFrameFrozen = true;
+        g_gameVals.framesToReach = m_baseFrame;
+        m_status = L("Base state saved.");
+    }
+    if (m_finalizePresentationLeadInAfterIncrement) {
+        m_finalizePresentationLeadInAfterIncrement = false;
+        if (m_runState != TasRunState::PresentationLeadIn) return;
+        if (GetCurrentFrame() != m_baseFrame) {
+            StopPlayback(false);
+            SetError(L("Presentation lead-in did not reach the editor base frame.").c_str());
+            return;
+        }
+        StartMovieFrames();
+    }
+    if (m_pendingKeyframeSlot >= 0) {
+        const int slot = m_pendingKeyframeSlot;
+        m_pendingKeyframeSlot = -1;
+        if (m_snapshotOwner && static_cast<size_t>(slot) < m_keyframes.size() &&
+            m_snapshotOwner->save_snapshot_index(kTasFirstKeyframeSlot + slot)) {
+            m_keyframes[slot].movieFrame = m_pendingKeyframeFrame;
+            m_keyframes[slot].valid = true;
+            m_keyframes[slot].sectionCheckpoint = m_pendingKeyframeIsSection;
+            m_nextKeyframeSlot = static_cast<size_t>(slot) + 1;
+        }
+    }
+    if (m_finishMovieAfterIncrement) {
+        m_finishMovieAfterIncrement = false;
+        if (m_runState == TasRunState::PresentationLeadOut) {
+            StopPlayback(true);
+        } else if (m_finishMovieCompleted && m_presentationMode) {
+            StartPresentationLeadOut();
+        } else if (m_finishMovieCompleted) {
+            StopPlayback(false);
+            m_status = L("Preview finished and paused at the movie end.");
+        } else {
+            FinishMovieRun(false);
+        }
+    }
 }

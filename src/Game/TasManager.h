@@ -19,6 +19,8 @@ struct TasSection {
 enum class TasRunState {
     Idle,
     PausedAtMovieFrame,
+    WaitingBaseLeadInBoundary,
+    PreparingBaseLeadIn,
     PresentationLeadIn,
     PlayingMovie,
     PresentationLeadOut,
@@ -30,7 +32,11 @@ public:
     static TasManager& Instance();
 
     bool IsActive() const { return m_active; }
-    bool HasBaseSnapshot() const { return m_snapshotOwner != nullptr && m_snapshotOwner->snapshot_count > 0 && m_snapshotSize > 0; }
+    bool HasBaseSnapshot() const { return m_playbackBaseReady && !IsPreparingBase() && m_snapshotOwner != nullptr && m_snapshotOwner->snapshot_count > 0 && m_snapshotSize > 0; }
+    bool IsPreparingBase() const {
+        return m_runState == TasRunState::WaitingBaseLeadInBoundary ||
+            m_runState == TasRunState::PreparingBaseLeadIn;
+    }
     bool IsInTrainingMatch() const;
     // --- live recording ----------------------------------------------------------------
     // Hands one player back to whoever is holding the controller and samples what they do,
@@ -62,7 +68,7 @@ public:
             m_runState == TasRunState::PresentationLeadOut;
     }
     bool IsPlaybackRunning() const {
-        return IsPlaying() || m_runState == TasRunState::ReplayingMovie;
+        return IsPlaying() || m_runState == TasRunState::ReplayingMovie || IsPreparingBase();
     }
     bool IsEditingRecording() const { return m_runState == TasRunState::PausedAtMovieFrame && !m_movie.empty(); }
     bool IsPlaybackUiHidden() const { return m_playbackUiHidden; }
@@ -96,7 +102,10 @@ public:
     bool ExportMovie(const std::string& path, bool includeInitialConditions);
     bool ImportMovie(const std::string& path);
 
+    // Requests A -> 60 hidden neutral frames -> B. Editing starts at B.
     bool SaveBaseSnapshot();
+    // Called only after the game increments its frame counter.
+    void FinalizeFrameAfterIncrement();
     bool LoadBaseSnapshot();
     // How many keyframes are currently held, for the UI to show why seeking is fast or slow.
     int GetKeyframeCount() const;
@@ -182,7 +191,9 @@ private:
     // the nearest one instead of replaying from the base every time. They live in the slots
     // this manager reserved; there is no per-frame state, which would need 10 MiB a frame.
     void ClearKeyframes();
-    void CaptureKeyframeIfDue();
+    void CaptureKeyframeIfDue(bool deferUntilFrameIncrement = false);
+    bool LoadPlaybackBaseSnapshot();
+    void AbortBaseLeadIn();
     void InvalidateKeyframesAfter(size_t frame);
     void InvalidateSectionCheckpointsBefore(size_t frame);
     // Best starting point for a seek: the latest keyframe at or before the target.
@@ -221,6 +232,17 @@ private:
     Snapshot* m_snapshotBuffer = nullptr;
     int m_snapshotSize = 0;
     unsigned int m_baseFrame = 0;
+    unsigned int m_playbackBaseFrame = 0;
+    bool m_playbackBaseReady = false;
+    unsigned int m_baseLeadInRemaining = 0;
+    bool m_capturePlaybackBaseAfterIncrement = false;
+    bool m_finalizeBasePairAfterIncrement = false;
+    bool m_finalizePresentationLeadInAfterIncrement = false;
+    int m_pendingKeyframeSlot = -1;
+    size_t m_pendingKeyframeFrame = 0;
+    bool m_pendingKeyframeIsSection = false;
+    bool m_finishMovieAfterIncrement = false;
+    bool m_finishMovieCompleted = false;
     unsigned int m_rerecordCount = 0;
 
     TasRunState m_runState = TasRunState::Idle;
