@@ -7,6 +7,7 @@
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/MatchState.h"
+#include "Game/NetplayArenaKeeper.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Game/SpectatorSyncDiagnostics.h"
 #include "Game/gamestates.h"
@@ -9912,6 +9913,10 @@ bool placeHooks_bbcf()
 		LOG(1, "[Crash] WinMain catch(...) site not found (site=0x%08X continuation=0x%08X); a C++ "
 		       "throw out of the main loop stays a silent exit(-1).\n", winMainCatchSite, winMainCatchContinuation);
 	}
+
+	// The bad_alloc that hook caught on 2026-10-02: the 100 MB netplay arena re-allocated on
+	// every online match load. Keep it at one address so a later load cannot run out of room.
+	InstallNetplayArenaKeeper();
 
 	//HookManager::RegisterHook
 	//UploadReplayToEndpointJmpBackAddr = HookManager::SetHook("UploadReplayToEndpoint", "\xA1\x40\x0C\x44\x01", "xxxxx", 5, UploadReplayToEndpoint);
