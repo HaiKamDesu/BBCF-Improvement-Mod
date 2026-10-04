@@ -362,7 +362,7 @@ void TasWindow::DrawBaseStateSection(TasManager& manager) {
         TextColoredWrapped(kColWarn, L("Waiting for the game's ranked search to leave its lobby..."));
         ImGui::SameLine();
         ImGui::TextDisabled("%us", seconds);
-        TextDisabledWrapped(L("BBCF cannot set up savestates while its ranked search is sitting in a matchmaking lobby. This is a limitation of the game, not the mod. The base state saves by itself as soon as the search leaves the lobby, usually within seconds."));
+        TextDisabledWrapped(L("BBCF cannot set up savestates while its ranked search is sitting in a matchmaking lobby. This is a limitation of the game, not the mod. The match is paused until then, and the base state saves by itself as soon as the search leaves the lobby, usually within seconds."));
         if (seconds >= 30) {
             ImGui::VerticalSpacing(2);
             TextColoredWrapped(kColWarn, L("This is taking unusually long. BBCF's ranked search sometimes gets stuck in one lobby and stops finding opponents altogether. Removing the ranked entry and setting it again fixes both."));

@@ -244,6 +244,9 @@ private:
     unsigned int m_baseFrame = 0;
     unsigned int m_playbackBaseFrame = 0;
     unsigned long m_netSessionWaitStartMs = 0;
+    // Whether the wait froze a running match, so Cancel can let it run again.
+    bool m_waitFrozeMatch = false;
+    unsigned int m_waitPrevFramesToReach = 0;
     bool m_playbackBaseReady = false;
     unsigned int m_baseLeadInRemaining = 0;
     bool m_capturePlaybackBaseAfterIncrement = false;

@@ -1170,9 +1170,18 @@ bool TasManager::SaveBaseSnapshot() {
         }
         // BBCF cannot set its savestates up while its ranked search sits in a matchmaking
         // lobby, and the search moves between lobbies on its own. So rather than fail, hold
-        // the request and let PollPendingBaseSave start it in the next gap. The match keeps
-        // running meanwhile: the search is driven by the game, and freezing the match is not
-        // something to risk while waiting on it.
+        // the request and let PollPendingBaseSave start it in the next gap.
+        //
+        // The match is frozen meanwhile, so the base is the moment the user asked for rather
+        // than wherever they had moved to by the time the gap came. The freeze only stops
+        // the battle update; the search keeps cycling lobbies under it (measured 2026-10-04:
+        // left one lobby and entered the next while TAS held the match frozen), and the poll
+        // runs from the render loop, so the wait still ends.
+        m_waitFrozeMatch = !g_gameVals.isFrameFrozen;
+        m_waitPrevFramesToReach = g_gameVals.framesToReach;
+        ClearInputOverride();
+        g_gameVals.isFrameFrozen = true;
+        g_gameVals.framesToReach = GetCurrentFrame();
         m_runState = TasRunState::WaitingForNetSession;
         m_netSessionWaitStartMs = GetTickCount();
         m_error.clear();
@@ -1217,8 +1226,24 @@ void TasManager::PollPendingBaseSave() {
         static_cast<unsigned long>(GetTickCount() - m_netSessionWaitStartMs));
     // SaveBaseSnapshot redoes every check (the players may have changed while waiting) and
     // now finds the init possible, so it goes straight on to the lead-in.
+    const bool waitFrozeMatch = m_waitFrozeMatch;
+    const unsigned int waitPrevFramesToReach = m_waitPrevFramesToReach;
     m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
-    SaveBaseSnapshot();
+    const bool started = SaveBaseSnapshot();
+    if (m_runState == TasRunState::WaitingForNetSession) {
+        // Back in a lobby between the check and the init: keep waiting, and keep what the
+        // first freeze has to restore on Cancel rather than the frozen state it found.
+        m_waitFrozeMatch = waitFrozeMatch;
+        m_waitPrevFramesToReach = waitPrevFramesToReach;
+        return;
+    }
+    m_waitFrozeMatch = false;
+    // On success the lead-in has already unfrozen the match. On failure, do not leave it
+    // frozen on the user's behalf.
+    if (!started && waitFrozeMatch) {
+        g_gameVals.isFrameFrozen = false;
+        g_gameVals.framesToReach = waitPrevFramesToReach;
+    }
 }
 
 void TasManager::CancelPendingBaseSave() {
@@ -1226,6 +1251,12 @@ void TasManager::CancelPendingBaseSave() {
         return;
     }
     LOG(1, "[TAS] base save cancelled while waiting for the ranked search\n");
+    // Hand the match back the way it was before the wait froze it.
+    if (m_waitFrozeMatch) {
+        g_gameVals.isFrameFrozen = false;
+        g_gameVals.framesToReach = m_waitPrevFramesToReach;
+    }
+    m_waitFrozeMatch = false;
     m_runState = m_movie.empty() ? TasRunState::Idle : TasRunState::PausedAtMovieFrame;
     m_status.clear();
 }
