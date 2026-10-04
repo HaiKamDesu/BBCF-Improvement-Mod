@@ -27,6 +27,7 @@
 #include "Game/FrameStallWatchdog.h"
 #include "Network/LobbyAvatarManager.h"
 #include "Network/LobbyLinkManager.h"
+#include "Game/NetplayArenaKeeper.h"
 #include "Game/ReplayTakeover/ReplayTakeoverFeatureFlags.h"
 
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
@@ -1020,6 +1021,10 @@ void WindowManager::HandleButtons()
 	// fires while the match frame counter advances, so it ticks in training but is dead
 	// on the online room screen -- exactly where copying a room link has to work.
 	LobbyLinkManager::GetInstance().Tick();
+
+	// Puts the 100 MB address-space reserve back after the netplay arena or a big file
+	// buffer had to be given it. Cheap: one atomic load on almost every frame.
+	TickNetplayArenaKeeper();
 
 	// Same reason as above: the lobby avatar only exists on menu screens, where the frame
 	// counter hook never fires.

@@ -9914,8 +9914,9 @@ bool placeHooks_bbcf()
 		       "throw out of the main loop stays a silent exit(-1).\n", winMainCatchSite, winMainCatchContinuation);
 	}
 
-	// The bad_alloc that hook caught on 2026-10-02: the 100 MB netplay arena re-allocated on
-	// every online match load. Keep it at one address so a later load cannot run out of room.
+	// The bad_alloc that hook caught on 2026-10-02 and twice since: the 100 MB netplay arena
+	// or the 62 MB char-select stage buffer finding no hole big enough. Holds 100 MB of
+	// address space from boot and gives it to them only when they would otherwise throw.
 	InstallNetplayArenaKeeper();
 
 	//HookManager::RegisterHook

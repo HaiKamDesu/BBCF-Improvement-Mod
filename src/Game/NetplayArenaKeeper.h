@@ -1,7 +1,10 @@
 #pragma once
 
-// Gives BBCF's two biggest transient buffers - the 100 MB per-match netplay arena and the
-// 62 MB char_select_stage.pac load - one shared address range for the whole session, so a
-// long online session cannot fragment the 2 GB address space until one of them throws
-// std::bad_alloc. See NetplayArenaKeeper.cpp.
+// Keeps 100 MB of the 32-bit address space in reserve from boot and gives it up only when
+// BBCF's two biggest transient buffers - the 100 MB per-match netplay arena and the 62 MB
+// char_select_stage.pac load - would otherwise fail to fit, which is a std::bad_alloc that
+// closes the game. See NetplayArenaKeeper.cpp.
 void InstallNetplayArenaKeeper();
+// Re-reserves after a release once a 100 MB hole exists again. Call once per rendered frame;
+// it does nothing most frames.
+void TickNetplayArenaKeeper();

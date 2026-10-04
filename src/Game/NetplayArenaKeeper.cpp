@@ -33,32 +33,48 @@
 // was 50.27 MB. Vanilla time-shares the address space: the arena's hole is free between
 // matches and that is where the stage buffer goes. Pinning the hole to the arena starved it.
 //
-// So the range is shared instead. One 100 MB range is reserved on the first online match
-// and handed to whichever big buffer asks while it is free: the arena, or a >= 32 MB file
-// buffer from the slot loader. A request that finds it busy goes to the game's allocator,
-// which is exactly what vanilla would have done. Freeing it DECOMMITS rather than releases,
-// so physical memory and commit go back but the hole stays ours; the next taker recommits
-// and gets demand-zero pages, the same thing a fresh allocation this size returns (the CRT
-// heap serves it straight from VirtualAlloc).
+// v2 shared one range between the two, reserved on the first online match and handed out
+// as the buffer itself, and crashed a third way (Crash_20261004_161313): an OFFLINE session
+// - a ranked entry set, then training - had never been online, so the range did not exist
+// yet, and the same 65,309,392-byte stage buffer threw with a largest free block of
+// 62.36 MB. The space was chopped up by 16 MB write-combined GPU driver blocks within
+// minutes of boot. Reserving lazily protects nothing that happens before the first match.
 //
-// Frees are caught at the operator delete thunk 0x0079E0D5 (`jmp 0x007A1035`, the CRT free)
-// rather than at individual free sites: the slot table frees from at least three places
-// and the arena from another, all through 0x0079E864 -> 0x0079E0D5, and missing one would
-// hand our VirtualAlloc block to HeapFree. Retargeting the thunk rewrites only its rel32,
-// which sits inside one cache line, so threads running through it never see a torn jump.
-// Detouring free's own prologue would rewrite 5 bytes of the hottest function in the
-// process while other threads are executing it.
-// Offline sessions never build the arena, so the range is never reserved and nothing changes.
+// v3, this version, never hands our memory to the game at all:
+//
+//   - At install, while the address space is still clean, reserve 100 MB. MEM_RESERVE only:
+//     no commit charge, no physical memory, nothing in it.
+//   - Both call sites first try the CRT's own malloc (0x007A106D). operator new (0x0079E086)
+//     is exactly `loop { p = malloc(n); if (p) return p; if (!_callnewh(n)) throw; }`, so
+//     on success this is the very same heap block operator new would have returned.
+//   - Only when malloc fails - the moment vanilla is about to throw - release the reserve
+//     and call the game's operator new, which now finds the hole we kept. If it still
+//     fails, it throws exactly as vanilla would.
+//   - A render-loop tick re-reserves once a 100 MB hole exists again, so the next big
+//     allocation is protected too.
+//
+// Every buffer the game gets is an ordinary CRT heap block, so free, realloc, _msize and
+// HeapFree on it are all correct no matter which of the game's ~300 direct free() sites or
+// the delete thunk eventually releases it. v2 handed out a VirtualAlloc block instead and
+// relied on every free going through the delete thunk, which the 278 callers of the slot
+// loader could not be proven to do; that thunk is no longer patched.
+//
+// What holding the reserve costs: 100 MB of address space other allocations cannot use.
+// The two hooked sites get it back whenever they would fail. Everything else BBCF
+// allocates is much smaller - the only constant-size request of 4 MB or more besides the
+// arena is 9.5 MB, and the GPU driver works in 16 MB chunks - and the dump that motivated
+// this had plenty of holes that size left. If the reserve itself cannot be made, nothing
+// changes: both sites behave exactly as vanilla.
 // ---------------------------------------------------------------------------------------
 namespace
 {
 	constexpr uintptr_t kArenaAllocCallRva = 0x003864C8;    // call operator new, in 0x007864C0
 	constexpr uintptr_t kFileSlotAllocCallRva = 0x0007C977; // call operator new, in 0x0047C930
-	constexpr uintptr_t kOperatorNewRva = 0x00387469;
-	constexpr uintptr_t kDeleteThunkRva = 0x0039E0D5;       // jmp CRT free
-	constexpr uintptr_t kCrtFreeRva = 0x003A1035;
-	constexpr size_t kRegionSize = 0x064A0000;              // the arena, the largest taker
-	constexpr size_t kMinFileBufferSize = 32u * 1024 * 1024;
+	constexpr uintptr_t kOperatorNewRva = 0x00387469;       // push ebp; mov ebp,esp; pop ebp; jmp 0x0079E086
+	constexpr uintptr_t kRealOperatorNewRva = 0x0039E086;   // the malloc / _callnewh / throw loop
+	constexpr uintptr_t kCrtMallocRva = 0x003A106D;
+	constexpr size_t kReserveSize = 0x064A0000;             // the arena, the largest taker
+	constexpr DWORD kReReserveIntervalMs = 5000;
 
 	// The bytes around each call, minus the rel32. Checked before patching so a different
 	// BBCF.exe is left alone instead of corrupted.
@@ -66,120 +82,59 @@ namespace
 	const BYTE kArenaSiteAfter[] = { 0x83, 0xC4, 0x04, 0x89, 0x86, 0xD8, 0x02, 0x00, 0x00 };  // add esp,4; mov [esi+2D8h],eax
 	const BYTE kFileSlotSiteBefore[] = { 0x56 };                                              // push esi (the file size)
 	const BYTE kFileSlotSiteAfter[] = { 0x83, 0xC4, 0x04, 0x89, 0x04, 0xFB };                 // add esp,4; mov [ebx+edi*8],eax
+	// operator new's first iteration, `push [ebp+8]; call malloc`, proving the malloc we
+	// call first is the one it would have called.
+	const BYTE kRealOperatorNewHead[] = { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0xEB, 0x0D };   // push ebp; mov ebp,esp; sub esp,10h; jmp +0Dh
+	constexpr uintptr_t kRealOperatorNewMallocCallOffset = 0x18;                               // 0x0079E09E: call 0x007A106D
 
-	using OperatorNew_t = void* (__cdecl*)(size_t);
-	using Free_t = void(__cdecl*)(void*);
+	using Alloc_t = void* (__cdecl*)(size_t);
 
-	OperatorNew_t g_gameOperatorNew = nullptr;
-	Free_t g_crtFree = nullptr;
+	Alloc_t g_gameOperatorNew = nullptr;
+	Alloc_t g_crtMalloc = nullptr;
 
-	enum class Taker : int { None = 0, Arena = 1, FileBuffer = 2 };
+	// Touched from whichever thread allocates and from the render-loop tick.
+	std::atomic<void*> g_reserve{ nullptr };
+	std::atomic<bool> g_installed{ false };
+	DWORD g_lastReReserveAttemptMs = 0;
 
-	// HookedFree runs on every thread, so ownership is claimed with a CAS and handed
-	// back only after the decommit has finished.
-	std::atomic<void*> g_region{ nullptr };
-	std::atomic<int> g_regionTaker{ static_cast<int>(Taker::None) };
-	std::atomic<size_t> g_regionTakerSize{ 0 };
-
-	const char* TakerName(Taker taker)
+	void* TryReserve()
 	{
-		switch (taker)
-		{
-		case Taker::Arena: return "netplay arena";
-		case Taker::FileBuffer: return "file buffer";
-		default: return "nothing";
-		}
+		return VirtualAlloc(nullptr, kReserveSize, MEM_RESERVE, PAGE_NOACCESS);
 	}
 
-	// Returns the region committed and owned by `taker`, or nullptr if it is not available.
-	void* TryTakeRegion(Taker taker, size_t size)
+	void* __cdecl RescuingAlloc(size_t size, const char* what)
 	{
-		void* region = g_region.load();
-		if (region == nullptr)
+		if (void* block = g_crtMalloc(size))
 		{
-			return nullptr;
+			return block;
 		}
 
-		int expected = static_cast<int>(Taker::None);
-		if (!g_regionTaker.compare_exchange_strong(expected, static_cast<int>(taker)))
+		// Vanilla would throw std::bad_alloc right now. Give the address space back and let
+		// the game's own operator new have its normal go at it.
+		void* reserve = g_reserve.exchange(nullptr);
+		if (reserve == nullptr)
 		{
-			LOG(1, "[NetplayArena] %s (%u bytes) found the shared range held by the %s (%u bytes); "
-			       "using the game's allocator, as vanilla would.\n",
-				TakerName(taker), static_cast<unsigned>(size),
-				TakerName(static_cast<Taker>(expected)), static_cast<unsigned>(g_regionTakerSize.load()));
-			return nullptr;
+			LOG(0, "[NetplayArena] %s of %u bytes did not fit and no reserve is held; "
+			       "the game's allocator decides, as in vanilla.\n", what, static_cast<unsigned>(size));
+			return g_gameOperatorNew(size);
 		}
 
-		// Commit only what this taker asked for; the release decommits the whole range.
-		if (VirtualAlloc(region, size, MEM_COMMIT, PAGE_READWRITE) == nullptr)
-		{
-			// Out of commit, not address space; the game's allocator would fail the same way.
-			LOG(0, "[NetplayArena] Recommitting the shared range for the %s failed (err=%lu).\n",
-				TakerName(taker), GetLastError());
-			g_regionTaker.store(static_cast<int>(Taker::None));
-			return nullptr;
-		}
-
-		g_regionTakerSize.store(size);
-		LOG(2, "[NetplayArena] Shared range 0x%p -> %s (%u bytes).\n", region, TakerName(taker), static_cast<unsigned>(size));
-		return region;
+		VirtualFree(reserve, 0, MEM_RELEASE);
+		LOG(0, "[NetplayArena] %s of %u bytes did not fit anywhere; released the 100 MB reserve "
+		       "at 0x%p for it.\n", what, static_cast<unsigned>(size), reserve);
+		void* block = g_gameOperatorNew(size); // throws as vanilla would if even that fails
+		LOG(0, "[NetplayArena] %s placed at 0x%p after the release.\n", what, block);
+		return block;
 	}
 
 	void* __cdecl ArenaAlloc(size_t size)
 	{
-		if (size != kRegionSize)
-		{
-			return g_gameOperatorNew(size);
-		}
-
-		if (g_region.load() == nullptr)
-		{
-			// First online match: reserve while the address space is still in good shape.
-			// Only this thread builds the arena, so there is no reservation race.
-			void* region = VirtualAlloc(nullptr, kRegionSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-			if (region == nullptr)
-			{
-				LOG(0, "[NetplayArena] Could not reserve the %u-byte shared range (err=%lu); "
-				       "using the game's allocator.\n", static_cast<unsigned>(kRegionSize), GetLastError());
-				return g_gameOperatorNew(size);
-			}
-			g_regionTakerSize.store(size);
-			g_regionTaker.store(static_cast<int>(Taker::Arena));
-			g_region.store(region);
-			LOG(1, "[NetplayArena] Reserved the shared 100 MB range at 0x%p for the rest of the session.\n", region);
-			return region;
-		}
-
-		void* region = TryTakeRegion(Taker::Arena, size);
-		return region != nullptr ? region : g_gameOperatorNew(size);
+		return RescuingAlloc(size, "Netplay arena");
 	}
 
 	void* __cdecl FileSlotAlloc(size_t size)
 	{
-		if (size >= kMinFileBufferSize && size <= kRegionSize)
-		{
-			if (void* region = TryTakeRegion(Taker::FileBuffer, size))
-			{
-				return region;
-			}
-		}
-		return g_gameOperatorNew(size);
-	}
-
-	void __cdecl HookedFree(void* block)
-	{
-		if (block == nullptr || block != g_region.load())
-		{
-			g_crtFree(block);
-			return;
-		}
-
-		// Decommit, never release: the pages and the commit charge go back, the hole stays.
-		const Taker taker = static_cast<Taker>(g_regionTaker.load());
-		VirtualFree(block, kRegionSize, MEM_DECOMMIT);
-		g_regionTakerSize.store(0);
-		g_regionTaker.store(static_cast<int>(Taker::None));
-		LOG(2, "[NetplayArena] Shared range released by the %s.\n", TakerName(taker));
+		return RescuingAlloc(size, "File buffer");
 	}
 
 	bool BytesMatch(uintptr_t address, const BYTE* expected, size_t length)
@@ -215,9 +170,9 @@ void InstallNetplayArenaKeeper()
 	const uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
 	const uintptr_t arenaCall = base + kArenaAllocCallRva;
 	const uintptr_t fileSlotCall = base + kFileSlotAllocCallRva;
-	const uintptr_t deleteThunk = base + kDeleteThunkRva;
-	const uintptr_t crtFree = base + kCrtFreeRva;
 	const uintptr_t operatorNew = base + kOperatorNewRva;
+	const uintptr_t realOperatorNew = base + kRealOperatorNewRva;
+	const uintptr_t crtMalloc = base + kCrtMallocRva;
 
 	const bool sitesMatch =
 		BytesMatch(arenaCall - sizeof(kArenaSiteBefore), kArenaSiteBefore, sizeof(kArenaSiteBefore)) &&
@@ -226,36 +181,66 @@ void InstallNetplayArenaKeeper()
 		BytesMatch(fileSlotCall - sizeof(kFileSlotSiteBefore), kFileSlotSiteBefore, sizeof(kFileSlotSiteBefore)) &&
 		BytesMatch(fileSlotCall + 5, kFileSlotSiteAfter, sizeof(kFileSlotSiteAfter)) &&
 		IsRel32To(fileSlotCall, 0xE8, operatorNew) &&
-		IsRel32To(deleteThunk, 0xE9, crtFree) &&
-		((deleteThunk + 1) >> 6) == ((deleteThunk + 4) >> 6); // rel32 inside one cache line
+		IsRel32To(operatorNew + 4, 0xE9, realOperatorNew) &&
+		BytesMatch(realOperatorNew, kRealOperatorNewHead, sizeof(kRealOperatorNewHead)) &&
+		IsRel32To(realOperatorNew + kRealOperatorNewMallocCallOffset, 0xE8, crtMalloc);
 	if (!sitesMatch)
 	{
 		LOG(0, "[NetplayArena] Call sites did not match the expected BBCF.exe; not patched. "
-		       "Long online sessions can still end in a bad_alloc on match load.\n");
+		       "Long sessions can still end in a bad_alloc on a big load.\n");
 		return;
 	}
 
-	g_gameOperatorNew = reinterpret_cast<OperatorNew_t>(operatorNew);
-	g_crtFree = reinterpret_cast<Free_t>(crtFree);
+	g_gameOperatorNew = reinterpret_cast<Alloc_t>(operatorNew);
+	g_crtMalloc = reinterpret_cast<Alloc_t>(crtMalloc);
 
-	// The free side first: until an alloc site is redirected nothing can hand out the
-	// range, so on its own it only adds a pointer compare to every delete. If it fails,
-	// nothing else is patched.
-	if (!RetargetRel32(deleteThunk, reinterpret_cast<void*>(&HookedFree)))
+	// Reserve before patching: with no reserve the hooks are a plain malloc-then-operator-new,
+	// which is still exactly vanilla, but there is no point patching for that.
+	void* reserve = TryReserve();
+	if (reserve == nullptr)
 	{
-		LOG(0, "[NetplayArena] VirtualProtect failed on the delete thunk (err=%lu); not patched.\n", GetLastError());
+		LOG(0, "[NetplayArena] Could not reserve %u bytes at boot (err=%lu); not patched.\n",
+			static_cast<unsigned>(kReserveSize), GetLastError());
 		return;
 	}
+	g_reserve.store(reserve);
 
 	if (!RetargetRel32(arenaCall, reinterpret_cast<void*>(&ArenaAlloc)) ||
 		!RetargetRel32(fileSlotCall, reinterpret_cast<void*>(&FileSlotAlloc)))
 	{
-		// A half-installed state is still consistent: every pointer the range hands out
-		// is caught by the delete thunk.
+		// A site that did get patched is still correct on its own: the hooks only ever
+		// return ordinary heap blocks.
 		LOG(0, "[NetplayArena] VirtualProtect failed (err=%lu); keeper only partly installed.\n", GetLastError());
+	}
+	g_installed.store(true);
+
+	LOG(1, "[NetplayArena] Keeper installed: 100 MB of address space reserved at 0x%p, released "
+	       "only if the netplay arena or a file buffer would otherwise fail to fit.\n", reserve);
+}
+
+void TickNetplayArenaKeeper()
+{
+	if (!g_installed.load() || g_reserve.load() != nullptr)
+	{
 		return;
 	}
+	const DWORD now = GetTickCount();
+	if (now - g_lastReReserveAttemptMs < kReReserveIntervalMs)
+	{
+		return;
+	}
+	g_lastReReserveAttemptMs = now;
 
-	LOG(1, "[NetplayArena] Keeper installed: the netplay arena and big file buffers share one "
-	       "100 MB range from the first online match on.\n");
+	void* reserve = TryReserve();
+	if (reserve == nullptr)
+	{
+		return; // no 100 MB hole yet; whatever took the last one is still alive
+	}
+	void* expected = nullptr;
+	if (!g_reserve.compare_exchange_strong(expected, reserve))
+	{
+		VirtualFree(reserve, 0, MEM_RELEASE);
+		return;
+	}
+	LOG(1, "[NetplayArena] Re-reserved 100 MB of address space at 0x%p.\n", reserve);
 }
