@@ -42,7 +42,8 @@
 //
 // v3, this version, never hands our memory to the game at all:
 //
-//   - At install, while the address space is still clean, reserve 100 MB. MEM_RESERVE only:
+//   - At install, while the address space is still clean, reserve the arena's size plus
+//     1 MB (see kReserveSize for why the extra MB matters). MEM_RESERVE only:
 //     no commit charge, no physical memory, nothing in it.
 //   - Both call sites first try the CRT's own malloc (0x007A106D). operator new (0x0079E086)
 //     is exactly `loop { p = malloc(n); if (p) return p; if (!_callnewh(n)) throw; }`, so
@@ -59,7 +60,7 @@
 // relied on every free going through the delete thunk, which the 278 callers of the slot
 // loader could not be proven to do; that thunk is no longer patched.
 //
-// What holding the reserve costs: 100 MB of address space other allocations cannot use.
+// What holding the reserve costs: 101 MB of address space other allocations cannot use.
 // The two hooked sites get it back whenever they would fail. Everything else BBCF
 // allocates is much smaller - the only constant-size request of 4 MB or more besides the
 // arena is 9.5 MB, and the GPU driver works in 16 MB chunks - and the dump that motivated
@@ -73,7 +74,14 @@ namespace
 	constexpr uintptr_t kOperatorNewRva = 0x00387469;       // push ebp; mov ebp,esp; pop ebp; jmp 0x0079E086
 	constexpr uintptr_t kRealOperatorNewRva = 0x0039E086;   // the malloc / _callnewh / throw loop
 	constexpr uintptr_t kCrtMallocRva = 0x003A106D;
-	constexpr size_t kReserveSize = 0x064A0000;             // the arena, the largest taker
+	constexpr size_t kArenaSize = 0x064A0000;               // the largest taker
+	// NOT just the arena's size. A heap block that big is its own VirtualAlloc of the size
+	// plus the heap's header, rounded to a page, at a 64 KB-aligned base - so a hole of
+	// exactly kArenaSize cannot hold it. That is what Crash_20261004_180532 was: the reserve
+	// was released for the arena, the largest free block became exactly 100.625 MB, and the
+	// arena still threw. Reproduced in a 32-bit test with the reserve's neighbours occupied:
+	// +0 does not fit, +64 KB fits. 1 MB covers any heap's header with room to spare.
+	constexpr size_t kReserveSize = kArenaSize + 0x00100000;
 	constexpr DWORD kReReserveIntervalMs = 5000;
 
 	// The bytes around each call, minus the rel32. Checked before patching so a different
@@ -120,7 +128,7 @@ namespace
 		}
 
 		VirtualFree(reserve, 0, MEM_RELEASE);
-		LOG(0, "[NetplayArena] %s of %u bytes did not fit anywhere; released the 100 MB reserve "
+		LOG(0, "[NetplayArena] %s of %u bytes did not fit anywhere; released the address-space reserve "
 		       "at 0x%p for it.\n", what, static_cast<unsigned>(size), reserve);
 		void* block = g_gameOperatorNew(size); // throws as vanilla would if even that fails
 		LOG(0, "[NetplayArena] %s placed at 0x%p after the release.\n", what, block);
@@ -214,8 +222,9 @@ void InstallNetplayArenaKeeper()
 	}
 	g_installed.store(true);
 
-	LOG(1, "[NetplayArena] Keeper installed: 100 MB of address space reserved at 0x%p, released "
-	       "only if the netplay arena or a file buffer would otherwise fail to fit.\n", reserve);
+	LOG(1, "[NetplayArena] Keeper installed: %u bytes of address space reserved at 0x%p, released "
+	       "only if the netplay arena or a file buffer would otherwise fail to fit.\n",
+		static_cast<unsigned>(kReserveSize), reserve);
 }
 
 void TickNetplayArenaKeeper()
@@ -242,5 +251,6 @@ void TickNetplayArenaKeeper()
 		VirtualFree(reserve, 0, MEM_RELEASE);
 		return;
 	}
-	LOG(1, "[NetplayArena] Re-reserved 100 MB of address space at 0x%p.\n", reserve);
+	LOG(1, "[NetplayArena] Re-reserved %u bytes of address space at 0x%p.\n",
+		static_cast<unsigned>(kReserveSize), reserve);
 }
