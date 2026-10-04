@@ -688,9 +688,12 @@
     <!-- Packaged configs keep the .pdb until package_release.ps1 has archived it into
          build\symbols\<tag>\; without symbols for the exact binary a user is running, a
          crash dump's mod frames are bare "dinput8+0x994ac" offsets that have to be decoded
-         out of the shipped DLL by hand. Non-packaged configs still clean it up here. -->
-    <Delete Files="$(ProjectDir)$(OutDir)$(TargetName).pdb" Condition="'$(Configuration)'=='ReleaseDeploy'" />
+         out of the shipped DLL by hand. Deploy configs keep theirs too and copy it next to
+         the deployed DLL, where the crash handler's symbol search looks, so a crash during
+         local testing names the mod's frames in crash_context.txt. dbghelp checks the PDB's
+         GUID, so a stale copy left by an older deploy is ignored rather than misread. -->
     <Copy SourceFiles="$(ProjectDir)$(OutDir)$(TargetName).dll" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfCopyDll)'=='true' and '$(BbcfInstallDir)'!=''" />
+    <Copy SourceFiles="$(ProjectDir)$(OutDir)$(TargetName).pdb" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfCopyDll)'=='true' and '$(BbcfInstallDir)'!='' and Exists('$(ProjectDir)$(OutDir)$(TargetName).pdb')" />
     <Copy SourceFiles="$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!='' and Exists('$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe')" />
     <Copy SourceFiles="$(ProjectDir)USER_README.txt" DestinationFolder="$(BbcfInstallDir)" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" Condition="('$(Configuration)'=='ReleaseDeploy' or '$(Configuration)'=='DebugDeploy') and '$(BbcfDeployEnabled)'=='true' and '$(BbcfInstallDir)'!=''" />
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\package_release.ps1&quot; -Configuration &quot;$(Configuration)&quot; -Channel prerelease" Condition="'$(Configuration)'=='Debug'" />

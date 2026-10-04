@@ -9452,9 +9452,14 @@ namespace
 			// minidump after this filter returns, so the process is not ours to kill once
 			// we are done - a watchdog left running here could fire on a process that was
 			// going to shut down on its own.
+			//
+			// The dialog is shown: without it a crash on this path looks exactly like the
+			// game quitting on its own (the bundle is written, but nothing says so), which
+			// is how a TAS base-state crash on 2026-10-04 got reported as "no crash log".
+			// The bundle writer disarms the watchdog before the dialog blocks.
 			ArmCrashWatchdog("Game-filter crash handling");
 			WriteCrashBundle("Game's own exception filter (BBCF caught this crash itself)",
-				g_bbcfFilterExceptionPointers, false);
+				g_bbcfFilterExceptionPointers, true);
 			DisarmCrashWatchdog();
 			return;
 		}
@@ -9465,7 +9470,7 @@ namespace
 		WriteCrashBundleForCurrentContext(
 			"Game's own exception filter (arguments unreadable)",
 			g_bbcfFilterExceptionCode != 0 ? g_bbcfFilterExceptionCode : 0x40000015 /* STATUS_FATAL_APP_EXIT */,
-			false);
+			true);
 		DisarmCrashWatchdog();
 	}
 }

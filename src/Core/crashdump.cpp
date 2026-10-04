@@ -1539,7 +1539,27 @@ static void WriteCrashBundleImpl(const char* reason, PEXCEPTION_POINTERS ExPtr, 
                 // force-fail the process out from under someone who simply had not clicked
                 // OK within a minute, which a test caught it doing exactly.
                 DisarmCrashWatchdog();
-                MessageBox(NULL, messageBuffer, _T("Unhandled exception"), MB_OK | MB_ICONERROR);
+
+                // Name the crash in the dialog itself: "a bundle was written" alone sends the
+                // user digging through folders for the one line that matters.
+                wchar_t dialogText[1024] = {};
+                if (ExPtr != nullptr && ExPtr->ExceptionRecord != nullptr)
+                {
+                        const EXCEPTION_RECORD& record = *ExPtr->ExceptionRecord;
+                        const std::string where = DescribeAddress(reinterpret_cast<uintptr_t>(record.ExceptionAddress));
+                        wsprintfW(dialogText, L"BBCF crashed: 0x%08lX %hs at %hs\nReason: %hs\n\n%ls",
+                                  record.ExceptionCode, ExceptionCodeName(record.ExceptionCode), where.c_str(),
+                                  reason ? reason : "unknown", messageBuffer);
+                }
+                else
+                {
+                        wsprintfW(dialogText, L"BBCF crashed.\nReason: %hs\n\n%ls",
+                                  reason ? reason : "unknown", messageBuffer);
+                }
+
+                // Topmost and foreground: an ownerless box otherwise opens behind the game
+                // window, and the crash looks like the game silently closing.
+                MessageBoxW(NULL, dialogText, L"BBCF Improvement Mod - crash", MB_OK | MB_ICONERROR | MB_TOPMOST | MB_SETFOREGROUND);
         }
 }
 
