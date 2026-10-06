@@ -443,3 +443,50 @@ Test plan:
   `tus/write` at match end; the server trusts the client completely. A modified client can
   upload any profile, since the blob format and crypto are client-side. This system does not
   make any of that easier. A client-side mod cannot prevent server-trusting tampering.
+
+## 6. Pre-update snapshot and restore (2026-10-06)
+
+The way back if an update ever breaks a profile. Code: `src/Core/SaveDataSafety.{h,cpp}` and
+`ProfileSync` (snapshot/restore); UI `src/Overlay/Window/ProfileRestorePanel.cpp`.
+
+**Where the UI lives:**
+- A collapsed red header, "Restore from a pre-update copy (cannot be undone)", at the very
+  bottom of Settings > Advanced. It never appears in the settings search.
+- Both buttons stay disabled until "I understand a restore cannot be undone" is ticked; the
+  tick resets each time the window opens and after every restore.
+- The confirmation says "This cannot be undone." with Cancel first and focused.
+- The replaced data is still quietly kept in `ProfileBackup\replaced\` for manual recovery.
+
+**What is copied, and when** (`BBCF_IM\ProfileBackup\preupdate\<mod version>\`):
+- **Local save:** `Save\bbsave.dat`, `bbrd.dat` and `replay_list.dat` are copied from
+  `DllMain` the first time a mod version runs, before the game's `WinMain`.
+- **Network profile:** `profile_<SteamID64>.dat` is saved at the first server download under
+  that version, before that version can upload anything. It uses the same encrypted format as
+  the backup.
+- Neither copy is ever overwritten.
+
+**Restoring:**
+- **Network profile:** the button writes `preupdate\restore_profile.pending`. On the next
+  server load, the sync task:
+  1. saves the current profile to `replaced\profile_<id>_<time>.dat`;
+  2. copies the snapshot in;
+  3. runs `FUN_004A1DD0`;
+  4. clears the latch and goes to State_Upload.
+
+  The marker is deleted first, so a restore runs once.
+- **Local save:** the button writes `preupdate\restore_local.pending`. The next launch applies
+  it in `DllMain`; the replaced files go to `replaced\<time>\`.
+
+This is an explicit rollback the player chooses; the dialog says progress since the copy is lost and that it cannot be undone.
+
+**Fixed alongside:** backups taken from an upload now carry the save time the upload actually
+sent (`FUN_004A2740` writes +0x0C after our pre-seal copy), so the stale-backup registry mark
+always matches the server.
+
+**Verified in-game 2026-10-06:**
+- Snapshots taken; the local copies are byte-identical to the originals; the profile snapshot
+  decrypts independently and equals the server copy.
+- Both restores were applied: the local files now match the snapshot and the originals were
+  kept; the profile was restored, uploaded (`tus/write ok`) and re-downloaded equal to the
+  snapshot apart from the checksum, stamp and save time.
+- The dialog's Cancel schedules nothing.

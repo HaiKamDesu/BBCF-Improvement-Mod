@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 // The network-entry profile sync, rewritten.
 //
 // Entering network mode runs the game's D-Code sync task (FUN_004B0970, outer network
@@ -43,4 +45,18 @@ namespace ProfileSync
 	// A profile upload just finished successfully. Commits the copy taken when that
 	// upload started to the local backup. Any thread.
 	void OnProfileUploadConfirmed();
+
+	bool IsInstalled();
+
+	// ---- Pre-update snapshot of the network profile (see Core/SaveDataSafety.h) ----
+
+	// Whether this Steam account has a network profile snapshot from before `version`.
+	bool HasSnapshot(const std::string& version);
+	// Restore that snapshot the next time the profile loads from the server (the next entry
+	// into Network mode), and upload it. The profile it replaces is kept in
+	// BBCF_IM\ProfileBackup\replaced. Survives a restart until it has run.
+	bool ScheduleSnapshotRestore(const std::string& version);
+	void CancelSnapshotRestore();
+	// The version a restore is scheduled from, or empty.
+	std::string PendingSnapshotRestore();
 }

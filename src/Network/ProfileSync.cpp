@@ -5,6 +5,8 @@
 #include "Core/logger.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Core/info.h"
+#include "Core/SaveDataSafety.h"
 #include "Game/GhidraDefs.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Hooks/HookManager.h"
@@ -377,18 +379,9 @@ namespace
 		}
 	}
 
-	bool WriteBackup(const uint8_t* profile, const char* why)
+	// Encrypts `profile` (resealed copy) for `steamId` and replaces `path` in one step.
+	bool WriteProfileFile(const std::wstring& path, const uint8_t* profile, uint64_t steamId)
 	{
-		if (!Settings::settingsIni.profileBackup)
-		{
-			return false;
-		}
-		const uint64_t steamId = SteamId();
-		if (steamId == 0)
-		{
-			return false;
-		}
-
 		std::vector<uint8_t> plain(profile, profile + kProfileSize);
 		Reseal(plain.data());
 		if (!ChecksumValid(plain.data()))
@@ -413,7 +406,6 @@ namespace
 		const std::lock_guard<std::mutex> lock(g_backupMutex);
 		CreateDirectoryW(GamePathW(L"BBCF_IM").c_str(), nullptr);
 		CreateDirectoryW(GamePathW(L"BBCF_IM\\ProfileBackup").c_str(), nullptr);
-		const std::wstring path = BackupPath(steamId);
 		const std::wstring temp = path + L".tmp";
 		HANDLE file = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (file == INVALID_HANDLE_VALUE)
@@ -434,13 +426,23 @@ namespace
 			NetworkStallDiagnostics::IncidentLog("[ProfileSync] backup not written: write failed (error %lu)\n", GetLastError());
 			return false;
 		}
-		RaiseMark(steamId, SaveTimeOf(plain.data()));
+		return true;
+	}
+
+	bool WriteBackup(const uint8_t* profile, const char* why)
+	{
+		const uint64_t steamId = SteamId();
+		if (!Settings::settingsIni.profileBackup || steamId == 0 || !WriteProfileFile(BackupPath(steamId), profile, steamId))
+		{
+			return false;
+		}
+		RaiseMark(steamId, SaveTimeOf(profile));
 		NetworkStallDiagnostics::IncidentLog("[ProfileSync] backup refreshed (%s)\n", why);
 		return true;
 	}
 
-	// The decrypted, verified backup for the current account, or false.
-	bool ReadBackup(std::vector<uint8_t>* out, SYSTEMTIME* savedLocal)
+	// The decrypted, verified profile in `path` for the current account, or false.
+	bool ReadProfileFile(const std::wstring& path, std::vector<uint8_t>* out, SYSTEMTIME* savedLocal)
 	{
 		const uint64_t steamId = SteamId();
 		if (steamId == 0)
@@ -448,7 +450,7 @@ namespace
 			return false;
 		}
 		const std::lock_guard<std::mutex> lock(g_backupMutex);
-		HANDLE file = CreateFileW(BackupPath(steamId).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (file == INVALID_HANDLE_VALUE)
 		{
 			return false;
@@ -475,7 +477,7 @@ namespace
 			memcmp(check, header, sizeof(check)) != 0 ||
 			!ChecksumValid(body.data()))
 		{
-			NetworkStallDiagnostics::IncidentLog("[ProfileSync] backup present but does not verify for this account; ignored\n");
+			NetworkStallDiagnostics::IncidentLog("[ProfileSync] %ls does not verify for this account; ignored\n", path.c_str());
 			return false;
 		}
 		if (savedLocal != nullptr)
@@ -486,6 +488,69 @@ namespace
 		}
 		*out = std::move(body);
 		return true;
+	}
+
+	bool ReadBackup(std::vector<uint8_t>* out, SYSTEMTIME* savedLocal)
+	{
+		const uint64_t steamId = SteamId();
+		return steamId != 0 && ReadProfileFile(BackupPath(steamId), out, savedLocal);
+	}
+
+	// ---- Pre-update snapshot (see SaveDataSafety.h) ----
+	//
+	// The network profile as the server held it the first time this mod version downloaded
+	// it, before this version could upload anything. Never overwritten. Restoring one is an
+	// explicit rollback the player asks for from the Online page.
+
+	std::wstring SnapshotProfilePath(const std::string& version, uint64_t steamId)
+	{
+		wchar_t name[64];
+		swprintf_s(name, L"\\profile_%llu.dat", static_cast<unsigned long long>(steamId));
+		return SaveDataSafety::SnapshotFolder(version) + name;
+	}
+
+	std::wstring PendingSnapshotMarker()
+	{
+		return GamePathW(L"BBCF_IM\\ProfileBackup\\preupdate\\restore_profile.pending");
+	}
+
+	void TakeSnapshotOnce(const uint8_t* profile)
+	{
+		const uint64_t steamId = SteamId();
+		if (steamId == 0)
+		{
+			return;
+		}
+		const std::wstring path = SnapshotProfilePath(MOD_VERSION, steamId);
+		if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
+		{
+			return;
+		}
+		CreateDirectoryW(GamePathW(L"BBCF_IM\\ProfileBackup\\preupdate").c_str(), nullptr);
+		CreateDirectoryW(SaveDataSafety::SnapshotFolder(MOD_VERSION).c_str(), nullptr);
+		if (WriteProfileFile(path, profile, steamId))
+		{
+			NetworkStallDiagnostics::IncidentLog("[ProfileSync] first download under %s: pre-update snapshot of the network profile saved\n", MOD_VERSION);
+		}
+	}
+
+	std::string ReadPendingSnapshotRestore()
+	{
+		HANDLE file = CreateFileW(PendingSnapshotMarker().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file == INVALID_HANDLE_VALUE)
+		{
+			return std::string();
+		}
+		char buffer[64] = {};
+		DWORD read = 0;
+		ReadFile(file, buffer, sizeof(buffer) - 1, &read, nullptr);
+		CloseHandle(file);
+		std::string version(buffer, read);
+		while (!version.empty() && (version.back() == '\n' || version.back() == '\r' || version.back() == ' '))
+		{
+			version.pop_back();
+		}
+		return version;
 	}
 
 	bool HaveBackup()
@@ -582,6 +647,50 @@ namespace
 		snprintf(text, sizeof(text),
 			L("The profile server has no profile for this account. Restored it from the local backup saved %s and uploaded it.").c_str(),
 			when);
+		Notify(text);
+		return true;
+	}
+
+	// The player asked to go back to a pre-update snapshot. Runs once the server copy has
+	// loaded, so the session is healthy; the caller then uploads it. The server copy being
+	// replaced is kept first, so this can be undone the same way.
+	bool RestoreSnapshot(const std::string& version, void* netManager)
+	{
+		DeleteFileW(PendingSnapshotMarker().c_str()); // once, even if what follows fails
+		const uint64_t steamId = SteamId();
+		std::vector<uint8_t> snapshot;
+		if (steamId == 0 || !ReadProfileFile(SnapshotProfilePath(version, steamId), &snapshot, nullptr))
+		{
+			NetworkStallDiagnostics::IncidentLog("[ProfileSync] snapshot restore from before %s: no usable snapshot for this account\n", version.c_str());
+			Notify(L("Couldn't restore your network profile: there is no snapshot for this Steam account."));
+			return false;
+		}
+
+		uint8_t* const blob = OwnBlob(netManager);
+		SYSTEMTIME now = {};
+		GetLocalTime(&now);
+		wchar_t name[96];
+		swprintf_s(name, L"BBCF_IM\\ProfileBackup\\replaced\\profile_%llu_%04u%02u%02u-%02u%02u%02u.dat",
+			static_cast<unsigned long long>(steamId), now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
+		CreateDirectoryW(GamePathW(L"BBCF_IM\\ProfileBackup\\replaced").c_str(), nullptr);
+		if (!WriteProfileFile(GamePathW(name), blob, steamId))
+		{
+			Notify(L("Couldn't restore your network profile: the current one could not be saved first."));
+			return false;
+		}
+
+		memcpy(blob, snapshot.data(), kProfileSize);
+		if (Game<BlobIntFn>(ADDR_DCodePayloadValidator)(blob) == 0 || LoaderState(blob) != kLoaderFromServer)
+		{
+			NetworkStallDiagnostics::IncidentLog("[ProfileSync] snapshot rejected by the game's validator\n");
+			return false;
+		}
+		SetOwn(Own_RestoredBackup, "pre-update snapshot");
+		TusLatch() = 0;
+		NetworkStallDiagnostics::IncidentLog("[ProfileSync] restored the network profile from the snapshot taken before %s; the replaced one is in %ls; uploading\n",
+			version.c_str(), name);
+		char text[512];
+		snprintf(text, sizeof(text), L("Your network profile was restored to the snapshot taken before %s and is being uploaded.").c_str(), version.c_str());
 		Notify(text);
 		return true;
 	}
@@ -730,6 +839,15 @@ namespace
 						NetworkStallDiagnostics::IncidentLog("[ProfileSync] own profile loaded after %d retr%s\n",
 							g_autoRetries, g_autoRetries == 1 ? "y" : "ies");
 						Notify(L("Your network profile loaded."));
+					}
+					TakeSnapshotOnce(blob);
+					const std::string restoreFrom = ReadPendingSnapshotRestore();
+					if (!restoreFrom.empty() && RestoreSnapshot(restoreFrom, netManager))
+					{
+						ResetRetries();
+						GoTo(task, State_Upload);
+						Field(task, kTaskScreen) = kScreenFetching;
+						return;
 					}
 					WriteBackup(blob, "downloaded from the server");
 				}
@@ -1136,6 +1254,52 @@ void ProfileSync::OnProfileUploadConfirmed()
 	}
 	if (copy.size() == kProfileSize)
 	{
+		// The copy was taken before FUN_004A2740 stamped this upload's save time into the
+		// blob; carry it over, so the backup matches what the server now holds.
+		if (g_gameVals.playerAvatarBaseAddr != 0)
+		{
+			memcpy(copy.data() + kProfileSaveTime,
+				reinterpret_cast<const uint8_t*>(g_gameVals.playerAvatarBaseAddr) + kProfileSaveTime, sizeof(uint64_t));
+		}
 		WriteBackup(copy.data(), "upload confirmed by the server");
 	}
+}
+
+bool ProfileSync::HasSnapshot(const std::string& version)
+{
+	const uint64_t steamId = SteamId();
+	return steamId != 0 && GetFileAttributesW(SnapshotProfilePath(version, steamId).c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+bool ProfileSync::ScheduleSnapshotRestore(const std::string& version)
+{
+	if (!g_installed || !HasSnapshot(version))
+	{
+		return false;
+	}
+	HANDLE file = CreateFileW(PendingSnapshotMarker().c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+	{
+		return false;
+	}
+	DWORD written = 0;
+	const std::string line = version + "\n";
+	const BOOL ok = WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+	CloseHandle(file);
+	return ok != FALSE;
+}
+
+void ProfileSync::CancelSnapshotRestore()
+{
+	DeleteFileW(PendingSnapshotMarker().c_str());
+}
+
+std::string ProfileSync::PendingSnapshotRestore()
+{
+	return ReadPendingSnapshotRestore();
+}
+
+bool ProfileSync::IsInstalled()
+{
+	return g_installed;
 }

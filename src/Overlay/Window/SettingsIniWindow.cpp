@@ -1,5 +1,7 @@
 #include "SettingsIniWindow.h"
 
+#include "ProfileRestorePanel.h"
+
 #include "Core/HotkeyManager.h"
 #include "Core/Localization.h"
 #include "Core/logger.h"
@@ -52,6 +54,9 @@ namespace {
 		{ "DCodeAutoRelogin", "Recover lost ranked progress", "Ranked", "The game signs in to Arc System Works' profile server once at launch. If that sign-in stops being accepted mid-session, your D-Code disappears and every match you play afterwards is thrown away when you close the game, with no warning. This signs back in so your progress keeps saving. Leave it on." },
 		{ "DCodeRetryOnRejection", "Keep loading the D-Code while signing back in", "Ranked", "When the profile server rejects the sign-in mid-download, the game gives up on that D-Code and the match screen goes on without it. This keeps the download marked as in progress, signs back in, and downloads again, so the D-Code shows up a few seconds later instead of never. Leave it on." },
 		{ "DCodeForceSessionWedge", "Break profile sign-in (testing)", "Debug", "TESTING ONLY. Deliberately invalidates your profile server sign-in once per launch, to check that the recovery above works. Turning this on will cost you any progress earned before it recovers. There is no reason to enable it unless a developer asked you to." },
+		{ "ProfileSyncRewrite", "Protect your network profile", "Ranked", "When the game cannot download your network profile it says you have none and offers to create a new one, which wipes your real profile. This retries instead, and never lets an empty profile be uploaded over yours. Leave it on." },
+		{ "ProfileBackup", "Back up your network profile", "Ranked", "Keeps an encrypted copy of your network profile, refreshed every time the server confirms it. It is only used if the server ever says it has no profile for you at all. Leave it on." },
+		{ "ProfileSyncTestFailures", "Fail profile downloads (testing)", "Debug", "TESTING ONLY. Makes the next N network profile downloads fail, to check the retries and the retry dialog. Leave at 0." },
 		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows a small overlay with your ranked stats while you are in ranked." },
 		{ "ShowSquareColorProgress", "Show net colour progress", "Ranked", "Shows how close you are to the next net colour (the coloured square next to your name)." },
 		{ "ShowRankedPrediction", "Show ranked prediction", "Ranked", "Before a ranked match, shows how much rank you stand to gain or lose." },
@@ -792,6 +797,11 @@ void SettingsIniWindow::DrawPageBody(bool& restartRowChanged)
 
 		DrawCategoryTable(info.name, restartRowChanged);
 	}
+
+	// Last thing on the last page, collapsed, and never in search results: the pre-update
+	// restore is an escape hatch, not something to stumble on. See ProfileRestorePanel.h.
+	if (m_currentPage == SPage_Advanced)
+		ProfileRestorePanel::Draw();
 }
 
 void SettingsIniWindow::DrawSearchResults(bool& restartRowChanged)

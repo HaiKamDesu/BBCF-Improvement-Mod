@@ -5072,6 +5072,63 @@ struct LocalizationKeysAccessor
 
         // Blocked an upload of an empty network profile, so it can't overwrite your real profile on the server.
         inline const char* Blocked_an_upload_of_an_empty_network_profile_so_it_can_t_overwrite_your_real_profile_on_the_server() const { return Get("Blocked an upload of an empty network profile, so it can't overwrite your real profile on the server."); }
+
+        // Network profile from before %s will be restored the next time you enter Network mode.
+        inline const char* Network_profile_from_before_s_will_be_restored_the_next_time_you_enter_Network_mode() const { return Get("Network profile from before %s will be restored the next time you enter Network mode."); }
+
+        // Local save data from before %s will be restored the next time you start the game.
+        inline const char* Local_save_data_from_before_s_will_be_restored_the_next_time_you_start_the_game() const { return Get("Local save data from before %s will be restored the next time you start the game."); }
+
+        // No copy has been taken yet. One is taken the next time the game starts.
+        inline const char* No_copy_has_been_taken_yet_One_is_taken_the_next_time_the_game_starts() const { return Get("No copy has been taken yet. One is taken the next time the game starts."); }
+
+        // Before %s, taken %04u-%02u-%02u %02u:%02u
+        inline const char* Before_s_taken_04u_02u_02u_02u_02u() const { return Get("Before %s, taken %04u-%02u-%02u %02u:%02u"); }
+
+        // Restore network profile
+        inline const char* Restore_network_profile() const { return Get("Restore network profile"); }
+
+        // Restore local save data
+        inline const char* Restore_local_save_data() const { return Get("Restore local save data"); }
+
+        // No network profile copy for this Steam account in this snapshot yet. It is taken the first time you enter Network mode with this version.
+        inline const char* No_network_profile_copy_for_this_Steam_account_in_this_snapshot_yet_It_is_taken_the_first_time_you_enter_Network_mode_with_this_version() const { return Get("No network profile copy for this Steam account in this snapshot yet. It is taken the first time you enter Network mode with this version."); }
+
+        // Couldn't schedule the restore. Check DEBUG.txt.
+        inline const char* Couldn_t_schedule_the_restore_Check_DEBUG_txt() const { return Get("Couldn't schedule the restore. Check DEBUG.txt."); }
+
+        // Couldn't restore your network profile: there is no snapshot for this Steam account.
+        inline const char* Couldn_t_restore_your_network_profile_there_is_no_snapshot_for_this_Steam_account() const { return Get("Couldn't restore your network profile: there is no snapshot for this Steam account."); }
+
+        // Couldn't restore your network profile: the current one could not be saved first.
+        inline const char* Couldn_t_restore_your_network_profile_the_current_one_could_not_be_saved_first() const { return Get("Couldn't restore your network profile: the current one could not be saved first."); }
+
+        // Your network profile was restored to the snapshot taken before %s and is being uploaded.
+        inline const char* Your_network_profile_was_restored_to_the_snapshot_taken_before_s_and_is_being_uploaded() const { return Get("Your network profile was restored to the snapshot taken before %s and is being uploaded."); }
+
+        // Restore from a pre-update copy (cannot be undone)
+        inline const char* Restore_from_a_pre_update_copy_cannot_be_undone() const { return Get("Restore from a pre-update copy (cannot be undone)"); }
+
+        // Only for when an update has broken your profile. The first time each mod version runs, it copies your local save data before the game starts, and your network profile the first time it downloads it. Restoring puts that copy back and throws away everything you earned since.
+        inline const char* Only_for_when_an_update_has_broken_your_profile_The_first_time_each_mod_version_runs_it_copies_your_local_save_data_before_the_game_starts_and_your_network_profile_the_first_time_it_downloads_it_Restoring_puts_that_copy_back_and_throws_away_everything_you_earned_since() const { return Get("Only for when an update has broken your profile. The first time each mod version runs, it copies your local save data before the game starts, and your network profile the first time it downloads it. Restoring puts that copy back and throws away everything you earned since."); }
+
+        // A restore cannot be undone.
+        inline const char* A_restore_cannot_be_undone() const { return Get("A restore cannot be undone."); }
+
+        // I understand a restore cannot be undone
+        inline const char* I_understand_a_restore_cannot_be_undone() const { return Get("I understand a restore cannot be undone"); }
+
+        // Replace your network profile with the copy taken before %s? It happens the next time you enter Network mode. Everything you earned since that copy is lost.
+        inline const char* Replace_your_network_profile_with_the_copy_taken_before_s_It_happens_the_next_time_you_enter_Network_mode_Everything_you_earned_since_that_copy_is_lost() const { return Get("Replace your network profile with the copy taken before %s? It happens the next time you enter Network mode. Everything you earned since that copy is lost."); }
+
+        // Replace your local save data with the copy taken before %s? It happens the next time you start the game. Everything you earned since that copy is lost.
+        inline const char* Replace_your_local_save_data_with_the_copy_taken_before_s_It_happens_the_next_time_you_start_the_game_Everything_you_earned_since_that_copy_is_lost() const { return Get("Replace your local save data with the copy taken before %s? It happens the next time you start the game. Everything you earned since that copy is lost."); }
+
+        // This cannot be undone.
+        inline const char* This_cannot_be_undone() const { return Get("This cannot be undone."); }
+
+        // Restore, I understand it cannot be undone
+        inline const char* Restore_I_understand_it_cannot_be_undone() const { return Get("Restore, I understand it cannot be undone"); }
 };
 
 

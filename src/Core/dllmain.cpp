@@ -1,3 +1,4 @@
+#include "Core/SaveDataSafety.h"
 #include "Audio/BgmReplacementManager.h"
 #include "crashdump.h"
 #include "info.h"
@@ -286,6 +287,8 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
         InstallCrashHandlers();
         ForceLog("[Init] Crash handlers installed.\n");
 
+	SaveDataSafety::FlushAttachLog();
+
 	logSettingsIni();
 	Settings::initSavedSettings();
 	ForceLog("[Init] Settings initialized and saved settings loaded.\n");
@@ -380,6 +383,10 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 
         InstallCrashHandlers();
         ForceLog("[Init] Crash handlers installed in DllMain");
+
+        // Before the game's WinMain runs, so a scheduled restore of the local save lands
+        // before the game reads it, and this version's snapshot is taken before anything.
+        SaveDataSafety::OnProcessAttach();
 
 	HANDLE hThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)BBCF_IM_Start, hinstDLL, 0, nullptr);
 	if (!hThread)
