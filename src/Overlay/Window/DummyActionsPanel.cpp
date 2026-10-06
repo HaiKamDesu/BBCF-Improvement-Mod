@@ -1876,6 +1876,9 @@ namespace
 		request.filters.push_back({ L("Playback file"), "*.playback" });
 		request.filters.push_back({ L("Playback library"), "*.upl" });
 		request.defaultExtension = "playback";
+		// A new row takes as many files as were picked, one action each, so a folder of
+		// recordings goes in with one pick. Replacing an existing row stays one file.
+		request.allowMultiple = actionIndex < 0;
 		if (NativeFileDialog::Open(kFileDialogToken, request))
 		{
 			g_filePickTrigger = trigger;
@@ -2099,49 +2102,81 @@ namespace
 		}
 
 		const TriggerType trigger = static_cast<TriggerType>(pending);
+		const std::vector<std::string> paths = result.paths.empty()
+			? std::vector<std::string>{ result.path } : result.paths;
 
-		// A Playback Library file is unpacked into one recording action per entry, so a big
-		// library built under the old system lands in a trigger in one go.
-		std::string lower = result.path;
-		for (char& ch : lower) { ch = static_cast<char>(tolower(static_cast<unsigned char>(ch))); }
-		if (lower.size() > 4 && lower.compare(lower.size() - 4, 4, ".upl") == 0)
-		{
-			int selectionMode = UnlimitedPlaybackManager::Selection_Random;
-			const int added = Manager::Instance().AddLibraryFile(trigger, result.path, &selectionMode);
-			if (added < 0)
-			{
-				UnlimitedPlaybackManager::Instance().PushToast(L("That library file could not be read."));
-			}
-			else
-			{
-				if (Manager::Instance().Get(trigger).actions.size() == static_cast<size_t>(added))
-				{
-					// The library was the whole trigger, so its picking order comes along.
-					Manager::Instance().SetSelectionMode(trigger, selectionMode);
-				}
-				UnlimitedPlaybackManager::Instance().PushToast(
-					FormatText(L("Added %d recording(s) from the library.").c_str(), added));
-			}
-			return;
-		}
-
-		// Committed straight from the picker's answer - there is no modal to save.
-		Manager::Action action;
-		action.source = Manager::Source_File;
-		action.filePath = result.path;
-		action.fileName = LeafOf(result.path);
+		// Replacing a row: the picker only allowed one file.
 		if (index >= 0)
 		{
+			Manager::Action action;
+			action.source = Manager::Source_File;
+			action.filePath = paths.front();
+			action.fileName = LeafOf(paths.front());
 			const Manager::Trigger& slot = Manager::Instance().Get(trigger);
 			if (static_cast<size_t>(index) < slot.actions.size())
 			{
 				action.delayFrames = slot.actions[index].delayFrames;
 			}
 			Manager::Instance().Replace(trigger, static_cast<size_t>(index), action);
+			return;
 		}
-		else
+
+		const bool triggerWasEmpty = Manager::Instance().Get(trigger).actions.empty();
+		int libraryCount = 0;
+		int librarySelectionMode = UnlimitedPlaybackManager::Selection_Random;
+		int addedFromLibraries = 0;
+		int addedFiles = 0;
+		int failedLibraries = 0;
+		for (const std::string& path : paths)
 		{
+			// A Playback Library file is unpacked into one recording action per entry, so a
+			// big library built under the old system lands in a trigger in one go.
+			std::string lower = path;
+			for (char& ch : lower) { ch = static_cast<char>(tolower(static_cast<unsigned char>(ch))); }
+			if (lower.size() > 4 && lower.compare(lower.size() - 4, 4, ".upl") == 0)
+			{
+				int selectionMode = UnlimitedPlaybackManager::Selection_Random;
+				const int added = Manager::Instance().AddLibraryFile(trigger, path, &selectionMode);
+				if (added < 0)
+				{
+					failedLibraries++;
+				}
+				else
+				{
+					libraryCount++;
+					librarySelectionMode = selectionMode;
+					addedFromLibraries += added;
+				}
+				continue;
+			}
+
+			// Committed straight from the picker's answer - there is no modal to save.
+			Manager::Action action;
+			action.source = Manager::Source_File;
+			action.filePath = path;
+			action.fileName = LeafOf(path);
 			Manager::Instance().Add(trigger, action);
+			addedFiles++;
+		}
+
+		// A single library that became the whole trigger brings its picking order along.
+		if (triggerWasEmpty && libraryCount == 1 && addedFiles == 0)
+		{
+			Manager::Instance().SetSelectionMode(trigger, librarySelectionMode);
+		}
+		if (failedLibraries > 0)
+		{
+			UnlimitedPlaybackManager::Instance().PushToast(L("That library file could not be read."));
+		}
+		if (libraryCount > 0)
+		{
+			UnlimitedPlaybackManager::Instance().PushToast(
+				FormatText(L("Added %d recording(s) from the library.").c_str(), addedFromLibraries));
+		}
+		else if (addedFiles > 1)
+		{
+			UnlimitedPlaybackManager::Instance().PushToast(
+				FormatText(L("Added %d playback files.").c_str(), addedFiles));
 		}
 	}
 

@@ -5001,6 +5001,9 @@ struct LocalizationKeysAccessor
         // Added %d recording(s) from the library.
         inline const char* Added_d_recording_s_from_the_library() const { return Get("Added %d recording(s) from the library."); }
 
+        // Added %d playback files.
+        inline const char* Added_d_playback_files() const { return Get("Added %d playback files."); }
+
         // That action has no inputs to save.
         inline const char* That_action_has_no_inputs_to_save() const { return Get("That action has no inputs to save."); }
 

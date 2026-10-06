@@ -1845,6 +1845,7 @@ Playback file or library,Playback file or library,Archivo de playback o bibliote
 Playback library,Playback library,Biblioteca de playback
 That library file could not be read.,That library file could not be read.,No se pudo leer ese archivo de biblioteca.
 Added %d recording(s) from the library.,Added %d recording(s) from the library.,Se añadieron %d grabación(es) de la biblioteca.
+Added %d playback files.,Added %d playback files.,Se añadieron %d archivos de playback.
 That action has no inputs to save.,That action has no inputs to save.,Esa acción no tiene inputs que guardar.
 That action has no inputs to send.,That action has no inputs to send.,Esa acción no tiene inputs que enviar.
 Sent to CF slot %d.,Sent to CF slot %d.,Enviado a la ranura CF %d.
