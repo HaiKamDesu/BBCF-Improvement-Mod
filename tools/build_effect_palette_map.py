@@ -76,6 +76,14 @@ CMD_BLEND_LAST = 3035
 CMD_RECIPE = 3040
 CMD_RECIPE_PARAM_FIRST = 3041
 CMD_RECIPE_PARAM_LAST = 3048
+# Hand-picked previews for files the walk gets technically right but unhelpfully: the
+# file IS drawn on those sprites, yet a player editing it recognises it by one object.
+# (tag, file) -> regex an image must match to stay on that file's sheet.
+#   mi 6: the robe from Izanami's intro. Her body sprites are drawn with file 6 too, but
+#         a sheet of thirty copies of her buried the robe the file is actually for.
+PREVIEW_ONLY = {
+    ("mi", 6): r"mi600_\d+y$",
+}
 OPENERS = {CMD_IF, CMD_IF_NOT, CMD_ELSE, CMD_UPON}
 CLOSERS = {CMD_END_IF, CMD_END_IF_NOT, CMD_END_ELSE, CMD_END_UPON}
 
@@ -247,7 +255,9 @@ def map_character(char_dir, tag, sizes):
         mask = 0
         for f in usage[image]:
             if 1 <= f <= 7:  # file 0 is the character's own colours, already on the sheet
-                mask |= 1 << f
+                keep = PREVIEW_ONLY.get((tag, f))
+                if keep is None or re.match(keep, image):
+                    mask |= 1 << f
         if mask:
             entries.append((packs[image], mask, image, render_of.get(image, new_render_state())))
     return entries
