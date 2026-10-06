@@ -112,6 +112,22 @@ SETTING(bool, dcodeTusGateAutoClear, "DCodeTusGateAutoClear", "1");
 // re-runs that login in place. See docs/Research/DCodeNetworkStallBug.md.
 SETTING(bool, dcodeAutoRelogin, "DCodeAutoRelogin", "1");
 SETTING(bool, dcodeRetryOnRejection, "DCodeRetryOnRejection", "1");
+// Replaces the game's network-entry profile sync (src/Network/ProfileSync.cpp). The game
+// treats ANY failed profile download as "you have no profile" and offers to create a new
+// one, which overwrites the real profile on the server. With this on, failures are retried
+// (signing in again when the server dropped the session), "create new" needs two explicit
+// confirmations, and a blank or failed profile can never be uploaded.
+// See docs/Research/ProfileResetPromptInvestigation.md.
+SETTING(bool, profileSyncRewrite, "ProfileSyncRewrite", "1");
+// Keeps an encrypted copy of your network profile in BBCF_IM\ProfileBackup, refreshed every
+// time the server confirms it. Only ever used when the server answers that it has no profile
+// for you at all; it can never be used to roll a profile back.
+SETTING(bool, profileBackup, "ProfileBackup", "1");
+// TEST ONLY: make the first N own-profile downloads at network entry fail the way a real
+// failure does (buffer zeroed, loader state 6), to exercise the retries and the dialog.
+// A forced failure can never trigger the backup restore; only a real "no data" answer from
+// the server can, or this switch would be a way to roll a profile back.
+SETTING(int, profileSyncTestFailures, "ProfileSyncTestFailures", "0");
 // TEST ONLY: corrupt one byte of the live session token so the server rejects
 // it exactly the way the real bug does (result 11 / status 3), to exercise the
 // re-login fix above end-to-end without waiting days for a natural occurrence.

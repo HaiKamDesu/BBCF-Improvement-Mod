@@ -5054,6 +5054,24 @@ struct LocalizationKeysAccessor
 
         // +%df
         inline const char* df() const { return Get("+%df"); }
+
+        // The profile server has no profile for this account. Restored it from the local backup saved %s and uploaded it.
+        inline const char* The_profile_server_has_no_profile_for_this_account_Restored_it_from_the_local_backup_saved_s_and_uploaded_it() const { return Get("The profile server has no profile for this account. Restored it from the local backup saved %s and uploaded it."); }
+
+        // Couldn't load your network profile from the server. Retrying...
+        inline const char* Couldn_t_load_your_network_profile_from_the_server_Retrying() const { return Get("Couldn't load your network profile from the server. Retrying..."); }
+
+        // The profile server isn't returning your profile right now. Your profile is not lost and is backed up locally. Choose OK to try again.
+        inline const char* The_profile_server_isn_t_returning_your_profile_right_now_Your_profile_is_not_lost_and_is_backed_up_locally_Choose_OK_to_try_again() const { return Get("The profile server isn't returning your profile right now. Your profile is not lost and is backed up locally. Choose OK to try again."); }
+
+        // The profile server isn't returning your profile right now. Your profile is not lost. Choose OK to try again; only choose Create New if this account has never played online.
+        inline const char* The_profile_server_isn_t_returning_your_profile_right_now_Your_profile_is_not_lost_Choose_OK_to_try_again_only_choose_Create_New_if_this_account_has_never_played_online() const { return Get("The profile server isn't returning your profile right now. Your profile is not lost. Choose OK to try again; only choose Create New if this account has never played online."); }
+
+        // Your network profile loaded.
+        inline const char* Your_network_profile_loaded() const { return Get("Your network profile loaded."); }
+
+        // Blocked an upload of an empty network profile, so it can't overwrite your real profile on the server.
+        inline const char* Blocked_an_upload_of_an_empty_network_profile_so_it_can_t_overwrite_your_real_profile_on_the_server() const { return Get("Blocked an upload of an empty network profile, so it can't overwrite your real profile on the server."); }
 };
 
 

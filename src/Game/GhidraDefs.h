@@ -968,6 +968,67 @@ static constexpr uintptr_t ADDR_UploadOwnProfile       = 0x000A96D0;
 static constexpr uintptr_t ADDR_ProfileStampSource     = 0x0000BF90;
 
 // ---------------------------------------------------------------------------
+// Network-entry profile sync: the D-Code sync task (outer network task 3) that
+// downloads the own profile and shows "Cannot find player information. Would you
+// like to create a new profile?". Fully reimplemented by src/Network/ProfileSync.cpp;
+// RE in docs/Research/ProfileResetPromptInvestigation.md. All __fastcall/__thiscall
+// as noted, verified against the disassembly 2026-10-06.
+// ---------------------------------------------------------------------------
+// FUN_004B0970 - the task itself, __fastcall(ecx = task). Single caller 0x4A70BF.
+// Starts push ebx / push esi / push edi / mov esi,ecx; replaced at entry.
+static constexpr uintptr_t ADDR_ProfileSyncTask          = 0x000B0970;
+// FUN_004A96D0 prologue push ebp / mov ebp,esp / sub esp,0D0h (9 bytes); upload guard
+static constexpr size_t    SIZE_UploadOwnProfilePrologue = 9;
+// FUN_00486070 - returns a pointer to the network interface holder; vtable +0x18
+// gives the net object whose +0xC accepts any fetch result, +0x1C is a tick
+static constexpr uintptr_t ADDR_NetInterfaceHolder       = 0x00086070;
+// FUN_0049A400 - returns the net manager (DAT_00CAD000), the ecx of most calls below
+static constexpr uintptr_t ADDR_NetManager               = 0x0009A400;
+// FUN_0049A230 - starts the own profile download (loader cc := 1), thiscall(netMgr)
+static constexpr uintptr_t ADDR_OwnProfileFetchStart     = 0x0009A230;
+// FUN_0049A940 - own profile fetch tick + poll: -100 pending, 0 ok (cc 3/4), 100 failed (cc 6)
+static constexpr uintptr_t ADDR_OwnProfileFetchPoll      = 0x0009A940;
+// FUN_004A0CF0 - reset a row's loader (cc := 0), fastcall(blob)
+static constexpr uintptr_t ADDR_ProfileLoaderReset       = 0x000A0CF0;
+// FUN_004A1F70 - build a default profile (reset + cc := 4), fastcall(blob)
+static constexpr uintptr_t ADDR_ProfileBuildDefault      = 0x000A1F70;
+// FUN_004A9D20 - clears the task's dialog/request block (+0x24..+0xA8), fastcall(task)
+static constexpr uintptr_t ADDR_NetTaskClearRequests     = 0x000A9D20;
+// FUN_004A7F90 - dialog still busy (+0xAC or +0xB8 set), fastcall(task)
+static constexpr uintptr_t ADDR_NetTaskDialogBusy        = 0x000A7F90;
+// FUN_004A7C30 - switch outer network task, thiscall(task, id), ret 4
+static constexpr uintptr_t ADDR_NetTaskSwitch            = 0x000A7C30;
+// FUN_004B8D30 - poll the own upload, thiscall(transfer, blob), ret 4; 0 when latched
+static constexpr uintptr_t ADDR_OwnProfileUploadPoll     = 0x000B8D30;
+// FUN_004B9100 / FUN_004B9070 - DLC ownership query start / poll, thiscall(transfer)
+static constexpr uintptr_t ADDR_DlcQueryStart            = 0x000B9100;
+static constexpr uintptr_t ADDR_DlcQueryPoll             = 0x000B9070;
+// FUN_00643B40 + FUN_00648210 - D-Code DLC consistency check (nonzero = error)
+static constexpr uintptr_t ADDR_DCodeDlcHolder           = 0x00243B40;
+static constexpr uintptr_t ADDR_DCodeDlcCheck            = 0x00248210;
+// FUN_006983E0 - log a named network error, cdecl(const char*)
+static constexpr uintptr_t ADDR_NetLogError              = 0x002983E0;
+// "NTER_DCodeDLCCheckError", the string the game passes to it
+static constexpr uintptr_t ADDR_Str_DCodeDLCCheckError   = 0x004A9E24;
+// FUN_006B2160 + FUN_006AF6F0, FUN_0047C8C0, FUN_00475300 + FUN_004769C0 (thiscall, ret 8),
+// FUN_004B9700, FUN_006C4330 - DLC refresh / "new DLC" notice / network-ready latch
+static constexpr uintptr_t ADDR_DlcRefreshHolder         = 0x002B2160;
+static constexpr uintptr_t ADDR_DlcRefresh               = 0x002AF6F0;
+static constexpr uintptr_t ADDR_DlcFlagsHolder           = 0x0007C8C0;
+static constexpr uintptr_t ADDR_MessageQueueHolder       = 0x00075300;
+static constexpr uintptr_t ADDR_MessageQueuePost         = 0x000769C0;
+static constexpr uintptr_t ADDR_NetSessionInfo           = 0x000B9700;
+static constexpr uintptr_t ADDR_NetSessionReady          = 0x002C4330;
+// DAT_00CF77A8 - TUS latch: nonzero skips every profile upload and D-Code read
+static constexpr uintptr_t ADDR_TusLatch                 = 0x008F77A8;
+// DAT_00A5A054 - work manager result (mgr+4): 7 read ok, 8 write ok, 9 no data, 0xB error
+static constexpr uintptr_t ADDR_WorkMgrResult            = 0x0065A054;
+// Loader sub-object: *(blob + 0x68A0); its +0xCC is the loader state
+// (0 idle, 1 queued, 2 in flight, 3 loaded from server, 4 default built, 6 failed).
+static constexpr uintptr_t OFFSET_ProfileLoaderPtr       = 0x68A0;
+static constexpr uintptr_t OFFSET_ProfileLoaderState     = 0xCC;
+
+// ---------------------------------------------------------------------------
 // Lobby avatar: the profile-blob fields are a MIRROR, not the source of truth
 // (RE'd 2026-09-05). The blob copies at +0x610C icon, +0x6110 colour,
 // +0x61C4/+0x61C5 accessories are re-derived from local state and overwritten

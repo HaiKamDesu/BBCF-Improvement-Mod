@@ -14,6 +14,7 @@
 #include "Game/stages.h"
 #include "Hooks/HookManager.h"
 #include "Hooks/RankedAutomationHarness.h"
+#include "Network/ProfileSync.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "Network/RoomManager.h"
 #include "Overlay/WindowManager.h"
@@ -9735,6 +9736,10 @@ bool placeHooks_bbcf()
 	DCodeFetchTickJmpBackAddr = HookManager::SetHook("DCodeFetchTick",
 		"\x56\x8B\xF1\x57\x8B\xBE\xA0\x68\x00\x00\x83\xBF\xCC\x00\x00\x00\x01",
 		"xxxxxxxxxxxxxxxxx", 10, DCodeFetchTickHookFunc);
+
+	// Network-entry profile sync (FUN_004B0970) replaced by a C++ rewrite, plus the guard
+	// on the profile upload (FUN_004A96D0). See src/Network/ProfileSync.h.
+	ProfileSync::InstallHooks();
 
 	// Ranked row-click latch (FUN_004a89d0, VA 0x4A89D0). Hooked by direct
 	// address (RVA 0xA89D0) like the other ranked-flow hooks - the prologue

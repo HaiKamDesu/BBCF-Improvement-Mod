@@ -36,6 +36,15 @@ namespace NetworkStallDiagnostics
 	void OnUpdate();
 	void OnFetchTickEnter(void* row);
 	void GetProfilePersistState(ProfilePersistState* out);
+
+	// Asks for a fresh user/login. Safe from any thread: the login itself only ever
+	// starts on the thread that ticks the web strategies, on its next tick. Subject to
+	// the same cooldown and per-window cap as the automatic re-login.
+	void RequestRelogin(const char* reason);
+
+	// Appends a line to DCodeIncidents.log (and the debug log), for subsystems that
+	// share this one's incident trail.
+	void IncidentLog(const char* fmt, ...);
 }
 
 // Plain-C thunk for the naked asm hook in hooks_bbcf.cpp.

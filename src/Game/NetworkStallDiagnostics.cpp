@@ -6,6 +6,8 @@
 #include "Network/RankedListConnectionFilter.h"
 #include "Core/Localization.h"
 #include "Overlay/NotificationBar/NotificationBar.h"
+#include "Network/ProfileSync.h"
+#include <atomic>
 
 #include <Windows.h>
 #include <cstdint>
@@ -562,6 +564,11 @@ namespace
 	uint32_t ReadLoginResponseSession(uintptr_t moduleBase, char* out, size_t outSize); // defined below
 	void ReArmAllSlots(uintptr_t moduleBase, const char* tag); // defined below
 
+	void TryForceRelogin(uintptr_t moduleBase, const char* reason); // defined below
+
+	// Set by RequestRelogin from any thread, consumed by the strategy ticker.
+	std::atomic<const char*> g_pendingReloginReason{ nullptr };
+
 	void __fastcall CNetworkerUpdateTrampoline(void* self, void* unused)
 	{
 		++g_strategyTicks;
@@ -581,6 +588,10 @@ namespace
 		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
 		if (moduleBase != 0)
 		{
+			if (const char* const reason = g_pendingReloginReason.exchange(nullptr))
+			{
+				TryForceRelogin(moduleBase, reason);
+			}
 			DefendReloginSession(moduleBase);
 		}
 
@@ -1679,6 +1690,8 @@ namespace
 	}
 
 	// Returns true if the latch was found set (whether or not we cleared it).
+	bool g_tusGateHeldForProfile = false;
+
 	bool HandleTusGate(uintptr_t moduleBase, ULONGLONG now, const char* progress)
 	{
 		int32_t* const gate = TusGatePtr(moduleBase);
@@ -1721,6 +1734,20 @@ namespace
 		{
 			return true; // cooling down, try again on a later poll
 		}
+
+		// The latch is also what keeps a FAILED profile download from being uploaded:
+		// after a failure the own blob is the game's zeroed default, and clearing the
+		// latch would let the next upload overwrite the real profile on the server.
+		if (!ProfileSync::OwnProfileSafeToUpload())
+		{
+			if (!g_tusGateHeldForProfile)
+			{
+				g_tusGateHeldForProfile = true;
+				IncidentPrintf("[TusGate] auto-clear held: the own profile did not come from the server this session\n");
+			}
+			return true;
+		}
+		g_tusGateHeldForProfile = false;
 
 		// 0 is the value the game itself writes once a sync succeeds (0x4B0A1A),
 		// so this only puts the subsystem back into a state the game produces.
@@ -1856,6 +1883,7 @@ namespace
 					g_uploadSuccesses, progress ? progress : "");
 			}
 			g_uploadConsecutiveFailures = 0;
+			ProfileSync::OnProfileUploadConfirmed();
 			return;
 		}
 
@@ -2173,6 +2201,32 @@ void NetworkStallDiagnostics::OnFetchTickEnter(void* rowPtr)
 extern "C" void __cdecl DCodeFetchTickEnterThunk(void* row)
 {
 	NetworkStallDiagnostics::OnFetchTickEnter(row);
+}
+
+void NetworkStallDiagnostics::RequestRelogin(const char* reason)
+{
+	// No ticker seen yet means nothing would ever consume the request; TryForceRelogin
+	// itself accepts any thread until a ticker has been identified.
+	if (g_strategyTickThreadId == 0)
+	{
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (moduleBase != 0)
+		{
+			TryForceRelogin(moduleBase, reason);
+		}
+		return;
+	}
+	g_pendingReloginReason.store(reason);
+}
+
+void NetworkStallDiagnostics::IncidentLog(const char* fmt, ...)
+{
+	char buffer[1024];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+	IncidentPrintf("%s", buffer);
 }
 
 void NetworkStallDiagnostics::GetProfilePersistState(ProfilePersistState* out)
