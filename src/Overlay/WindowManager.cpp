@@ -569,7 +569,13 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	}
 	else
 	{
-		ImGui::GetIO().Fonts->AddFontDefault();
+		// 13 is the size AddFontDefault picks by itself; passing it explicitly is what lets the
+		// Unicode font below merge in at its own size. Left implicit, ImGui 1.92 asserts in
+		// AddFont (imgui_draw.cpp "Cannot use MergeMode with an explicit reference size"), which
+		// aborted every Debug build at boot. Renders the same: the flag only feeds that assert.
+		ImFontConfig defaultConfig;
+		defaultConfig.SizePixels = 13.0f;
+		ImGui::GetIO().Fonts->AddFontDefault(&defaultConfig);
 	}
 
 	// Add Unicode font
