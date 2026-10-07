@@ -5246,6 +5246,27 @@ struct LocalizationKeysAccessor
 
         // Drag onto Player 1 or Player 2 to use it there.
         inline const char* Drag_onto_Player_1_or_Player_2_to_use_it_there() const { return Get("Drag onto Player 1 or Player 2 to use it there."); }
+
+        // Controller
+        inline const char* Controller() const { return Get("Controller"); }
+
+        // PlayStation controller
+        inline const char* PlayStation_controller() const { return Get("PlayStation controller"); }
+
+        // Switch controller
+        inline const char* Switch_controller() const { return Get("Switch controller"); }
+
+        // Arcade stick (Xbox)
+        inline const char* Arcade_stick_Xbox() const { return Get("Arcade stick (Xbox)"); }
+
+        // Arcade stick (PlayStation)
+        inline const char* Arcade_stick_PlayStation() const { return Get("Arcade stick (PlayStation)"); }
+
+        // Arcade stick (Switch)
+        inline const char* Arcade_stick_Switch() const { return Get("Arcade stick (Switch)"); }
+
+        // Drop here to hide it
+        inline const char* Drop_here_to_hide_it() const { return Get("Drop here to hide it"); }
 };
 
 

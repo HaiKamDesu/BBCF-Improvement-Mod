@@ -19,6 +19,7 @@
 //
 // See docs/Decompilation/Controllers.md for the game side.
 
+#include "DeviceModels.h"
 #include "LocalInputTypes.h"
 
 #include <Windows.h>
@@ -41,9 +42,10 @@ namespace LocalInput
 	struct DeviceView
 	{
 		std::string id;
-		std::string name;         // custom name, or the OS name
-		std::string defaultName;
+		std::string name;         // custom name, or the default name
+		std::string defaultName;  // the product's name when the device is known, else the OS name
 		DeviceKind kind = DeviceKind::Keyboard;
+		DeviceModel model;        // what it physically is (names, icons, drawings only)
 		bool connected = false;
 		Side side = Side_P1;
 		bool pinned = false;
@@ -102,6 +104,8 @@ namespace LocalInput
 		void ResetMapping(const std::string& id);
 		static Mapping DefaultMapping(DeviceKind kind);
 		static std::string ControlName(DeviceKind kind, int control);
+		// The name printed on the device when it is a known model ("Cross", "Options").
+		static std::string ControlName(const DeviceView& device, int control);
 
 		// Rebinding: while a capture is armed nothing reaches the game, and the first control
 		// newly pressed on that device is returned once.

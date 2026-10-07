@@ -125,6 +125,7 @@
     <ClCompile Include="src\Overlay\Window\ProfileRestorePanel.cpp" />
     <ClCompile Include="src\Input\WindowsInputBackend.cpp" />
     <ClCompile Include="src\Input\LinuxInputBackend.cpp" />
+    <ClCompile Include="src\Input\DeviceModels.cpp" />
     <ClCompile Include="src\Input\LocalInputManager.cpp" />
     <ClCompile Include="src\Input\GameInputBridge.cpp" />
     <ClCompile Include="src\Input\GameKeyConfig.cpp" />
@@ -333,6 +334,7 @@
     <ClInclude Include="src\Network\ProfileSync.h" />
     <ClInclude Include="src\Core\SaveDataSafety.h" />
     <ClInclude Include="src\Overlay\Window\ProfileRestorePanel.h" />
+    <ClInclude Include="src\Input\DeviceModels.h" />
     <ClInclude Include="src\Input\LocalInputTypes.h" />
     <ClInclude Include="src\Input\InputBackend.h" />
     <ClInclude Include="src\Input\GameKeyConfig.h" />

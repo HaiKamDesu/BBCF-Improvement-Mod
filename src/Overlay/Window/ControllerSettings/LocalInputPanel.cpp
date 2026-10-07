@@ -52,11 +52,24 @@ namespace
 
 	std::string KindText(const DeviceView& d)
 	{
-		switch (DeviceArt::StyleFor(d.kind, d.defaultName))
+		if (d.kind == DeviceKind::Keyboard)
+			return L("Keyboard");
+		const PadFamily family = d.model.Family();
+		if (d.model.arcadeStick)
 		{
-		case DeviceArt::IconStyle::Keyboard: return L("Keyboard");
-		case DeviceArt::IconStyle::XboxPad: return L("Xbox controller");
-		case DeviceArt::IconStyle::ArcadeStick: return L("Arcade stick");
+			switch (family)
+			{
+			case PadFamily::Xbox: return L("Arcade stick (Xbox)");
+			case PadFamily::PlayStation: return L("Arcade stick (PlayStation)");
+			case PadFamily::Nintendo: return L("Arcade stick (Switch)");
+			default: return L("Arcade stick");
+			}
+		}
+		switch (family)
+		{
+		case PadFamily::Xbox: return L("Xbox controller");
+		case PadFamily::PlayStation: return L("PlayStation controller");
+		case PadFamily::Nintendo: return L("Switch controller");
 		default: return L("Controller");
 		}
 	}
@@ -101,7 +114,7 @@ namespace
 		ImGui::SetDragDropPayload(kPayload, device.id.c_str(), device.id.size() + 1);
 		const ImVec2 at = ImGui::GetCursorScreenPos();
 		DeviceArt::DrawIcon(ImGui::GetWindowDrawList(), at, ImGui::GetFontSize() * 1.6f,
-			DeviceArt::StyleFor(device.kind, device.defaultName), IM_COL32(220, 225, 235, 255));
+			DeviceArt::StyleFor(device), IM_COL32(220, 225, 235, 255));
 		ImGui::Dummy(ImVec2(ImGui::GetFontSize() * 2.7f, ImGui::GetFontSize() * 1.6f));
 		ImGui::SameLine();
 		ImGui::TextUnformatted(device.name.c_str());
@@ -161,7 +174,7 @@ namespace
 		const float iconH = height * 0.62f;
 		const ImU32 iconColor = device.connected ? IM_COL32(225, 230, 240, 255) : IM_COL32(110, 115, 125, 255);
 		DeviceArt::DrawIcon(draw, ImVec2(a.x + 10.0f, a.y + (height - iconH) * 0.5f), iconH,
-			DeviceArt::StyleFor(device.kind, device.defaultName), iconColor);
+			DeviceArt::StyleFor(device), iconColor);
 
 		const float textX = a.x + 18.0f + iconH * 1.6f;
 		draw->AddText(ImVec2(textX, a.y + height * 0.14f),
@@ -260,7 +273,7 @@ namespace
 					if (!(it->second & info.bit))
 						continue;
 					ImGui::PushID(it->first);
-					const std::string name = Manager::ControlName(device.kind, it->first) + "  x";
+					const std::string name = Manager::ControlName(device, it->first) + "  x";
 					if (ImGui::SmallButton(name.c_str()))
 					{
 						it->second &= ~info.bit;
@@ -324,7 +337,7 @@ namespace
 		// Header: icon, name (Rename to edit), and which player it plays for.
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		const float iconH = ImGui::GetFontSize() * 1.8f;
-		DeviceArt::DrawIcon(draw, ImGui::GetCursorScreenPos(), iconH, DeviceArt::StyleFor(device.kind, device.defaultName),
+		DeviceArt::DrawIcon(draw, ImGui::GetCursorScreenPos(), iconH, DeviceArt::StyleFor(device),
 			IM_COL32(225, 230, 240, 255));
 		ImGui::Dummy(ImVec2(iconH * 1.6f, iconH));
 		ImGui::SameLine();
@@ -468,6 +481,21 @@ namespace
 	// The devices kept out of the cards. Its header lights exactly while one of them is held -
 	// hold and it stays lit, tap and it blinks once - so a device hidden by mistake can be
 	// matched to what the player is doing.
+	// The item just submitted takes a device dropped on it and hides it.
+	void HideDropTarget(const std::vector<DeviceView>& devices)
+	{
+		if (!ImGui::BeginDragDropTarget())
+			return;
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayload))
+		{
+			const std::string id(static_cast<const char*>(payload->Data));
+			auto it = std::find_if(devices.begin(), devices.end(), [&](const DeviceView& d) { return d.id == id; });
+			if (it != devices.end() && !Hidden(*it))
+				Manager::Get().SetIgnored(id, true);
+		}
+		ImGui::EndDragDropTarget();
+	}
+
 	void DrawHiddenList(const std::vector<DeviceView>& devices)
 	{
 		std::vector<const DeviceView*> hidden;
@@ -481,24 +509,50 @@ namespace
 			if (d.connected && (d.controls.any() || now - d.lastInputMs < kGlowMs))
 				held = true; // steady while used, short trailing glow like the tiles, never blinking
 		}
+		// Dragging a device from a player card: the list is where it can be dropped to hide it,
+		// shown as a drop zone while it is empty.
+		const ImGuiPayload* drag = ImGui::GetDragDropPayload();
+		const bool dragging = drag && drag->IsDataType(kPayload);
 		if (hidden.empty())
+		{
+			if (!dragging)
+				return;
+			ImGui::Spacing();
+			const float height = ImGui::GetFontSize() * 2.0f;
+			const ImVec2 a = ImGui::GetCursorScreenPos();
+			const float width = ImGui::GetContentRegionAvail().x;
+			ImGui::InvisibleButton("##hide_drop", ImVec2(width, height));
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			draw->AddRectFilled(a, ImVec2(a.x + width, a.y + height), IM_COL32(34, 37, 46, 255), 5.0f);
+			draw->AddRect(a, ImVec2(a.x + width, a.y + height), IM_COL32(120, 126, 140, 255), 5.0f, 0, 1.5f);
+			const std::string text = L("Drop here to hide it");
+			const ImVec2 size = ImGui::CalcTextSize(text.c_str());
+			draw->AddText(ImVec2(a.x + (width - size.x) * 0.5f, a.y + (height - size.y) * 0.5f), IM_COL32(200, 205, 215, 255), text.c_str());
+			HideDropTarget(devices);
 			return;
+		}
 		const bool flashing = held;
 
 		ImGui::Spacing();
 		char label[128];
 		snprintf(label, sizeof(label), L("Hidden devices (%d)").c_str(), static_cast<int>(hidden.size()));
+		std::string header = label;
+		if (dragging)
+			header += "  -  " + L("Drop here to hide it");
+		header += "###hidden_devices";
 		ImGui::PushStyleColor(ImGuiCol_Header, flashing ? DeviceArt::PlayerColor(Side_P1, 0.9f) : IM_COL32(40, 44, 54, 255));
 		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(55, 60, 72, 255));
 		ImGui::PushStyleColor(ImGuiCol_Text, flashing ? IM_COL32(10, 20, 20, 255) : IM_COL32(220, 222, 228, 255));
 		ImGui::SetNextItemOpen(g_hiddenOpen, ImGuiCond_Always);
-		g_hiddenOpen = ImGui::CollapsingHeader(label);
+		g_hiddenOpen = ImGui::CollapsingHeader(header.c_str());
 		ImGui::PopStyleColor(3);
+		HideDropTarget(devices);
 		if (held && !g_hiddenOpen && ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", L("A hidden device is being pressed. Open the list to see which one.").c_str());
 		if (!g_hiddenOpen)
 			return;
 
+		ImGui::BeginGroup();
 		for (const DeviceView* d : hidden)
 		{
 			ImGui::PushID(d->id.c_str());
@@ -511,7 +565,7 @@ namespace
 				active ? DeviceArt::PlayerColor(Side_P1, 0.45f) : IM_COL32(34, 37, 46, 255), 5.0f);
 			const float iconH = height * 0.62f;
 			DeviceArt::DrawIcon(draw, ImVec2(a.x + 8.0f, a.y + (height - iconH) * 0.5f), iconH,
-				DeviceArt::StyleFor(d->kind, d->defaultName), d->connected ? IM_COL32(200, 205, 215, 255) : IM_COL32(100, 104, 112, 255));
+				DeviceArt::StyleFor(*d), d->connected ? IM_COL32(200, 205, 215, 255) : IM_COL32(100, 104, 112, 255));
 			const float textX = a.x + 16.0f + iconH * 1.6f;
 			draw->AddText(ImVec2(textX, a.y + height * 0.18f), d->connected ? IM_COL32(225, 228, 235, 255) : IM_COL32(120, 124, 132, 255), d->name.c_str());
 			const std::string reason = HiddenReason(*d);
@@ -538,6 +592,8 @@ namespace
 			ImGui::Dummy(ImVec2(0, 0));
 			ImGui::PopID();
 		}
+		ImGui::EndGroup();
+		HideDropTarget(devices);
 	}
 
 	void DrawFooter()
@@ -601,7 +657,8 @@ void LocalInputPanel::Draw()
 	for (const DeviceView& d : devices)
 		if (!Hidden(d))
 			rows[d.side]++;
-	const float tile = ImGui::GetFontSize() * 2.6f + ImGui::GetStyle().ItemSpacing.y + 2.0f;
+	// A tile is its button and a 2px spacer, each followed by the item spacing.
+	const float tile = ImGui::GetFontSize() * 2.6f + ImGui::GetStyle().ItemSpacing.y * 2.0f + 2.0f;
 	const float cardHeight = ImGui::GetFontSize() * 3.2f + tile * (std::max)(2, (std::max)(rows[0], rows[1])) + 12.0f;
 
 	bool openConfigure = false;

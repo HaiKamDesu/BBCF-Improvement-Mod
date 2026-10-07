@@ -3,11 +3,11 @@
 #include <Windows.h>
 
 #include <algorithm>
-#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace DeviceArt
 {
@@ -55,14 +55,64 @@ namespace DeviceArt
 			draw->AddText(font, size, ImVec2(center.x - extent.x * 0.5f, center.y - extent.y * 0.5f), color, text);
 		}
 
+		// The printed symbol of a face button: PlayStation shapes, otherwise the letter or
+		// number on it.
+		void FaceGlyph(ImDrawList* draw, ImVec2 c, float r, PadFamily family, int role, const char* name, bool pressed)
+		{
+			const bool face = role <= Role_North;
+			if (family == PadFamily::PlayStation && face)
+			{
+				static const ImU32 kShape[4] = {
+					IM_COL32(120, 160, 240, 255), // Cross
+					IM_COL32(235, 85, 90, 255),   // Circle
+					IM_COL32(225, 130, 200, 255), // Square
+					IM_COL32(60, 205, 170, 255),  // Triangle
+				};
+				const ImU32 col = pressed ? IM_COL32(20, 20, 20, 255) : kShape[role];
+				const float s = r * 0.42f;
+				const float t = (std::max)(1.5f, r * 0.14f);
+				switch (role)
+				{
+				case Role_South:
+					draw->AddLine(ImVec2(c.x - s, c.y - s), ImVec2(c.x + s, c.y + s), col, t);
+					draw->AddLine(ImVec2(c.x - s, c.y + s), ImVec2(c.x + s, c.y - s), col, t);
+					break;
+				case Role_East:
+					draw->AddCircle(c, s, col, 0, t);
+					break;
+				case Role_West:
+					draw->AddRect(ImVec2(c.x - s * 0.85f, c.y - s * 0.85f), ImVec2(c.x + s * 0.85f, c.y + s * 0.85f), col, 0.0f, 0, t);
+					break;
+				default:
+					draw->AddTriangle(ImVec2(c.x, c.y - s), ImVec2(c.x - s * 0.95f, c.y + s * 0.7f), ImVec2(c.x + s * 0.95f, c.y + s * 0.7f), col, t);
+					break;
+				}
+				return;
+			}
+			if (name)
+				CenteredText(draw, c, pressed ? IM_COL32(20, 20, 20, 255) : IM_COL32_WHITE, name, 0.85f);
+		}
+
+		// Xbox face buttons are coloured; everything else is a dark button with a symbol on it.
+		ImU32 FaceTint(PadFamily family, int role)
+		{
+			if (family == PadFamily::Xbox && role <= Role_North)
+			{
+				static const ImU32 kXbox[4] = {
+					IM_COL32(60, 170, 70, 255), IM_COL32(200, 60, 60, 255), IM_COL32(60, 110, 210, 255), IM_COL32(210, 180, 50, 255),
+				};
+				return kXbox[role];
+			}
+			return IM_COL32(70, 74, 88, 255);
+		}
+
 		// One round button: lit fill when pressed, the game button it sends beside it.
-		void RoundControl(ImDrawList* draw, ImVec2 c, float r, bool pressed, ImU32 tint, const char* glyph,
+		void RoundButton(ImDrawList* draw, ImVec2 c, float r, bool pressed, PadFamily family, int role, const char* name,
 			const std::string& label, ImVec2 labelOffset)
 		{
-			draw->AddCircleFilled(c, r, pressed ? kLit : Mix(tint, 0.55f));
+			draw->AddCircleFilled(c, r, pressed ? kLit : Mix(FaceTint(family, role), 0.55f));
 			draw->AddCircle(c, r, pressed ? IM_COL32_WHITE : kOutline, 0, 1.5f);
-			if (glyph)
-				CenteredText(draw, c, pressed ? IM_COL32(20, 20, 20, 255) : IM_COL32_WHITE, glyph, 0.85f);
+			FaceGlyph(draw, c, r, family, role, name, pressed);
 			if (!label.empty())
 				CenteredText(draw, ImVec2(c.x + labelOffset.x, c.y + labelOffset.y), kLabel, label.c_str(), 0.8f);
 		}
@@ -86,10 +136,8 @@ namespace DeviceArt
 				clicked ? kLit : (moved ? IM_COL32(90, 200, 120, 255) : kDim));
 		}
 
-		void Dpad(ImDrawList* draw, ImVec2 c, float s, bool up, bool down, bool left, bool right, const Mapping* mapping,
-			int upCode, int downCode, int leftCode, int rightCode)
+		void Dpad(ImDrawList* draw, ImVec2 c, float s, bool up, bool down, bool left, bool right)
 		{
-			(void)mapping; (void)upCode; (void)downCode; (void)leftCode; (void)rightCode;
 			const float w = s * 0.42f;
 			auto arm = [&](ImVec2 a, ImVec2 b, bool on)
 			{
@@ -110,111 +158,195 @@ namespace DeviceArt
 			draw->AddRectFilled(ImVec2(c.x - 7.5f * u, c.y - 4.0f * u), ImVec2(c.x + 7.5f * u, c.y + 2.8f * u), kBody, 3.0f * u);
 		}
 
-		void DrawXboxPad(ImDrawList* draw, ImVec2 origin, float width, const DeviceView& d, const Mapping& m)
+		// A device's controls by place, from its layout.
+		struct Controls
 		{
+			const DeviceView& d;
+			const Mapping& m;
+			const PadLayout& layout;
+			int Code(int role) const { return layout.control[role]; }
+			bool On(int role) const { const int k = Code(role); return k >= 0 && k < kMaxControls && d.controls[k]; }
+			std::string Label(int role) const { const int k = Code(role); return k < 0 ? std::string() : MappedLabel(m, k); }
+			const char* Name(int role) const { return layout.name[role]; }
+			bool Has(int role) const { return Code(role) >= 0; }
+			float Axis(int index) const { return index >= 0 && index < d.axisCount ? d.axes[index] / 1000.0f : 0.0f; }
+			// The left stick's halves as control codes, for an arcade lever on XInput or axes.
+			bool LeftStick(int dir) const // 0 up 1 down 2 left 3 right
+			{
+				if (d.kind == DeviceKind::XInputPad)
+					return d.controls[16 + dir] != false;
+				static const int kHalf[4] = { 2, 3, 0, 1 };
+				return d.controls[kDInputAxisBase + kHalf[dir]] != false;
+			}
+		};
+
+		// A small centre button (Select/Start style) with its printed name under it.
+		void CentreButton(ImDrawList* draw, const Controls& k, int role, ImVec2 a, ImVec2 b, float u)
+		{
+			if (!k.Has(role))
+				return;
+			RectControl(draw, a, b, k.On(role), nullptr, k.Label(role), ImVec2((a.x + b.x) * 0.5f, a.y - 0.6f * u));
+			if (k.Name(role))
+				CenteredText(draw, ImVec2((a.x + b.x) * 0.5f, b.y + 0.35f * u), IM_COL32(150, 155, 168, 255), k.Name(role), 0.62f);
+		}
+
+		void SmallRoundButton(ImDrawList* draw, const Controls& k, int role, ImVec2 c, float r, float u)
+		{
+			if (!k.Has(role))
+				return;
+			const bool on = k.On(role);
+			draw->AddCircleFilled(c, r, on ? kLit : kDim);
+			draw->AddCircle(c, r, on ? IM_COL32_WHITE : kOutline, 0, 1.2f);
+			const std::string label = k.Label(role);
+			std::string text = k.Name(role) ? k.Name(role) : "";
+			CenteredText(draw, ImVec2(c.x, c.y + r + 0.35f * u), IM_COL32(150, 155, 168, 255), text.c_str(), 0.62f);
+			if (!label.empty())
+				CenteredText(draw, ImVec2(c.x, c.y + r + 0.85f * u), kLabel, label.c_str(), 0.75f);
+		}
+
+		void DrawPad(ImDrawList* draw, ImVec2 origin, float width, const DeviceView& d, const Mapping& m)
+		{
+			const Controls k{ d, m, *d.model.layout };
+			const PadFamily family = k.layout.family;
 			const float u = width / 20.0f;
 			const ImVec2 c(origin.x + width * 0.5f, origin.y + 7.5f * u);
-			const auto on = [&](int code) { return d.controls[code] != false; };
 
 			// Shoulders and triggers above the body.
-			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 7.0f * u), ImVec2(c.x - 4.4f * u, c.y - 5.9f * u), on(14), "LT", MappedLabel(m, 14), ImVec2(c.x - 9.2f * u, c.y - 6.45f * u));
-			RectControl(draw, ImVec2(c.x + 4.4f * u, c.y - 7.0f * u), ImVec2(c.x + 7.6f * u, c.y - 5.9f * u), on(15), "RT", MappedLabel(m, 15), ImVec2(c.x + 9.2f * u, c.y - 6.45f * u));
-			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 5.5f * u), ImVec2(c.x - 4.0f * u, c.y - 4.5f * u), on(4), "LB", MappedLabel(m, 4), ImVec2(c.x - 9.2f * u, c.y - 5.0f * u));
-			RectControl(draw, ImVec2(c.x + 4.0f * u, c.y - 5.5f * u), ImVec2(c.x + 7.6f * u, c.y - 4.5f * u), on(5), "RB", MappedLabel(m, 5), ImVec2(c.x + 9.2f * u, c.y - 5.0f * u));
+			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 7.0f * u), ImVec2(c.x - 4.4f * u, c.y - 5.9f * u), k.On(Role_L2), k.Name(Role_L2), k.Label(Role_L2), ImVec2(c.x - 9.2f * u, c.y - 6.45f * u));
+			RectControl(draw, ImVec2(c.x + 4.4f * u, c.y - 7.0f * u), ImVec2(c.x + 7.6f * u, c.y - 5.9f * u), k.On(Role_R2), k.Name(Role_R2), k.Label(Role_R2), ImVec2(c.x + 9.2f * u, c.y - 6.45f * u));
+			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 5.5f * u), ImVec2(c.x - 4.0f * u, c.y - 4.5f * u), k.On(Role_L1), k.Name(Role_L1), k.Label(Role_L1), ImVec2(c.x - 9.2f * u, c.y - 5.0f * u));
+			RectControl(draw, ImVec2(c.x + 4.0f * u, c.y - 5.5f * u), ImVec2(c.x + 7.6f * u, c.y - 4.5f * u), k.On(Role_R1), k.Name(Role_R1), k.Label(Role_R1), ImVec2(c.x + 9.2f * u, c.y - 5.0f * u));
 
 			PadBody(draw, c, u);
 
-			const float lx = d.axisCount > 1 ? d.axes[0] / 1000.0f : 0.0f;
-			const float ly = d.axisCount > 1 ? d.axes[1] / 1000.0f : 0.0f;
-			const float rx = d.axisCount > 3 ? d.axes[2] / 1000.0f : 0.0f;
-			const float ry = d.axisCount > 3 ? d.axes[3] / 1000.0f : 0.0f;
-			Stick(draw, ImVec2(c.x - 4.6f * u, c.y - 1.6f * u), 1.6f * u, lx, ly, on(8));
-			Stick(draw, ImVec2(c.x + 2.3f * u, c.y + 1.4f * u), 1.4f * u, rx, ry, on(9));
-			Dpad(draw, ImVec2(c.x - 2.3f * u, c.y + 1.4f * u), 1.3f * u, on(10), on(11), on(12), on(13), &m, 10, 11, 12, 13);
+			// Xbox and Nintendo put the left stick above the d-pad; PlayStation and most generic
+			// pads put the d-pad there and both sticks at the bottom.
+			const bool offset = family == PadFamily::Xbox || family == PadFamily::Nintendo;
+			const ImVec2 upperLeft(c.x - 4.6f * u, c.y - 1.6f * u);
+			const ImVec2 lowerLeft(c.x - 2.3f * u, c.y + 1.4f * u);
+			Stick(draw, offset ? upperLeft : lowerLeft, (offset ? 1.6f : 1.35f) * u, k.Axis(0), k.Axis(1), k.On(Role_L3));
+			Stick(draw, ImVec2(c.x + 2.3f * u, c.y + 1.4f * u), 1.35f * u, k.Axis(k.layout.rightX), k.Axis(k.layout.rightY), k.On(Role_R3));
+			Dpad(draw, offset ? lowerLeft : upperLeft, 1.3f * u, k.On(Role_DpadUp), k.On(Role_DpadDown), k.On(Role_DpadLeft), k.On(Role_DpadRight));
 
+			struct Face { int role; ImVec2 at; ImVec2 label; };
+			const Face faces[4] = {
+				{ Role_South, ImVec2(0, 1.4f), ImVec2(0, 1.5f) },
+				{ Role_East, ImVec2(1.4f, 0), ImVec2(1.7f, 0) },
+				{ Role_West, ImVec2(-1.4f, 0), ImVec2(-1.7f, 0) },
+				{ Role_North, ImVec2(0, -1.4f), ImVec2(1.9f, -0.9f) }, // beside it: above is the shoulder
+			};
 			const ImVec2 face(c.x + 4.8f * u, c.y - 1.6f * u);
-			const float r = 0.75f * u;
-			RoundControl(draw, ImVec2(face.x, face.y + 1.4f * u), r, on(0), IM_COL32(60, 170, 70, 255), "A", MappedLabel(m, 0), ImVec2(0, 1.5f * u));
-			RoundControl(draw, ImVec2(face.x + 1.4f * u, face.y), r, on(1), IM_COL32(200, 60, 60, 255), "B", MappedLabel(m, 1), ImVec2(1.7f * u, 0));
-			RoundControl(draw, ImVec2(face.x - 1.4f * u, face.y), r, on(2), IM_COL32(60, 110, 210, 255), "X", MappedLabel(m, 2), ImVec2(-1.7f * u, 0));
-			RoundControl(draw, ImVec2(face.x, face.y - 1.4f * u), r, on(3), IM_COL32(210, 180, 50, 255), "Y", MappedLabel(m, 3), ImVec2(0, -1.5f * u));
+			for (const Face& f : faces)
+				RoundButton(draw, ImVec2(face.x + f.at.x * u, face.y + f.at.y * u), 0.75f * u, k.On(f.role), family, f.role,
+					k.Name(f.role), k.Label(f.role), ImVec2(f.label.x * u, f.label.y * u));
 
-			RectControl(draw, ImVec2(c.x - 1.6f * u, c.y - 2.0f * u), ImVec2(c.x - 0.5f * u, c.y - 1.3f * u), on(6), nullptr, MappedLabel(m, 6), ImVec2(c.x - 1.05f * u, c.y - 2.7f * u));
-			RectControl(draw, ImVec2(c.x + 0.5f * u, c.y - 2.0f * u), ImVec2(c.x + 1.6f * u, c.y - 1.3f * u), on(7), nullptr, MappedLabel(m, 7), ImVec2(c.x + 1.05f * u, c.y - 2.7f * u));
+			if (family == PadFamily::PlayStation)
+			{
+				// Touchpad in the middle, Share/Create and Options either side, PS between the sticks.
+				const ImVec2 ta(c.x - 1.5f * u, c.y - 3.7f * u), tb(c.x + 1.5f * u, c.y - 1.7f * u);
+				if (k.Has(Role_Touchpad))
+				{
+					RectControl(draw, ta, tb, k.On(Role_Touchpad), nullptr, k.Label(Role_Touchpad), ImVec2(c.x, (ta.y + tb.y) * 0.5f));
+					if (k.Label(Role_Touchpad).empty())
+						CenteredText(draw, ImVec2(c.x, (ta.y + tb.y) * 0.5f), IM_COL32(150, 155, 168, 255), k.Name(Role_Touchpad), 0.62f);
+				}
+				CentreButton(draw, k, Role_Select, ImVec2(c.x - 2.6f * u, c.y - 3.5f * u), ImVec2(c.x - 1.9f * u, c.y - 2.9f * u), u);
+				CentreButton(draw, k, Role_Start, ImVec2(c.x + 1.9f * u, c.y - 3.5f * u), ImVec2(c.x + 2.6f * u, c.y - 2.9f * u), u);
+				SmallRoundButton(draw, k, Role_Home, ImVec2(c.x, c.y + 0.3f * u), 0.45f * u, u);
+			}
+			else
+			{
+				CentreButton(draw, k, Role_Select, ImVec2(c.x - 1.6f * u, c.y - 2.0f * u), ImVec2(c.x - 0.5f * u, c.y - 1.3f * u), u);
+				CentreButton(draw, k, Role_Start, ImVec2(c.x + 0.5f * u, c.y - 2.0f * u), ImVec2(c.x + 1.6f * u, c.y - 1.3f * u), u);
+				SmallRoundButton(draw, k, Role_Capture, ImVec2(c.x - 0.8f * u, c.y - 0.2f * u), 0.35f * u, u);
+				SmallRoundButton(draw, k, Role_Home, ImVec2(c.x + 0.8f * u, c.y - 0.2f * u), 0.35f * u, u);
+			}
 
 			ImGui::Dummy(ImVec2(width, 13.0f * u));
 		}
 
 		void DrawArcadeStick(ImDrawList* draw, ImVec2 origin, float width, const DeviceView& d, const Mapping& m)
 		{
+			const Controls k{ d, m, *d.model.layout };
+			const PadFamily family = k.layout.family;
 			const float u = width / 20.0f;
 			const ImVec2 a(origin.x + 0.5f * u, origin.y + 0.5f * u);
 			const ImVec2 b(origin.x + width - 0.5f * u, origin.y + 9.0f * u);
 			draw->AddRectFilled(a, b, kBody, 1.0f * u);
 			draw->AddRect(a, b, kOutline, 1.0f * u, 0, 1.5f);
 
-			// Lever: hat 0 if the device has one, else the X/Y axes.
-			const bool up = d.controls[kDInputPovBase + 0] || d.controls[kDInputAxisBase + 2];
-			const bool right = d.controls[kDInputPovBase + 1] || d.controls[kDInputAxisBase + 1];
-			const bool down = d.controls[kDInputPovBase + 2] || d.controls[kDInputAxisBase + 3];
-			const bool left = d.controls[kDInputPovBase + 3] || d.controls[kDInputAxisBase + 0];
+			// Lever: the d-pad (hat or buttons), or the left stick on sticks that send that.
+			const bool up = k.On(Role_DpadUp) || k.LeftStick(0);
+			const bool down = k.On(Role_DpadDown) || k.LeftStick(1);
+			const bool left = k.On(Role_DpadLeft) || k.LeftStick(2);
+			const bool right = k.On(Role_DpadRight) || k.LeftStick(3);
 			const ImVec2 lever(a.x + 4.0f * u, a.y + 4.3f * u);
 			draw->AddCircle(lever, 2.2f * u, kOutline, 8, 1.5f);
 			const ImVec2 ball(lever.x + (right ? 1.3f : left ? -1.3f : 0.0f) * u, lever.y + (down ? 1.3f : up ? -1.3f : 0.0f) * u);
 			draw->AddLine(lever, ball, kOutline, 0.35f * u);
 			draw->AddCircleFilled(ball, 1.1f * u, (up || down || left || right) ? kLit : IM_COL32(200, 50, 50, 255));
 
-			// Buttons in the usual two rows of four, numbered as Windows numbers them.
+			// Eight buttons in the usual two rows of four. A known stick shows them where they
+			// are (Square Triangle R1 L1 / Cross Circle R2 L2); an unknown one by Windows' numbers.
+			static const int kRows[2][4] = {
+				{ Role_West, Role_North, Role_R1, Role_L1 },
+				{ Role_South, Role_East, Role_R2, Role_L2 },
+			};
+			const bool known = family != PadFamily::Generic;
 			const float bx = a.x + 8.5f * u;
 			for (int i = 0; i < 8; ++i)
 			{
 				const int col = i % 4;
 				const int row = i / 4;
-				const ImVec2 c(bx + col * 2.6f * u + (row == 0 ? 0.0f : 0.0f), a.y + 2.8f * u + row * 3.0f * u - (col == 0 ? 0.4f * u : 0.0f));
-				char glyph[8];
-				snprintf(glyph, sizeof(glyph), "%d", i + 1);
-				RoundControl(draw, c, 1.0f * u, d.controls[i] != false, IM_COL32(80, 80, 95, 255), glyph, MappedLabel(m, i), ImVec2(0, 1.6f * u));
+				const ImVec2 c(bx + col * 2.6f * u, a.y + 2.8f * u + row * 3.0f * u - (col == 0 ? 0.4f * u : 0.0f));
+				if (known)
+				{
+					const int role = kRows[row][col];
+					RoundButton(draw, c, 1.0f * u, k.On(role), family, role, k.Name(role), k.Label(role), ImVec2(0, 1.6f * u));
+				}
+				else
+				{
+					char glyph[8];
+					snprintf(glyph, sizeof(glyph), "%d", i + 1);
+					RoundButton(draw, c, 1.0f * u, d.controls[i] != false, family, Role_Count, glyph, MappedLabel(m, i), ImVec2(0, 1.6f * u));
+				}
 			}
-			// Extra buttons (start/select/home) along the top edge.
-			for (int i = 8; i < 12; ++i)
+
+			// The small buttons along the top edge, with their names and what they send.
+			struct Extra { bool on; const char* name; std::string label; };
+			std::vector<Extra> extras;
+			char numbers[4][8];
+			if (known)
 			{
-				const ImVec2 c(a.x + 8.0f * u + (i - 8) * 2.2f * u, a.y + 0.9f * u);
-				char glyph[8];
-				snprintf(glyph, sizeof(glyph), "%d", i + 1);
-				RoundControl(draw, c, 0.5f * u, d.controls[i] != false, IM_COL32(70, 70, 80, 255), nullptr, std::string(), ImVec2());
-				if (d.controls[i])
-					CenteredText(draw, ImVec2(c.x, c.y + 1.0f * u), kLit, glyph, 0.7f);
+				for (int role : { Role_Select, Role_Start, Role_Home, Role_Touchpad, Role_Capture })
+					if (k.Has(role))
+						extras.push_back({ k.On(role), k.Name(role), k.Label(role) });
+			}
+			else
+			{
+				for (int i = 8; i < 12; ++i)
+				{
+					snprintf(numbers[i - 8], sizeof(numbers[i - 8]), "%d", i + 1);
+					extras.push_back({ d.controls[i] != false, numbers[i - 8], MappedLabel(m, i) });
+				}
+			}
+			for (size_t i = 0; i < extras.size(); ++i)
+			{
+				const ImVec2 c(a.x + 1.4f * u + i * 3.8f * u, a.y + 0.9f * u);
+				draw->AddCircleFilled(c, 0.4f * u, extras[i].on ? kLit : IM_COL32(70, 70, 80, 255));
+				draw->AddCircle(c, 0.4f * u, extras[i].on ? IM_COL32_WHITE : kOutline, 0, 1.2f);
+				std::string text = extras[i].name ? extras[i].name : "";
+				ImFont* font = ImGui::GetFont();
+				const float size = ImGui::GetFontSize() * 0.62f;
+				const ImVec2 at(c.x + 0.6f * u, c.y - size * 0.5f);
+				draw->AddText(font, size, at, IM_COL32(170, 175, 188, 255), text.c_str());
+				if (!extras[i].label.empty())
+				{
+					const float w = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str()).x;
+					draw->AddText(font, size, ImVec2(at.x + w + 0.25f * u, at.y), kLabel, extras[i].label.c_str());
+				}
 			}
 			ImGui::Dummy(ImVec2(width, 10.0f * u));
-		}
-
-		void DrawGenericPad(ImDrawList* draw, ImVec2 origin, float width, const DeviceView& d, const Mapping& m)
-		{
-			const float u = width / 20.0f;
-			const ImVec2 c(origin.x + width * 0.5f, origin.y + 7.5f * u);
-			const auto on = [&](int code) { return d.controls[code] != false; };
-			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 7.0f * u), ImVec2(c.x - 4.4f * u, c.y - 5.9f * u), on(6), "7", MappedLabel(m, 6), ImVec2(c.x - 9.2f * u, c.y - 6.45f * u));
-			RectControl(draw, ImVec2(c.x + 4.4f * u, c.y - 7.0f * u), ImVec2(c.x + 7.6f * u, c.y - 5.9f * u), on(7), "8", MappedLabel(m, 7), ImVec2(c.x + 9.2f * u, c.y - 6.45f * u));
-			RectControl(draw, ImVec2(c.x - 7.6f * u, c.y - 5.5f * u), ImVec2(c.x - 4.0f * u, c.y - 4.5f * u), on(4), "5", MappedLabel(m, 4), ImVec2(c.x - 9.2f * u, c.y - 5.0f * u));
-			RectControl(draw, ImVec2(c.x + 4.0f * u, c.y - 5.5f * u), ImVec2(c.x + 7.6f * u, c.y - 4.5f * u), on(5), "6", MappedLabel(m, 5), ImVec2(c.x + 9.2f * u, c.y - 5.0f * u));
-			PadBody(draw, c, u);
-			const bool up = on(kDInputPovBase + 0), right = on(kDInputPovBase + 1), down = on(kDInputPovBase + 2), left = on(kDInputPovBase + 3);
-			Dpad(draw, ImVec2(c.x - 4.6f * u, c.y - 1.6f * u), 1.4f * u, up, down, left, right, &m, 0, 0, 0, 0);
-			const float lx = d.axisCount > 1 ? d.axes[0] / 1000.0f : 0.0f;
-			const float ly = d.axisCount > 1 ? d.axes[1] / 1000.0f : 0.0f;
-			const float rx = d.axisCount > 5 ? d.axes[2] / 1000.0f : 0.0f;
-			const float ry = d.axisCount > 5 ? d.axes[5] / 1000.0f : 0.0f;
-			Stick(draw, ImVec2(c.x - 2.3f * u, c.y + 1.4f * u), 1.3f * u, lx, ly, on(10));
-			Stick(draw, ImVec2(c.x + 2.3f * u, c.y + 1.4f * u), 1.3f * u, rx, ry, on(11));
-			const ImVec2 face(c.x + 4.8f * u, c.y - 1.6f * u);
-			const float r = 0.75f * u;
-			RoundControl(draw, ImVec2(face.x - 1.4f * u, face.y), r, on(0), IM_COL32(90, 90, 110, 255), "1", MappedLabel(m, 0), ImVec2(-1.7f * u, 0));
-			RoundControl(draw, ImVec2(face.x, face.y + 1.4f * u), r, on(1), IM_COL32(90, 90, 110, 255), "2", MappedLabel(m, 1), ImVec2(0, 1.5f * u));
-			RoundControl(draw, ImVec2(face.x + 1.4f * u, face.y), r, on(2), IM_COL32(90, 90, 110, 255), "3", MappedLabel(m, 2), ImVec2(1.7f * u, 0));
-			RoundControl(draw, ImVec2(face.x, face.y - 1.4f * u), r, on(3), IM_COL32(90, 90, 110, 255), "4", MappedLabel(m, 3), ImVec2(0, -1.5f * u));
-			RectControl(draw, ImVec2(c.x - 1.6f * u, c.y - 2.0f * u), ImVec2(c.x - 0.5f * u, c.y - 1.3f * u), on(8), nullptr, MappedLabel(m, 8), ImVec2(c.x - 1.05f * u, c.y - 2.7f * u));
-			RectControl(draw, ImVec2(c.x + 0.5f * u, c.y - 2.0f * u), ImVec2(c.x + 1.6f * u, c.y - 1.3f * u), on(9), nullptr, MappedLabel(m, 9), ImVec2(c.x + 1.05f * u, c.y - 2.7f * u));
-			ImGui::Dummy(ImVec2(width, 13.0f * u));
 		}
 
 		struct Key
@@ -288,19 +420,19 @@ namespace DeviceArt
 		}
 	}
 
-	IconStyle StyleFor(DeviceKind kind, const std::string& name)
+	IconStyle StyleFor(const DeviceView& device)
 	{
-		if (kind == DeviceKind::Keyboard)
+		if (device.kind == DeviceKind::Keyboard)
 			return IconStyle::Keyboard;
-		if (kind == DeviceKind::XInputPad)
-			return IconStyle::XboxPad;
-		std::string lower = name;
-		for (char& c : lower)
-			c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-		for (const char* word : { "stick", "arcade", "hitbox", "hit box", "fight", "joystick", "vjoy", "qanba", "mayflash", "snack box", "leverless" })
-			if (lower.find(word) != std::string::npos)
-				return IconStyle::ArcadeStick;
-		return IconStyle::GenericPad;
+		if (device.model.arcadeStick)
+			return IconStyle::ArcadeStick;
+		switch (device.model.Family())
+		{
+		case PadFamily::Xbox: return IconStyle::XboxPad;
+		case PadFamily::PlayStation: return IconStyle::PlayStationPad;
+		case PadFamily::Nintendo: return IconStyle::NintendoPad;
+		default: return IconStyle::GenericPad;
+		}
 	}
 
 	void DrawIcon(ImDrawList* draw, ImVec2 p, float h, IconStyle style, ImU32 color)
@@ -328,6 +460,8 @@ namespace DeviceArt
 			break;
 		}
 		case IconStyle::XboxPad:
+		case IconStyle::PlayStationPad:
+		case IconStyle::NintendoPad:
 		case IconStyle::GenericPad:
 		{
 			const ImVec2 c(p.x + w * 0.5f, p.y + h * 0.5f);
@@ -339,20 +473,43 @@ namespace DeviceArt
 			// d-pad
 			draw->AddRectFilled(ImVec2(c.x - 4.6f * u, c.y - 1.0f * u), ImVec2(c.x - 2.0f * u, c.y - 0.2f * u), hole);
 			draw->AddRectFilled(ImVec2(c.x - 3.7f * u, c.y - 1.9f * u), ImVec2(c.x - 2.9f * u, c.y + 0.7f * u), hole);
+			// Face buttons: north, south, west, east.
+			const ImVec2 at[4] = {
+				ImVec2(c.x + 3.3f * u, c.y - 1.7f * u), ImVec2(c.x + 3.3f * u, c.y + 0.5f * u),
+				ImVec2(c.x + 2.2f * u, c.y - 0.6f * u), ImVec2(c.x + 4.4f * u, c.y - 0.6f * u),
+			};
+			const float r = 0.65f * u;
 			if (style == IconStyle::XboxPad)
 			{
-				draw->AddCircleFilled(ImVec2(c.x + 3.3f * u, c.y - 1.7f * u), 0.65f * u, IM_COL32(230, 200, 60, 255));
-				draw->AddCircleFilled(ImVec2(c.x + 3.3f * u, c.y + 0.5f * u), 0.65f * u, IM_COL32(80, 200, 90, 255));
-				draw->AddCircleFilled(ImVec2(c.x + 2.2f * u, c.y - 0.6f * u), 0.65f * u, IM_COL32(70, 130, 230, 255));
-				draw->AddCircleFilled(ImVec2(c.x + 4.4f * u, c.y - 0.6f * u), 0.65f * u, IM_COL32(220, 70, 70, 255));
+				const ImU32 xbox[4] = { IM_COL32(230, 200, 60, 255), IM_COL32(80, 200, 90, 255), IM_COL32(70, 130, 230, 255), IM_COL32(220, 70, 70, 255) };
+				for (int i = 0; i < 4; ++i)
+					draw->AddCircleFilled(at[i], r, xbox[i]);
+			}
+			else if (style == IconStyle::PlayStationPad)
+			{
+				// The four shapes in their colours, and the touchpad.
+				const float s = r * 0.95f, t = (std::max)(1.0f, u * 0.35f);
+				draw->AddTriangleFilled(ImVec2(at[0].x, at[0].y - s), ImVec2(at[0].x - s, at[0].y + s * 0.75f), ImVec2(at[0].x + s, at[0].y + s * 0.75f), IM_COL32(60, 205, 170, 255));
+				draw->AddLine(ImVec2(at[1].x - s, at[1].y - s), ImVec2(at[1].x + s, at[1].y + s), IM_COL32(120, 160, 240, 255), t);
+				draw->AddLine(ImVec2(at[1].x - s, at[1].y + s), ImVec2(at[1].x + s, at[1].y - s), IM_COL32(120, 160, 240, 255), t);
+				draw->AddRectFilled(ImVec2(at[2].x - s * 0.8f, at[2].y - s * 0.8f), ImVec2(at[2].x + s * 0.8f, at[2].y + s * 0.8f), IM_COL32(225, 130, 200, 255));
+				draw->AddCircleFilled(at[3], s * 0.9f, IM_COL32(235, 85, 90, 255));
+				draw->AddRectFilled(ImVec2(c.x - 1.3f * u, c.y - 2.8f * u), ImVec2(c.x + 1.3f * u, c.y - 1.0f * u), hole, 0.4f * u);
+			}
+			else if (style == IconStyle::NintendoPad)
+			{
+				// Plain buttons with - and + between the halves.
+				for (int i = 0; i < 4; ++i)
+					draw->AddCircleFilled(at[i], r, hole);
+				const float t = (std::max)(1.0f, u * 0.3f);
+				draw->AddLine(ImVec2(c.x - 1.5f * u, c.y - 1.7f * u), ImVec2(c.x - 0.6f * u, c.y - 1.7f * u), hole, t);
+				draw->AddLine(ImVec2(c.x + 0.6f * u, c.y - 1.7f * u), ImVec2(c.x + 1.5f * u, c.y - 1.7f * u), hole, t);
+				draw->AddLine(ImVec2(c.x + 1.05f * u, c.y - 2.15f * u), ImVec2(c.x + 1.05f * u, c.y - 1.25f * u), hole, t);
 			}
 			else
 			{
 				for (int i = 0; i < 4; ++i)
-				{
-					const float ang = i * 1.5708f;
-					draw->AddCircleFilled(ImVec2(c.x + 3.3f * u + std::cos(ang) * 1.1f * u, c.y - 0.6f * u + std::sin(ang) * 1.1f * u), 0.6f * u, hole);
-				}
+					draw->AddCircleFilled(at[i], r * 0.9f, hole);
 			}
 			break;
 		}
@@ -371,7 +528,6 @@ namespace DeviceArt
 		}
 		}
 	}
-
 	ImU32 PlayerColor(Side side, float alpha)
 	{
 		// One accent for "this is being used" on both sides; the cards say which player.
@@ -446,12 +602,11 @@ namespace DeviceArt
 	{
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		const ImVec2 origin = ImGui::GetCursorScreenPos();
-		switch (StyleFor(device.kind, device.defaultName))
-		{
-		case IconStyle::Keyboard: DrawKeyboard(draw, origin, width, device, mapping); break;
-		case IconStyle::XboxPad: DrawXboxPad(draw, origin, width, device, mapping); break;
-		case IconStyle::ArcadeStick: DrawArcadeStick(draw, origin, width, device, mapping); break;
-		case IconStyle::GenericPad: DrawGenericPad(draw, origin, width, device, mapping); break;
-		}
+		if (device.kind == DeviceKind::Keyboard || !device.model.layout)
+			DrawKeyboard(draw, origin, width, device, mapping);
+		else if (device.model.arcadeStick)
+			DrawArcadeStick(draw, origin, width, device, mapping);
+		else
+			DrawPad(draw, origin, width, device, mapping);
 	}
 }

@@ -42,6 +42,9 @@ namespace LocalInput
 		std::string id;           // stable across sessions where the OS allows it
 		std::string defaultName;  // what the OS calls it
 		DeviceKind kind = DeviceKind::Keyboard;
+		uint16_t vendorId = 0;    // USB ids of DirectInput HID devices, 0 when unknown
+		uint16_t productId = 0;
+		uint8_t subType = 0;      // XInput subtype (XINPUT_DEVSUBTYPE_*), 0 when unknown
 		bool connected = false;
 		ControlSet controls;      // what is held right now
 		// Raw analog values for the "is my controller working" view, -1000..1000.

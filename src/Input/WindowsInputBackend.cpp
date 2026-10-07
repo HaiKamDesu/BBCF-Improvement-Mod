@@ -15,6 +15,7 @@
 //     moment focus goes, so nothing stays held across an alt-tab.
 
 #include "InputBackend.h"
+#include "DeviceModels.h"
 
 #include "Core/dllmain.h"
 #include "Core/interfaces.h"
@@ -99,6 +100,7 @@ namespace LocalInput
 			bool connected = false;
 			bool everChecked = false;
 			DWORD lastEmptyCheck = 0;
+			uint8_t subType = 0;   // asked once per connection
 			ControlSet controls;
 			int16_t axes[6] = {};
 		};
@@ -109,6 +111,7 @@ namespace LocalInput
 		{
 			GUID instance{};
 			std::string name;
+			uint16_t vendorId = 0, productId = 0;
 			IDirectInputDevice8W* device = nullptr; // opened by the worker, handed over
 		};
 
@@ -116,6 +119,7 @@ namespace LocalInput
 		{
 			std::string id;
 			std::string name;
+			uint16_t vendorId = 0, productId = 0;
 			IDirectInputDevice8W* device = nullptr;
 			bool connected = false;
 			bool axisPresent[kDInputAxisCount] = {};
@@ -386,7 +390,11 @@ namespace LocalInput
 						else
 						{
 							if (!pad.connected)
-								LOG(1, "[LocalInput] XInput pad %lu connected\n", index);
+							{
+								XINPUT_CAPABILITIES caps = {};
+								pad.subType = XInputRuntime::GetCapabilities(index, &caps) == ERROR_SUCCESS ? caps.SubType : 0;
+								LOG(1, "[LocalInput] XInput pad %lu connected (subtype %u)\n", index, pad.subType);
+							}
 							pad.connected = true;
 							Decode(state.Gamepad, pad);
 						}
@@ -396,8 +404,10 @@ namespace LocalInput
 						continue;
 					DeviceSnapshot snap;
 					snap.id = "XI:" + std::to_string(index);
-					snap.defaultName = "Xbox controller " + std::to_string(index + 1);
+					const bool stick = pad.subType == kXInputSubTypeArcadeStick || pad.subType == kXInputSubTypeArcadePad;
+					snap.defaultName = (stick ? "Xbox arcade stick " : "Xbox controller ") + std::to_string(index + 1);
 					snap.kind = DeviceKind::XInputPad;
+					snap.subType = pad.subType;
 					snap.connected = pad.connected;
 					snap.controls = pad.controls;
 					snap.axisCount = 6;
@@ -485,6 +495,13 @@ namespace LocalInput
 				DIFound found;
 				found.instance = instance->guidInstance;
 				found.name = Narrow(instance->tszProductName[0] ? instance->tszProductName : instance->tszInstanceName);
+				// HID devices carry their USB ids in the product GUID: Data1 = PID << 16 | VID,
+				// Data4 ending in "PIDVID".
+				if (std::memcmp(&instance->guidProduct.Data4[2], "PIDVID", 6) == 0)
+				{
+					found.vendorId = LOWORD(instance->guidProduct.Data1);
+					found.productId = HIWORD(instance->guidProduct.Data1);
+				}
 				const std::string id = "DI:" + GuidString(found.instance);
 				// Already open on the game thread: only its presence matters.
 				if (std::find(ctx->known->begin(), ctx->known->end(), id) == ctx->known->end())
@@ -612,6 +629,8 @@ namespace LocalInput
 					pad->restCaptured = false;
 					pad->id = id;
 					pad->name = f.name.empty() ? "Controller" : f.name;
+					pad->vendorId = f.vendorId;
+					pad->productId = f.productId;
 					pad->device = f.device;
 					f.device = nullptr;
 					AxisSetup setup{ pad->device, pad };
@@ -619,7 +638,7 @@ namespace LocalInput
 					pad->device->EnumObjects(EnumAxes, &setup, DIDFT_AXIS);
 					pad->device->Acquire();
 					pad->connected = true;
-					LOG(1, "[LocalInput] DirectInput device connected: %s (%s)\n", pad->name.c_str(), id.c_str());
+					LOG(1, "[LocalInput] DirectInput device connected: %s (%s, %04X:%04X)\n", pad->name.c_str(), id.c_str(), pad->vendorId, pad->productId);
 				}
 				for (DIPad& pad : m_diPads)
 				{
@@ -670,6 +689,8 @@ namespace LocalInput
 					snap.id = pad.id;
 					snap.defaultName = pad.name;
 					snap.kind = DeviceKind::DInputPad;
+					snap.vendorId = pad.vendorId;
+					snap.productId = pad.productId;
 					snap.connected = pad.connected;
 					snap.controls = pad.controls;
 					snap.axisCount = kDInputAxisCount;

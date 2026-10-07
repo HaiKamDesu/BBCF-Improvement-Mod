@@ -15,11 +15,13 @@ namespace DeviceArt
 	{
 		Keyboard,
 		XboxPad,
+		PlayStationPad,
+		NintendoPad,
 		ArcadeStick,
 		GenericPad,
 	};
 
-	IconStyle StyleFor(LocalInput::DeviceKind kind, const std::string& name);
+	IconStyle StyleFor(const LocalInput::DeviceView& device);
 
 	// Draws into the current window at `pos`, `height` tall (width = height * 1.6).
 	void DrawIcon(ImDrawList* draw, ImVec2 pos, float height, IconStyle style, ImU32 color);
@@ -28,7 +30,8 @@ namespace DeviceArt
 	// other buttons as chips. Reserves its own space (ImGui::Dummy).
 	void DrawGameInput(uint32_t buttons, float height);
 
-	// The device with its controls lit, sized to `width`. Reserves its own space.
+	// The device with its controls lit and named as printed on it (DeviceModels.h), each
+	// labelled with the game button it sends, sized to `width`. Reserves its own space.
 	void DrawDevice(const LocalInput::DeviceView& device, const LocalInput::Mapping& mapping, float width);
 
 	// The accent used for activity (a lit tile, a lit header dot, the selected side).

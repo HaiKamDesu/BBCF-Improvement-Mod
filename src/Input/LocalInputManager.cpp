@@ -167,6 +167,14 @@ namespace LocalInput
 		return m;
 	}
 
+	std::string Manager::ControlName(const DeviceView& device, int control)
+	{
+		if (device.kind == DeviceKind::DInputPad)
+			if (const char* name = LayoutControlName(device.model.layout, control))
+				return name;
+		return ControlName(device.kind, control);
+	}
+
 	std::string Manager::ControlName(DeviceKind kind, int control)
 	{
 		char buf[64];
@@ -644,10 +652,11 @@ namespace LocalInput
 				continue; // never seen connected this session
 			DeviceView view;
 			view.id = id;
-			view.defaultName = device->snap.defaultName;
+			view.model = IdentifyDevice(device->snap);
+			view.defaultName = view.model.name ? view.model.name : device->snap.defaultName;
 			auto profile = g_profiles.find(id);
 			view.name = (profile != g_profiles.end() && !profile->second.name.empty())
-				? profile->second.name : device->snap.defaultName;
+				? profile->second.name : view.defaultName;
 			view.kind = device->snap.kind;
 			view.connected = device->snap.connected;
 			view.side = device->side;
