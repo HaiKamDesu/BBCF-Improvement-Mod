@@ -5129,6 +5129,123 @@ struct LocalizationKeysAccessor
 
         // Restore, I understand it cannot be undone
         inline const char* Restore_I_understand_it_cannot_be_undone() const { return Get("Restore, I understand it cannot be undone"); }
+
+        // Move to Player 1
+        inline const char* Move_to_Player_1() const { return Get("Move to Player 1"); }
+
+        // Move to Player 2
+        inline const char* Move_to_Player_2() const { return Get("Move to Player 2"); }
+
+        // Game button
+        inline const char* Game_button() const { return Get("Game button"); }
+
+        // Bound to
+        inline const char* Bound_to() const { return Get("Bound to"); }
+
+        // + Bind
+        inline const char* Bind_2() const { return Get("+ Bind"); }
+
+        // Press a button on %s for %s... (the game ignores input while listening)
+        inline const char* Press_a_button_on_s_for_s_the_game_ignores_input_while_listening() const { return Get("Press a button on %s for %s... (the game ignores input while listening)"); }
+
+        // Reset buttons to default
+        inline const char* Reset_buttons_to_default() const { return Get("Reset buttons to default"); }
+
+        // The new controller system is off (NewControllerSystem in Settings), or controller hooks are disabled on this platform.
+        inline const char* The_new_controller_system_is_off_NewControllerSystem_in_Settings_or_controller_hooks_are_disabled_on_this_platform() const { return Get("The new controller system is off (NewControllerSystem in Settings), or controller hooks are disabled on this platform."); }
+
+        // Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2.
+        inline const char* Forgets_every_device_you_moved_by_hand_keyboards_go_back_to_Player_1_the_first_controller_to_Player_1_the_second_to_Player_2() const { return Get("Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2."); }
+
+        // Keyboard
+        inline const char* Keyboard() const { return Get("Keyboard"); }
+
+        // Xbox controller
+        inline const char* Xbox_controller() const { return Get("Xbox controller"); }
+
+        // Arcade stick
+        inline const char* Arcade_stick() const { return Get("Arcade stick"); }
+
+        // Test and buttons...
+        inline const char* Test_and_buttons() const { return Get("Test and buttons..."); }
+
+        // unplugged
+        inline const char* unplugged() const { return Get("unplugged"); }
+
+        // always this player
+        inline const char* always_this_player() const { return Get("always this player"); }
+
+        // Plug in a controller, or drag one here.
+        inline const char* Plug_in_a_controller_or_drag_one_here() const { return Get("Plug in a controller, or drag one here."); }
+
+        // What the game sees
+        inline const char* What_the_game_sees() const { return Get("What the game sees"); }
+
+        // Change this device's buttons
+        inline const char* Change_this_device_s_buttons() const { return Get("Change this device's buttons"); }
+
+        // Done
+        inline const char* Done() const { return Get("Done"); }
+
+        // Controller disconnected
+        inline const char* Controller_disconnected() const { return Get("Controller disconnected"); }
+
+        // %s was unplugged. Plug it back in and it returns to the same player.
+        inline const char* s_was_unplugged_Plug_it_back_in_and_it_returns_to_the_same_player() const { return Get("%s was unplugged. Plug it back in and it returns to the same player."); }
+
+        // Drag a keyboard or controller to the other player to switch sides. Controllers can be plugged in at any time: the first one joins Player 1, the second Player 2. Click one to test it.
+        inline const char* Drag_a_keyboard_or_controller_to_the_other_player_to_switch_sides_Controllers_can_be_plugged_in_at_any_time_the_first_one_joins_Player_1_the_second_Player_2_Click_one_to_test_it() const { return Get("Drag a keyboard or controller to the other player to switch sides. Controllers can be plugged in at any time: the first one joins Player 1, the second Player 2. Click one to test it."); }
+
+        // Reset sides
+        inline const char* Reset_sides() const { return Get("Reset sides"); }
+
+        // Plays for
+        inline const char* Plays_for() const { return Get("Plays for"); }
+
+        // hidden, unplugged
+        inline const char* hidden_unplugged() const { return Get("hidden, unplugged"); }
+
+        // hidden by you
+        inline const char* hidden_by_you() const { return Get("hidden by you"); }
+
+        // never used
+        inline const char* never_used() const { return Get("never used"); }
+
+        // Hide this device
+        inline const char* Hide_this_device() const { return Get("Hide this device"); }
+
+        // Hidden devices (%d)
+        inline const char* Hidden_devices_d() const { return Get("Hidden devices (%d)"); }
+
+        // A hidden device is being pressed. Open the list to see which one.
+        inline const char* A_hidden_device_is_being_pressed_Open_the_list_to_see_which_one() const { return Get("A hidden device is being pressed. Open the list to see which one."); }
+
+        // Show
+        inline const char* Show() const { return Get("Show"); }
+
+        // Automatically detect controllers
+        inline const char* Automatically_detect_controllers() const { return Get("Automatically detect controllers"); }
+
+        // Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in.
+        inline const char* Notices_controllers_being_plugged_in_and_out_while_the_game_runs_Turn_off_only_if_your_PC_stutters_when_devices_change_then_use_Refresh_after_plugging_something_in() const { return Get("Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in."); }
+
+        // Rename...
+        inline const char* Rename_2() const { return Get("Rename..."); }
+
+        // This device uses the buttons set below instead of the game's Button Settings.
+        inline const char* This_device_uses_the_buttons_set_below_instead_of_the_game_s_Button_Settings() const { return Get("This device uses the buttons set below instead of the game's Button Settings."); }
+
+        // Use the game's Button Settings again
+        inline const char* Use_the_game_s_Button_Settings_again() const { return Get("Use the game's Button Settings again"); }
+
+        // Set this device's buttons in the game's own Button Settings (Options, character select, or the pause menu). They are remembered for this device, on either player.
+        inline const char* Set_this_device_s_buttons_in_the_game_s_own_Button_Settings_Options_character_select_or_the_pause_menu_They_are_remembered_for_this_device_on_either_player() const { return Get("Set this device's buttons in the game's own Button Settings (Options, character select, or the pause menu). They are remembered for this device, on either player."); }
+
+        // Change this device's buttons in the mod instead
+        inline const char* Change_this_device_s_buttons_in_the_mod_instead() const { return Get("Change this device's buttons in the mod instead"); }
+
+        // Drag onto Player 1 or Player 2 to use it there.
+        inline const char* Drag_onto_Player_1_or_Player_2_to_use_it_there() const { return Get("Drag onto Player 1 or Player 2 to use it there."); }
 };
 
 

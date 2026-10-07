@@ -5,6 +5,11 @@
 bool InstallSystemInputHook();
 void RemoveSystemInputHook();
 
+// Records a controller object for PollTrainingResetPressed. The SystemInputWrite hook does it
+// for controllers the game builds itself; the local input system calls it for the ones it
+// builds instead (see Input/GameInputBridge.cpp).
+void NoteControllerForResetProbe(void* controller);
+
 // Scans the captured controller objects for the training "reset positions" action
 // having JUST been pressed this frame (logical action bit 0x08000000 = action index
 // 0x1B in the just-pressed word at [device+0x28] - keyconfig-resolved, so it fires for

@@ -1,4 +1,5 @@
 ﻿#include "WindowManager.h"
+#include "Input/LocalInputManager.h"
 
 #include "Branding.h"
 #include "Palette/PaletteThumbnails.h"
@@ -959,6 +960,12 @@ void WindowManager::HandleButtons()
 	// press edges this call computes, so they all agree on what happened this frame.
 	// Gating (window focus, typing into an overlay text field) lives inside it.
 	HotkeyManager::Update();
+
+	// Keeps device state and the Controllers page live while the game is not ticking its
+	// controllers (loading screens); the game's own update polls first when it is, so this is
+	// usually a no-op. Keyboards stop reaching the game while an overlay text box has focus.
+	LocalInput::Manager::Get().SetOverlayWantsKeyboard(ImGui::GetIO().WantTextInput);
+	LocalInput::Manager::Get().Tick(false);
 
 	// Save states and the replay-takeover load used to read their hotkeys from inside the
 	// buttons that trigger them, on mod-menu pages. That made a bind work only while the

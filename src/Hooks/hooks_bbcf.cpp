@@ -15,6 +15,7 @@
 #include "Hooks/HookManager.h"
 #include "Hooks/RankedAutomationHarness.h"
 #include "Network/ProfileSync.h"
+#include "Input/LocalInputManager.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "Network/RoomManager.h"
 #include "Overlay/WindowManager.h"
@@ -8671,7 +8672,9 @@ int PassKeyboardInputToGame()
 
 extern "C" BOOL __stdcall GetKeyboardStateFiltered(PBYTE lpKeyState)
 {
-	if (!IsControllerHooksRuntimeAllowed())
+	// The local input system routes keyboards through the players itself; the older
+	// per-keyboard filter (and the Player 2 battle override it drives) must not run on top.
+	if (!IsControllerHooksRuntimeAllowed() || LocalInput::Manager::Get().IsActive())
 	{
 		return GetKeyboardState(lpKeyState);
 	}
@@ -9263,7 +9266,7 @@ void __declspec(naked)GetFrameCounter()
 
 	__asm pushfd
 	__asm pushad
-	if (IsControllerHooksRuntimeAllowed())
+	if (IsControllerHooksRuntimeAllowed() && !LocalInput::Manager::Get().IsActive())
 	{
 		ControllerOverrideManager::GetInstance().TickAutoRefresh();
 	}

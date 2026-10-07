@@ -82,18 +82,7 @@ namespace
             // game's per-frame input builder has finished. (This hook itself fires at
             // the builder's zero-init, so the words aren't final here - see
             // GhidraDefs.h input action system block.)
-            for (size_t i = 0; i < kProbeMaxControllers; ++i)
-            {
-                if (s_probeControllers[i] == controllerPtr)
-                {
-                    break;
-                }
-                if (s_probeControllers[i] == nullptr)
-                {
-                    s_probeControllers[i] = controllerPtr;
-                    break;
-                }
-            }
+            NoteControllerForResetProbe(controllerPtr);
 
             uint32_t automationWord = 0;
             static int logBudget = 40;
@@ -156,6 +145,22 @@ namespace
 
                 jmp systemInputWrite_JmpBack
             }
+        }
+}
+
+void NoteControllerForResetProbe(void* controller)
+{
+        for (size_t i = 0; i < kProbeMaxControllers; ++i)
+        {
+                if (s_probeControllers[i] == controller)
+                {
+                        return;
+                }
+                if (s_probeControllers[i] == nullptr)
+                {
+                        s_probeControllers[i] = controller;
+                        return;
+                }
         }
 }
 

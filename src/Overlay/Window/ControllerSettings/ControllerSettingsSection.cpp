@@ -10,6 +10,8 @@
 #include "Overlay/Window/ControllerSettings/LocalControllerOverrideDrawer.h"
 #include "Overlay/Window/ControllerSettings/MultipleKeyboardOverrideDrawer.h"
 #include "Overlay/Window/ControllerSettings/SteamInputWarningDrawer.h"
+#include "Overlay/Window/ControllerSettings/LocalInputPanel.h"
+#include "Input/LocalInputManager.h"
 
 #include "imgui.h"
 
@@ -31,6 +33,12 @@ namespace ControllerSettings
                         ImGui::HorizontalSpacing();
                         ImGui::TextWrapped(Messages.To_force_enable_these_hooks_set_ForceEnableControllerSettingHooks_to_1_at_your_own_risk());
                         ImGui::PopStyleColor();
+                        return;
+                }
+
+                if (LocalInput::Manager::Get().IsActive())
+                {
+                        LocalInputPanel::Draw();
                         return;
                 }
 

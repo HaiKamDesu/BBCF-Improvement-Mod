@@ -123,6 +123,13 @@
     <ClCompile Include="src\Network\ProfileSync.cpp" />
     <ClCompile Include="src\Core\SaveDataSafety.cpp" />
     <ClCompile Include="src\Overlay\Window\ProfileRestorePanel.cpp" />
+    <ClCompile Include="src\Input\WindowsInputBackend.cpp" />
+    <ClCompile Include="src\Input\LinuxInputBackend.cpp" />
+    <ClCompile Include="src\Input\LocalInputManager.cpp" />
+    <ClCompile Include="src\Input\GameInputBridge.cpp" />
+    <ClCompile Include="src\Input\GameKeyConfig.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\LocalInputPanel.cpp" />
+    <ClCompile Include="src\Overlay\Window\ControllerSettings\DeviceArt.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
@@ -326,6 +333,12 @@
     <ClInclude Include="src\Network\ProfileSync.h" />
     <ClInclude Include="src\Core\SaveDataSafety.h" />
     <ClInclude Include="src\Overlay\Window\ProfileRestorePanel.h" />
+    <ClInclude Include="src\Input\LocalInputTypes.h" />
+    <ClInclude Include="src\Input\InputBackend.h" />
+    <ClInclude Include="src\Input\GameKeyConfig.h" />
+    <ClInclude Include="src\Input\LocalInputManager.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\LocalInputPanel.h" />
+    <ClInclude Include="src\Overlay\Window\ControllerSettings\DeviceArt.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Network\RoomManager.h" />

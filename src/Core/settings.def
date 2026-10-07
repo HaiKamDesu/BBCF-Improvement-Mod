@@ -269,6 +269,11 @@ SETTING(int, allowPaletteDownloads, "AllowPaletteDownloads", "-1");
 SETTING(bool, customPalettesInCharSelect, "CustomPalettesInCharSelect", "1");
 SETTING(int, takeoverInputSlot, "TakeoverInputSlot", "0");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
+// The local input system (src/Input/LocalInputManager.h): every keyboard and controller is
+// assigned to Player 1 or Player 2 from the Controllers page, with hot-plug, per-device names
+// and button mapping. Replaces the game's own controller handling and the older override
+// options below. 0 = the game's own handling plus the older options, as before.
+SETTING(bool, newControllerSystem, "NewControllerSystem", "1");
 SETTING(bool, EnableControllerHooks, "EnableControllerHooks", "1");
 SETTING(bool, ForceEnableControllerSettingHooks, "ForceEnableControllerSettingHooks", "0");
 // Whether the user has answered the Wine/Proton controller prompt. 0 = not asked yet, so

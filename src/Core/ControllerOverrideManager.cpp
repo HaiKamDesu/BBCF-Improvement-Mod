@@ -1,4 +1,5 @@
 #include "ControllerOverrideManager.h"
+#include "Input/LocalInputManager.h"
 #include "InputDevices.h"
 
 #include "dllmain.h"
@@ -1576,8 +1577,13 @@ namespace
                 return reinterpret_cast<IDirectInputDevice8W**>(base + BBCF_PAD_SLOT0_PTR_OFFSET);
         }
 
+        // BBCF_PAD_SLOT0_PTR_OFFSET points outside the game image (base+0x104FA298), so this
+        // never read anything meaningful (docs/Decompilation/Controllers.md). The game's
+        // DirectInput devices live at pad+0x08 inside its device registry. Kept as a no-op
+        // so the call sites below stay readable.
         void DebugLogPadSlot0()
         {
+                return;
                 auto ppDev = GetBbcfPadSlot0Ptr();
                 if (!ppDev || IsBadReadPtr(ppDev, sizeof(*ppDev)))
                 {
@@ -1995,6 +2001,12 @@ extern "C" void HandleControllerWndProcMessage(UINT msg, WPARAM wParam, LPARAM l
         if (!IsControllerHooksRuntimeAllowed())
         {
                 return;
+        }
+
+        if (LocalInput::Manager::Get().IsActive())
+        {
+                LocalInput::Manager::Get().OnWindowMessage(g_gameProc.hWndGameWindow, msg, wParam, lParam);
+                return; // the older override layer stands down
         }
 
         ControllerOverrideManager::GetInstance().HandleWindowMessage(msg, wParam, lParam);

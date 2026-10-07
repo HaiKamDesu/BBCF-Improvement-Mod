@@ -1,4 +1,5 @@
 #include "Core/SaveDataSafety.h"
+#include "Input/LocalInputManager.h"
 #include "Audio/BgmReplacementManager.h"
 #include "crashdump.h"
 #include "info.h"
@@ -339,6 +340,12 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	LOG(2, "BBCF_IM_Start: InstallSystemInputHook failed; system input override disabled.\n");
 	ForceLog("[Init] InstallSystemInputHook failed; continuing without system input override.\n");
 }
+
+	// Every keyboard and pad assigned to a player, with hot-plug. While it is active the older
+	// override layer gets neither window messages nor its refresh tick (see
+	// HandleControllerWndProcMessage), so the two never fight; its saved settings are left as
+	// they are for when NewControllerSystem is turned off.
+	LocalInput::Manager::Get().Start();
 
 	// Reads the same controller objects the SystemInputWrite hook captures, so it is only
 	// useful under the same gate.

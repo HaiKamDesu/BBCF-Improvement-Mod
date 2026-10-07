@@ -1888,3 +1888,42 @@ Replace your network profile with the copy taken before %s? It happens the next 
 Replace your local save data with the copy taken before %s? It happens the next time you start the game. Everything you earned since that copy is lost.,Replace your local save data with the copy taken before %s? It happens the next time you start the game. Everything you earned since that copy is lost.,¿Reemplazar tus datos de guardado locales con la copia de antes de %s? Ocurre la próxima vez que inicies el juego. Se pierde todo lo que hayas ganado desde esa copia.
 This cannot be undone.,This cannot be undone.,Esto no se puede deshacer.
 "Restore, I understand it cannot be undone","Restore, I understand it cannot be undone","Restaurar, entiendo que no se puede deshacer"
+Move to Player 1,Move to Player 1,Mover al Jugador 1
+Move to Player 2,Move to Player 2,Mover al Jugador 2
+Game button,Game button,Botón del juego
+Bound to,Bound to,Asignado a
++ Bind,+ Bind,+ Asignar
+Press a button on %s for %s... (the game ignores input while listening),Press a button on %s for %s... (the game ignores input while listening),Presiona un botón en %s para %s... (el juego ignora la entrada mientras escucha)
+Reset buttons to default,Reset buttons to default,Restablecer botones
+"The new controller system is off (NewControllerSystem in Settings), or controller hooks are disabled on this platform.","The new controller system is off (NewControllerSystem in Settings), or controller hooks are disabled on this platform.","El nuevo sistema de controles está desactivado (NewControllerSystem en Ajustes), o los hooks de controles están desactivados en esta plataforma."
+"Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2.","Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2.","Olvida los dispositivos que moviste a mano: los teclados vuelven al Jugador 1, el primer control al Jugador 1 y el segundo al Jugador 2."
+Keyboard,Keyboard,Teclado
+Xbox controller,Xbox controller,Control de Xbox
+Arcade stick,Arcade stick,Arcade stick
+Test and buttons...,Test and buttons...,Probar y botones...
+unplugged,unplugged,desconectado
+always this player,always this player,siempre este jugador
+"Plug in a controller, or drag one here.","Plug in a controller, or drag one here.",Conecta un control o arrastra uno aquí.
+What the game sees,What the game sees,Lo que ve el juego
+Change this device's buttons,Change this device's buttons,Cambiar los botones de este dispositivo
+Done,Done,Listo
+Controller disconnected,Controller disconnected,Control desconectado
+%s was unplugged. Plug it back in and it returns to the same player.,%s was unplugged. Plug it back in and it returns to the same player.,%s se desconectó. Vuelve a conectarlo y regresa al mismo jugador.
+"Drag a keyboard or controller to the other player to switch sides. Controllers can be plugged in at any time: the first one joins Player 1, the second Player 2. Click one to test it.","Drag a keyboard or controller to the other player to switch sides. Controllers can be plugged in at any time: the first one joins Player 1, the second Player 2. Click one to test it.",Arrastra un teclado o control al otro jugador para cambiarlo de lado. Puedes conectar controles en cualquier momento: el primero se une al Jugador 1 y el segundo al Jugador 2. Haz clic en uno para probarlo.
+Reset sides,Reset sides,Restablecer lados
+Plays for,Plays for,Juega para
+"hidden, unplugged","hidden, unplugged","oculto, desconectado"
+hidden by you,hidden by you,oculto por ti
+never used,never used,nunca usado
+Hide this device,Hide this device,Ocultar este dispositivo
+Hidden devices (%d),Hidden devices (%d),Dispositivos ocultos (%d)
+A hidden device is being pressed. Open the list to see which one.,A hidden device is being pressed. Open the list to see which one.,Se está presionando un dispositivo oculto. Abre la lista para ver cuál.
+Show,Show,Mostrar
+Automatically detect controllers,Automatically detect controllers,Detectar controles automáticamente
+Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in.,Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in.,Detecta controles que se conectan y desconectan mientras el juego está abierto. Desactívalo solo si tu PC se traba cuando cambian los dispositivos; entonces usa Actualizar después de conectar algo.
+Rename...,Rename...,Renombrar...
+This device uses the buttons set below instead of the game's Button Settings.,This device uses the buttons set below instead of the game's Button Settings.,Este dispositivo usa los botones de abajo en lugar de la Configuración de botones del juego.
+Use the game's Button Settings again,Use the game's Button Settings again,Volver a usar la Configuración de botones del juego
+"Set this device's buttons in the game's own Button Settings (Options, character select, or the pause menu). They are remembered for this device, on either player.","Set this device's buttons in the game's own Button Settings (Options, character select, or the pause menu). They are remembered for this device, on either player.","Configura los botones de este dispositivo en la Configuración de botones del propio juego (Opciones, selección de personaje o el menú de pausa). Se recuerdan para este dispositivo, en cualquier jugador."
+Change this device's buttons in the mod instead,Change this device's buttons in the mod instead,Cambiar los botones de este dispositivo en el mod
+Drag onto Player 1 or Player 2 to use it there.,Drag onto Player 1 or Player 2 to use it there.,Arrástralo a Jugador 1 o Jugador 2 para usarlo ahí.

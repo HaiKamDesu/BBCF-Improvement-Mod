@@ -89,6 +89,7 @@ namespace {
 		{ "OnlineInputDelay", "Online input delay (frames)", "Netcode", "How many frames your own inputs are held back in online matches. The game always uses 2. Raising it gives both you and your opponent less rollback and gives you more input lag, which is the trade worth making on a bad connection. It cannot be set below 2, because a lower number does not speed you up - it makes your inputs reach your opponent later and pushes the rollback onto them and onto anyone spectating. Takes effect on your next online match." },
 		{ "AllowPaletteDownloads", "Let others save your palette", "Palettes", "Whether other players can save the custom colours they see you using. \"Not chosen yet\" means the mod will ask you once in-game." },
 		{ "CustomPalettesInCharSelect", "Show custom colours on character select", "Palettes", "Makes the colour preview on the character select screen use your custom palettes, so it matches what you will actually see in the match. The mod writes a modified copy of one of the game's data files into its own folder to do this - nothing the game shipped is changed. Turn it off if you would rather it did not write that file." },
+		{ "NewControllerSystem", "New controller system", "Controller", "Every keyboard and controller is assigned to Player 1 or Player 2 on the Controllers page, with hot-plug, names and button mapping per device. Turn off to go back to the game's own controller handling and the older options below." },
 		{ "SwapControllerPos", "Swap player 1 and 2 controllers", "Controller", "Swaps which physical controller counts as player 1 and which as player 2. Currently forced off at startup because it can crash the game; turn it on again during a session if you need it." },
 		{ "EnableControllerHooks", "Controller tools", "Controller", "Powers the mod's controller features (assignment, keyboard separation). Turn it off only if you suspect them of causing trouble." },
 		{ "ForceEnableControllerSettingHooks", "Force controller tools on Linux/Steam Deck", "Controller", "The mod switches the controller tools off automatically under Wine/Proton because they misbehave there. This forces them back on, and overrides the platform check on its own - you do not also need to turn Controller tools back on. Unsupported: expect problems, and turn it off again before reporting a bug." },
@@ -515,7 +516,7 @@ namespace {
 		static const char* const kRestartKeys[] = {
 			"RenderingWidth", "RenderingHeight", "Viewport", "AntiAliasing", "V-sync", "MenuSize",
 			"DinputDllWrapper",
-			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks",
+			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks", "NewControllerSystem",
 			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
 			"SpectatorSyncHooksEnabled",
 			"D3D9IatFallbackHook",
