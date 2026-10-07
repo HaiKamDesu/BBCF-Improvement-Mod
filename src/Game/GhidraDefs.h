@@ -473,18 +473,20 @@ static constexpr uintptr_t ADDR_OnlineStorageTransferSingleton = 0x000B8F70;
 // Addresses are base-relative RVAs (Ghidra/dumpbin VAs assume image base
 // 0x00400000). Verified against tools/bbcf_disasm_ascii.txt.
 //
-// Each AA_CInput device object (keyboard / pad; the "controller pointer" the
-// SystemInputWrite hook sees in ESI) keeps three per-frame LOGICAL ACTION
-// bitmask words, one bit per keyconfig action index (1 << actionIndex,
-// actionCount at device+0x38, typically 30):
-//   device+0x28 = actions JUST PRESSED this frame (edge)
-//   device+0x2C = actions RELEASED this frame (edge)
-//   device+0x30 = actions HELD this frame (level)
-// Built by FUN_004963F0 (per-action loop calling vtbl+8 with the action
-// index, i.e. keyconfig-resolved "is physical binding down"). The mod's
-// SystemInputWrite hook at base+0x96408 sits at the loop's zero-init
-// instruction, so EBX there is always 0 - to observe real values read the
-// words AFTER FUN_004963F0 returns (e.g. from a per-frame tick).
+// CORRECTED 2026-10-07 (docs/Decompilation/Controllers.md): these words live in the
+// CONTROLLER TASK (GAME_KeyControler, size 0x58), not in an AA_CInput device. The
+// "controller pointer" the SystemInputWrite hook sees in ESI is a KeyControler; its
+// +0x18 is a device REGISTRY INDEX, not a device pointer. One bit per keyconfig action
+// index (1 << actionIndex, actionCount at +0x38 = 0x1C = 28, so bits 28-31 never set):
+//   ctrl+0x28 = actions JUST PRESSED this tick (edge vs. the previous effective word)
+//   ctrl+0x2C = actions RELEASED this tick
+//   ctrl+0x30 = PHYSICAL held word (before the +0x4C/+0x50 one-tick override)
+//   [ctrl+0x20]+0x0C = EFFECTIVE held word (history node; what ActionHeld reads)
+// Built by FUN_004963F0 (per-action loop calling vtbl+8 with the action index).
+// The SystemInputWrite hook at base+0x96408 sits at the zero-init of +0x30; writing a
+// word there MERGES with the device (the loop still ORs device bits in, and the
+// effective word is computed from the device), which is why the local input system
+// replaces FUN_004963F0 for its controllers instead (src/Input/GameInputBridge.cpp).
 // ---------------------------------------------------------------------------
 // Ghidra FUN_004963F0 - per-frame device action-word build (thiscall, ecx=device)
 static constexpr uintptr_t ADDR_InputDevice_BuildActionWords = 0x000963F0;
@@ -517,8 +519,12 @@ static constexpr uintptr_t ADDR_ActionIdMaskTable = 0x005DE0B0;
 // which fans out to both devices of that controller):
 // FUN_004641B0(actionId) = just-pressed (maskTable[id] & device+0x28)
 static constexpr uintptr_t ADDR_ControllerWrapper_ActionJustPressed = 0x000641B0;
-// FUN_00464170(actionId) = pressed-or-key-repeat (menu navigation variant)
+// FUN_00464170(actionId) = HELD (effective word & mask). CORRECTED 2026-10-07: it is
+// not a repeat check; the menu repeat check is FUN_004641F0 (just pressed, or held
+// >= 9 frames and every 4th frame). Name kept for existing callers.
 static constexpr uintptr_t ADDR_ControllerWrapper_ActionRepeatPressed = 0x00064170;
+static constexpr uintptr_t ADDR_ControllerWrapper_ActionHeld = 0x00064170;
+static constexpr uintptr_t ADDR_ControllerWrapper_ActionRepeat = 0x000641F0;
 // FUN_004640E0(rawMask) = just-pressed by raw bitmask (device+0x28 & mask)
 static constexpr uintptr_t ADDR_ControllerWrapper_MaskJustPressed = 0x000640E0;
 // FUN_0047E7B0(controllerId) cdecl - controller wrapper by id;
@@ -720,7 +726,11 @@ static constexpr uintptr_t ADDR_SystemKeyControler_DirExtrasJumpTable = 0x000698
 //     0x25 = ESCAPE, 0x26-0x31 = F1-F12, 0x41 = SPACE, 0x42 = BACKSPACE,
 //     0x54-0x5D = numpad 0-9, 0x5E = UP, 0x5F = RIGHT, 0x60 = DOWN, 0x61 = LEFT.
 static constexpr uintptr_t ADDR_Keyboard_VkToGameKeyTable = 0x006255C8; // 256 bytes, BSS
-static constexpr uintptr_t ADDR_Keyboard_Poll = 0x000194E0;             // FUN_004194E0
+// CORRECTED 2026-10-07: FUN_004194E0 only translates the VK state into the game-key
+// map; the GetKeyboardState call is the keyboard's vtbl+8, FUN_004194B0, which skips
+// polling while the app is inactive (app object 0xA5A500 +0xD0, set by WM_ACTIVATEAPP).
+static constexpr uintptr_t ADDR_Keyboard_Poll = 0x000194E0;             // FUN_004194E0 (translate)
+static constexpr uintptr_t ADDR_Keyboard_ReadState = 0x000194B0;        // FUN_004194B0 (vtbl+8)
 static constexpr uintptr_t ADDR_Keyboard_IsPressed = 0x00019400;        // FUN_00419400
 
 // ---------------------------------------------------------------------------
