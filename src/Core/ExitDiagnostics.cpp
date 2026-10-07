@@ -3,6 +3,7 @@
 #include "Core/crashdump.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
+#include "Game/FrameStallWatchdog.h"
 
 #include <detours.h>
 #include <intrin.h>
@@ -269,6 +270,10 @@ namespace
 	{
 		MarkExiting();
 		ExitDiagnostics::NoteWithStack("ExitProcess(%u) on %s", exitCode, ThreadLabel());
+		// ExitProcess kills every other thread while this one keeps going. If the stall
+		// watchdog is between SuspendThread and ResumeThread on this thread at that moment,
+		// nobody resumes it: the game never finishes closing and stays "Suspended" forever.
+		FrameStallWatchdog::Stop();
 		orig_ExitProcess(exitCode);
 	}
 
