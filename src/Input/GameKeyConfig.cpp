@@ -336,11 +336,26 @@ namespace LocalInput
 				g_staged.menuSet[side] = binds.menuSet & 1;
 			}
 
+			// The 40 bytes of a keyboard's battle records (Type A, then Type B), for the log:
+			// with these a report shows exactly which keys a screen started from.
+			std::string RecordHex(const uint8_t* rec)
+			{
+				char text[96];
+				int at = 0;
+				for (int i = 0; i < 40; ++i)
+					at += snprintf(text + at, sizeof(text) - at, i == 20 ? "|%02X" : "%02X", rec[i]);
+				return text;
+			}
+
 			void StageKeyboard(int side, const KeyboardCandidate& kb)
 			{
 				uint8_t* const opt = OptData();
 				if (!opt || kb.id.empty())
 					return;
+				// Records that no longer hold this keyboard's keys mean the game rewrote them since
+				// they were last staged (or another keyboard had them).
+				const bool replaced = std::memcmp(opt + kKbSetB, kb.binds.setB, 40) != 0 ||
+					std::memcmp(opt + kKbSetA, kb.binds.setA, 40) != 0;
 				g_kbOwner = kb.id;
 				g_kbOwnerSide = side;
 				g_kbOwnerBinds = kb.binds;
@@ -349,7 +364,8 @@ namespace LocalInput
 				std::memcpy(opt + kKbSetA, kb.binds.setA, 40);
 				std::memcpy(g_staged.kbB, kb.binds.setB, 40);
 				std::memcpy(g_staged.kbA, kb.binds.setA, 40);
-				LOG(1, "[GameKeyConfig] keyboard records -> %s (P%d)\n", kb.id.c_str(), side + 1);
+				LOG(1, "[GameKeyConfig] keyboard records -> %s (P%d)%s: %s\n", kb.id.c_str(), side + 1,
+					replaced ? ", replacing different keys that were in them" : "", RecordHex(kb.binds.setB[0]).c_str());
 			}
 
 			// ---------------------------------------------------------------- patches
@@ -1007,7 +1023,8 @@ namespace LocalInput
 				std::memcpy(g_kbOwnerBinds.setA, now.kbA, 40);
 				Sanitize(g_kbOwnerBinds, BindClass::Keyboard);
 				record(g_kbOwner, g_kbOwnerBinds);
-				LOG(1, "[GameKeyConfig] %s: keyboard settings changed (P%d)\n", g_kbOwner.c_str(), g_kbOwnerSide + 1);
+				LOG(1, "[GameKeyConfig] %s: keyboard settings changed (P%d): %s (was %s)\n", g_kbOwner.c_str(), g_kbOwnerSide + 1,
+					RecordHex(now.kbB).c_str(), RecordHex(g_staged.kbB).c_str());
 			}
 			// The menu editor's Current Set applies live through engine+0x25D8 and only reaches
 			// optData on close; follow it while the editor is open.
@@ -1049,8 +1066,10 @@ namespace LocalInput
 							best = &d;
 					}
 					if (!editor.open)
-						LOG(1, "[GameKeyConfig] P%d Button Settings opened%s\n", side + 1,
-							best ? "" : " - that player has no usable pad right now (keyboard or nothing)");
+						LOG(1, "[GameKeyConfig] P%d Button Settings opened%s; Type B flags %d/%d, keyboard records hold %s (%s)\n", side + 1,
+							best ? "" : " - that player has no usable pad right now (keyboard or nothing)",
+							opt[kTypeBFlag] & 1, opt[kTypeBFlag + 1] & 1, g_kbOwner.empty() ? "nobody's keys" : g_kbOwner.c_str(),
+							RecordHex(opt + kKbSetB).c_str());
 					editor.open = true;
 					if (best)
 					{
@@ -1060,11 +1079,15 @@ namespace LocalInput
 						StagePad(side, editor.padBinds);
 						LOG(1, "[GameKeyConfig] P%d editor: pad records -> %s\n", side + 1, best->id.c_str());
 					}
-					// A keyboard player: stage their keyboard right away, so the keyboard panel
-					// shows their keys even before the switch hook runs.
+					// Stage this player's keyboard right away, so the keyboard panel shows its keys
+					// even before the switch hook runs - always, not only when another keyboard
+					// had the records: the game may have rewritten them since they were staged,
+					// and its panel would then show (and save) other keys over this keyboard's.
+					// Only while the other player's editor is not showing its own keyboard.
 					const KeyboardCandidate& kb = g_kbCandidate[side];
 					const DeviceRef* kbRef = kb.id.empty() ? nullptr : find(kb.id);
-					if (kbRef && (!best || kbRef->lastInputMs > best->lastInputMs) && g_kbOwner != kb.id)
+					const bool otherHasKeyboard = g_kbOwnerSide == (side ^ 1) && g_editor[side ^ 1].open;
+					if (kbRef && !otherHasKeyboard)
 						StageKeyboard(side, kb);
 				}
 				else if (!open[side] && editor.open)

@@ -169,6 +169,8 @@ namespace LocalInput
 			DWORD lastEmptyCheck = 0;
 			uint8_t subType = 0;   // asked once per connection
 			ULONGLONG connectedAt = 0;
+			std::string battery;           // last logged battery text
+			ULONGLONG batteryCheckedAt = 0;
 			ControlSet controls;
 			int16_t axes[6] = {};
 		};
@@ -471,10 +473,31 @@ namespace LocalInput
 								const bool haveCaps = XInputRuntime::GetCapabilities(index, &caps) == ERROR_SUCCESS;
 								pad.subType = haveCaps ? caps.SubType : 0;
 								pad.connectedAt = GetTickCount64();
+								pad.battery = BatteryText(index);
+								pad.batteryCheckedAt = pad.connectedAt;
 								LOG(1, "[LocalInput] XInput pad %lu connected: subtype %u (%s), %s, battery %s%s\n", index,
 									pad.subType, XInputSubTypeText(pad.subType),
 									!haveCaps ? "capabilities unknown" : (caps.Flags & 0x0002 /* XINPUT_CAPS_WIRELESS */) ? "wireless" : "wired",
-									BatteryText(index).c_str(), recheckAll ? " (found right after a device change)" : "");
+									pad.battery.c_str(), recheckAll ? " (found right after a device change)" : "");
+							}
+							else
+							{
+								// Right after connecting the battery is often not reported yet; ask
+								// again after 3 s, then every 30 s, and log only when it changes -
+								// a wireless pad that drops out can then be matched to a low battery.
+								const ULONGLONG ms = GetTickCount64();
+								const bool early = pad.batteryCheckedAt - pad.connectedAt < 3000;
+								if (ms - pad.batteryCheckedAt >= (early ? 3000u : 30000u))
+								{
+									pad.batteryCheckedAt = ms;
+									const std::string battery = BatteryText(index);
+									if (battery != pad.battery)
+									{
+										LOG(1, "[LocalInput] XInput pad %lu battery: %s (was %s), %s after it connected\n", index,
+											battery.c_str(), pad.battery.c_str(), Seconds(ms - pad.connectedAt).c_str());
+										pad.battery = battery;
+									}
+								}
 							}
 							pad.connected = true;
 							Decode(state.Gamepad, pad);
@@ -604,6 +627,7 @@ namespace LocalInput
 				std::vector<DIFound>* found;
 				const std::vector<std::string>* known;
 				std::set<std::string>* loggedSkips;   // worker-only: each skip is logged once
+				std::string* xinputList;              // the XInput pads Windows lists, for the log
 			};
 
 			static BOOL CALLBACK EnumDevice(LPCDIDEVICEINSTANCEW instance, LPVOID context)
@@ -634,6 +658,12 @@ namespace LocalInput
 					}
 					if (IsXInputDevice(device))
 					{
+						// XInput itself has no names or USB ids; listing them on every look ties
+						// an "XInput pad N connected" line to the physical pad.
+						char item[160];
+						snprintf(item, sizeof(item), "%s'%s' %04X:%04X", ctx->xinputList->empty() ? "" : ", ",
+							found.name.c_str(), found.vendorId, found.productId);
+						*ctx->xinputList += item;
 						if (ctx->loggedSkips->insert(id).second)
 							LOG(1, "[LocalInput] DirectInput skips '%s' (%04X:%04X): it is an XInput pad, listed through XInput instead\n",
 								found.name.c_str(), found.vendorId, found.productId);
@@ -682,7 +712,8 @@ namespace LocalInput
 							known.push_back(pad.id);
 				}
 				std::vector<DIFound> found;
-				EnumContext ctx{ dinput, &found, &known, &m_loggedSkips };
+				std::string xinputList;
+				EnumContext ctx{ dinput, &found, &known, &m_loggedSkips, &xinputList };
 				const DWORD start = GetTickCount();
 				const HRESULT enumResult = dinput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDevice, &ctx, DIEDFL_ATTACHEDONLY);
 				const DWORD took = GetTickCount() - start;
@@ -705,10 +736,11 @@ namespace LocalInput
 				const bool changed = ids != m_lastEnumIds;
 				if (reason != WakeReason::None || changed)
 				{
-					LOG(1, "[LocalInput] DirectInput look (%s%s): %d pad(s)%s%s, %lu ms\n",
+					LOG(1, "[LocalInput] DirectInput look (%s%s): %d pad(s)%s%s%s%s, %lu ms\n",
 						WakeReasonText(reason),
 						reason == WakeReason::None && changed ? " - Windows sent no message for this change" : "",
-						static_cast<int>(found.size()), found.empty() ? "" : ": ", list.c_str(), took);
+						static_cast<int>(found.size()), found.empty() ? "" : ": ", list.c_str(),
+						xinputList.empty() ? "" : "; XInput pads Windows lists: ", xinputList.c_str(), took);
 				}
 				else if (took > 250)
 				{

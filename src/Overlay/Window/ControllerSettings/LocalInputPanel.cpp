@@ -74,6 +74,27 @@ namespace
 		}
 	}
 
+	// The text cut to maxWidth with "..." at the end, for labels drawn straight onto the draw
+	// list (they do not wrap or clip, so a long name would run out of its tile).
+	std::string FitText(const std::string& text, float maxWidth)
+	{
+		if (maxWidth <= 0.0f)
+			return std::string();
+		if (ImGui::CalcTextSize(text.c_str()).x <= maxWidth)
+			return text;
+		const float dotsW = ImGui::CalcTextSize("...").x;
+		size_t len = text.size();
+		while (len > 0)
+		{
+			--len;
+			while (len > 0 && (static_cast<unsigned char>(text[len]) & 0xC0) == 0x80)
+				--len; // never cut a UTF-8 character in half
+			if (ImGui::CalcTextSize(text.c_str(), text.c_str() + len).x + dotsW <= maxWidth)
+				break;
+		}
+		return len > 0 ? text.substr(0, len) + "..." : (dotsW <= maxWidth ? std::string("...") : std::string());
+	}
+
 	void BigText(const char* text, ImU32 color, float scale)
 	{
 		ImGui::PushFont(nullptr, ImGui::GetFontSize() * scale);
@@ -177,14 +198,18 @@ namespace
 			DeviceArt::StyleFor(device), iconColor);
 
 		const float textX = a.x + 18.0f + iconH * 1.6f;
+		const float textW = b.x - 8.0f - textX;
 		draw->AddText(ImVec2(textX, a.y + height * 0.14f),
-			device.connected ? IM_COL32(240, 240, 245, 255) : IM_COL32(130, 130, 140, 255), device.name.c_str());
+			device.connected ? IM_COL32(240, 240, 245, 255) : IM_COL32(130, 130, 140, 255), FitText(device.name, textW).c_str());
 		std::string sub = KindText(device);
 		if (!device.connected)
 			sub += "  -  " + L("unplugged");
 		else if (device.pinned)
 			sub += "  -  " + L("always this player");
-		draw->AddText(ImVec2(textX, a.y + height * 0.54f), IM_COL32(150, 155, 168, 255), sub.c_str());
+		draw->AddText(ImVec2(textX, a.y + height * 0.54f), IM_COL32(150, 155, 168, 255), FitText(sub, textW).c_str());
+		if (hovered && (textW < ImGui::CalcTextSize(device.name.c_str()).x || textW < ImGui::CalcTextSize(sub.c_str()).x)
+			&& !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+			ImGui::SetTooltip("%s\n%s", device.name.c_str(), sub.c_str()); // shortened: the full text
 
 		ImGui::Dummy(ImVec2(0, 2.0f));
 		ImGui::PopID();
@@ -220,7 +245,7 @@ namespace
 		if (shown == 0)
 		{
 			ImGui::Spacing();
-			ImGui::TextDisabled("%s", L("Plug in a controller, or drag one here.").c_str());
+			ImGui::TextDisabledWrapped("%s", L("Plug in a controller, or drag one here.").c_str());
 		}
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
@@ -332,7 +357,9 @@ namespace
 			return;
 		}
 		const DeviceView& device = *it;
-		const float contentWidth = 620.0f;
+		// Narrower on a small game window, so the window never runs off the screen.
+		const float contentWidth = (std::max)(260.0f, (std::min)(620.0f,
+			ImGui::GetIO().DisplaySize.x * 0.92f - ImGui::GetStyle().WindowPadding.x * 2.0f));
 
 		// Header: icon, name (Rename to edit), and which player it plays for.
 		ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -567,22 +594,31 @@ namespace
 			DeviceArt::DrawIcon(draw, ImVec2(a.x + 8.0f, a.y + (height - iconH) * 0.5f), iconH,
 				DeviceArt::StyleFor(*d), d->connected ? IM_COL32(200, 205, 215, 255) : IM_COL32(100, 104, 112, 255));
 			const float textX = a.x + 16.0f + iconH * 1.6f;
-			draw->AddText(ImVec2(textX, a.y + height * 0.18f), d->connected ? IM_COL32(225, 228, 235, 255) : IM_COL32(120, 124, 132, 255), d->name.c_str());
-			const std::string reason = HiddenReason(*d);
-			const float nameW = ImGui::CalcTextSize(d->name.c_str()).x;
-			draw->AddText(ImVec2(textX + nameW + 10.0f, a.y + height * 0.18f), IM_COL32(140, 145, 158, 255), reason.c_str());
-
 			// Unplugged devices that were never hidden have nothing to show; they reappear on
 			// their own when plugged back in.
-			if (d->ignored || (d->idle && d->connected))
+			const bool canShow = d->ignored || (d->idle && d->connected);
+			const std::string show = L("Show");
+			const float buttonW = ImGui::CalcTextSize(show.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			// Name, then why it is here; both shortened to stay clear of the Show button.
+			const float textRight = a.x + width - (canShow ? buttonW + 16.0f : 8.0f);
+			const std::string name = FitText(d->name, textRight - textX);
+			draw->AddText(ImVec2(textX, a.y + height * 0.18f), d->connected ? IM_COL32(225, 228, 235, 255) : IM_COL32(120, 124, 132, 255), name.c_str());
+			const float reasonX = textX + ImGui::CalcTextSize(name.c_str()).x + 10.0f;
+			const std::string reason = FitText(HiddenReason(*d), textRight - reasonX);
+			if (!reason.empty())
+				draw->AddText(ImVec2(reasonX, a.y + height * 0.18f), IM_COL32(140, 145, 158, 255), reason.c_str());
+
+			if (canShow)
 			{
-				const std::string show = L("Show");
-				const float buttonW = ImGui::CalcTextSize(show.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 				// The row itself drags onto a player: that shows it and puts it on that side.
 				ImGui::SetCursorScreenPos(a);
 				ImGui::InvisibleButton("##hidden_row", ImVec2((std::max)(1.0f, width - buttonW - 16.0f), height));
 				if (ImGui::IsItemHovered() && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
-					ImGui::SetTooltip("%s", L("Drag onto Player 1 or Player 2 to use it there.").c_str());
+				{
+					// The row may show the name shortened: the tooltip has all of it.
+					ImGui::SetTooltip("%s - %s\n%s", d->name.c_str(), HiddenReason(*d).c_str(),
+						L("Drag onto Player 1 or Player 2 to use it there.").c_str());
+				}
 				DrawDragPayload(*d);
 				ImGui::SetCursorScreenPos(ImVec2(a.x + width - buttonW - 8.0f, a.y + (height - ImGui::GetFrameHeight()) * 0.5f));
 				if (ImGui::Button(show.c_str()))
@@ -602,25 +638,32 @@ namespace
 		ImGui::Spacing();
 		if (manager.SteamInputLikely())
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.25f, 1.0f), "%s", Messages.Steam_input_active_notice());
-			ImGui::SameLine();
-			ImGui::ShowHelpMarker(Messages.Steam_input_limitations());
+			ImGui::TextColoredWrapped(ImVec4(1.0f, 0.75f, 0.25f, 1.0f), "%s", Messages.Steam_input_active_notice());
+			ImGui::ShowHelpMarkerSameLine(Messages.Steam_input_limitations());
 		}
 
+		// Each control and its help marker move to the next line together when the menu is too
+		// narrow for both.
+		const float spacing = ImGui::GetStyle().ItemSpacing.x;
+		const float marker = ImGui::HelpMarkerWidth();
+		const std::string autoLabel = L("Automatically detect controllers");
 		bool autoDetect = Settings::settingsIni.autoUpdateControllers;
-		if (ImGui::Checkbox(L("Automatically detect controllers").c_str(), &autoDetect))
+		if (ImGui::Checkbox(autoLabel.c_str(), &autoDetect))
 		{
 			Settings::settingsIni.autoUpdateControllers = autoDetect;
 			Settings::changeSetting("AutomaticallyUpdateControllers", autoDetect ? "1" : "0");
 			manager.SetAutoDetect(autoDetect);
 		}
-		ImGui::SameLine();
-		ImGui::ShowHelpMarker(L("Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in.").c_str());
-		ImGui::SameLine();
-		if (ImGui::SmallButton(L("Refresh controllers").c_str()))
+		ImGui::ShowHelpMarkerSameLine(L("Notices controllers being plugged in and out while the game runs. Turn off only if your PC stutters when devices change; then use Refresh after plugging something in.").c_str());
+
+		const std::string refreshLabel = L("Refresh controllers");
+		const std::string resetLabel = L("Reset sides");
+		const std::string reportLabel = L("Log what's happening now");
+		ImGui::SameLineOrWrap(ImGui::ButtonWidth(refreshLabel.c_str()));
+		if (ImGui::SmallButton(refreshLabel.c_str()))
 			manager.Refresh();
-		ImGui::SameLine();
-		if (ImGui::SmallButton(L("Reset sides").c_str()))
+		ImGui::SameLineOrWrap(ImGui::ButtonWidth(resetLabel.c_str()) + spacing + marker);
+		if (ImGui::SmallButton(resetLabel.c_str()))
 			manager.ResetAssignments();
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2.").c_str());
@@ -629,7 +672,7 @@ namespace
 		// so a report can point at the exact moment something went wrong.
 		static int s_lastReport = -1;
 		static double s_reportShownAt = -100.0;
-		if (ImGui::SmallButton(L("Log what's happening now").c_str()))
+		if (ImGui::SmallButton(reportLabel.c_str()))
 		{
 			s_lastReport = manager.LogReport("the player pressed Log what's happening now");
 			s_reportShownAt = ImGui::GetTime();
@@ -638,19 +681,23 @@ namespace
 		ImGui::ShowHelpMarker(L("Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.").c_str());
 		if (ImGui::GetTime() - s_reportShownAt < 6.0)
 		{
-			ImGui::SameLine();
-			if (s_lastReport > 0)
-				ImGui::TextColored(ImVec4(0.55f, 0.9f, 0.55f, 1.0f), L("Written to DEBUG.txt as report #%d").c_str(), s_lastReport);
-			else
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.25f, 1.0f), "%s", L("Debug logs are off. Turn on Generate debug logs in Settings first.").c_str());
+			char done[128];
+			snprintf(done, sizeof(done), L("Written to DEBUG.txt as report #%d").c_str(), s_lastReport);
+			const std::string status = s_lastReport > 0 ? std::string(done)
+				: L("Debug logs are off. Turn on Generate debug logs in Settings first.");
+			ImGui::SameLineOrWrap(ImGui::CalcTextSize(status.c_str()).x);
+			ImGui::TextColoredWrapped(s_lastReport > 0 ? ImVec4(0.55f, 0.9f, 0.55f, 1.0f) : ImVec4(1.0f, 0.75f, 0.25f, 1.0f),
+				"%s", status.c_str());
 		}
 
 		if (Settings::settingsIni.enableInDevelopmentFeatures)
 		{
 			if (ImGui::SmallButton(Messages.Open_Joy_cpl()))
 				ControllerOverrideManager::GetInstance().OpenControllerControlPanel();
-			ImGui::SameLine();
-			ImGui::TextDisabled(Messages.STEAM_INPUT_s(), manager.SteamInputLikely() ? Messages.ON() : Messages.OFF());
+			char steam[128];
+			snprintf(steam, sizeof(steam), Messages.STEAM_INPUT_s(), manager.SteamInputLikely() ? Messages.ON() : Messages.OFF());
+			ImGui::SameLineOrWrap(ImGui::CalcTextSize(steam).x);
+			ImGui::TextDisabled("%s", steam);
 		}
 	}
 }
@@ -672,20 +719,28 @@ void LocalInputPanel::Draw()
 	ImGui::Spacing();
 
 	const float spacing = ImGui::GetStyle().ItemSpacing.x;
-	const float cardWidth = (ImGui::GetContentRegionAvail().x - spacing) * 0.5f;
+	const float avail = ImGui::GetContentRegionAvail().x;
+	// Side by side while each card can still show a device name; one above the other below that.
+	const bool stacked = (avail - spacing) * 0.5f < ImGui::GetFontSize() * 14.0f;
+	const float cardWidth = stacked ? avail : (avail - spacing) * 0.5f;
 	int rows[2] = {};
 	for (const DeviceView& d : devices)
 		if (!Hidden(d))
 			rows[d.side]++;
-	// A tile is its button and a 2px spacer, each followed by the item spacing.
+	// A tile is its button and a 2px spacer, each followed by the item spacing. Stacked, each
+	// card fits its own devices; side by side, both match the taller one.
 	const float tile = ImGui::GetFontSize() * 2.6f + ImGui::GetStyle().ItemSpacing.y * 2.0f + 2.0f;
-	const float cardHeight = ImGui::GetFontSize() * 3.2f + tile * (std::max)(2, (std::max)(rows[0], rows[1])) + 12.0f;
+	const auto cardHeight = [&](int count) {
+		return ImGui::GetFontSize() * 3.2f + tile * (std::max)(stacked ? 1 : 2, count) + 12.0f;
+	};
+	const int both = (std::max)(rows[0], rows[1]);
 
 	bool openConfigure = false;
 	DeviceView target;
-	DrawCard(Side_P1, devices, cardWidth, cardHeight, &openConfigure, &target);
-	ImGui::SameLine();
-	DrawCard(Side_P2, devices, cardWidth, cardHeight, &openConfigure, &target);
+	DrawCard(Side_P1, devices, cardWidth, cardHeight(stacked ? rows[0] : both), &openConfigure, &target);
+	if (!stacked)
+		ImGui::SameLine();
+	DrawCard(Side_P2, devices, cardWidth, cardHeight(stacked ? rows[1] : both), &openConfigure, &target);
 	if (openConfigure)
 	{
 		g_configureId = target.id;
