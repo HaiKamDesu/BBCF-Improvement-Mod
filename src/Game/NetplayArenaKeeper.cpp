@@ -74,6 +74,8 @@ namespace
 	constexpr uintptr_t kOperatorNewRva = 0x00387469;       // push ebp; mov ebp,esp; pop ebp; jmp 0x0079E086
 	constexpr uintptr_t kRealOperatorNewRva = 0x0039E086;   // the malloc / _callnewh / throw loop
 	constexpr uintptr_t kCrtMallocRva = 0x003A106D;
+	constexpr uintptr_t kArenaFreeCallRva = 0x00386A3E;     // call delete, in 0x00786A30 (the arena's only free)
+	constexpr uintptr_t kDeleteRva = 0x0039E864;            // jmp 0x0079E0D5
 	constexpr size_t kArenaSize = 0x064A0000;               // the largest taker
 	// NOT just the arena's size. A heap block that big is its own VirtualAlloc of the size
 	// plus the heap's header, rounded to a page, at a 64 KB-aligned base - so a hole of
@@ -88,6 +90,8 @@ namespace
 	// BBCF.exe is left alone instead of corrupted.
 	const BYTE kArenaSiteBefore[] = { 0x56, 0x68, 0x00, 0x00, 0x4A, 0x06, 0x8B, 0xF1 };        // push esi; push 64A0000h; mov esi,ecx
 	const BYTE kArenaSiteAfter[] = { 0x83, 0xC4, 0x04, 0x89, 0x86, 0xD8, 0x02, 0x00, 0x00 };  // add esp,4; mov [esi+2D8h],eax
+	const BYTE kArenaFreeSiteBefore[] = { 0x85, 0xC0, 0x74, 0x13, 0x50 };                      // test eax,eax; jz; push eax
+	const BYTE kArenaFreeSiteAfter[] = { 0x83, 0xC4, 0x04, 0xC7, 0x86, 0xD8, 0x02, 0x00, 0x00 }; // add esp,4; mov [esi+2D8h],0
 	const BYTE kFileSlotSiteBefore[] = { 0x56 };                                              // push esi (the file size)
 	const BYTE kFileSlotSiteAfter[] = { 0x83, 0xC4, 0x04, 0x89, 0x04, 0xFB };                 // add esp,4; mov [ebx+edi*8],eax
 	// operator new's first iteration, `push [ebp+8]; call malloc`, proving the malloc we
@@ -96,8 +100,10 @@ namespace
 	constexpr uintptr_t kRealOperatorNewMallocCallOffset = 0x18;                               // 0x0079E09E: call 0x007A106D
 
 	using Alloc_t = void* (__cdecl*)(size_t);
+	using Free_t = void(__cdecl*)(void*);
 
 	Alloc_t g_gameOperatorNew = nullptr;
+	Free_t g_gameDelete = nullptr;
 	Alloc_t g_crtMalloc = nullptr;
 
 	// Touched from whichever thread allocates and from the render-loop tick.
@@ -145,6 +151,33 @@ namespace
 		return RescuingAlloc(size, "File buffer");
 	}
 
+	// The arena's hole is only free for a moment: a rematch frees the old arena on the result
+	// screen and the versus screen loads straight into the hole, so the new arena then has
+	// nowhere to go (Crash_20261007_230314: freed 23:03:00, hole taken by a 4 MB and a 28 MB
+	// block, arena threw 23:03:14). The 5 s tick was too slow; take the hole back the moment
+	// the game frees the arena, while it is still one piece.
+	void __cdecl ArenaFree(void* block)
+	{
+		g_gameDelete(block);
+		if (!g_installed.load() || g_reserve.load() != nullptr)
+		{
+			return;
+		}
+		void* reserve = TryReserve();
+		void* expected = nullptr;
+		if (reserve != nullptr && g_reserve.compare_exchange_strong(expected, reserve))
+		{
+			LOG(1, "[NetplayArena] Arena freed; took its address space back as the reserve at 0x%p.\n", reserve);
+		}
+		else
+		{
+			if (reserve != nullptr)
+				VirtualFree(reserve, 0, MEM_RELEASE);
+			LOG(1, "[NetplayArena] Arena freed but no %u-byte hole was left to reserve (err=%lu).\n",
+				static_cast<unsigned>(kReserveSize), GetLastError());
+		}
+	}
+
 	bool BytesMatch(uintptr_t address, const BYTE* expected, size_t length)
 	{
 		return memcmp(reinterpret_cast<const void*>(address), expected, length) == 0;
@@ -181,6 +214,8 @@ void InstallNetplayArenaKeeper()
 	const uintptr_t operatorNew = base + kOperatorNewRva;
 	const uintptr_t realOperatorNew = base + kRealOperatorNewRva;
 	const uintptr_t crtMalloc = base + kCrtMallocRva;
+	const uintptr_t arenaFreeCall = base + kArenaFreeCallRva;
+	const uintptr_t gameDelete = base + kDeleteRva;
 
 	const bool sitesMatch =
 		BytesMatch(arenaCall - sizeof(kArenaSiteBefore), kArenaSiteBefore, sizeof(kArenaSiteBefore)) &&
@@ -199,7 +234,14 @@ void InstallNetplayArenaKeeper()
 		return;
 	}
 
+	// Optional: without it the 5 s tick still re-reserves, just later.
+	const bool freeSiteMatches =
+		BytesMatch(arenaFreeCall - sizeof(kArenaFreeSiteBefore), kArenaFreeSiteBefore, sizeof(kArenaFreeSiteBefore)) &&
+		BytesMatch(arenaFreeCall + 5, kArenaFreeSiteAfter, sizeof(kArenaFreeSiteAfter)) &&
+		IsRel32To(arenaFreeCall, 0xE8, gameDelete);
+
 	g_gameOperatorNew = reinterpret_cast<Alloc_t>(operatorNew);
+	g_gameDelete = reinterpret_cast<Free_t>(gameDelete);
 	g_crtMalloc = reinterpret_cast<Alloc_t>(crtMalloc);
 
 	// Reserve before patching: with no reserve the hooks are a plain malloc-then-operator-new,
@@ -220,6 +262,8 @@ void InstallNetplayArenaKeeper()
 		// return ordinary heap blocks.
 		LOG(0, "[NetplayArena] VirtualProtect failed (err=%lu); keeper only partly installed.\n", GetLastError());
 	}
+	if (!freeSiteMatches || !RetargetRel32(arenaFreeCall, reinterpret_cast<void*>(&ArenaFree)))
+		LOG(0, "[NetplayArena] Arena free site not patched; the reserve comes back on the 5 s tick only.\n");
 	g_installed.store(true);
 
 	LOG(1, "[NetplayArena] Keeper installed: %u bytes of address space reserved at 0x%p, released "
