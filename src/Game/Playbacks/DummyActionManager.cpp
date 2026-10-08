@@ -966,6 +966,10 @@ bool DummyActionManager::WriteTo(const std::string& path, const TriggerTable& tr
 			case Source_Animation:
 			{
 				fprintf(file, "moves=%s\n", JoinList(action.animationNames).c_str());
+				// The same delay in the older per-move form too, which is the only delay an
+				// earlier build reads: going back to one keeps the timing. Read back here only
+				// when "actiondelay" is absent or 0, so the two always agree.
+				fprintf(file, "movedelays=%d\n", action.delayFrames);
 				fprintf(file, "naoto=%d\n", action.naotoEnSpecials ? 1 : 0);
 				if (!action.animationCharacter.empty())
 				{
