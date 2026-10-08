@@ -113,7 +113,15 @@ namespace LocalInput
 			int32_t* const activeId = reinterpret_cast<int32_t*>(
 				reinterpret_cast<uintptr_t>(GetBbcfBaseAdress()) + kActiveControllerIdRva);
 			if (*activeId != 0)
+			{
+				static int lastLogged = 0;
+				if (lastLogged != *activeId)
+				{
+					lastLogged = *activeId;
+					LOG(1, "[LocalInput] the game switched its active controller to id %d; put back to 0 (Player 1)\n", *activeId);
+				}
 				*activeId = 0;
+			}
 
 			uint32_t value = 0;
 			switch (role)
@@ -177,7 +185,16 @@ namespace LocalInput
 			if (!manager.IsActive())
 				return -1;
 			const int wrapper = (id == 1 || id == 2) ? 1 : 0;
-			return wrapper == 0 ? 1 : (manager.PlayerHasDevice(Side_P2) ? 1 : 0);
+			const int answer = wrapper == 0 ? 1 : (manager.PlayerHasDevice(Side_P2) ? 1 : 0);
+			// What the join and pad-assign screens are told, on change only.
+			static int lastAnswer[2] = { -1, -1 };
+			if (lastAnswer[wrapper] != answer)
+			{
+				lastAnswer[wrapper] = answer;
+				LOG(1, "[LocalInput] game asked whether controller %s is connected: %s\n",
+					wrapper == 0 ? "0 (Player 1)" : "1/2 (Player 2)", answer ? "yes" : "no");
+			}
+			return answer;
 		}
 
 		void __declspec(naked) IsControllerIdConnectedHook()

@@ -625,6 +625,26 @@ namespace
 		ImGui::SameLine();
 		ImGui::ShowHelpMarker(L("Forgets every device you moved by hand: keyboards go back to Player 1, the first controller to Player 1, the second to Player 2.").c_str());
 
+		// For testers: one click writes the whole input state and recent presses to DEBUG.txt,
+		// so a report can point at the exact moment something went wrong.
+		static int s_lastReport = -1;
+		static double s_reportShownAt = -100.0;
+		if (ImGui::SmallButton(L("Log what's happening now").c_str()))
+		{
+			s_lastReport = manager.LogReport("the player pressed Log what's happening now");
+			s_reportShownAt = ImGui::GetTime();
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.").c_str());
+		if (ImGui::GetTime() - s_reportShownAt < 6.0)
+		{
+			ImGui::SameLine();
+			if (s_lastReport > 0)
+				ImGui::TextColored(ImVec4(0.55f, 0.9f, 0.55f, 1.0f), L("Written to DEBUG.txt as report #%d").c_str(), s_lastReport);
+			else
+				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.25f, 1.0f), "%s", L("Debug logs are off. Turn on Generate debug logs in Settings first.").c_str());
+		}
+
 		if (Settings::settingsIni.enableInDevelopmentFeatures)
 		{
 			if (ImGui::SmallButton(Messages.Open_Joy_cpl()))

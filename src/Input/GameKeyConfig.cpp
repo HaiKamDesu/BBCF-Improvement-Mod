@@ -1048,6 +1048,9 @@ namespace LocalInput
 						if (!best || d.lastInputMs > best->lastInputMs)
 							best = &d;
 					}
+					if (!editor.open)
+						LOG(1, "[GameKeyConfig] P%d Button Settings opened%s\n", side + 1,
+							best ? "" : " - that player has no usable pad right now (keyboard or nothing)");
 					editor.open = true;
 					if (best)
 					{
@@ -1066,6 +1069,8 @@ namespace LocalInput
 				}
 				else if (!open[side] && editor.open)
 				{
+					LOG(1, "[GameKeyConfig] P%d Button Settings closed%s\n", side + 1,
+						editor.padOwner.empty() ? " (no pad was being edited)" : (" (was editing " + editor.padOwner + ")").c_str());
 					editor = SideEditor();
 					if (g_kbOwnerSide == side)
 						g_kbOwnerSide = -1;   // the records stay staged; the next editor re-picks

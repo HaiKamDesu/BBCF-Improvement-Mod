@@ -32,6 +32,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -93,6 +94,72 @@ namespace LocalInput
 			return g_gameProc.hWndGameWindow;
 		}
 
+		// Why the DirectInput worker looked for devices, for the log.
+		enum class WakeReason : int
+		{
+			None,
+			Startup,
+			DeviceMessage,   // Windows sent WM_DEVICECHANGE
+			KeyboardChange,  // a keyboard arrived or left (WM_INPUT_DEVICE_CHANGE)
+			ReadFailure,     // an open pad stopped answering
+			Refresh,         // the Refresh button
+		};
+
+		const char* WakeReasonText(WakeReason reason)
+		{
+			switch (reason)
+			{
+			case WakeReason::Startup: return "startup";
+			case WakeReason::DeviceMessage: return "Windows reported a device change";
+			case WakeReason::KeyboardChange: return "a keyboard arrived or left";
+			case WakeReason::ReadFailure: return "a pad stopped answering";
+			case WakeReason::Refresh: return "Refresh button";
+			default: return "periodic re-check";
+			}
+		}
+
+		// XINPUT_DEVSUBTYPE_* values; the SDK header this builds against predates most of them.
+		const char* XInputSubTypeText(uint8_t subType)
+		{
+			switch (subType)
+			{
+			case 0x01: return "gamepad";
+			case 0x02: return "wheel";
+			case 0x03: return "arcade stick";
+			case 0x04: return "flight stick";
+			case 0x05: return "dance pad";
+			case 0x06: case 0x07: case 0x0B: return "guitar";
+			case 0x08: return "drum kit";
+			case 0x13: return "arcade pad";
+			default: return "unknown";
+			}
+		}
+
+		std::string BatteryText(DWORD index)
+		{
+			XINPUT_BATTERY_INFORMATION battery = {};
+			if (XInputRuntime::GetBatteryInformation(index, &battery) != ERROR_SUCCESS)
+				return "unknown";
+			const char* type = "unknown";
+			switch (battery.BatteryType)
+			{
+			case BATTERY_TYPE_DISCONNECTED: type = "none reported"; break;
+			case BATTERY_TYPE_WIRED: return "wired";
+			case BATTERY_TYPE_ALKALINE: type = "AA batteries"; break;
+			case BATTERY_TYPE_NIMH: type = "rechargeable (NiMH)"; break;
+			default: break;
+			}
+			static const char* const levels[] = { "empty", "low", "medium", "full" };
+			return std::string(type) + ", " + (battery.BatteryLevel <= BATTERY_LEVEL_FULL ? levels[battery.BatteryLevel] : "?");
+		}
+
+		std::string Seconds(ULONGLONG ms)
+		{
+			char buf[32];
+			snprintf(buf, sizeof(buf), "%.1f s", ms / 1000.0);
+			return buf;
+		}
+
 		// ---------------------------------------------------------------- XInput
 
 		struct XPad
@@ -101,6 +168,7 @@ namespace LocalInput
 			bool everChecked = false;
 			DWORD lastEmptyCheck = 0;
 			uint8_t subType = 0;   // asked once per connection
+			ULONGLONG connectedAt = 0;
 			ControlSet controls;
 			int16_t axes[6] = {};
 		};
@@ -126,11 +194,17 @@ namespace LocalInput
 			LONG axisMin[kDInputAxisCount] = {};
 			LONG axisMax[kDInputAxisCount] = {};
 			DWORD lastAcquireTry = 0;
+			ULONGLONG connectedAt = 0;
+			ULONGLONG failingSince = 0;   // reads failing since then, 0 while it answers
+			HRESULT lastFailure = S_OK;
 			ControlSet controls;
 			int16_t axes[kDInputAxisCount] = {};
-			// Where each axis rests, taken from the first reading. Sticks rest in the middle,
-			// but triggers and unused axes on DirectInput devices often rest at one end; without
-			// this they would read as held forever.
+			// Where each axis rests, taken from the device's first real report. Sticks rest in
+			// the middle, but triggers and unused axes on DirectInput devices often rest at one
+			// end; without this they would read as held forever. Until that report arrives,
+			// DirectInput hands back a neutral state (every axis centred, nothing pressed), and
+			// a pad that only reports on change keeps it until its first press - so a neutral
+			// reading never decides where an axis rests.
 			bool restCaptured = false;
 			LONG rest[kDInputAxisCount] = {};
 		};
@@ -316,12 +390,13 @@ namespace LocalInput
 					return false; // DefWindowProc must still see it
 				case WM_INPUT_DEVICE_CHANGE:
 					OnKeyboardDeviceChange(reinterpret_cast<HANDLE>(lParam), wParam == GIDC_ARRIVAL);
-					WakeWorker();
+					WakeWorker(WakeReason::KeyboardChange);
 					return false;
 				case WM_DEVICECHANGE:
+					LogDeviceChangeMessage(wParam);
 					if (m_autoDetect)
 					{
-						WakeWorker();
+						WakeWorker(WakeReason::DeviceMessage);
 						m_xinputRecheckAll = true;
 					}
 					return false;
@@ -341,7 +416,7 @@ namespace LocalInput
 				LOG(1, "[LocalInput] refresh requested\n");
 				m_xinputRecheckAll = true;
 				ListKeyboards();
-				WakeWorker();
+				WakeWorker(WakeReason::Refresh);
 			}
 
 			bool SteamInputLikely() const override
@@ -382,7 +457,8 @@ namespace LocalInput
 						if (!connected)
 						{
 							if (pad.connected)
-								LOG(1, "[LocalInput] XInput pad %lu disconnected\n", index);
+								LOG(1, "[LocalInput] XInput pad %lu disconnected (was connected %s)\n", index,
+									Seconds(GetTickCount64() - pad.connectedAt).c_str());
 							pad.connected = false;
 							pad.controls.reset();
 							pad.lastEmptyCheck = now;
@@ -392,8 +468,13 @@ namespace LocalInput
 							if (!pad.connected)
 							{
 								XINPUT_CAPABILITIES caps = {};
-								pad.subType = XInputRuntime::GetCapabilities(index, &caps) == ERROR_SUCCESS ? caps.SubType : 0;
-								LOG(1, "[LocalInput] XInput pad %lu connected (subtype %u)\n", index, pad.subType);
+								const bool haveCaps = XInputRuntime::GetCapabilities(index, &caps) == ERROR_SUCCESS;
+								pad.subType = haveCaps ? caps.SubType : 0;
+								pad.connectedAt = GetTickCount64();
+								LOG(1, "[LocalInput] XInput pad %lu connected: subtype %u (%s), %s, battery %s%s\n", index,
+									pad.subType, XInputSubTypeText(pad.subType),
+									!haveCaps ? "capabilities unknown" : (caps.Flags & 0x0002 /* XINPUT_CAPS_WIRELESS */) ? "wireless" : "wired",
+									BatteryText(index).c_str(), recheckAll ? " (found right after a device change)" : "");
 							}
 							pad.connected = true;
 							Decode(state.Gamepad, pad);
@@ -441,13 +522,37 @@ namespace LocalInput
 
 			// ---------------- DirectInput worker
 
-			void WakeWorker()
+			void WakeWorker(WakeReason reason)
 			{
 				{
 					std::lock_guard<std::mutex> lock(m_workerMutex);
 					m_wakeRequested = true;
+					if (m_wakeReason == WakeReason::None)
+						m_wakeReason = reason;
 				}
 				m_workerWake.notify_all();
+			}
+
+			// A plug or unplug sends a burst of these (one per device node); only the first of a
+			// burst is logged, which is when Windows noticed the change.
+			void LogDeviceChangeMessage(WPARAM type)
+			{
+				const ULONGLONG now = GetTickCount64();
+				const bool sameBurst = now - m_lastDeviceMessageMs < 1000;
+				m_lastDeviceMessageMs = now;
+				if (sameBurst)
+					return;
+				const char* what = "other";
+				switch (type)
+				{
+				case 0x0007: what = "device tree changed"; break;      // DBT_DEVNODES_CHANGED
+				case 0x8000: what = "device arrived"; break;            // DBT_DEVICEARRIVAL
+				case 0x8004: what = "device removed"; break;            // DBT_DEVICEREMOVECOMPLETE
+				case 0x0018: what = "configuration changed"; break;     // DBT_CONFIGCHANGED
+				default: break;
+				}
+				LOG(1, "[LocalInput] Windows: %s (WM_DEVICECHANGE 0x%04X)%s\n", what, static_cast<unsigned>(type),
+					m_autoDetect ? "" : " - ignored, automatic detection is off");
 			}
 
 			void WorkerLoop()
@@ -464,17 +569,28 @@ namespace LocalInput
 				}
 
 				std::unique_lock<std::mutex> lock(m_workerMutex);
+				WakeReason reason = WakeReason::Startup;
+				bool waitedForWindow = false;
 				while (m_running)
 				{
 					lock.unlock();
 					if (dinput && GameWindow())
-						Enumerate(dinput);
+						Enumerate(dinput, reason);
+					else if (dinput && !waitedForWindow)
+					{
+						waitedForWindow = true;
+						LOG(1, "[LocalInput] DirectInput: waiting for the game window before looking for pads\n");
+					}
 					lock.lock();
 					if (m_autoDetect)
 						m_workerWake.wait_for(lock, std::chrono::milliseconds(kEnumSafetyNetMs),
 							[this] { return !m_running || m_wakeRequested; });
 					else
 						m_workerWake.wait(lock, [this] { return !m_running || m_wakeRequested; });
+					reason = m_wakeRequested ? m_wakeReason : WakeReason::None;
+					if (reason == WakeReason::None && m_firstEnumPending)
+						reason = WakeReason::Startup;
+					m_wakeReason = WakeReason::None;
 					m_wakeRequested = false;
 				}
 				lock.unlock();
@@ -487,6 +603,7 @@ namespace LocalInput
 				IDirectInput8W* dinput;
 				std::vector<DIFound>* found;
 				const std::vector<std::string>* known;
+				std::set<std::string>* loggedSkips;   // worker-only: each skip is logged once
 			};
 
 			static BOOL CALLBACK EnumDevice(LPCDIDEVICEINSTANCEW instance, LPVOID context)
@@ -507,10 +624,19 @@ namespace LocalInput
 				if (std::find(ctx->known->begin(), ctx->known->end(), id) == ctx->known->end())
 				{
 					IDirectInputDevice8W* device = nullptr;
-					if (FAILED(ctx->dinput->CreateDevice(found.instance, &device, nullptr)) || !device)
+					const HRESULT hr = ctx->dinput->CreateDevice(found.instance, &device, nullptr);
+					if (FAILED(hr) || !device)
+					{
+						if (ctx->loggedSkips->insert(id + "/open").second)
+							LOG(1, "[LocalInput] DirectInput could not open '%s' (%s, %04X:%04X): hr 0x%08lX\n",
+								found.name.c_str(), id.c_str(), found.vendorId, found.productId, static_cast<unsigned long>(hr));
 						return DIENUM_CONTINUE;
+					}
 					if (IsXInputDevice(device))
 					{
+						if (ctx->loggedSkips->insert(id).second)
+							LOG(1, "[LocalInput] DirectInput skips '%s' (%04X:%04X): it is an XInput pad, listed through XInput instead\n",
+								found.name.c_str(), found.vendorId, found.productId);
 						device->Release();
 						return DIENUM_CONTINUE; // XInput covers it
 					}
@@ -544,8 +670,9 @@ namespace LocalInput
 				m_steamInput = steam;
 			}
 
-			void Enumerate(IDirectInput8W* dinput)
+			void Enumerate(IDirectInput8W* dinput, WakeReason reason)
 			{
+				m_firstEnumPending = false;
 				DetectSteamInput();
 				std::vector<std::string> known;
 				{
@@ -555,12 +682,39 @@ namespace LocalInput
 							known.push_back(pad.id);
 				}
 				std::vector<DIFound> found;
-				EnumContext ctx{ dinput, &found, &known };
+				EnumContext ctx{ dinput, &found, &known, &m_loggedSkips };
 				const DWORD start = GetTickCount();
-				dinput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDevice, &ctx, DIEDFL_ATTACHEDONLY);
+				const HRESULT enumResult = dinput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDevice, &ctx, DIEDFL_ATTACHEDONLY);
 				const DWORD took = GetTickCount() - start;
-				if (took > 50)
+				if (FAILED(enumResult))
+					LOG(1, "[LocalInput] DirectInput EnumDevices failed: hr 0x%08lX\n", static_cast<unsigned long>(enumResult));
+
+				// What was found: always after an event, and after a periodic re-check only when
+				// it changed something (then Windows never told us, which is worth knowing).
+				std::vector<std::string> ids;
+				std::string list;
+				for (const DIFound& f : found)
+				{
+					ids.push_back("DI:" + GuidString(f.instance));
+					char item[160];
+					snprintf(item, sizeof(item), "%s'%s' %04X:%04X%s", list.empty() ? "" : ", ", f.name.c_str(),
+						f.vendorId, f.productId, f.device ? " (new)" : "");
+					list += item;
+				}
+				std::sort(ids.begin(), ids.end());
+				const bool changed = ids != m_lastEnumIds;
+				if (reason != WakeReason::None || changed)
+				{
+					LOG(1, "[LocalInput] DirectInput look (%s%s): %d pad(s)%s%s, %lu ms\n",
+						WakeReasonText(reason),
+						reason == WakeReason::None && changed ? " - Windows sent no message for this change" : "",
+						static_cast<int>(found.size()), found.empty() ? "" : ": ", list.c_str(), took);
+				}
+				else if (took > 250)
+				{
 					LOG(1, "[LocalInput] DirectInput enumeration took %lu ms (worker thread, game unaffected)\n", took);
+				}
+				m_lastEnumIds = ids;
 
 				// New devices are prepared here, off the game thread, so the game thread only
 				// ever polls.
@@ -568,13 +722,19 @@ namespace LocalInput
 				{
 					if (!f.device)
 						continue;
-					if (FAILED(f.device->SetDataFormat(&c_dfDIJoystick2)))
+					const HRESULT formatResult = f.device->SetDataFormat(&c_dfDIJoystick2);
+					if (FAILED(formatResult))
 					{
+						LOG(1, "[LocalInput] DirectInput: '%s' refused the joystick data format (hr 0x%08lX), not used\n",
+							f.name.c_str(), static_cast<unsigned long>(formatResult));
 						f.device->Release();
 						f.device = nullptr;
 						continue;
 					}
-					f.device->SetCooperativeLevel(GameWindow(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+					const HRESULT coopResult = f.device->SetCooperativeLevel(GameWindow(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+					if (FAILED(coopResult))
+						LOG(1, "[LocalInput] DirectInput: SetCooperativeLevel failed for '%s' (hr 0x%08lX)\n",
+							f.name.c_str(), static_cast<unsigned long>(coopResult));
 				}
 
 				std::lock_guard<std::mutex> lock(m_handoffMutex);
@@ -636,15 +796,30 @@ namespace LocalInput
 					AxisSetup setup{ pad->device, pad };
 					std::memset(pad->axisPresent, 0, sizeof(pad->axisPresent));
 					pad->device->EnumObjects(EnumAxes, &setup, DIDFT_AXIS);
-					pad->device->Acquire();
+					const HRESULT acquired = pad->device->Acquire();
 					pad->connected = true;
-					LOG(1, "[LocalInput] DirectInput device connected: %s (%s, %04X:%04X)\n", pad->name.c_str(), id.c_str(), pad->vendorId, pad->productId);
+					pad->connectedAt = GetTickCount64();
+					pad->failingSince = 0;
+					DIDEVCAPS caps = {};
+					caps.dwSize = sizeof(caps);
+					const bool haveCaps = SUCCEEDED(pad->device->GetCapabilities(&caps));
+					std::string axes;
+					static const char* const kAxisNames[kDInputAxisCount] = { "X", "Y", "Z", "Rx", "Ry", "Rz", "S0", "S1" };
+					for (int axis = 0; axis < kDInputAxisCount; ++axis)
+						if (pad->axisPresent[axis])
+							axes += std::string(axes.empty() ? "" : " ") + kAxisNames[axis];
+					LOG(1, "[LocalInput] DirectInput device connected: '%s' (%s, %04X:%04X), %lu buttons, %lu hats, axes [%s], type 0x%08lX%s, acquire %s\n",
+						pad->name.c_str(), id.c_str(), pad->vendorId, pad->productId,
+						haveCaps ? caps.dwButtons : 0ul, haveCaps ? caps.dwPOVs : 0ul, axes.c_str(),
+						haveCaps ? caps.dwDevType : 0ul, haveCaps && (caps.dwFlags & DIDC_ATTACHED) ? "" : " (not reported attached)",
+						SUCCEEDED(acquired) ? "ok" : "FAILED");
 				}
 				for (DIPad& pad : m_diPads)
 				{
 					if (pad.device && std::find(present.begin(), present.end(), pad.id) == present.end())
 					{
-						LOG(1, "[LocalInput] DirectInput device disconnected: %s\n", pad.name.c_str());
+						LOG(1, "[LocalInput] DirectInput device disconnected: '%s' (%s, was connected %s)\n", pad.name.c_str(),
+							pad.id.c_str(), Seconds(GetTickCount64() - pad.connectedAt).c_str());
 						ReleasePad(pad);
 						pad.connected = false;
 						pad.controls.reset();
@@ -670,16 +845,31 @@ namespace LocalInput
 							}
 						}
 						DIJOYSTATE2 js = {};
-						if (SUCCEEDED(pad.device->GetDeviceState(sizeof(js), &js)))
+						const HRESULT read = pad.device->GetDeviceState(sizeof(js), &js);
+						if (SUCCEEDED(read))
 						{
+							if (pad.failingSince)
+								LOG(1, "[LocalInput] '%s' answers again after %s of failed reads\n", pad.name.c_str(),
+									Seconds(GetTickCount64() - pad.failingSince).c_str());
+							pad.failingSince = 0;
 							pad.connected = true;
+							const bool restPending = !pad.restCaptured;
 							Decode(js, pad);
+							if (restPending && pad.restCaptured)
+								LogRestPositions(pad);
 						}
 						else
 						{
 							// Most likely unplugged: report it now, let the worker confirm.
+							if (!pad.failingSince)
+							{
+								pad.failingSince = GetTickCount64();
+								pad.lastFailure = read;
+								LOG(1, "[LocalInput] '%s' stopped answering (hr 0x%08lX, poll hr 0x%08lX); checking whether it was unplugged\n",
+									pad.name.c_str(), static_cast<unsigned long>(read), static_cast<unsigned long>(hr));
+							}
 							if (pad.connected)
-								WakeWorker();
+								WakeWorker(WakeReason::ReadFailure);
 							pad.connected = false;
 							pad.controls.reset();
 						}
@@ -699,6 +889,30 @@ namespace LocalInput
 				}
 			}
 
+			// Where each axis was taken to rest. An axis that rests at an end (triggers) is
+			// normal; one that the first reading caught mid-way is assumed centred. Either way
+			// this is what "held" is measured against, so a wrong rest shows up here first.
+			static void LogRestPositions(const DIPad& pad)
+			{
+				static const char* const kAxisNames[kDInputAxisCount] = { "X", "Y", "Z", "Rx", "Ry", "Rz", "S0", "S1" };
+				std::string text;
+				for (int axis = 0; axis < kDInputAxisCount; ++axis)
+				{
+					if (!pad.axisPresent[axis])
+						continue;
+					char item[32];
+					snprintf(item, sizeof(item), "%s%s=%ld", text.empty() ? "" : " ", kAxisNames[axis], pad.rest[axis]);
+					text += item;
+				}
+				std::string held;
+				for (int c = 0; c < kMaxControls; ++c)
+					if (pad.controls[c])
+						held += (held.empty() ? "" : " ") + std::to_string(c);
+				LOG(1, "[LocalInput] '%s' first report: axis rest positions (-1000..1000) %s; held in that report: %s (%s after it was opened)\n",
+					pad.name.c_str(), text.empty() ? "(no axes)" : text.c_str(), held.empty() ? "nothing" : ("controls " + held).c_str(),
+					Seconds(GetTickCount64() - pad.connectedAt).c_str());
+			}
+
 			static void Decode(const DIJOYSTATE2& js, DIPad& pad)
 			{
 				pad.controls.reset();
@@ -716,6 +930,31 @@ namespace LocalInput
 					pad.controls[base + 2] = angle >= 11250 && angle <= 24750;
 					pad.controls[base + 3] = angle >= 20250 && angle <= 33750;
 				}
+				LONG norms[kDInputAxisCount] = {};
+				bool neutral = pad.controls.none();
+				for (int axis = 0; axis < kDInputAxisCount; ++axis)
+				{
+					if (!pad.axisPresent[axis])
+						continue;
+					const LONG raw = AxisValue(js, axis);
+					const LONG range = pad.axisMax[axis] - pad.axisMin[axis];
+					norms[axis] = range > 0 ? ((raw - pad.axisMin[axis]) * 2000 / range) - 1000 : 0;
+					if (norms[axis] < -2 || norms[axis] > 2)
+						neutral = false;
+				}
+				if (!pad.restCaptured && !neutral)
+				{
+					for (int axis = 0; axis < kDInputAxisCount; ++axis)
+					{
+						// X/Y are the main stick on every pad and stick: always centred, so a
+						// first report that is a stick push cannot become its rest. Others rest
+						// centred or parked at an end; anything in between means it was being
+						// held: assume centred.
+						const LONG magnitude = norms[axis] < 0 ? -norms[axis] : norms[axis];
+						pad.rest[axis] = (axis <= 1 || (magnitude > 300 && magnitude < 850)) ? 0 : norms[axis];
+					}
+					pad.restCaptured = true;
+				}
 				for (int axis = 0; axis < kDInputAxisCount; ++axis)
 				{
 					if (!pad.axisPresent[axis])
@@ -723,22 +962,11 @@ namespace LocalInput
 						pad.axes[axis] = 0;
 						continue;
 					}
-					const LONG raw = AxisValue(js, axis);
-					const LONG range = pad.axisMax[axis] - pad.axisMin[axis];
-					const LONG norm = range > 0 ? ((raw - pad.axisMin[axis]) * 2000 / range) - 1000 : 0;
-					pad.axes[axis] = static_cast<int16_t>(std::max<LONG>(-1000, std::min<LONG>(1000, norm)));
-					if (!pad.restCaptured)
-					{
-						// A resting axis is either centred or parked at an end. Anything in
-						// between means it was being held at connect time: assume centred.
-						const LONG magnitude = norm < 0 ? -norm : norm;
-						pad.rest[axis] = (magnitude <= 300 || magnitude >= 850) ? norm : 0;
-					}
-					const LONG delta = norm - pad.rest[axis];
+					pad.axes[axis] = static_cast<int16_t>(std::max<LONG>(-1000, std::min<LONG>(1000, norms[axis])));
+					const LONG delta = norms[axis] - (pad.restCaptured ? pad.rest[axis] : 0);
 					pad.controls[kDInputAxisBase + axis * 2 + 0] = delta < -kAxisThreshold;
 					pad.controls[kDInputAxisBase + axis * 2 + 1] = delta > kAxisThreshold;
 				}
-				pad.restCaptured = true;
 			}
 
 			// ---------------- Keyboards
@@ -789,7 +1017,10 @@ namespace LocalInput
 					kb.name = KeyboardProductName(path);
 					if (kb.name.empty())
 						kb.name = "Keyboard";
+					LOG(1, "[LocalInput] keyboard found: %s '%s' (%s)\n", kb.id.c_str(), kb.name.c_str(), Narrow(path.c_str()).c_str());
 				}
+				if (handle == nullptr)
+					LOG(1, "[LocalInput] keyboard input with no device behind it (SendInput, AutoHotkey, an on-screen keyboard or a remapper): listed as KB:virtual\n");
 				return m_keyboards.emplace(handle, kb).first->second;
 			}
 
@@ -811,6 +1042,8 @@ namespace LocalInput
 			{
 				std::lock_guard<std::mutex> lock(m_keyboardMutex);
 				Keyboard& kb = KeyboardFor(handle);
+				if (kb.connected != arrived)
+					LOG(1, "[LocalInput] keyboard %s: %s '%s'\n", arrived ? "plugged in" : "unplugged", kb.id.c_str(), kb.name.c_str());
 				kb.connected = arrived;
 				if (!arrived)
 					kb.keys.reset();
@@ -882,6 +1115,11 @@ namespace LocalInput
 			std::condition_variable m_workerWake;
 			bool m_running = false;
 			bool m_wakeRequested = false;
+			WakeReason m_wakeReason = WakeReason::None;   // under m_workerMutex
+			bool m_firstEnumPending = true;
+			std::vector<std::string> m_lastEnumIds;       // worker only
+			std::set<std::string> m_loggedSkips;          // worker only
+			ULONGLONG m_lastDeviceMessageMs = 0;          // window thread only
 			std::mutex m_handoffMutex;
 			std::vector<DIFound> m_pendingFound;
 			uint64_t m_pendingGeneration = 0;

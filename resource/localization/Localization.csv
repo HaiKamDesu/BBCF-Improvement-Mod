@@ -1934,3 +1934,7 @@ Arcade stick (Xbox),Arcade stick (Xbox),Arcade stick (Xbox)
 Arcade stick (PlayStation),Arcade stick (PlayStation),Arcade stick (PlayStation)
 Arcade stick (Switch),Arcade stick (Switch),Arcade stick (Switch)
 Drop here to hide it,Drop here to hide it,Suéltalo aquí para ocultarlo
+Log what's happening now,Log what's happening now,Registrar lo que pasa ahora
+Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.,Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.,¿Encontraste un problema con un control? Presiona esto justo cuando pase: todo sobre tus controles y tus últimas pulsaciones se escribe en DEBUG.txt dentro de la carpeta BBCF_IM para el reporte.
+Written to DEBUG.txt as report #%d,Written to DEBUG.txt as report #%d,Escrito en DEBUG.txt como reporte #%d
+Debug logs are off. Turn on Generate debug logs in Settings first.,Debug logs are off. Turn on Generate debug logs in Settings first.,Los registros de depuración están desactivados. Activa Generate debug logs en Settings primero.

@@ -3,13 +3,17 @@
 #include "GameKeyConfig.h"
 #include "InputBackend.h"
 
+#include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/RuntimePlatform.h"
 #include "Core/Settings.h"
 #include "Core/utils.h"
+#include "Game/gamestates.h"
 
 #include <algorithm>
+#include <cstdarg>
 #include <cstdio>
+#include <deque>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -46,6 +50,10 @@ namespace LocalInput
 		ULONGLONG lastInputMs = 0;
 		uint32_t buttons = 0;       // battle word (what the UI shows)
 		uint32_t menuWord = 0;
+		// Diagnostics
+		ULONGLONG connectedAt = 0;
+		bool firstInputLogged = false;  // since it last (re)connected or changed side
+		ControlSet loggedControls;      // controls as last recorded in the event history
 	};
 
 	namespace
@@ -120,6 +128,159 @@ namespace LocalInput
 					word |= entry.second;
 			}
 			return word;
+		}
+
+		// ---------------------------------------------------------------- diagnostics
+		//
+		// Everything a tester's DEBUG.txt needs to explain a controller report on its own: what
+		// was connected, how Windows saw it, which side it went to and why, what the player did
+		// in the panel, and where in the game each of those happened. Input itself is not
+		// logged line by line (a match would bury the log); press/release edges go into a
+		// short in-memory history that the "log what's happening now" button writes out.
+
+		constexpr size_t kEventHistory = 160;
+		std::deque<std::string> g_events;
+		bool g_lastHasDevice[2] = {};
+		bool g_presenceLogged = false;
+		int g_reportCount = 0;
+
+		void RecordEvent(const char* format, ...)
+		{
+			char text[256];
+			va_list args;
+			va_start(args, format);
+			vsnprintf(text, sizeof(text), format, args);
+			va_end(args);
+			SYSTEMTIME time;
+			GetLocalTime(&time);
+			char line[300];
+			snprintf(line, sizeof(line), "%02d:%02d:%02d.%03d %s", time.wHour, time.wMinute, time.wSecond, time.wMilliseconds, text);
+			g_events.push_back(line);
+			while (g_events.size() > kEventHistory)
+				g_events.pop_front();
+		}
+
+		const char* GameModeText(int mode)
+		{
+			switch (mode)
+			{
+			case 1: return "Arcade";
+			case 4: return "Story";
+			case 5: return "Versus";
+			case 6: return "Training";
+			case 7: return "Tutorial";
+			case 8: return "Challenge";
+			case 9: return "Gallery";
+			case 10: return "Item shop";
+			case 11: return "Replay theater";
+			case 12: return "Title";
+			case 13: return "Main menu";
+			case 15: return "Online";
+			case 16: return "Abyss";
+			case 18: return "D-Code edit";
+			default: return "mode";
+			}
+		}
+
+		const char* GameStateText(int state)
+		{
+			switch (state)
+			{
+			case 2: return "logos";
+			case 3: return "intro movie";
+			case 4: return "title screen";
+			case 6: return "character select";
+			case 11: return "mode select";
+			case 12: return "character info";
+			case 13: return "stage select";
+			case 14: return "versus screen / loading";
+			case 15: return "in a match";
+			case 16: case 17: case 18: return "victory screen";
+			case 24: return "story menu";
+			case 25: return "gallery/item menu";
+			case 26: return "replay menu";
+			case 27: return "main menu";
+			case 28: return "tutorial/library menu";
+			case 31: return "lobby";
+			case 33: return "story";
+			case 34: return "abyss menu";
+			case 39: return "D-Code edit";
+			default: return "state";
+			}
+		}
+
+		// "Versus, in a match (mode 5, state 15)"
+		std::string WhereInGame()
+		{
+			if (!g_gameVals.pGameMode || !g_gameVals.pGameState)
+				return "game not ready yet";
+			const int mode = *g_gameVals.pGameMode;
+			const int state = *g_gameVals.pGameState;
+			char buf[96];
+			snprintf(buf, sizeof(buf), "%s, %s (mode %d, state %d)", GameModeText(mode), GameStateText(state), mode, state);
+			return buf;
+		}
+
+		std::string ButtonsText(uint32_t word)
+		{
+			std::string out;
+			for (const GameButtonInfo& info : kGameButtons)
+				if (word & info.bit)
+					out += std::string(out.empty() ? "" : "+") + info.name;
+			return out.empty() ? "nothing" : out;
+		}
+
+		// "Cross+D-pad Right", each name once (a keyboard's Shift is both Shift and Left Shift).
+		std::string HeldText(const DeviceSnapshot& snap)
+		{
+			DeviceView view;
+			view.kind = snap.kind;
+			view.model = IdentifyDevice(snap);
+			std::vector<std::string> names;
+			for (int c = 0; c < kMaxControls; ++c)
+			{
+				if (!snap.controls[c])
+					continue;
+				const std::string name = Manager::ControlName(view, c);
+				if (std::find(names.begin(), names.end(), name) == names.end())
+					names.push_back(name);
+			}
+			std::string out;
+			for (const std::string& name : names)
+				out += (out.empty() ? "" : "+") + name;
+			return out.empty() ? "nothing" : out;
+		}
+
+		const char* KindText(const DeviceSnapshot& snap, const DeviceModel& model)
+		{
+			if (snap.kind == DeviceKind::Keyboard)
+				return "keyboard";
+			const bool xinput = snap.kind == DeviceKind::XInputPad;
+			switch (model.Family())
+			{
+			case PadFamily::Xbox: return model.arcadeStick ? "XInput arcade stick" : "XInput pad";
+			case PadFamily::PlayStation: return model.arcadeStick ? "DirectInput arcade stick, PlayStation layout" : "DirectInput pad, PlayStation layout";
+			case PadFamily::Nintendo: return model.arcadeStick ? "DirectInput arcade stick, Switch layout" : "DirectInput pad, Switch layout";
+			default: return xinput ? "XInput pad" : (model.arcadeStick ? "DirectInput stick, unknown model" : "DirectInput pad, unknown model");
+			}
+		}
+
+		// "DI:... 'Wireless Controller' = DualShock 4 [DirectInput pad, PlayStation layout, 054C:09CC]"
+		std::string DescribeDevice(const DeviceSnapshot& snap)
+		{
+			const DeviceModel model = IdentifyDevice(snap);
+			std::string out = snap.id + " '" + snap.defaultName + "'";
+			if (model.name)
+				out += std::string(" = ") + model.name;
+			out += std::string(" [") + KindText(snap, model);
+			if (snap.vendorId || snap.productId)
+			{
+				char ids[16];
+				snprintf(ids, sizeof(ids), ", %04X:%04X", snap.vendorId, snap.productId);
+				out += ids;
+			}
+			out += "]";
+			return out;
 		}
 	}
 
@@ -380,7 +541,19 @@ namespace LocalInput
 		g_backend->SetAutoDetect(Settings::settingsIni.autoUpdateControllers);
 		g_backend->Start();
 		m_active = true;
-		LOG(1, "[LocalInput] started with backend: %s\n", g_backend->Name());
+		LOG(1, "[LocalInput] started with backend: %s; automatic detection %s\n", g_backend->Name(),
+			Settings::settingsIni.autoUpdateControllers ? "on" : "off");
+		LOG(1, "[LocalInput] controllers.ini remembers %d device(s)\n", static_cast<int>(g_profiles.size()));
+		for (const auto& entry : g_profiles)
+		{
+			const Profile& p = entry.second;
+			LOG(1, "[LocalInput]   %s:%s%s%s%s%s%s\n", entry.first.c_str(),
+				p.pinned ? (p.pinnedSide == Side_P2 ? " always P2" : " always P1") : "",
+				p.ignored ? " hidden" : "", p.seen ? " used" : "",
+				p.hasBinds ? (p.binds.typeB ? " own button settings (Type B on)" : " own button settings") : "",
+				p.hasMapping ? " mod mapping" : "",
+				p.name.empty() ? "" : (" named '" + p.name + "'").c_str());
+		}
 	}
 
 	void Manager::Shutdown()
@@ -440,13 +613,21 @@ namespace LocalInput
 		RecomputeWords();
 	}
 
-	Side Manager::ChooseSide(const Device& device) const
+	Side Manager::ChooseSide(const Device& device, const char** why) const
 	{
+		const char* ignoredWhy = nullptr;
+		const char*& reason = why ? *why : ignoredWhy;
 		auto profile = g_profiles.find(device.snap.id);
 		if (profile != g_profiles.end() && profile->second.pinned)
+		{
+			reason = "moved there by the player earlier (controllers.ini)";
 			return profile->second.pinnedSide;
+		}
 		if (device.snap.kind == DeviceKind::Keyboard)
+		{
+			reason = "keyboards start on P1";
 			return Side_P1;
+		}
 		int pads[2] = {};
 		for (const auto& other : g_devices)
 		{
@@ -459,15 +640,61 @@ namespace LocalInput
 			pads[other->side]++;
 		}
 		if (pads[Side_P1] == 0)
+		{
+			reason = "P1 had no pad";
 			return Side_P1;
+		}
 		if (pads[Side_P2] == 0)
+		{
+			reason = "P1 already had a pad, P2 had none";
 			return Side_P2;
+		}
+		reason = "both sides had pads; the side with fewer";
 		return pads[Side_P2] < pads[Side_P1] ? Side_P2 : Side_P1;
+	}
+
+	// One line with who is where, after anything that changes it.
+	void Manager::LogRoster(const char* reason) const
+	{
+		if (!IsLoggingEnabled())
+			return;
+		std::string sides[2], hidden, unplugged;
+		for (const std::string& id : g_order)
+		{
+			const Device* device = g_devicesById[id];
+			if (!device->sessionKnown)
+				continue;
+			auto profile = g_profiles.find(id);
+			const bool ignored = profile != g_profiles.end() && profile->second.ignored;
+			const bool idle = device->snap.kind == DeviceKind::Keyboard &&
+				!(profile != g_profiles.end() && (profile->second.seen || profile->second.pinned));
+			std::string label = id + " '" + device->snap.defaultName + "'";
+			if (!device->snap.connected)
+				unplugged += (unplugged.empty() ? "" : ", ") + label + (device->side == Side_P2 ? " (P2)" : " (P1)");
+			else if (ignored)
+				hidden += (hidden.empty() ? "" : ", ") + label;
+			else
+			{
+				if (idle)
+					label += " (unused keyboard)";
+				if (profile != g_profiles.end() && profile->second.pinned)
+					label += " (pinned)";
+				sides[device->side] += (sides[device->side].empty() ? "" : ", ") + label;
+			}
+		}
+		LOG(1, "[LocalInput] roster after %s [%s]:\n", reason, WhereInGame().c_str());
+		LOG(1, "[LocalInput]   P1: %s\n", sides[0].empty() ? "(nothing)" : sides[0].c_str());
+		LOG(1, "[LocalInput]   P2: %s\n", sides[1].empty() ? "(nothing)" : sides[1].c_str());
+		if (!hidden.empty())
+			LOG(1, "[LocalInput]   hidden: %s\n", hidden.c_str());
+		if (!unplugged.empty())
+			LOG(1, "[LocalInput]   unplugged: %s\n", unplugged.c_str());
 	}
 
 	void Manager::ApplySnapshots()
 	{
 		const ULONGLONG now = GetTickCount64();
+		bool rosterChanged = false;
 		for (const DeviceSnapshot& snap : g_snapshots)
 		{
 			Device* device = nullptr;
@@ -485,19 +712,66 @@ namespace LocalInput
 			}
 			const bool wasConnected = device->snap.connected;
 			device->snap = snap;
+			auto knownIt = g_profiles.find(snap.id);
+			const Profile* known = knownIt != g_profiles.end() ? &knownIt->second : nullptr;
 
 			// Sides are decided the first time a device shows up connected this session, and
 			// kept from then on - an unplug/replug lands it back where it was.
 			if (snap.connected && !device->sessionKnown)
 			{
-				device->side = ChooseSide(*device);
+				const char* why = "";
+				device->side = ChooseSide(*device, &why);
 				device->sessionKnown = true;
-				LOG(1, "[LocalInput] %s '%s' -> P%d\n", snap.id.c_str(), snap.defaultName.c_str(), device->side + 1);
+				device->connectedAt = now;
+				device->firstInputLogged = false;
+				LOG(1, "[LocalInput] new device %s -> P%d (%s)%s%s [%s]\n", DescribeDevice(snap).c_str(), device->side + 1, why,
+					known && known->ignored ? ", HIDDEN by the player: sends nothing" : "",
+					known && known->hasBinds ? ", has its own button settings" : ", uses the game's button settings",
+					WhereInGame().c_str());
+				RecordEvent("connected %s -> P%d", snap.id.c_str(), device->side + 1);
+				rosterChanged = true;
 			}
 			else if (snap.connected != wasConnected && device->sessionKnown)
 			{
-				LOG(1, "[LocalInput] %s %s (stays on P%d)\n", snap.id.c_str(),
-					snap.connected ? "reconnected" : "disconnected", device->side + 1);
+				LOG(1, "[LocalInput] %s %s (stays on P%d)%s [%s]\n", DescribeDevice(snap).c_str(),
+					snap.connected ? "reconnected" : "disconnected", device->side + 1,
+					snap.connected ? "" : (" after " + std::to_string((now - device->connectedAt) / 1000) + " s").c_str(),
+					WhereInGame().c_str());
+				RecordEvent("%s %s", snap.connected ? "reconnected" : "disconnected", snap.id.c_str());
+				if (snap.connected)
+				{
+					device->connectedAt = now;
+					device->firstInputLogged = false;
+				}
+				rosterChanged = true;
+			}
+
+			// Press/release edges into the history (not the log). A keyboard's keys are kept out
+			// of it except for the ones the game would use, so typing a name stays private.
+			if (snap.connected && device->sessionKnown && snap.controls != device->loggedControls)
+			{
+				const ControlSet changed = snap.controls ^ device->loggedControls;
+				DeviceView view;
+				view.kind = snap.kind;
+				view.model = IdentifyDevice(snap);
+				Mapping keyboardKeys;
+				if (snap.kind == DeviceKind::Keyboard)
+					keyboardKeys = known && known->hasMapping ? known->mapping
+						: GameKeyConfig::EffectiveMapping(snap.kind, EffectiveBinds(known, snap.kind, device->side), device->side);
+				for (int c = 0; c < kMaxControls; ++c)
+				{
+					if (!changed[c])
+						continue;
+					if (snap.kind == DeviceKind::Keyboard && keyboardKeys.count(c) == 0)
+						continue;
+					RecordEvent("%s P%d %s %s", snap.id.c_str(), device->side + 1, snap.controls[c] ? "press" : "release",
+						ControlName(view, c).c_str());
+				}
+				device->loggedControls = snap.controls;
+			}
+			else if (!snap.connected)
+			{
+				device->loggedControls.reset();
 			}
 
 			if (snap.connected && snap.controls.any())
@@ -510,10 +784,14 @@ namespace LocalInput
 					{
 						profile.seen = true;
 						SaveProfiles();
+						LOG(1, "[LocalInput] keyboard %s typed on for the first time: it now counts as a player's keyboard\n", snap.id.c_str());
+						rosterChanged = true;
 					}
 				}
 			}
 		}
+		if (rosterChanged)
+			LogRoster("a device change");
 	}
 
 	void Manager::RecomputeWords()
@@ -541,6 +819,32 @@ namespace LocalInput
 				const GameKeyConfig::HeldKeys held = GameKeyConfig::HeldGameKeys(device->snap.kind, device->snap.controls);
 				device->buttons = GameKeyConfig::Word(cls, held, binds, true, device->side);
 				device->menuWord = GameKeyConfig::Word(cls, held, binds, false, device->side);
+			}
+
+			// The first press after a device connects (or moves) proves the whole path: which
+			// controls it reports and what the game gets from them.
+			if (!device->firstInputLogged && device->snap.controls.any())
+			{
+				device->firstInputLogged = true;
+				const std::string held = HeldText(device->snap);
+				// A pad input within a moment of connecting is almost surely not a press: an
+				// axis that reads as held from the start (a trigger or stick that rests
+				// off-centre). Keyboards are exempt: the software keyboard only appears when
+				// it is first typed on.
+				const ULONGLONG sinceConnect = GetTickCount64() - device->connectedAt;
+				const bool atConnect = sinceConnect < 300 && device->snap.kind != DeviceKind::Keyboard;
+				const bool hiddenDevice = profile != g_profiles.end() && profile->second.ignored;
+				const char* note = hiddenDevice ? " - but it is HIDDEN, so the game gets nothing"
+					: capturing ? " - but a rebind is listening, so the game gets nothing"
+					: (device->snap.kind == DeviceKind::Keyboard && m_overlayWantsKeyboard) ? " - but the overlay is typing, so the game gets nothing"
+					: "";
+				LOG(1, "[LocalInput] first input from %s on P%d, %.1f s after it connected%s: %s -> battle %s, menus %s%s%s [%s]\n",
+					device->snap.id.c_str(), device->side + 1, sinceConnect / 1000.0,
+					atConnect ? " (ALREADY HELD when it connected - if nobody pressed it, this control reads as stuck)" : "",
+					held.c_str(),
+					ButtonsText(device->buttons).c_str(), ButtonsText(device->menuWord).c_str(),
+					profile != g_profiles.end() && profile->second.hasMapping ? " (mod mapping)" : "",
+					note, WhereInGame().c_str());
 			}
 
 			// A keyboard that has never been typed on is most likely not a keyboard anyone
@@ -591,6 +895,21 @@ namespace LocalInput
 				g_words[side][set] = CleanDirections(words[side][set]);
 		g_hasDevice[0] = hasDevice[0];
 		g_hasDevice[1] = hasDevice[1];
+
+		// What the game's "is a controller connected" question answers (P2's join, pad assign).
+		for (int side = 0; side < 2; ++side)
+		{
+			if (g_presenceLogged && g_lastHasDevice[side] == hasDevice[side])
+				continue;
+			LOG(1, "[LocalInput] Player %d %s [%s]\n", side + 1,
+				hasDevice[side] ? "has a device now"
+					: side == Side_P2 ? "has NO device now (the game sees Player 2's controller as disconnected)"
+					: "has no device in use now (unused keyboards do not count; the game still treats Player 1 as connected)",
+				WhereInGame().c_str());
+			RecordEvent("P%d %s", side + 1, hasDevice[side] ? "has a device" : "has no device");
+			g_lastHasDevice[side] = hasDevice[side];
+		}
+		g_presenceLogged = true;
 	}
 
 	uint32_t Manager::PlayerWord(Side side, bool battle) const
@@ -629,6 +948,20 @@ namespace LocalInput
 			Profile& profile = g_profiles[entry.first];
 			profile.hasBinds = true;
 			profile.binds = entry.second;
+			auto it = g_devicesById.find(entry.first);
+			if (it != g_devicesById.end())
+			{
+				const Device& device = *it->second;
+				DeviceView view;
+				view.kind = device.snap.kind;
+				view.model = IdentifyDevice(device.snap);
+				std::string text;
+				for (const auto& m : GameKeyConfig::EffectiveMapping(device.snap.kind, entry.second, device.side))
+					text += (text.empty() ? "" : ", ") + ControlName(view, m.first) + "=" + ButtonsText(m.second);
+				LOG(1, "[LocalInput] %s now plays with (battle, %s): %s\n", entry.first.c_str(),
+					entry.second.typeB ? "Type B allowed" : "Type A", text.c_str());
+				RecordEvent("button settings of %s changed", entry.first.c_str());
+			}
 		}
 		SaveProfiles();
 	}
@@ -678,6 +1011,7 @@ namespace LocalInput
 	{
 		std::lock_guard<std::mutex> lock(g_mutex);
 		Profile& profile = g_profiles[id];
+		const bool wasHidden = profile.ignored;
 		profile.pinned = true;
 		profile.pinnedSide = side;
 		// Putting a device on a side is using it: a hidden device (dragged out of the hidden
@@ -685,10 +1019,19 @@ namespace LocalInput
 		profile.ignored = false;
 		profile.seen = true;
 		auto it = g_devicesById.find(id);
+		int from = -1;
 		if (it != g_devicesById.end())
+		{
+			from = it->second->side;
 			it->second->side = side;
+			it->second->firstInputLogged = false;
+		}
 		SaveProfiles();
-		LOG(1, "[LocalInput] %s pinned to P%d\n", id.c_str(), side + 1);
+		LOG(1, "[LocalInput] player moved %s %s P%d%s, pinned there [%s]\n", id.c_str(),
+			from < 0 ? "to" : (from == side ? "(already there) to" : (from == Side_P1 ? "P1 ->" : "P2 ->")),
+			side + 1, wasHidden ? " (was hidden, now shown)" : "", WhereInGame().c_str());
+		RecordEvent("player moved %s to P%d", id.c_str(), side + 1);
+		LogRoster("the player moved a device");
 	}
 
 	void Manager::ResetAssignments()
@@ -699,15 +1042,21 @@ namespace LocalInput
 		for (auto& device : g_devices)
 			device->sessionKnown = false;
 		// Re-run the defaults in the order devices were first seen.
+		LOG(1, "[LocalInput] player pressed Reset sides [%s]\n", WhereInGame().c_str());
 		for (const std::string& id : g_order)
 		{
 			Device* device = g_devicesById[id];
 			if (!device->snap.connected)
 				continue;
-			device->side = ChooseSide(*device);
+			const char* why = "";
+			device->side = ChooseSide(*device, &why);
 			device->sessionKnown = true;
+			device->firstInputLogged = false;
+			LOG(1, "[LocalInput]   %s -> P%d (%s)\n", id.c_str(), device->side + 1, why);
 		}
 		SaveProfiles();
+		RecordEvent("player pressed Reset sides");
+		LogRoster("Reset sides");
 	}
 
 	void Manager::Rename(const std::string& id, const std::string& name)
@@ -715,6 +1064,7 @@ namespace LocalInput
 		std::lock_guard<std::mutex> lock(g_mutex);
 		g_profiles[id].name = name;
 		SaveProfiles();
+		LOG(1, "[LocalInput] player renamed %s to '%s'\n", id.c_str(), name.c_str());
 	}
 
 	Mapping Manager::GetMapping(const std::string& id) const
@@ -752,6 +1102,17 @@ namespace LocalInput
 		profile.hasMapping = true;
 		profile.mapping = mapping;
 		SaveProfiles();
+		auto it = g_devicesById.find(id);
+		DeviceView view;
+		if (it != g_devicesById.end())
+		{
+			view.kind = it->second->snap.kind;
+			view.model = IdentifyDevice(it->second->snap);
+		}
+		std::string text;
+		for (const auto& entry : mapping)
+			text += (text.empty() ? "" : ", ") + ControlName(view, entry.first) + "=" + ButtonsText(entry.second);
+		LOG(1, "[LocalInput] player set a mod mapping for %s (replaces the game's button settings): %s\n", id.c_str(), text.c_str());
 	}
 
 	void Manager::ResetMapping(const std::string& id)
@@ -761,6 +1122,7 @@ namespace LocalInput
 		profile.hasMapping = false;
 		profile.mapping.clear();
 		SaveProfiles();
+		LOG(1, "[LocalInput] player removed the mod mapping of %s: it uses the game's button settings again\n", id.c_str());
 	}
 
 	void Manager::BeginCapture(const std::string& id)
@@ -769,11 +1131,14 @@ namespace LocalInput
 		g_captureId = id;
 		g_captureBaselineTaken = false;
 		g_capturedControl = -1;
+		LOG(1, "[LocalInput] mod rebind listening on %s (the game gets no input meanwhile)\n", id.c_str());
 	}
 
 	void Manager::EndCapture()
 	{
 		std::lock_guard<std::mutex> lock(g_mutex);
+		if (!g_captureId.empty())
+			LOG(1, "[LocalInput] mod rebind stopped listening on %s\n", g_captureId.c_str());
 		g_captureId.clear();
 		g_capturedControl = -1;
 	}
@@ -797,7 +1162,64 @@ namespace LocalInput
 		if (!ignored)
 			profile.seen = true; // showing an unused keyboard means someone plays on it
 		SaveProfiles();
-		LOG(1, "[LocalInput] %s %s\n", id.c_str(), ignored ? "hidden" : "shown");
+		LOG(1, "[LocalInput] player %s %s [%s]\n", ignored ? "hid" : "showed", id.c_str(), WhereInGame().c_str());
+		RecordEvent("player %s %s", ignored ? "hid" : "showed", id.c_str());
+		LogRoster(ignored ? "hiding a device" : "showing a device");
+	}
+
+	int Manager::LogReport(const char* why)
+	{
+		if (!IsLoggingEnabled())
+			return 0;
+		std::lock_guard<std::mutex> lock(g_mutex);
+		const int number = ++g_reportCount;
+		const ULONGLONG now = GetTickCount64();
+		LOG(1, "[LocalInput] ==================== CONTROLLER REPORT #%d (%s) ====================\n", number, why);
+		LOG(1, "[LocalInput] where: %s; automatic detection %s; Steam Input %s; overlay typing %s; rebind listening %s\n",
+			WhereInGame().c_str(), Settings::settingsIni.autoUpdateControllers ? "on" : "off",
+			g_backend && g_backend->SteamInputLikely() ? "ACTIVE" : "not seen",
+			m_overlayWantsKeyboard ? "yes" : "no", g_captureId.empty() ? "no" : g_captureId.c_str());
+		for (int side = 0; side < 2; ++side)
+			LOG(1, "[LocalInput] P%d: has device %s; menus get %s; battle gets %s\n", side + 1, g_hasDevice[side] ? "yes" : "NO",
+				ButtonsText(g_words[side][0]).c_str(), ButtonsText(g_words[side][1]).c_str());
+		for (const std::string& id : g_order)
+		{
+			const Device* device = g_devicesById[id];
+			if (!device->sessionKnown)
+				continue; // an empty XInput slot and the like
+			auto profile = g_profiles.find(id);
+			const Profile* p = profile != g_profiles.end() ? &profile->second : nullptr;
+			DeviceView view;
+			view.kind = device->snap.kind;
+			view.model = IdentifyDevice(device->snap);
+			const std::string held = device->snap.connected ? HeldText(device->snap) : "nothing";
+			char age[48] = "never";
+			if (device->lastInputMs)
+				snprintf(age, sizeof(age), "%.1f s ago", (now - device->lastInputMs) / 1000.0);
+			LOG(1, "[LocalInput] - %s\n", DescribeDevice(device->snap).c_str());
+			LOG(1, "[LocalInput]     %s, %s, P%d%s%s%s; last input %s; holding %s\n",
+				device->snap.connected ? "connected" : "UNPLUGGED",
+				p && p->ignored ? "HIDDEN" : "shown", device->side + 1, p && p->pinned ? " (pinned)" : "",
+				device->snap.kind == DeviceKind::Keyboard && !(p && (p->seen || p->pinned)) ? ", unused keyboard" : "",
+				p && !p->name.empty() ? (", named '" + p->name + "'").c_str() : "",
+				age, held.c_str());
+			if (device->snap.kind != DeviceKind::Keyboard || (p && (p->hasBinds || p->hasMapping)))
+			{
+				const Mapping mapping = p && p->hasMapping ? p->mapping
+					: GameKeyConfig::EffectiveMapping(device->snap.kind, EffectiveBinds(p, device->snap.kind, device->side), device->side);
+				std::string text;
+				for (const auto& m : mapping)
+					text += (text.empty() ? "" : ", ") + ControlName(view, m.first) + "=" + ButtonsText(m.second);
+				LOG(1, "[LocalInput]     buttons (%s): %s\n",
+					p && p->hasMapping ? "mod mapping" : p && p->hasBinds ? (p->binds.typeB ? "own settings, Type B allowed" : "own settings")
+						: "the game's settings", text.c_str());
+			}
+		}
+		LOG(1, "[LocalInput] last %d input events (oldest first):\n", static_cast<int>(g_events.size()));
+		for (const std::string& event : g_events)
+			LOG(1, "[LocalInput]   %s\n", event.c_str());
+		LOG(1, "[LocalInput] ==================== END OF REPORT #%d ====================\n", number);
+		return number;
 	}
 
 	void Manager::SetAutoDetect(bool enabled)

@@ -116,6 +116,10 @@ namespace LocalInput
 		// Keyboards also stop reaching the game while the overlay is typing into a text box.
 		void SetOverlayWantsKeyboard(bool wants) { m_overlayWantsKeyboard = wants; }
 
+		// Writes everything the input system knows right now into DEBUG.txt, with the recent
+		// input history, for bug reports. Returns the report's number, 0 when logging is off.
+		int LogReport(const char* why);
+
 		struct Device; // internal device record (LocalInputManager.cpp)
 
 	private:
@@ -123,7 +127,8 @@ namespace LocalInput
 		void LoadProfiles();
 		void SaveProfiles() const;
 		void ApplySnapshots();
-		Side ChooseSide(const Device& device) const;
+		Side ChooseSide(const Device& device, const char** why = nullptr) const;
+		void LogRoster(const char* reason) const;
 		void RecomputeWords();
 		void SyncGameKeyConfig();
 

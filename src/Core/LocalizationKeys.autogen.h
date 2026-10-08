@@ -5267,6 +5267,18 @@ struct LocalizationKeysAccessor
 
         // Drop here to hide it
         inline const char* Drop_here_to_hide_it() const { return Get("Drop here to hide it"); }
+
+        // Log what's happening now
+        inline const char* Log_what_s_happening_now() const { return Get("Log what's happening now"); }
+
+        // Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.
+        inline const char* Found_a_controller_problem_Press_this_right_when_it_happens_everything_about_your_controllers_and_your_last_button_presses_goes_into_DEBUG_txt_in_the_BBCF_IM_folder_for_the_bug_report() const { return Get("Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report."); }
+
+        // Written to DEBUG.txt as report #%d
+        inline const char* Written_to_DEBUG_txt_as_report_d() const { return Get("Written to DEBUG.txt as report #%d"); }
+
+        // Debug logs are off. Turn on Generate debug logs in Settings first.
+        inline const char* Debug_logs_are_off_Turn_on_Generate_debug_logs_in_Settings_first() const { return Get("Debug logs are off. Turn on Generate debug logs in Settings first."); }
 };
 
 
