@@ -1938,3 +1938,93 @@ Log what's happening now,Log what's happening now,Registrar lo que pasa ahora
 Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.,Found a controller problem? Press this right when it happens: everything about your controllers and your last button presses goes into DEBUG.txt in the BBCF_IM folder for the bug report.,¿Encontraste un problema con un control? Presiona esto justo cuando pase: todo sobre tus controles y tus últimas pulsaciones se escribe en DEBUG.txt dentro de la carpeta BBCF_IM para el reporte.
 Written to DEBUG.txt as report #%d,Written to DEBUG.txt as report #%d,Escrito en DEBUG.txt como reporte #%d
 Debug logs are off. Turn on Generate debug logs in Settings first.,Debug logs are off. Turn on Generate debug logs in Settings first.,Los registros de depuración están desactivados. Activa Generate debug logs en Settings primero.
+Improvement Mod music replacement file,Improvement Mod music replacement file,Archivo de reemplazo de música de Improvement Mod
+Add songs,Add songs,Agregar canciones
+Import a music replacement file,Import a music replacement file,Importar un archivo de reemplazo de música
+"Load a music replacement file someone made, or one you exported before.","Load a music replacement file someone made, or one you exported before.","Carga un archivo de reemplazo de música que hizo otra persona, o uno que exportaste antes."
+Export your music replacements,Export your music replacements,Exportar tus reemplazos de música
+"Working on the music file, please wait...","Working on the music file, please wait...","Procesando el archivo de música, espera..."
+file not found,file not found,archivo no encontrado
+Replaces:,Replaces:,Reemplaza:
+was removed.,was removed.,fue quitada.
+Takes the song out of the list and puts back the original of every track it replaced. The file itself is not deleted.,Takes the song out of the list and puts back the original of every track it replaced. The file itself is not deleted.,Saca la canción de la lista y vuelve a poner la original en cada pista que reemplazaba. El archivo en sí no se borra.
+Import music replacements,Import music replacements,Importar reemplazos de música
+Keep the songs you have now and add these on top? The tracks this file sets are changed either way.,Keep the songs you have now and add these on top? The tracks this file sets are changed either way.,¿Mantener las canciones que tienes y agregar estas encima? Las pistas que define este archivo cambian de todas formas.
+Add on top,Add on top,Agregar encima
+Your other replacements stay as they are.,Your other replacements stay as they are.,Tus otros reemplazos se quedan como están.
+Replace everything,Replace everything,Reemplazar todo
+"Every song goes back to the original first, and your song list is cleared, so you get exactly what is in the file. Export first if you want to keep your current setup.","Every song goes back to the original first, and your song list is cleared, so you get exactly what is in the file. Export first if you want to keep your current setup.","Primero todas las canciones vuelven a la original y tu lista de canciones se vacía, así obtienes exactamente lo que trae el archivo. Exporta antes si quieres conservar tu configuración actual."
+Improvement Mod Jukebox playlist,Improvement Mod Jukebox playlist,Lista de reproducción de Jukebox de Improvement Mod
+"A playlist file holds all of your music: the ticked tracks, the settings above, your custom songs and your music replacements, the song files included. Save one per mood and swap between them any time, or share it as a music pack.","A playlist file holds all of your music: the ticked tracks, the settings above, your custom songs and your music replacements, the song files included. Save one per mood and swap between them any time, or share it as a music pack.","Un archivo de playlist guarda toda tu música: las pistas marcadas, los ajustes de arriba, tus canciones personalizadas y tus reemplazos de música, con los archivos de las canciones incluidos. Guarda uno por estado de ánimo y cámbialos cuando quieras, o compártelo como pack de música."
+Save playlist...,Save playlist...,Guardar lista...
+Save this Jukebox playlist,Save this Jukebox playlist,Guardar esta lista de Jukebox
+Load playlist...,Load playlist...,Cargar lista...
+Load a Jukebox playlist,Load a Jukebox playlist,Cargar una lista de Jukebox
+Recent,Recent,Recientes
+This file was moved or deleted. Click to take it off the list.,This file was moved or deleted. Click to take it off the list.,Este archivo se movió o se borró. Haz clic para quitarlo de la lista.
+"Working on the playlist, please wait...","Working on the playlist, please wait...","Procesando la lista, espera..."
+Import music file...,Import music file...,Importar archivo de música...
+Export music file...,Export music file...,Exportar archivo de música...
+"Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.","Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.","Guarda todo lo de aquí en un solo archivo - cada canción, lo que reemplaza, su volumen y si está activada - para que funcione en cualquier PC."
+Put every track back to normal,Put every track back to normal,Volver todas las pistas a la normalidad
+Puts every song back to the original and deletes the converted files. Your songs stay in the list.,Puts every song back to the original and deletes the converted files. Your songs stay in the list.,Vuelve a poner todas las canciones originales y borra los archivos convertidos. Tus canciones se quedan en la lista.
+Switched off: the original plays.,Switched off: the original plays.,Desactivada: suena la original.
+Restart the game to hear this one.,Restart the game to hear this one.,Reinicia el juego para oír esta.
+Put the original back,Put the original back,Volver a la original
+Options,Options,Opciones
+"Rotation mode, what plays when a match starts and on a rematch, repeat, and resetting everything.","Rotation mode, what plays when a match starts and on a rematch, repeat, and resetting everything.","Modo de rotación, qué suena al empezar una partida y en la revancha, repetir y restablecer todo."
+Playlist,Playlist,Lista
+Ticked tracks out of all tracks. Only ticked tracks play in rotation.,Ticked tracks out of all tracks. Only ticked tracks play in rotation.,Pistas marcadas de todas las pistas. Solo las marcadas suenan en la rotación.
+Shortcuts,Shortcuts,Atajos
+next track,next track,siguiente pista
+this window,this window,esta ventana
+"Copies songs into the Jukebox's custom folder and converts them. Accepts every format the mod can read, not just MP3.","Copies songs into the Jukebox's custom folder and converts them. Accepts every format the mod can read, not just MP3.","Copia canciones a la carpeta personalizada de la Jukebox y las convierte. Acepta todos los formatos que el mod puede leer, no solo MP3."
+Nothing playing - the Jukebox plays during matches.,Nothing playing - the Jukebox plays during matches.,No suena nada - la Jukebox suena durante las partidas.
+Unknown track,Unknown track,Pista desconocida
+Double-click to play it now.,Double-click to play it now.,Doble clic para reproducirla ahora.
+"Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.","Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.","Guarda todo lo de esta ventana - pistas marcadas, cada opción, canciones personalizadas con su volumen - en un solo archivo."
+Double-click it during a match to play it.,Double-click it during a match to play it.,Haz doble clic durante una partida para reproducirla.
+A song can't replace itself.,A song can't replace itself.,Una canción no puede reemplazarse a sí misma.
+Add from the game's soundtrack,Add from the game's soundtrack,Agregar de la banda sonora del juego
+Add music,Add music,Agregar música
+"Bring in songs, then choose which of the game's tracks each one replaces. One song can replace as many tracks as you like.","Bring in songs, then choose which of the game's tracks each one replaces. One song can replace as many tracks as you like.",Trae canciones y luego elige qué pistas del juego reemplaza cada una. Una canción puede reemplazar tantas pistas como quieras.
+Build its replacements again from the same song.,Build its replacements again from the same song.,Vuelve a crear sus reemplazos a partir de la misma canción.
+Choose a track to add. You choose what it replaces next.,Choose a track to add. You choose what it replaces next.,Elige una pista para agregar. Después eliges qué reemplaza.
+Choose the file to use instead of,Choose the file to use instead of,Elige el archivo a usar en lugar de
+Choose tracks,Choose tracks,Elegir pistas
+Choose tracks...,Choose tracks...,Elegir pistas...
+Choose what this song replaces on the right.,Choose what this song replaces on the right.,Elige a la derecha qué reemplaza esta canción.
+Click to choose the tracks.,Click to choose the tracks.,Haz clic para elegir las pistas.
+"Click what a song replaces to choose its tracks. Untick a song to hear the originals again without losing it. Open a song with its arrow to set each track on its own, and right-click for previews and more.","Click what a song replaces to choose its tracks. Untick a song to hear the originals again without losing it. Open a song with its arrow to set each track on its own, and right-click for previews and more.","Haz clic en lo que reemplaza una canción para elegir sus pistas. Desmarca una canción para volver a escuchar las originales sin perderla. Abre una canción con su flecha para ajustar cada pista por separado, y haz clic derecho para escucharla y más."
+Double-click to choose what it replaces. Right-click for more.,Double-click to choose what it replaces. Right-click for more.,Doble clic para elegir qué reemplaza. Clic derecho para más.
+From files...,From files...,Desde archivos...
+From the game's soundtrack...,From the game's soundtrack...,De la banda sonora del juego...
+Its tracks are at different volumes. Applying here sets them all to the same one.,Its tracks are at different volumes. Applying here sets them all to the same one.,Sus pistas tienen volúmenes distintos. Aplicar aquí las deja todas en el mismo.
+"Music replacement files, and undoing everything.","Music replacement files, and undoing everything.",Archivos de reemplazo de música y deshacer todo.
+"No music yet. Use Add music to bring in songs, then choose which of the game's tracks each one replaces.","No music yet. Use Add music to bring in songs, then choose which of the game's tracks each one replaces.",Todavía no hay música. Usa Agregar música para traer canciones y luego elige qué pistas del juego reemplaza cada una.
+Now plays:,Now plays:,Ahora suena:
+One of the game's own tracks.,One of the game's own tracks.,Una de las pistas del propio juego.
+Pick as many songs as you like at once.,Pick as many songs as you like at once.,Elige tantas canciones como quieras a la vez.
+Play this song,Play this song,Reproducir esta canción
+Put it on a track first to hear it.,Put it on a track first to hear it.,Ponla en una pista primero para escucharla.
+Put its tracks back to normal,Put its tracks back to normal,Devolver sus pistas a la normalidad
+"Put this song on every track in this group, or take it off them all","Put this song on every track in this group, or take it off them all","Pon esta canción en todas las pistas de este grupo, o quítala de todas"
+Remove from the list,Remove from the list,Quitar de la lista
+"Show each track on its own, with its own switch and volume.","Show each track on its own, with its own switch and volume.","Muestra cada pista por separado, con su propio interruptor y volumen."
+"Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.","Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.","Cambia esta canción por otro archivo, conservando las pistas que reemplaza, su volumen y sus interruptores. Útil si el archivo se movió."
+"The song stays in the list, replacing nothing.","The song stays in the list, replacing nothing.","La canción se queda en la lista, sin reemplazar nada."
+"This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.","This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.","El archivo de esta canción ya no está, así que no se puede poner en pistas nuevas. Haz clic derecho y usa otro archivo."
+Ticking it hands it to this song.,Ticking it hands it to this song.,Marcarla se la pasa a esta canción.
+Tracks that play,Tracks that play,Pistas donde suena
+Untick to hear the original of this track again.,Untick to hear the original of this track again.,Desmarca para volver a escuchar la original de esta pista.
+"Untick to hear the originals again. The song stays set, ready to tick back on.","Untick to hear the originals again. The song stays set, ready to tick back on.","Desmarca para volver a escuchar las originales. La canción queda puesta, lista para marcarla de nuevo."
+Use a different file...,Use a different file...,Usar otro archivo...
+Use one of the game's own tracks in place of others.,Use one of the game's own tracks in place of others.,Usa una de las pistas del propio juego en lugar de otras.
+in your list,in your list,en tu lista
+instead:,instead:,en su lugar:
+its tracks are back to normal.,its tracks are back to normal.,sus pistas volvieron a la normalidad.
+nothing yet,nothing yet,nada todavía
+now plays in place of,now plays in place of,ahora suena en lugar de
+now:,now:,ahora:
+song(s) added. Click Choose tracks on each to say what it replaces.,song(s) added. Click Choose tracks on each to say what it replaces.,canción(es) agregada(s). Haz clic en Elegir pistas en cada una para decir qué reemplaza.
+track(s) ticked,track(s) ticked,pista(s) marcada(s)

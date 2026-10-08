@@ -27,6 +27,13 @@ private:
 	void DrawTrackList();
 	void DrawImportButton();
 	void PollImportDialog();
+	// Rotation options and playlists, each behind one button so the window stays a list.
+	void DrawOptionsPopup();
+	// Save / load / swap whole Jukebox setups as *.bbcfim-playlist files.
+	void DrawPlaylistMenu();
+	void PollPlaylistDialogs();
+	std::string m_playlistMessage;
+	bool m_playlistMessageOk = true;
 	// The volume button and popup for one row. Custom songs and BGM replacements keep their
 	// stored level in different places - a custom song's here, a replacement's in
 	// BgmReplacementManager alongside the browser that also edits it - so the popup reads

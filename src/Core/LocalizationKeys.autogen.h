@@ -5279,6 +5279,276 @@ struct LocalizationKeysAccessor
 
         // Debug logs are off. Turn on Generate debug logs in Settings first.
         inline const char* Debug_logs_are_off_Turn_on_Generate_debug_logs_in_Settings_first() const { return Get("Debug logs are off. Turn on Generate debug logs in Settings first."); }
+
+        // Improvement Mod music replacement file
+        inline const char* Improvement_Mod_music_replacement_file() const { return Get("Improvement Mod music replacement file"); }
+
+        // Add songs
+        inline const char* Add_songs() const { return Get("Add songs"); }
+
+        // Import a music replacement file
+        inline const char* Import_a_music_replacement_file() const { return Get("Import a music replacement file"); }
+
+        // Load a music replacement file someone made, or one you exported before.
+        inline const char* Load_a_music_replacement_file_someone_made_or_one_you_exported_before() const { return Get("Load a music replacement file someone made, or one you exported before."); }
+
+        // Export your music replacements
+        inline const char* Export_your_music_replacements() const { return Get("Export your music replacements"); }
+
+        // Working on the music file, please wait...
+        inline const char* Working_on_the_music_file_please_wait() const { return Get("Working on the music file, please wait..."); }
+
+        // file not found
+        inline const char* file_not_found_2() const { return Get("file not found"); }
+
+        // Replaces:
+        inline const char* Replaces() const { return Get("Replaces:"); }
+
+        // was removed.
+        inline const char* was_removed() const { return Get("was removed."); }
+
+        // Takes the song out of the list and puts back the original of every track it replaced. The file itself is not deleted.
+        inline const char* Takes_the_song_out_of_the_list_and_puts_back_the_original_of_every_track_it_replaced_The_file_itself_is_not_deleted() const { return Get("Takes the song out of the list and puts back the original of every track it replaced. The file itself is not deleted."); }
+
+        // Import music replacements
+        inline const char* Import_music_replacements() const { return Get("Import music replacements"); }
+
+        // Keep the songs you have now and add these on top? The tracks this file sets are changed either way.
+        inline const char* Keep_the_songs_you_have_now_and_add_these_on_top_The_tracks_this_file_sets_are_changed_either_way() const { return Get("Keep the songs you have now and add these on top? The tracks this file sets are changed either way."); }
+
+        // Add on top
+        inline const char* Add_on_top() const { return Get("Add on top"); }
+
+        // Your other replacements stay as they are.
+        inline const char* Your_other_replacements_stay_as_they_are() const { return Get("Your other replacements stay as they are."); }
+
+        // Replace everything
+        inline const char* Replace_everything() const { return Get("Replace everything"); }
+
+        // Every song goes back to the original first, and your song list is cleared, so you get exactly what is in the file. Export first if you want to keep your current setup.
+        inline const char* Every_song_goes_back_to_the_original_first_and_your_song_list_is_cleared_so_you_get_exactly_what_is_in_the_file_Export_first_if_you_want_to_keep_your_current_setup() const { return Get("Every song goes back to the original first, and your song list is cleared, so you get exactly what is in the file. Export first if you want to keep your current setup."); }
+
+        // Improvement Mod Jukebox playlist
+        inline const char* Improvement_Mod_Jukebox_playlist() const { return Get("Improvement Mod Jukebox playlist"); }
+
+        // A playlist file holds all of your music: the ticked tracks, the settings above, your custom songs and your music replacements, the song files included. Save one per mood and swap between them any time, or share it as a music pack.
+        inline const char* A_playlist_file_holds_all_of_your_music_the_ticked_tracks_the_settings_above_your_custom_songs_and_your_music_replacements_the_song_files_included_Save_one_per_mood_and_swap_between_them_any_time_or_share_it_as_a_music_pack() const { return Get("A playlist file holds all of your music: the ticked tracks, the settings above, your custom songs and your music replacements, the song files included. Save one per mood and swap between them any time, or share it as a music pack."); }
+
+        // Save playlist...
+        inline const char* Save_playlist() const { return Get("Save playlist..."); }
+
+        // Save this Jukebox playlist
+        inline const char* Save_this_Jukebox_playlist() const { return Get("Save this Jukebox playlist"); }
+
+        // Load playlist...
+        inline const char* Load_playlist() const { return Get("Load playlist..."); }
+
+        // Load a Jukebox playlist
+        inline const char* Load_a_Jukebox_playlist() const { return Get("Load a Jukebox playlist"); }
+
+        // Recent
+        inline const char* Recent() const { return Get("Recent"); }
+
+        // This file was moved or deleted. Click to take it off the list.
+        inline const char* This_file_was_moved_or_deleted_Click_to_take_it_off_the_list() const { return Get("This file was moved or deleted. Click to take it off the list."); }
+
+        // Working on the playlist, please wait...
+        inline const char* Working_on_the_playlist_please_wait() const { return Get("Working on the playlist, please wait..."); }
+
+        // Import music file...
+        inline const char* Import_music_file() const { return Get("Import music file..."); }
+
+        // Export music file...
+        inline const char* Export_music_file() const { return Get("Export music file..."); }
+
+        // Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.
+        inline const char* Saves_everything_here_into_one_file_every_song_what_it_replaces_its_volume_and_whether_it_is_on_so_it_works_on_any_PC() const { return Get("Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC."); }
+
+        // Put every track back to normal
+        inline const char* Put_every_track_back_to_normal() const { return Get("Put every track back to normal"); }
+
+        // Puts every song back to the original and deletes the converted files. Your songs stay in the list.
+        inline const char* Puts_every_song_back_to_the_original_and_deletes_the_converted_files_Your_songs_stay_in_the_list() const { return Get("Puts every song back to the original and deletes the converted files. Your songs stay in the list."); }
+
+        // Switched off: the original plays.
+        inline const char* Switched_off_the_original_plays() const { return Get("Switched off: the original plays."); }
+
+        // Restart the game to hear this one.
+        inline const char* Restart_the_game_to_hear_this_one() const { return Get("Restart the game to hear this one."); }
+
+        // Put the original back
+        inline const char* Put_the_original_back() const { return Get("Put the original back"); }
+
+        // Options
+        inline const char* Options() const { return Get("Options"); }
+
+        // Rotation mode, what plays when a match starts and on a rematch, repeat, and resetting everything.
+        inline const char* Rotation_mode_what_plays_when_a_match_starts_and_on_a_rematch_repeat_and_resetting_everything() const { return Get("Rotation mode, what plays when a match starts and on a rematch, repeat, and resetting everything."); }
+
+        // Playlist
+        inline const char* Playlist() const { return Get("Playlist"); }
+
+        // Ticked tracks out of all tracks. Only ticked tracks play in rotation.
+        inline const char* Ticked_tracks_out_of_all_tracks_Only_ticked_tracks_play_in_rotation() const { return Get("Ticked tracks out of all tracks. Only ticked tracks play in rotation."); }
+
+        // Shortcuts
+        inline const char* Shortcuts() const { return Get("Shortcuts"); }
+
+        // next track
+        inline const char* next_track() const { return Get("next track"); }
+
+        // this window
+        inline const char* this_window() const { return Get("this window"); }
+
+        // Copies songs into the Jukebox's custom folder and converts them. Accepts every format the mod can read, not just MP3.
+        inline const char* Copies_songs_into_the_Jukebox_s_custom_folder_and_converts_them_Accepts_every_format_the_mod_can_read_not_just_MP3() const { return Get("Copies songs into the Jukebox's custom folder and converts them. Accepts every format the mod can read, not just MP3."); }
+
+        // Nothing playing - the Jukebox plays during matches.
+        inline const char* Nothing_playing_the_Jukebox_plays_during_matches() const { return Get("Nothing playing - the Jukebox plays during matches."); }
+
+        // Unknown track
+        inline const char* Unknown_track() const { return Get("Unknown track"); }
+
+        // Double-click to play it now.
+        inline const char* Double_click_to_play_it_now() const { return Get("Double-click to play it now."); }
+
+        // Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.
+        inline const char* Saves_everything_in_this_window_ticked_tracks_every_option_custom_songs_with_their_volume_into_one_file() const { return Get("Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file."); }
+
+        // Double-click it during a match to play it.
+        inline const char* Double_click_it_during_a_match_to_play_it() const { return Get("Double-click it during a match to play it."); }
+
+        // A song can't replace itself.
+        inline const char* A_song_can_t_replace_itself() const { return Get("A song can't replace itself."); }
+
+        // Add from the game's soundtrack
+        inline const char* Add_from_the_game_s_soundtrack() const { return Get("Add from the game's soundtrack"); }
+
+        // Add music
+        inline const char* Add_music_2() const { return Get("Add music"); }
+
+        // Bring in songs, then choose which of the game's tracks each one replaces. One song can replace as many tracks as you like.
+        inline const char* Bring_in_songs_then_choose_which_of_the_game_s_tracks_each_one_replaces_One_song_can_replace_as_many_tracks_as_you_like() const { return Get("Bring in songs, then choose which of the game's tracks each one replaces. One song can replace as many tracks as you like."); }
+
+        // Build its replacements again from the same song.
+        inline const char* Build_its_replacements_again_from_the_same_song() const { return Get("Build its replacements again from the same song."); }
+
+        // Choose a track to add. You choose what it replaces next.
+        inline const char* Choose_a_track_to_add_You_choose_what_it_replaces_next() const { return Get("Choose a track to add. You choose what it replaces next."); }
+
+        // Choose the file to use instead of
+        inline const char* Choose_the_file_to_use_instead_of() const { return Get("Choose the file to use instead of"); }
+
+        // Choose tracks
+        inline const char* Choose_tracks() const { return Get("Choose tracks"); }
+
+        // Choose tracks...
+        inline const char* Choose_tracks_2() const { return Get("Choose tracks..."); }
+
+        // Choose what this song replaces on the right.
+        inline const char* Choose_what_this_song_replaces_on_the_right() const { return Get("Choose what this song replaces on the right."); }
+
+        // Click to choose the tracks.
+        inline const char* Click_to_choose_the_tracks() const { return Get("Click to choose the tracks."); }
+
+        // Click what a song replaces to choose its tracks. Untick a song to hear the originals again without losing it. Open a song with its arrow to set each track on its own, and right-click for previews and more.
+        inline const char* Click_what_a_song_replaces_to_choose_its_tracks_Untick_a_song_to_hear_the_originals_again_without_losing_it_Open_a_song_with_its_arrow_to_set_each_track_on_its_own_and_right_click_for_previews_and_more() const { return Get("Click what a song replaces to choose its tracks. Untick a song to hear the originals again without losing it. Open a song with its arrow to set each track on its own, and right-click for previews and more."); }
+
+        // Double-click to choose what it replaces. Right-click for more.
+        inline const char* Double_click_to_choose_what_it_replaces_Right_click_for_more() const { return Get("Double-click to choose what it replaces. Right-click for more."); }
+
+        // From files...
+        inline const char* From_files() const { return Get("From files..."); }
+
+        // From the game's soundtrack...
+        inline const char* From_the_game_s_soundtrack() const { return Get("From the game's soundtrack..."); }
+
+        // Its tracks are at different volumes. Applying here sets them all to the same one.
+        inline const char* Its_tracks_are_at_different_volumes_Applying_here_sets_them_all_to_the_same_one() const { return Get("Its tracks are at different volumes. Applying here sets them all to the same one."); }
+
+        // Music replacement files, and undoing everything.
+        inline const char* Music_replacement_files_and_undoing_everything() const { return Get("Music replacement files, and undoing everything."); }
+
+        // No music yet. Use Add music to bring in songs, then choose which of the game's tracks each one replaces.
+        inline const char* No_music_yet_Use_Add_music_to_bring_in_songs_then_choose_which_of_the_game_s_tracks_each_one_replaces() const { return Get("No music yet. Use Add music to bring in songs, then choose which of the game's tracks each one replaces."); }
+
+        // Now plays:
+        inline const char* Now_plays_2() const { return Get("Now plays:"); }
+
+        // One of the game's own tracks.
+        inline const char* One_of_the_game_s_own_tracks() const { return Get("One of the game's own tracks."); }
+
+        // Pick as many songs as you like at once.
+        inline const char* Pick_as_many_songs_as_you_like_at_once() const { return Get("Pick as many songs as you like at once."); }
+
+        // Play this song
+        inline const char* Play_this_song() const { return Get("Play this song"); }
+
+        // Put it on a track first to hear it.
+        inline const char* Put_it_on_a_track_first_to_hear_it() const { return Get("Put it on a track first to hear it."); }
+
+        // Put its tracks back to normal
+        inline const char* Put_its_tracks_back_to_normal() const { return Get("Put its tracks back to normal"); }
+
+        // Put this song on every track in this group, or take it off them all
+        inline const char* Put_this_song_on_every_track_in_this_group_or_take_it_off_them_all() const { return Get("Put this song on every track in this group, or take it off them all"); }
+
+        // Remove from the list
+        inline const char* Remove_from_the_list() const { return Get("Remove from the list"); }
+
+        // Show each track on its own, with its own switch and volume.
+        inline const char* Show_each_track_on_its_own_with_its_own_switch_and_volume() const { return Get("Show each track on its own, with its own switch and volume."); }
+
+        // Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.
+        inline const char* Swap_this_song_for_another_file_keeping_the_tracks_it_replaces_their_volume_and_their_switches_Handy_when_the_file_was_moved() const { return Get("Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved."); }
+
+        // The song stays in the list, replacing nothing.
+        inline const char* The_song_stays_in_the_list_replacing_nothing() const { return Get("The song stays in the list, replacing nothing."); }
+
+        // This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.
+        inline const char* This_song_s_file_is_gone_so_it_can_t_be_put_on_new_tracks_Right_click_it_and_use_a_different_file() const { return Get("This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file."); }
+
+        // Ticking it hands it to this song.
+        inline const char* Ticking_it_hands_it_to_this_song() const { return Get("Ticking it hands it to this song."); }
+
+        // Tracks that play
+        inline const char* Tracks_that_play() const { return Get("Tracks that play"); }
+
+        // Untick to hear the original of this track again.
+        inline const char* Untick_to_hear_the_original_of_this_track_again() const { return Get("Untick to hear the original of this track again."); }
+
+        // Untick to hear the originals again. The song stays set, ready to tick back on.
+        inline const char* Untick_to_hear_the_originals_again_The_song_stays_set_ready_to_tick_back_on() const { return Get("Untick to hear the originals again. The song stays set, ready to tick back on."); }
+
+        // Use a different file...
+        inline const char* Use_a_different_file() const { return Get("Use a different file..."); }
+
+        // Use one of the game's own tracks in place of others.
+        inline const char* Use_one_of_the_game_s_own_tracks_in_place_of_others() const { return Get("Use one of the game's own tracks in place of others."); }
+
+        // in your list
+        inline const char* in_your_list() const { return Get("in your list"); }
+
+        // instead:
+        inline const char* instead() const { return Get("instead:"); }
+
+        // its tracks are back to normal.
+        inline const char* its_tracks_are_back_to_normal() const { return Get("its tracks are back to normal."); }
+
+        // nothing yet
+        inline const char* nothing_yet() const { return Get("nothing yet"); }
+
+        // now plays in place of
+        inline const char* now_plays_in_place_of() const { return Get("now plays in place of"); }
+
+        // now:
+        inline const char* now() const { return Get("now:"); }
+
+        // song(s) added. Click Choose tracks on each to say what it replaces.
+        inline const char* song_s_added_Click_Choose_tracks_on_each_to_say_what_it_replaces() const { return Get("song(s) added. Click Choose tracks on each to say what it replaces."); }
+
+        // track(s) ticked
+        inline const char* track_s_ticked() const { return Get("track(s) ticked"); }
 };
 
 

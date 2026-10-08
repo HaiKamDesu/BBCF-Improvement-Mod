@@ -820,6 +820,9 @@ void MusicManager::PollCustomMusicDiscovery() {
     std::vector<CustomTrackInfo> customTracks = m_customMusicFuture.get();
     RegisterCustomTracks(customTracks);
     m_customMusicLoading = false;
+    if (m_playlistWaitingForSongs && !m_playlistRescanQueued) {
+        ApplyPendingPlaylistSongs();
+    }
     {
         std::lock_guard<std::mutex> lock(m_customMusicStatusMutex);
         m_customMusicStatus = customTracks.empty()
@@ -950,6 +953,7 @@ void MusicManager::Update() {
     if (!m_initialized) return;
 
     PollCustomMusicDiscovery();
+    PollPlaylistJobs();
 
     if (m_pendingPlay) {
         m_pendingPlayRetries++;
@@ -2415,6 +2419,14 @@ bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string
 }
 
 void MusicManager::PlayNextTrack() {
+    // Only inside a match, like PreviewPac. Out of one (main menu, character select) this
+    // takes the game's BGM slot over with a non-native track, and the next character select
+    // is built on that state: it comes up with no cursor and takes no input (2026-10-08,
+    // main menu -> Training). The button and F11 are the only callers.
+    if (!IsInMatch()) {
+        LogMusic("MusicManager: PlayNextTrack ignored - the Jukebox only plays inside a match\n");
+        return;
+    }
     // Pick the next track according to the current rotation mode.
     int nextTrackId = SelectNextTrack();
     if (nextTrackId < 0) {
@@ -2809,6 +2821,10 @@ void MusicManager::SavePreferences() {
             file << entry.first << "=0\n";
     }
 
+    file << "\n[RecentPlaylists]\n";
+    for (size_t i = 0; i < m_recentPlaylists.size(); ++i)
+        file << i << "=" << m_recentPlaylists[i] << "\n";
+
     file << "\n[Settings]\n";
     file << "Enabled=" << (m_enabled ? "1" : "0") << "\n";
 
@@ -2859,7 +2875,10 @@ void MusicManager::LoadPreferences() {
         std::string key = line.substr(0, eqPos);
         std::string value = line.substr(eqPos + 1);
 
-        if (section == "CategoryExpanded") {
+        if (section == "RecentPlaylists") {
+            if (!value.empty() && std::find(m_recentPlaylists.begin(), m_recentPlaylists.end(), value) == m_recentPlaylists.end())
+                m_recentPlaylists.push_back(value);
+        } else if (section == "CategoryExpanded") {
             if (!key.empty() && key[0] != ';')
                 m_categoryExpanded[key] = (value == "1");
         } else if (section == "CustomTrackVolume") {
@@ -2914,3 +2933,232 @@ void MusicManager::ResetPreferences() {
     LOG(2, "MusicManager: Preferences reset - all tracks enabled\n");
 }
 
+
+// ---------------------------------------------------------------------------------------
+// Playlists
+// ---------------------------------------------------------------------------------------
+
+namespace {
+    const char* const kPlaylistKind = "jukebox playlist";
+    // The replacement setup a playlist carries lives in sections with this prefix, apart
+    // from the playlist's own "Replacements" (which of them are ticked in the Jukebox).
+    const char* const kPlaylistSetupPrefix = "Music";
+}
+
+bool MusicManager::ExportPlaylist(const std::string& path) {
+    if (IsPlaylistBusy()) return false;
+
+    MusicPackage::Manifest manifest;
+    manifest.Add("Package", "Kind", kPlaylistKind);
+    manifest.Add("Package", "Format", "1");
+    manifest.Add("Package", "Name", MusicPackage::StemOf(path));
+
+    manifest.Add("Settings", "Enabled", m_enabled ? "1" : "0");
+    manifest.Add("Settings", "RotationMode", m_rotationMode == MusicRotationMode::Sequential ? "1" : "2");
+    manifest.Add("Settings", "RepeatSingle", m_repeatSingle ? "1" : "0");
+    manifest.Add("Settings", "MatchStartTrack", std::to_string((int)m_matchStartTrackChoice));
+    manifest.Add("Settings", "RematchTrack", std::to_string((int)m_rematchTrackChoice));
+    for (const auto& entry : m_categoryExpanded) {
+        if (!entry.second) manifest.Add("CollapsedCategories", entry.first, "1");
+    }
+
+    std::vector<MusicPackage::SongFile> songs;
+    auto& replacements = BgmReplacementManager::GetInstance();
+    for (const auto& track : m_tracks) {
+        const bool enabled = IsTrackEnabled(track.id);
+        if (track.id < kCustomTrackIdBase) {
+            manifest.Add("NativeTracks", std::to_string(track.id), enabled ? "1" : "0");
+        } else if (IsCustomTrackId(track.id)) {
+            const std::string source = GetCustomTrackSourceName(track.id);
+            if (source.empty()) continue;
+            const int n = (int)songs.size() + 1;
+            songs.push_back({ GamePath("data/Sound/BGM/custom/" + source), MusicPackage::ArchiveNameFor(n, source) });
+            manifest.Add("Songs", std::to_string(n), source);
+            manifest.Add("SongEnabled", std::to_string(n), enabled ? "1" : "0");
+            const float volume = GetCustomTrackVolumeDb(track.id);
+            if (volume != 0.0f) manifest.Add("SongVolume", std::to_string(n), std::to_string(volume));
+        } else if (const BgmReplaceableTrack* replaced = replacements.FindTrack(GetReplacementTableIndex(track.id))) {
+            manifest.Add("Replacements", replaced->baseName, enabled ? "1" : "0");
+        }
+    }
+
+    // The music replacements, songs and all: a Jukebox track that is a replacement has no
+    // audio of its own, so without them a playlist would play the originals anywhere else.
+    const int customSongs = (int)songs.size();
+    manifest.Add("Package", "HasMusicSetup", "1");
+    replacements.WriteSetup(manifest, songs, kPlaylistSetupPrefix);
+
+    m_playlistPath = path;
+    m_playlistExport = MusicPackage::WriteAsync(path, manifest, songs, kPlaylistKind);
+    LogMusic("MusicManager: Saving playlist \"%s\" with %d custom song(s) and %d replacement song(s)\n",
+        path.c_str(), customSongs, (int)songs.size() - customSongs);
+    return true;
+}
+
+bool MusicManager::ImportPlaylist(const std::string& path) {
+    if (IsPlaylistBusy()) return false;
+    m_playlistPath = path;
+    std::string customDir = GamePath("data/Sound/BGM/custom");
+    std::replace(customDir.begin(), customDir.end(), '/', '\\');
+    const std::string stem = MusicPackage::StemOf(path);
+    m_playlistImport = MusicPackage::ReadAsync(path, kPlaylistKind, [customDir, stem](const MusicPackage::Manifest& manifest) {
+        // Jukebox songs into the custom folder; replacement songs into a folder of their
+        // own, where the custom-folder scan does not turn them into Jukebox songs as well.
+        std::map<std::string, std::string> destinations;
+        for (const auto& entry : manifest.Section("Songs"))
+            destinations[MusicPackage::ArchiveNameFor(atoi(entry.first.c_str()), entry.second)] =
+                customDir + "\\" + MusicPackage::SafeFileName(entry.second);
+        BgmReplacementManager::AddSetupDestinations(manifest, kPlaylistSetupPrefix, stem, destinations);
+        return destinations;
+    });
+    LogMusic("MusicManager: Loading playlist \"%s\"\n", path.c_str());
+    return true;
+}
+
+void MusicManager::PollPlaylistJobs() {
+    if (m_playlistExport.valid() &&
+        m_playlistExport.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+        const MusicPackage::WriteResult result = m_playlistExport.get();
+        const std::string name = MusicPackage::FileNameOf(m_playlistPath);
+        if (!result.ok) {
+            SetPlaylistMessage("Could not save the playlist: " + result.error, false);
+        } else {
+            RememberRecentPlaylist(m_playlistPath);
+            SavePreferences();
+            SetPlaylistMessage(result.missingSongs.empty()
+                ? "Saved " + name + " (" + std::to_string(result.songsWritten) + " song file(s) included)."
+                : "Saved " + name + ", leaving out " + std::to_string(result.missingSongs.size()) + " song(s) no longer on disk.",
+                result.missingSongs.empty());
+        }
+    }
+
+    // A rescan asked for while another was still running: start it once that one is done.
+    if (m_playlistRescanQueued && !m_customMusicLoading) {
+        m_playlistRescanQueued = false;
+        RescanCustomMusic();
+    }
+
+    if (!m_playlistImport.valid() ||
+        m_playlistImport.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        return;
+    }
+    const MusicPackage::ReadResult result = m_playlistImport.get();
+    const std::string name = MusicPackage::FileNameOf(m_playlistPath);
+    if (!result.ok) {
+        SetPlaylistMessage("Could not load " + name + ": " + result.error, false);
+        return;
+    }
+    const MusicPackage::Manifest& manifest = result.manifest;
+
+    m_enabled = manifest.Get("Settings", "Enabled", m_enabled ? "1" : "0") == "1";
+    m_rotationMode = manifest.Get("Settings", "RotationMode", "1") == "1" ? MusicRotationMode::Sequential : MusicRotationMode::Shuffle;
+    m_repeatSingle = manifest.Get("Settings", "RepeatSingle", "0") == "1";
+    m_matchStartTrackChoice = ParseMatchTrackChoice(manifest.Get("Settings", "MatchStartTrack", "0"), m_matchStartTrackChoice);
+    m_rematchTrackChoice = ParseMatchTrackChoice(manifest.Get("Settings", "RematchTrack", "0"), m_rematchTrackChoice);
+    m_categoryExpanded.clear();
+    for (const auto& entry : manifest.Section("CollapsedCategories")) {
+        if (entry.second == "1") m_categoryExpanded[entry.first] = false;
+    }
+
+    // Native tracks: only ids this build knows, so a playlist from a newer build cannot
+    // invent rows.
+    for (const auto& entry : manifest.Section("NativeTracks")) {
+        const int id = atoi(entry.first.c_str());
+        if (id >= 0 && id < kCustomTrackIdBase)
+            m_trackEnabled[id] = entry.second == "1";
+    }
+
+    // The music replacements the playlist was saved with, exactly. A playlist from before
+    // they were carried leaves the current ones alone.
+    auto& replacements = BgmReplacementManager::GetInstance();
+    std::string setupNote;
+    if (manifest.Get("Package", "HasMusicSetup") == "1") {
+        const BgmReplacementManager::SetupResult setup = replacements.ApplySetup(result, kPlaylistSetupPrefix, true);
+        setupNote = std::to_string(setup.applied) + " music replacement(s)";
+        if (setup.skipped > 0)
+            setupNote += " (" + std::to_string(setup.skipped) + " skipped: tracks not on this copy of the game)";
+    }
+    m_playlistSetupNote = setupNote;
+
+    // Replacements are named by the track they stand in for. Every replacement id gets an
+    // answer, listed or not, so one assigned after this load also follows the playlist.
+    for (const auto& track : replacements.GetTracks()) {
+        const std::string listed = manifest.Get("Replacements", track.baseName);
+        m_trackEnabled[kReplacementTrackIdBase + track.tableIndex] = listed == "1";
+    }
+
+    // Custom songs: the file name each landed under (it can differ from the one in the
+    // playlist when the custom folder already had another song by that name).
+    m_pendingPlaylistSongs.clear();
+    for (const auto& entry : manifest.Section("Songs")) {
+        auto it = result.extracted.find(MusicPackage::ArchiveNameFor(atoi(entry.first.c_str()), entry.second));
+        if (it == result.extracted.end()) continue;
+        const std::string fileName = MusicPackage::FileNameOf(it->second);
+        m_pendingPlaylistSongs[fileName] = manifest.Get("SongEnabled", entry.first, "1") == "1";
+        const std::string volume = manifest.Get("SongVolume", entry.first);
+        if (!volume.empty()) m_customTrackVolume[fileName] = (float)atof(volume.c_str());
+        else m_customTrackVolume.erase(fileName);
+    }
+
+    RememberRecentPlaylist(m_playlistPath);
+    SavePreferences();
+
+    // The songs only get ids once the custom folder has been scanned again.
+    m_playlistWaitingForSongs = true;
+    if (m_customMusicLoading) {
+        m_playlistRescanQueued = true;
+    } else {
+        RescanCustomMusic();
+    }
+    LogMusic("MusicManager: Playlist \"%s\" applied; %d custom song(s) waiting for the rescan\n",
+        m_playlistPath.c_str(), (int)m_pendingPlaylistSongs.size());
+}
+
+void MusicManager::ApplyPendingPlaylistSongs() {
+    m_playlistWaitingForSongs = false;
+    int ticked = 0;
+    for (const auto& row : m_customTrackRows) {
+        auto it = m_pendingPlaylistSongs.find(GetCustomTrackSourceName(row.id));
+        const bool enabled = it != m_pendingPlaylistSongs.end() && it->second;
+        m_trackEnabled[row.id] = enabled;
+        if (enabled) ++ticked;
+    }
+    m_pendingPlaylistSongs.clear();
+    if (m_rotationMode == MusicRotationMode::Shuffle) ShufflePlaylist();
+    SavePreferences();
+    // No count of ticked tracks: replacements still converting join the list a moment
+    // later, so any total taken now is short.
+    std::string message = "Loaded " + MusicPackage::FileNameOf(m_playlistPath) + ": " +
+        std::to_string(ticked) + " custom song(s)";
+    if (!m_playlistSetupNote.empty())
+        message += " and " + m_playlistSetupNote;
+    m_playlistSetupNote.clear();
+    SetPlaylistMessage(message + ".", true);
+}
+
+void MusicManager::RememberRecentPlaylist(const std::string& path) {
+    m_recentPlaylists.erase(std::remove_if(m_recentPlaylists.begin(), m_recentPlaylists.end(),
+        [&](const std::string& p) { return _stricmp(p.c_str(), path.c_str()) == 0; }), m_recentPlaylists.end());
+    m_recentPlaylists.insert(m_recentPlaylists.begin(), path);
+    if (m_recentPlaylists.size() > 10) m_recentPlaylists.resize(10);
+}
+
+void MusicManager::ForgetRecentPlaylist(const std::string& path) {
+    m_recentPlaylists.erase(std::remove(m_recentPlaylists.begin(), m_recentPlaylists.end(), path), m_recentPlaylists.end());
+    SavePreferences();
+}
+
+void MusicManager::SetPlaylistMessage(const std::string& message, bool ok) {
+    LogMusic("MusicManager: %s\n", message.c_str());
+    m_playlistMessage = message;
+    m_playlistMessageOk = ok;
+    m_hasPlaylistMessage = true;
+}
+
+bool MusicManager::ConsumePlaylistMessage(std::string& message, bool& ok) {
+    if (!m_hasPlaylistMessage) return false;
+    message = m_playlistMessage;
+    ok = m_playlistMessageOk;
+    m_hasPlaylistMessage = false;
+    return true;
+}

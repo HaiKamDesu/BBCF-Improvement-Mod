@@ -1,5 +1,6 @@
 #pragma once
 #include "AudioDecode.h"
+#include "MusicPackage.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -27,6 +28,7 @@ enum class BgmReplacementState
 	Missing,      // assigned, but the converted file is gone - pointer left alone
 	Failed,       // conversion failed
 	Unavailable,  // the shipped track isn't installed, so there's nothing to stand in for
+	Off,          // converted and on disk, but turned off by the user - the original plays
 };
 
 // When a swap to this track actually starts being heard. The game does not load every BGM
@@ -84,7 +86,10 @@ public:
 	// BuildReplacementPacFromPac), which is what lets one shipped track stand in for
 	// another and what makes a .pac from a music mod usable directly. Everything else about
 	// the assignment - persistence, Retry, the pointer dance - is identical.
-	void Assign(int tableIndex, const std::string& mp3Path);
+	//
+	// `gainDb`, when given, is the volume to build it at (a pack carries one per track);
+	// otherwise a re-conversion of the same song keeps its volume and a new song starts at 0.
+	void Assign(int tableIndex, const std::string& mp3Path, const float* gainDb = nullptr);
 
 	// Assign the shipped file of `sourceTableIndex` as the replacement for `tableIndex`.
 	// Both must be installed tracks; a no-op otherwise.
@@ -104,6 +109,11 @@ public:
 	float GetHeadroomDb(int tableIndex) const;
 	// The song's own ReplayGain if it had one; false when it did not.
 	bool GetTagGainDb(int tableIndex, float& outGainDb) const;
+	// A replacement can be switched off without being forgotten: the original plays, and
+	// switching it back on is instant because the converted file is kept.
+	bool IsEnabled(int tableIndex) const;
+	void SetEnabled(int tableIndex, bool enabled);
+
 	// Restores the pointer, forgets the assignment and deletes the converted file.
 	void Unassign(int tableIndex);
 	// Drops every assignment.
@@ -163,6 +173,64 @@ public:
 	// skip rebuilding its own list. Allocates nothing; only equality is meaningful.
 	unsigned int GetActiveSignature() const;
 
+	// ---- Song library ---------------------------------------------------------------
+	// The songs the user has brought in, whether or not each one replaces anything yet.
+	// Adding songs and then choosing what each replaces is what lets a whole set be put
+	// together in one go instead of one track at a time. A song stays in the library after
+	// its last replacement is undone, until it is removed. Every song an older build had
+	// assigned is part of it from the first load, so nothing is lost on the upgrade.
+	// One of the game's own tracks can be a library song too, to play it in place of others.
+	struct LibrarySong
+	{
+		std::string      path;       // the audio file, or the shipped .pac for a game track
+		std::string      name;       // its file name, or the game track's name
+		bool             exists = true;
+		int              vanillaTrack = -1;   // the game track it is, or -1 for a user file
+		std::vector<int> replaces;   // table indices it stands in for, in table order
+	};
+	std::vector<LibrarySong> GetLibrary() const;
+	// Adds files to the library; returns how many were new.
+	int AddToLibrary(const std::vector<std::string>& paths);
+	// Adds one of the game's own tracks as a song; returns its library path, empty if it
+	// is not installed.
+	std::string AddVanillaToLibrary(int sourceTableIndex);
+	// Removes a song, undoing every replacement it was used for.
+	void RemoveFromLibrary(const std::string& path);
+	// Makes `path` the song for this track, whichever kind of song it is.
+	void AssignSong(int tableIndex, const std::string& path);
+
+	// ---- Packs (*.bbcfim-music) -----------------------------------------------------
+	// A pack is the whole setup in one file: every library song and what each replaces,
+	// with its volume. Export and import run in the background; Update() finishes them.
+	bool ExportPack(const std::string& path);
+	// `replaceEverything` undoes the current setup first; otherwise the pack's
+	// replacements are added on top, taking over only the tracks the pack sets.
+	bool ImportPack(const std::string& path, bool replaceEverything);
+	bool IsPackBusy() const { return m_exportJob.valid() || m_importJob.valid(); }
+	// The outcome of the last export/import, once: true when there is one to show.
+	bool ConsumePackMessage(std::string& message, bool& ok);
+
+	// ---- The setup inside another file ----------------------------------------------
+	// A playlist carries the whole replacement setup too, so the pieces a pack is made of
+	// are open to it. Every section is named `prefix` + its name ("" for a pack itself);
+	// songs are numbered on from the ones already in `songs`.
+	void WriteSetup(MusicPackage::Manifest& manifest, std::vector<MusicPackage::SongFile>& songs,
+		const std::string& prefix) const;
+	// Where each of the setup's songs goes when the file is opened: a folder per file, so
+	// two files with a song of the same name keep both.
+	static void AddSetupDestinations(const MusicPackage::Manifest& manifest, const std::string& prefix,
+		const std::string& fileStem, std::map<std::string, std::string>& destinations);
+	struct SetupResult
+	{
+		int songs = 0;
+		int applied = 0;
+		int skipped = 0;   // tracks this copy of the game does not have
+	};
+	// Puts the file's setup in place. `replaceEverything` makes it exactly the file's;
+	// otherwise it is added on top, taking over only the tracks the file sets. A track
+	// already playing the same song at the same volume is left alone, not converted again.
+	SetupResult ApplySetup(const MusicPackage::ReadResult& result, const std::string& prefix, bool replaceEverything);
+
 	// True when this replacement's pointer was already in the table before the game loaded
 	// the track, so it is what you are hearing now. Only ever false for a GameRestart track
 	// that was swapped mid-session: those are read once during the game's boot, so the swap
@@ -189,6 +257,8 @@ private:
 		bool  hasTagGain = false;
 		// Whether the pointer was in place before the game's boot read this entry.
 		bool  appliedBeforeBoot = false;
+		// Switched off by the user: kept and converted, but the pointer stays original.
+		bool  enabled = true;
 	};
 
 	struct Job
@@ -231,6 +301,12 @@ private:
 	void Save();
 	void Load();
 
+	// The shipped track whose own file `path` is (a vanilla stand-in), or -1.
+	int VanillaTrackForSource(const std::string& path) const;
+	void RememberInLibrary(const std::string& path);
+	void FinishPackJobs();
+	void SetPackMessage(const std::string& message, bool ok);
+
 	bool        m_initialized = false;
 	// Set only while Initialize() re-applies saved assignments, which happens before the
 	// game's own boot audio init; distinguishes those from mid-session swaps.
@@ -241,6 +317,15 @@ private:
 
 	std::vector<BgmReplaceableTrack> m_tracks;
 	std::map<int, Assignment>        m_assignments;
+	std::vector<std::string>         m_library;   // song paths, in the order added
+
+	std::future<MusicPackage::WriteResult> m_exportJob;
+	std::future<MusicPackage::ReadResult>  m_importJob;
+	std::string m_packPath;
+	bool        m_importReplace = false;
+	std::string m_packMessage;
+	bool        m_packMessageOk = true;
+	bool        m_hasPackMessage = false;
 
 	std::deque<Job>        m_pending;
 	std::future<JobResult> m_inFlight;

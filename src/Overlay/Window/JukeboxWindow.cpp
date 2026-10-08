@@ -9,6 +9,7 @@
 #include "Audio/AudioDecode.h"
 #include "Audio/BgmReplacementManager.h"
 #include "Core/NativeFileDialog.h"
+#include "MusicListStyle.h"
 #include "Core/utils.h"
 
 #include <Windows.h>
@@ -22,6 +23,13 @@
 namespace
 {
 	const char* const kJukeboxDialogOwner = "jukebox_window";
+	const char* const kPlaylistSaveOwner = "jukebox_playlist_save";
+	const char* const kPlaylistLoadOwner = "jukebox_playlist_load";
+
+	std::string PlaylistFilterDescription()
+	{
+		return L("Improvement Mod Jukebox playlist") + " (*." + MusicPackage::kPlaylistExtension + ")";
+	}
 	const char* const kCustomDirRel = "data/Sound/BGM/custom";
 
 	// Centres a row of buttons whose combined width is known, so a dialog's actions sit
@@ -65,38 +73,23 @@ void JukeboxWindow::Draw() {
 	// DrawTrackList holds pointers into it for the length of one frame.
 	musicManager.SyncReplacementTracks();
 	PollImportDialog();
+	PollPlaylistDialogs();
+	musicManager.PollPlaylistJobs();
 	PollRestartAfterVolume();
 
-	DrawControls();
-	ImGui::SameLine();
-	DrawImportButton();
-	ImGui::Separator();
 	DrawCurrentTrackInfo();
-	ImGui::Separator();
+	ImGui::Spacing();
+	DrawControls();
 	DrawTrackList();
 	DrawDeleteTrackModal();
 }
 
+// The everyday controls on two rows - rotation on/off with its options behind one button,
+// then adding music, playlists and the search - and nothing else. Every setting the window
+// used to lay out in full is one click away in the Options popup.
 void JukeboxWindow::DrawControls() {
 	MusicManager& musicManager = GetMusicManager();
 
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), "%s", L("Jukebox").c_str());
-
-	ImGui::Spacing();
-
-	if (musicManager.IsCustomMusicLoading()) {
-		std::string status = musicManager.GetCustomMusicStatus();
-		ImGui::Text("%s", L("Loading custom music...").c_str());
-		ImGui::ProgressBar(musicManager.GetCustomMusicProgress(), ImVec2(-1, 0), "");
-		ImGui::TextDisabledWrapped("%s", status.c_str());
-		ImGui::Spacing();
-	} else if (musicManager.HasStartedCustomMusicDiscovery()) {
-		std::string status = musicManager.GetCustomMusicStatus();
-		ImGui::TextDisabledWrapped("%s", status.c_str());
-		ImGui::Spacing();
-	}
-
-	// Enable checkbox
 	bool enabled = musicManager.IsEnabled();
 	if (ImGui::Checkbox(L("Enable Music Rotation").c_str(), &enabled)) {
 		musicManager.SetEnabled(enabled);
@@ -105,7 +98,69 @@ void JukeboxWindow::DrawControls() {
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(L("Enable/disable automatic music rotation in-game").c_str());
 
-	ImGui::Spacing();
+	const std::string optionsLabel = L("Options");
+	ImGui::SameLine((std::max)(ImGui::GetCursorPosX(),
+		ImGui::GetContentRegionMax().x - ImGui::ButtonWidth(optionsLabel.c_str())));
+	if (ImGui::Button(optionsLabel.c_str()))
+		ImGui::OpenPopup("##jukebox_options");
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Rotation mode, what plays when a match starts and on a rematch, repeat, and resetting everything.").c_str());
+	MusicListStyle::AnchorNextPopupBelowLastItem();
+	DrawOptionsPopup();
+
+	// Row two: add music, playlists, search.
+	DrawImportButton();
+	ImGui::SameLine();
+	const std::string playlistLabel = L("Playlist");
+	if (ImGui::Button((playlistLabel + "  v").c_str()))
+		ImGui::OpenPopup("##jukebox_playlists");
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("A playlist file holds all of your music: the ticked tracks, the settings above, your custom songs and your music replacements, the song files included. Save one per mood and swap between them any time, or share it as a music pack.").c_str());
+	MusicListStyle::AnchorNextPopupBelowLastItem();
+	DrawPlaylistMenu();
+
+	char ticked[64];
+	snprintf(ticked, sizeof(ticked), "%d / %d", (int)musicManager.GetEnabledTracks().size(),
+		(int)musicManager.GetAllTracks().size());
+	const float tickedWidth = ImGui::CalcTextSize(ticked).x;
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth((std::max)(80.0f, ImGui::GetContentRegionAvail().x - tickedWidth - ImGui::GetStyle().ItemSpacing.x));
+	ImGui::InputTextWithHint("##search", L("Search Tracks").c_str(), m_searchBuffer, sizeof(m_searchBuffer),
+		ImGuiInputTextFlags_AutoSelectAll);
+	ImGui::SameLine();
+	ImGui::TextDisabled("%s", ticked);
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Ticked tracks out of all tracks. Only ticked tracks play in rotation.").c_str());
+
+	// Only while something is actually happening.
+	if (musicManager.IsCustomMusicLoading()) {
+		ImGui::TextDisabled("%s", L("Loading custom music...").c_str());
+		ImGui::ProgressBar(musicManager.GetCustomMusicProgress(), ImVec2(-1, 3.0f), "");
+	}
+	std::string message;
+	bool ok = true;
+	if (musicManager.ConsumePlaylistMessage(message, ok)) {
+		m_playlistMessage = message;
+		m_playlistMessageOk = ok;
+	}
+	if (musicManager.IsPlaylistBusy())
+		ImGui::TextColoredWrapped(ImVec4(1.0f, 0.85f, 0.35f, 1.0f), "%s", L("Working on the playlist, please wait...").c_str());
+	else if (!m_playlistMessage.empty())
+		ImGui::TextColoredWrapped(m_playlistMessageOk ? ImVec4(0.35f, 0.90f, 0.65f, 1.0f) : ImVec4(1.0f, 0.75f, 0.30f, 1.0f),
+			"%s", m_playlistMessage.c_str());
+}
+
+void JukeboxWindow::DrawOptionsPopup() {
+	MusicListStyle::OpaquePopup opaque;
+	if (!ImGui::BeginPopup("##jukebox_options"))
+		return;
+	MusicManager& musicManager = GetMusicManager();
+	// Wide enough for the longest answer, so no choice is cut off.
+	float longest = 0.0f;
+	for (const char* key : { "Play the track picked at Character Select", "Play the next track in the playlist",
+		"Play the last track the Jukebox played" })
+		longest = (std::max)(longest, ImGui::CalcTextSize(L(key).c_str()).x);
+	const float comboWidth = longest + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.x * 3.0f;
 
 	// Rotation mode (Random and Shuffle are merged: both play in shuffled order)
 	ImGui::Text("%s", L("Rotation Mode:").c_str());
@@ -114,9 +169,9 @@ void JukeboxWindow::DrawControls() {
 		L("Sequential: play tracks in order") + "\n" +
 		L("Shuffle: play tracks in a shuffled order, no repeats until all have played");
 	ImGui::ShowHelpMarker(rotationHelp.c_str());
-
 	int modeInt = (musicManager.GetRotationMode() == MusicRotationMode::Sequential) ? 0 : 1;
 	const std::string rotationItems = L("Sequential") + '\0' + L("Shuffle") + '\0';
+	ImGui::SetNextItemWidth(comboWidth);
 	if (ImGui::Combo("##RotationMode", &modeInt, rotationItems.c_str())) {
 		musicManager.SetRotationMode(modeInt == 0 ? MusicRotationMode::Sequential : MusicRotationMode::Shuffle);
 		musicManager.SavePreferences();
@@ -136,13 +191,13 @@ void JukeboxWindow::DrawControls() {
 		L("Play the next track in the playlist") + '\0' +
 		L("Play the last track the Jukebox played") + '\0';
 
+	ImGui::Spacing();
 	ImGui::BeginDisabled(!rotationOn);
-
 	ImGui::Text("%s", L("When a match starts:").c_str());
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(L("What plays when you enter a match - Training, local VS or Online. Leave it on the Character Select track to keep the song the game picked; pick a playlist option to hear only the tracks you have ticked below.").c_str());
-
 	int matchStartChoice = static_cast<int>(musicManager.GetMatchStartTrackChoice());
+	ImGui::SetNextItemWidth(comboWidth);
 	if (ImGui::Combo("##MatchStartTrack", &matchStartChoice, choiceItems.c_str())) {
 		musicManager.SetMatchStartTrackChoice(static_cast<MatchTrackChoice>(matchStartChoice));
 		musicManager.SavePreferences();
@@ -151,23 +206,20 @@ void JukeboxWindow::DrawControls() {
 	ImGui::Text("%s", L("When you rematch:").c_str());
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(L("What plays on the next match of a set in local VS and Online, after the victory screen. Training never gets here - it uses the setting above.").c_str());
-
 	int rematchChoice = static_cast<int>(musicManager.GetRematchTrackChoice());
+	ImGui::SetNextItemWidth(comboWidth);
 	if (ImGui::Combo("##RematchTrack", &rematchChoice, choiceItems.c_str())) {
 		musicManager.SetRematchTrackChoice(static_cast<MatchTrackChoice>(rematchChoice));
 		musicManager.SavePreferences();
 	}
-
 	ImGui::EndDisabled();
-
 	if (!rotationOn) {
+		ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + comboWidth);
 		ImGui::TextDisabledWrapped("%s", L("Turn on \"Enable Music Rotation\" above for these two to do anything.").c_str());
+		ImGui::PopTextWrapPos();
 	}
 
 	ImGui::Spacing();
-
-	// Repeat settings
-	ImGui::HorizontalSpacing();
 	bool repeatSingle = musicManager.IsRepeatSingle();
 	if (ImGui::Checkbox(L("Repeat Single").c_str(), &repeatSingle)) {
 		musicManager.SetRepeatSingle(repeatSingle);
@@ -176,26 +228,7 @@ void JukeboxWindow::DrawControls() {
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(L("Repeat the current track instead of playing a new one").c_str());
 
-	ImGui::Spacing();
-
-	// Play button — advance per the rotation mode (Sequential / Shuffle).
-	if (ImGui::Button(L("Play Next >|").c_str())) {
-		musicManager.PlayNextTrack();
-	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltipWrapped(L("Play the next track (per the rotation mode)").c_str());
-	ImGui::SameLine();
-	ImGui::TextDisabled("%s: %s", L("Shortcut").c_str(),
-		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_JukeboxNextTrack)).c_str());
-
-	ImGui::Spacing();
-
-	// Search bar
-	ImGui::InputText(L("Search Tracks").c_str(), m_searchBuffer, sizeof(m_searchBuffer),
-		ImGuiInputTextFlags_AutoSelectAll);
-
-	ImGui::Spacing();
-
-	// Enable/Disable all
+	ImGui::Separator();
 	if (ImGui::Button(L("Enable All").c_str())) {
 		for (const auto& track : musicManager.GetAllTracks()) {
 			if (!musicManager.IsTrackEnabled(track.id)) {
@@ -214,19 +247,21 @@ void JukeboxWindow::DrawControls() {
 		musicManager.SavePreferences();
 	}
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker(L("Enable/Disable all tracks at once").c_str());
+	if (ImGui::Button(L("Reset Preferences").c_str())) {
+		musicManager.ResetPreferences();
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Reset all settings and re-enable all tracks").c_str());
 
-	ImGui::Spacing();
-
-    // Reset button
-    if (ImGui::Button(L("Reset Preferences").c_str())) {
-        musicManager.ResetPreferences();
-    }
-    ImGui::SameLine();
-    ImGui::ShowHelpMarker(L("Reset all settings and re-enable all tracks").c_str());
+	ImGui::TextDisabled("%s: %s %s, %s %s", L("Shortcuts").c_str(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_JukeboxNextTrack)).c_str(),
+		L("next track").c_str(),
+		HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_ToggleJukebox)).c_str(),
+		L("this window").c_str());
+	ImGui::EndPopup();
 }
 
-// Copies a chosen audio file into the custom folder and rescans. Adding music otherwise
+// Copies chosen audio files into the custom folder and rescans. Adding music otherwise
 // meant finding data/Sound/BGM/custom yourself and restarting the game.
 void JukeboxWindow::DrawImportButton() {
 	MusicManager& musicManager = GetMusicManager();
@@ -237,27 +272,31 @@ void JukeboxWindow::DrawImportButton() {
 		NativeFileDialog::Request request;
 		request.title = "Add music to the Jukebox";
 		request.filters.push_back({ AudioDecode::FilterDescription(), AudioDecode::FilterPattern() });
+		request.allowMultiple = true;
 		NativeFileDialog::Open(kJukeboxDialogOwner, request);
 	}
 	ImGui::EndDisabled();
 
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltipWrapped(
-			L("Copies a song into the Jukebox's custom folder and converts it. Accepts "
-			  "every format the mod can read, not just MP3.").c_str());
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+		ImGui::SetTooltipWrapped((L("Copies songs into the Jukebox's custom folder and converts them. Accepts "
+			"every format the mod can read, not just MP3.") + "\n\n" + musicManager.GetCustomMusicStatus()).c_str());
 	}
 }
+
+
 
 void JukeboxWindow::PollImportDialog() {
 	NativeFileDialog::Result result;
 	if (!NativeFileDialog::Consume(kJukeboxDialogOwner, &result))
 		return;
-	if (!result.accepted || result.path.empty())
+	if (!result.accepted || result.paths.empty())
 		return;
 
-	const std::string fileName = FileNameOf(result.path);
 	const std::string destDir = GamePath(kCustomDirRel);
 	CreateDirectoryW(utf8_to_utf16(destDir).c_str(), NULL);
+	int added = 0;
+	for (const std::string& path : result.paths) {
+	const std::string fileName = FileNameOf(path);
 	const std::string destPath = destDir + "\\" + fileName;
 
 	// The source file has to stay somewhere the scan can find it on later launches, which
@@ -265,20 +304,24 @@ void JukeboxWindow::PollImportDialog() {
 	// track survive the user moving or deleting the original.
 	// Wide copy: the chosen path and the name it keeps can both be outside the system
 	// codepage, and an ANSI copy would silently mangle them.
-	if (CopyFileW(utf8_to_utf16(result.path).c_str(), utf8_to_utf16(destPath).c_str(), FALSE) == 0) {
+	if (CopyFileW(utf8_to_utf16(path).c_str(), utf8_to_utf16(destPath).c_str(), FALSE) == 0) {
 		const DWORD error = GetLastError();
 		if (g_imGuiLogger)
 			g_imGuiLogger->Log("[error] Could not copy '%s' into the custom folder (error %lu)\n",
 				fileName.c_str(), error);
 		if (g_notificationBar)
 			g_notificationBar->AddNotification(("Could not add " + fileName).c_str());
-		return;
+		continue;
 	}
 
 	if (g_imGuiLogger)
 		g_imGuiLogger->Log("[system] Added '%s' to the Jukebox's custom folder\n", fileName.c_str());
+	++added;
+	}
+	if (added == 0)
+		return;
 	if (g_notificationBar)
-		g_notificationBar->AddNotification(("Converting " + fileName + "...").c_str());
+		g_notificationBar->AddNotification(("Converting " + std::to_string(added) + " song(s)...").c_str());
 
 	GetMusicManager().RescanCustomMusic();
 }
@@ -307,7 +350,8 @@ void JukeboxWindow::PollRestartAfterVolume() {
 	if (musicManager.GetCurrentTrackId() != trackId)
 		return;
 
-	musicManager.PlayTrack(trackId, true);
+	if (musicManager.IsInMatch())
+		musicManager.PlayTrack(trackId, true);
 }
 
 // A small button per row opening a volume popup. A slider on every row would swamp a list
@@ -332,18 +376,14 @@ void JukeboxWindow::DrawTrackVolume(int trackId) {
 
 	const std::string popupId = "##vol" + std::to_string(trackId);
 
-	char label[48];
-	if (saved == 0.0f)
-		snprintf(label, sizeof(label), "%s%s", L("vol").c_str(), popupId.c_str());
-	else
-		snprintf(label, sizeof(label), "%+.0f dB%s", saved, popupId.c_str());
-
-	if (ImGui::SmallButton(label))
+	if (MusicListStyle::VolumeButton(saved, popupId.c_str()))
 		ImGui::OpenPopup(popupId.c_str());
 
 	if (ImGui::IsItemHovered())
 		ImGui::SetTooltipWrapped(L("Set how loud this song is. The file is converted again when you apply it.").c_str());
 
+	MusicListStyle::AnchorNextPopupBelowLastItem();
+	MusicListStyle::OpaquePopup opaque;
 	if (ImGui::BeginPopup(popupId.c_str())) {
 		// The draft only exists while this popup is open, and re-seeds if the stored value
 		// moves underneath it - an apply from the music replacement window, or this one's
@@ -416,83 +456,62 @@ void JukeboxWindow::DrawTrackVolume(int trackId) {
 	}
 }
 
+// Now playing: the track, its time and a thin progress bar, with Next beside it. Outside a
+// match the Jukebox drives nothing, so it says that instead of showing a stale track.
 void JukeboxWindow::DrawCurrentTrackInfo() {
 	MusicManager& musicManager = GetMusicManager();
 
 	const MusicTrack* currentTrack = musicManager.GetCurrentTrack();
-	int currentTrackId = musicManager.GetCurrentTrackId();
-	bool inMatch = musicManager.ShouldShowPlayback();
+	const int currentTrackId = musicManager.GetCurrentTrackId();
+	const bool inMatch = musicManager.ShouldShowPlayback();
 
-	ImGui::Text("%s", L("Current Track:").c_str());
-	ImGui::SameLine();
+	const std::string nextLabel = L("Play Next >|");
+	const float nextWidth = ImGui::ButtonWidth(nextLabel.c_str());
+	ImGui::BeginGroup();
+	ImGui::PushTextWrapPos(ImGui::GetContentRegionMax().x - nextWidth - ImGui::GetStyle().ItemSpacing.x);
 	if (!inMatch) {
-		// The jukebox only drives music during a match.
-		ImGui::TextDisabled("%s", L("None (enter a match)").c_str());
+		ImGui::TextDisabledWrapped("%s", L("Nothing playing - the Jukebox plays during matches.").c_str());
 	} else if (currentTrack) {
-		ImGui::TextColored(ImVec4(0, 1, 1, 1), "%s (ID: %d)", currentTrack->name.c_str(), currentTrack->id);
+		ImGui::PushStyleColor(ImGuiCol_Text, MusicListStyle::CategoryColor(currentTrack->category));
+		ImGui::TextWrapped("%s", currentTrack->name.c_str());
+		ImGui::PopStyleColor();
 	} else if (currentTrackId >= 0) {
 		const char* filename = MusicManager::GetBgmFilename(currentTrackId);
-		if (filename) {
-			ImGui::TextDisabled("%s.pac (ID: %d)", filename, currentTrackId);
-		} else {
-			ImGui::TextDisabled("ID: %d (Unknown track)", currentTrackId);
-		}
+		ImGui::TextDisabledWrapped("%s", filename ? (std::string(filename) + ".pac").c_str() : L("Unknown track").c_str());
 	} else {
 		ImGui::TextDisabled("%s", L("None").c_str());
 	}
+	ImGui::PopTextWrapPos();
 
-	// Song timer — frozen at 00:00 / 00:00 when not in a match.
-	ImGui::Text("%s", L("Time:").c_str());
-	ImGui::SameLine();
-	if (!inMatch) {
-		ImGui::TextColored(ImVec4(0, 1, 0, 1), "00:00");
-		ImGui::SameLine();
-		ImGui::TextDisabled("/ 00:00");
-	} else {
-		ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", musicManager.GetSongTimeString().c_str());
+	if (inMatch) {
+		const int totalFrames = musicManager.GetRotationThresholdFrames();
+		const int totalSec = totalFrames > 0 ? totalFrames / 60 : 0;
+		ImGui::TextDisabled("%s / %02d:%02d", musicManager.GetSongTimeString().c_str(), totalSec / 60, totalSec % 60);
+	}
+	ImGui::EndGroup();
 
-		int totalFrames = musicManager.GetRotationThresholdFrames();
-		if (totalFrames > 0) {
-			int totalSec = totalFrames / 60;
-			int totalMins = totalSec / 60;
-			int totalSecs = totalSec % 60;
-			ImGui::SameLine();
-			ImGui::TextDisabled("/ %02d:%02d", totalMins, totalSecs);
-
-			// Progress bar
-			float progress = (float)musicManager.GetSongPlaybackFrames() / (float)totalFrames;
-			if (progress > 1.0f) progress = 1.0f;
-			ImGui::ProgressBar(progress, ImVec2(-1, 0), "");
-		}
+	ImGui::SameLine((std::max)(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - nextWidth));
+	ImGui::BeginDisabled(!musicManager.IsInMatch());
+	if (ImGui::Button(nextLabel.c_str())) {
+		musicManager.PlayNextTrack();
+	}
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+		ImGui::SetTooltipWrapped((L("Play the next track (per the rotation mode)") + "  (" +
+			HotkeyManager::DisplayString(HotkeyManager::GetBinding(HotkeyManager::Hotkey_JukeboxNextTrack)) + ")").c_str());
 	}
 
-	ImGui::Text("%s: %d / %d", L("Enabled Tracks").c_str(),
-		(int)musicManager.GetEnabledTracks().size(),
-		(int)musicManager.GetAllTracks().size());
+	if (inMatch) {
+		const int totalFrames = musicManager.GetRotationThresholdFrames();
+		float progress = totalFrames > 0 ? (float)musicManager.GetSongPlaybackFrames() / (float)totalFrames : 0.0f;
+		if (progress > 1.0f) progress = 1.0f;
+		ImGui::ProgressBar(progress, ImVec2(-1, 3.0f), "");
+	}
 }
 
-// Category colors
-static const ImVec4 COLOR_BTL  = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);   // Red - Battle themes
-static const ImVec4 COLOR_VS   = ImVec4(0.4f, 0.6f, 1.0f, 1.0f);   // Blue - Versus themes
-static const ImVec4 COLOR_BOSS = ImVec4(0.8f, 0.4f, 1.0f, 1.0f);   // Purple - Boss themes
-static const ImVec4 COLOR_SYS  = ImVec4(1.0f, 1.0f, 0.4f, 1.0f);   // Yellow - System themes
-static const ImVec4 COLOR_OLD  = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);   // Gray - Legacy/old versions
-static const ImVec4 COLOR_STORY = ImVec4(0.4f, 1.0f, 0.6f, 1.0f);  // Light Green - Story themes
-static const ImVec4 COLOR_ASTRAL = ImVec4(1.0f, 0.6f, 0.2f, 1.0f); // Orange - Astral Finish themes
-static const ImVec4 COLOR_CUSTOM = ImVec4(0.2f, 0.8f, 1.0f, 1.0f); // Cyan/Teal - Custom user tracks
-static const ImVec4 COLOR_REPLACEMENT = ImVec4(0.6f, 1.0f, 0.4f, 1.0f); // Green - BGM replacements
-
+// Shared with the music replacement window, so both lists use the same colours.
 static ImVec4 GetCategoryColor(const std::string& category) {
-	if (category == "btl") return COLOR_BTL;
-	if (category == "vs") return COLOR_VS;
-	if (category == "boss") return COLOR_BOSS;
-	if (category == "sys" || category == "sysex") return COLOR_SYS;
-	if (category == "old") return COLOR_OLD;
-	if (category == "story") return COLOR_STORY;
-	if (category == "astral") return COLOR_ASTRAL;
-	if (category == "custom") return COLOR_CUSTOM;
-	if (category == "replacements") return COLOR_REPLACEMENT;
-	return ImVec4(1, 1, 1, 1);
+	return MusicListStyle::CategoryColor(category);
 }
 
 // Only a row the user put there can be deleted: a native track is one of the game's own
@@ -544,6 +563,7 @@ void JukeboxWindow::DrawDeleteTrackModal() {
 		return;
 	}
 
+	MusicListStyle::OpaquePopup opaque;
 	if (!ImGui::BeginPopupModal(modalTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		return;
 	}
@@ -647,19 +667,7 @@ void JukeboxWindow::DrawTrackList() {
 	// Draw category header with a "check all" toggle for the whole category
 		if (track->category != lastCategory) {
 			lastCategory = track->category;
-			ImVec4 catColor = GetCategoryColor(lastCategory);
-			ImGui::Separator();
-			int catState = musicManager.GetCategoryEnabledState(lastCategory);
-			bool catAllOn = (catState == 1);
-			if (ImGui::Checkbox(("##CatAll_" + lastCategory).c_str(), &catAllOn)) {
-				musicManager.SetCategoryEnabled(lastCategory, catAllOn);
-			}
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetTooltipWrapped(catState == -1
-					? L("Mixed: click to enable ALL tracks in this category").c_str()
-					: L("Enable/disable ALL tracks in this category").c_str());
-			}
-			ImGui::SameLine();
+			const int catState = musicManager.GetCategoryEnabledState(lastCategory);
 
 			// Forced open/closed from our own saved state every frame rather than left to
 			// ImGui's, which does not survive the session. The return value is still the
@@ -670,13 +678,13 @@ void JukeboxWindow::DrawTrackList() {
 			// the search puts the collapsed ones back.
 			const bool searching = !searchStr.empty();
 			const bool wasExpanded = musicManager.IsCategoryExpanded(lastCategory);
-			ImGui::SetNextItemOpen(searching || wasExpanded, ImGuiCond_Always);
-			ImGui::PushStyleColor(ImGuiCol_Text, catColor);
-			char header[96];
-			snprintf(header, sizeof(header), "[ %s ]##Cat_%s",
-				lastCategory.c_str(), lastCategory.c_str());
-			categoryOpen = ImGui::CollapsingHeader(header);
-			ImGui::PopStyleColor();
+			ImGui::Spacing();
+			const MusicListStyle::HeaderResult header = MusicListStyle::CategoryHeader(lastCategory, catState, true,
+				searching || wasExpanded, L("Enable/disable ALL tracks in this category").c_str());
+			if (header.checkboxClicked) {
+				musicManager.SetCategoryEnabled(lastCategory, header.checkTo);
+			}
+			categoryOpen = header.open;
 			if (!searching && categoryOpen != wasExpanded) {
 				musicManager.SetCategoryExpanded(lastCategory, categoryOpen);
 			}
@@ -714,14 +722,22 @@ void JukeboxWindow::DrawTrackList() {
 		const float volumeWidth = hasVolume ? 70.0f : 0.0f;
 		const float selectableWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x - volumeWidth);
 
-		if (ImGui::Selectable((std::to_string(track->id) + ": " + track->name + "##Sel" + std::to_string(track->id)).c_str(),
+		if (ImGui::Selectable((track->name + "##Sel" + std::to_string(track->id)).c_str(),
 			isCurrent, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap,
 			ImVec2(selectableWidth, 0.0f)) && ImGui::IsMouseDoubleClicked(0)) {
-			musicManager.PlayTrack(track->id);
+			// Inside a match only: playing a track anywhere else takes the game's BGM slot
+			// over and breaks the next character select (no cursor, no input).
+			if (musicManager.IsInMatch())
+				musicManager.PlayTrack(track->id);
 		}
 
-		if (ImGui::IsItemHovered() && isReplacement) {
-			ImGui::SetTooltipWrapped(L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.").c_str());
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+			// The id is what search also matches; the list itself stays names only.
+			std::string tip = track->name + "  (ID " + std::to_string(track->id) + ")\n" +
+				(musicManager.IsInMatch() ? L("Double-click to play it now.") : L("Double-click it during a match to play it."));
+			if (isReplacement)
+				tip += "\n" + L("Plays the replacement itself. The track it stands in for is still listed separately and still plays the original. Its volume is the same setting the music replacement window shows.");
+			ImGui::SetTooltipWrapped(tip.c_str());
 		}
 
 		// Attached to the Selectable, so it is the row that answers a right-click. It has
@@ -740,4 +756,67 @@ void JukeboxWindow::DrawTrackList() {
 	}
 
 	ImGui::EndChild();
+}
+
+void JukeboxWindow::DrawPlaylistMenu() {
+	MusicListStyle::OpaquePopup opaque;
+	if (!ImGui::BeginPopup("##jukebox_playlists"))
+		return;
+	MusicManager& musicManager = GetMusicManager();
+	const bool busy = NativeFileDialog::IsOpen() || musicManager.IsPlaylistBusy();
+
+	if (ImGui::MenuItem(L("Save playlist...").c_str(), nullptr, false, !busy)) {
+		NativeFileDialog::Request request;
+		request.save = true;
+		request.title = L("Save this Jukebox playlist");
+		request.filters.push_back({ PlaylistFilterDescription(), std::string("*.") + MusicPackage::kPlaylistExtension });
+		request.defaultExtension = MusicPackage::kPlaylistExtension;
+		request.initialPath = std::string("My playlist.") + MusicPackage::kPlaylistExtension;
+		NativeFileDialog::Open(kPlaylistSaveOwner, request);
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.").c_str());
+	if (ImGui::MenuItem(L("Load playlist...").c_str(), nullptr, false, !busy)) {
+		NativeFileDialog::Request request;
+		request.title = L("Load a Jukebox playlist");
+		request.filters.push_back({ PlaylistFilterDescription(), std::string("*.") + MusicPackage::kPlaylistExtension });
+		NativeFileDialog::Open(kPlaylistLoadOwner, request);
+	}
+
+	// The recent ones, for swapping with one click.
+	const std::vector<std::string> recent = musicManager.GetRecentPlaylists();
+	if (!recent.empty()) {
+		ImGui::Separator();
+		ImGui::TextDisabled("%s", L("Recent").c_str());
+		for (const std::string& path : recent) {
+			ImGui::PushID(path.c_str());
+			const bool exists = GetFileAttributesW(utf8_to_utf16(path).c_str()) != INVALID_FILE_ATTRIBUTES;
+			const std::string name = MusicPackage::StemOf(path);
+			if (ImGui::MenuItem(exists ? name.c_str() : (name + "  (" + L("file not found") + ")").c_str(), nullptr, false, !busy)) {
+				if (exists) {
+					musicManager.ImportPlaylist(path);
+					m_playlistMessage.clear();
+				} else {
+					musicManager.ForgetRecentPlaylist(path);
+				}
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltipWrapped(exists ? path.c_str() : L("This file was moved or deleted. Click to take it off the list.").c_str());
+			ImGui::PopID();
+		}
+	}
+	ImGui::EndPopup();
+}
+
+void JukeboxWindow::PollPlaylistDialogs() {
+	MusicManager& musicManager = GetMusicManager();
+	NativeFileDialog::Result result;
+	if (NativeFileDialog::Consume(kPlaylistSaveOwner, &result) && result.accepted && !result.path.empty()) {
+		if (musicManager.ExportPlaylist(result.path))
+			m_playlistMessage.clear();
+	}
+	if (NativeFileDialog::Consume(kPlaylistLoadOwner, &result) && result.accepted && !result.path.empty()) {
+		if (musicManager.ImportPlaylist(result.path))
+			m_playlistMessage.clear();
+	}
 }

@@ -206,6 +206,17 @@ bool BgmReplacementManager::ApplyPointer(int tableIndex)
 	if (it == m_assignments.end())
 		return false;
 
+	// Switched off: the file is kept, the game keeps its own.
+	if (!it->second.enabled)
+	{
+		RestorePointer(tableIndex);
+		const bool usable = LooksLikeUsablePac(it->second.pacPath);
+		it->second.state = usable ? BgmReplacementState::Off : BgmReplacementState::Missing;
+		if (!usable)
+			it->second.error = "The converted file is gone - use Rebuild to make it again";
+		return false;
+	}
+
 	// The one rule that must never be broken: a table entry pointing at a file that isn't
 	// there hangs the game during match load rather than falling back to silence.
 	if (!LooksLikeUsablePac(it->second.pacPath))
@@ -628,6 +639,7 @@ void BgmReplacementManager::Update()
 	}
 
 	StartNextJob();
+	FinishPackJobs();
 
 	if (!IsBusy() && m_batchTotal != 0)
 	{
@@ -653,7 +665,7 @@ float BgmReplacementManager::GetBatchProgress() const
 // Assignment
 // ---------------------------------------------------------------------------------------
 
-void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
+void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path, const float* gainDb)
 {
 	if (!m_initialized)
 		return;
@@ -695,9 +707,17 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	const std::string outDir = GamePath(track->originalDir + "/" + kReplacementDir);
 	CreateDirectoryA(outDir.c_str(), NULL);
 
+	// Whatever a track is given, the song stays in the library for reuse.
+	RememberInLibrary(mp3Path);
+
 	// Carry the gain over when this is a re-conversion of the same file - that is what
 	// SetGain and Retry both go through. A genuinely new song starts on auto again.
 	float carriedGain = 0.0f;
+	if (gainDb)
+	{
+		carriedGain = *gainDb;
+	}
+	else
 	{
 		auto prior = m_assignments.find(tableIndex);
 		if (prior != m_assignments.end() && prior->second.sourcePath == mp3Path)
@@ -707,6 +727,12 @@ void BgmReplacementManager::Assign(int tableIndex, const std::string& mp3Path)
 	Assignment assignment;
 	assignment.sourcePath = mp3Path;
 	assignment.gainDb = carriedGain;
+	{
+		// A volume change or rebuild of a switched-off replacement leaves it off.
+		auto prior = m_assignments.find(tableIndex);
+		if (prior != m_assignments.end() && prior->second.sourcePath == mp3Path)
+			assignment.enabled = prior->second.enabled;
+	}
 	assignment.pacPath = outDir + "/" + track->fileName;
 	assignment.relPath = std::string(kReplacementDir) + "/" + track->fileName;
 	assignment.state = BgmReplacementState::Converting;
@@ -841,6 +867,29 @@ void BgmReplacementManager::Unassign(int tableIndex)
 		m_original[tableIndex] ? m_original[tableIndex] : "(null)");
 
 	m_assignments.erase(it);
+	Save();
+}
+
+bool BgmReplacementManager::IsEnabled(int tableIndex) const
+{
+	auto it = m_assignments.find(tableIndex);
+	return it != m_assignments.end() && it->second.enabled;
+}
+
+void BgmReplacementManager::SetEnabled(int tableIndex, bool enabled)
+{
+	auto it = m_assignments.find(tableIndex);
+	if (it == m_assignments.end() || it->second.enabled == enabled)
+		return;
+	it->second.enabled = enabled;
+	// Mid-conversion the finished job applies (or not) by the flag; nothing to do now.
+	if (it->second.state != BgmReplacementState::Converting &&
+		it->second.state != BgmReplacementState::Failed &&
+		it->second.state != BgmReplacementState::Unavailable)
+	{
+		ApplyPointer(tableIndex); // restores the original instead while switched off
+	}
+	LogRepl("Entry %d switched %s\n", tableIndex, enabled ? "on" : "off");
 	Save();
 }
 
@@ -1096,6 +1145,25 @@ void BgmReplacementManager::Save()
 			continue;
 		file << track->baseName << "=" << entry.second.gainDb << "\n";
 	}
+
+	// Replacements switched off. An older build does not know the section and plays them.
+	file << "\n";
+	file << "# Replacements that are switched off: kept, but the original plays.\n";
+	file << "[Off]\n";
+	for (const auto& entry : m_assignments)
+	{
+		const BgmReplaceableTrack* track = FindTrack(entry.first);
+		if (track && !entry.second.sourcePath.empty() && !entry.second.enabled)
+			file << track->baseName << "=1\n";
+	}
+
+	// Songs brought in, used or not. Older builds skip a section they do not know, so
+	// this file still loads in them, minus the songs that replace nothing.
+	file << "\n";
+	file << "# Every song in the library, in the order it was added.\n";
+	file << "[Library]\n";
+	for (const std::string& song : m_library)
+		file << "song=" << song << "\n";
 }
 
 void BgmReplacementManager::Load()
@@ -1106,6 +1174,7 @@ void BgmReplacementManager::Load()
 
 	std::string line;
 	std::string section;
+	bool sawLibrary = false;
 	while (std::getline(file, line))
 	{
 		if (line.empty() || line[0] == '#' || line[0] == ';')
@@ -1113,9 +1182,16 @@ void BgmReplacementManager::Load()
 		if (line.front() == '[' && line.back() == ']')
 		{
 			section = line.substr(1, line.size() - 2);
+			sawLibrary = sawLibrary || section == "Library";
 			continue;
 		}
-		if (section != "Replacements" && section != "Gain")
+		if (section == "Library")
+		{
+			if (line.compare(0, 5, "song=") == 0 && line.size() > 5)
+				RememberInLibrary(line.substr(5));
+			continue;
+		}
+		if (section != "Replacements" && section != "Gain" && section != "Off")
 			continue;
 
 		const size_t eq = line.find('=');
@@ -1134,6 +1210,14 @@ void BgmReplacementManager::Load()
 		{
 			LogRepl("Saved replacement for unknown or missing track \"%s\" - ignored\n",
 				baseName.c_str());
+			continue;
+		}
+
+		if (section == "Off")
+		{
+			auto existing = m_assignments.find(track->tableIndex);
+			if (existing != m_assignments.end())
+				existing->second.enabled = source != "1" ? true : false;
 			continue;
 		}
 
@@ -1157,4 +1241,385 @@ void BgmReplacementManager::Load()
 		assignment.state = BgmReplacementState::Missing;
 		m_assignments[track->tableIndex] = assignment;
 	}
+
+	// Every song in use is in the library: a file from before the library existed starts it
+	// from its assignments, and one from before game tracks could be songs gains those.
+	const size_t listed = m_library.size();
+	for (const auto& entry : m_assignments)
+		RememberInLibrary(entry.second.sourcePath);
+	if (m_library.size() != listed)
+		LogRepl("Added %d song(s) in use to the library%s\n", (int)(m_library.size() - listed),
+			sawLibrary ? "" : " (first load since the library existed)");
+}
+
+// ---------------------------------------------------------------------------------------
+// Song library
+// ---------------------------------------------------------------------------------------
+
+int BgmReplacementManager::VanillaTrackForSource(const std::string& path) const
+{
+	if (!IsPacPath(path))
+		return -1;
+	for (const auto& track : m_tracks)
+	{
+		if (!track.originalDir.empty() &&
+			_stricmp(GamePath(track.originalDir + "/" + track.fileName).c_str(), path.c_str()) == 0)
+			return track.tableIndex;
+	}
+	return -1;
+}
+
+void BgmReplacementManager::RememberInLibrary(const std::string& path)
+{
+	if (path.empty())
+		return;
+	for (const std::string& song : m_library)
+	{
+		if (_stricmp(song.c_str(), path.c_str()) == 0)
+			return;
+	}
+	m_library.push_back(path);
+}
+
+std::vector<BgmReplacementManager::LibrarySong> BgmReplacementManager::GetLibrary() const
+{
+	std::vector<LibrarySong> songs;
+	for (const std::string& path : m_library)
+	{
+		LibrarySong song;
+		song.path = path;
+		song.vanillaTrack = VanillaTrackForSource(path);
+		const BgmReplaceableTrack* vanilla = song.vanillaTrack >= 0 ? FindTrack(song.vanillaTrack) : nullptr;
+		song.name = vanilla ? vanilla->displayName : FileNameOf(path);
+		song.exists = FileExists(path);
+		for (const auto& entry : m_assignments)
+		{
+			if (_stricmp(entry.second.sourcePath.c_str(), path.c_str()) == 0)
+				song.replaces.push_back(entry.first);
+		}
+		songs.push_back(song);
+	}
+	return songs;
+}
+
+int BgmReplacementManager::AddToLibrary(const std::vector<std::string>& paths)
+{
+	const size_t before = m_library.size();
+	for (const std::string& path : paths)
+		RememberInLibrary(path);
+	const int added = (int)(m_library.size() - before);
+	if (added > 0)
+	{
+		LogRepl("Added %d song(s) to the library\n", added);
+		Save();
+	}
+	return added;
+}
+
+std::string BgmReplacementManager::AddVanillaToLibrary(int sourceTableIndex)
+{
+	const BgmReplaceableTrack* track = FindTrack(sourceTableIndex);
+	if (!track || track->originalDir.empty())
+		return std::string();
+	const std::string path = GamePath(track->originalDir + "/" + track->fileName);
+	AddToLibrary({ path });
+	return path;
+}
+
+void BgmReplacementManager::AssignSong(int tableIndex, const std::string& path)
+{
+	const int vanilla = VanillaTrackForSource(path);
+	if (vanilla >= 0)
+		AssignFromVanilla(tableIndex, vanilla);
+	else
+		Assign(tableIndex, path);
+}
+
+void BgmReplacementManager::RemoveFromLibrary(const std::string& path)
+{
+	std::vector<int> users;
+	for (const auto& entry : m_assignments)
+	{
+		if (_stricmp(entry.second.sourcePath.c_str(), path.c_str()) == 0)
+			users.push_back(entry.first);
+	}
+	for (int index : users)
+		Unassign(index);
+	m_library.erase(std::remove_if(m_library.begin(), m_library.end(),
+		[&](const std::string& song) { return _stricmp(song.c_str(), path.c_str()) == 0; }), m_library.end());
+	LogRepl("Removed \"%s\" from the library (%d replacement(s) undone)\n", path.c_str(), (int)users.size());
+	Save();
+}
+
+// ---------------------------------------------------------------------------------------
+// Packs
+// ---------------------------------------------------------------------------------------
+
+namespace
+{
+	const char* const kPackKind = "music replacement pack";
+
+	std::string LowerKey(std::string p)
+	{
+		for (char& c : p) c = (char)tolower((unsigned char)c);
+		return p;
+	}
+}
+
+void BgmReplacementManager::WriteSetup(MusicPackage::Manifest& manifest, std::vector<MusicPackage::SongFile>& songs,
+	const std::string& prefix) const
+{
+	std::map<std::string, int> songNumber;   // lower-cased path -> its number in the file
+	for (const std::string& song : m_library)
+	{
+		// A game track is on every copy of the game; the file only names it.
+		const int vanilla = VanillaTrackForSource(song);
+		if (vanilla >= 0)
+		{
+			manifest.Add(prefix + "GameTracks", FindTrack(vanilla)->baseName, "1");
+			continue;
+		}
+		const int n = (int)songs.size() + 1;
+		songs.push_back({ song, MusicPackage::ArchiveNameFor(n, song) });
+		songNumber[LowerKey(song)] = n;
+		manifest.Add(prefix + "Songs", std::to_string(n), FileNameOf(song));
+	}
+	for (const auto& entry : m_assignments)
+	{
+		const BgmReplaceableTrack* track = FindTrack(entry.first);
+		if (!track || entry.second.sourcePath.empty())
+			continue;
+		const int vanilla = VanillaTrackForSource(entry.second.sourcePath);
+		std::string value;
+		if (vanilla >= 0)
+		{
+			value = "vanilla:" + FindTrack(vanilla)->baseName;
+		}
+		else
+		{
+			auto it = songNumber.find(LowerKey(entry.second.sourcePath));
+			if (it == songNumber.end())
+				continue; // cannot happen: every assigned song is in the library
+			value = "song:" + std::to_string(it->second);
+		}
+		manifest.Add(prefix + "Replacements", track->baseName, value);
+		manifest.Add(prefix + "Gain", track->baseName, std::to_string(entry.second.gainDb));
+		if (!entry.second.enabled)
+			manifest.Add(prefix + "Off", track->baseName, "1");
+	}
+}
+
+void BgmReplacementManager::AddSetupDestinations(const MusicPackage::Manifest& manifest, const std::string& prefix,
+	const std::string& fileStem, std::map<std::string, std::string>& destinations)
+{
+	std::string dir = GamePath("BBCF_IM\\MusicPacks\\" + MusicPackage::SafeFileName(fileStem));
+	std::replace(dir.begin(), dir.end(), '/', '\\');
+	for (const auto& entry : manifest.Section(prefix + "Songs"))
+	{
+		destinations[MusicPackage::ArchiveNameFor(atoi(entry.first.c_str()), entry.second)] =
+			dir + "\\" + MusicPackage::SafeFileName(entry.second);
+	}
+}
+
+BgmReplacementManager::SetupResult BgmReplacementManager::ApplySetup(const MusicPackage::ReadResult& result,
+	const std::string& prefix, bool replaceEverything)
+{
+	SetupResult out;
+	const MusicPackage::Manifest& manifest = result.manifest;
+	const auto trackNamed = [&](const std::string& baseName) -> const BgmReplaceableTrack* {
+		for (const auto& t : m_tracks)
+		{
+			if (_stricmp(t.baseName.c_str(), baseName.c_str()) == 0)
+				return &t;
+		}
+		return nullptr;
+	};
+
+	std::map<std::string, std::string> songPath;   // song number -> extracted file
+	for (const auto& entry : manifest.Section(prefix + "Songs"))
+	{
+		auto it = result.extracted.find(MusicPackage::ArchiveNameFor(atoi(entry.first.c_str()), entry.second));
+		if (it != result.extracted.end())
+			songPath[entry.first] = it->second;
+	}
+	out.songs = (int)songPath.size();
+
+	// What the file asks for, track by track.
+	struct Wanted
+	{
+		std::string source;
+		float gain = 0.0f;
+		bool on = true;
+	};
+	std::map<int, Wanted> wanted;
+	for (const auto& entry : manifest.Section(prefix + "Replacements"))
+	{
+		const BgmReplaceableTrack* track = trackNamed(entry.first);
+		if (!track || track->originalDir.empty() || !track->everUsed)
+		{
+			++out.skipped;
+			continue;
+		}
+		Wanted want;
+		const std::string& value = entry.second;
+		if (value.compare(0, 8, "vanilla:") == 0)
+		{
+			const BgmReplaceableTrack* source = trackNamed(value.substr(8));
+			if (!source || source->originalDir.empty())
+			{
+				++out.skipped;
+				continue;
+			}
+			want.source = GamePath(source->originalDir + "/" + source->fileName);
+		}
+		else if (value.compare(0, 5, "song:") == 0)
+		{
+			auto it = songPath.find(value.substr(5));
+			if (it == songPath.end())
+			{
+				++out.skipped;
+				continue;
+			}
+			want.source = it->second;
+		}
+		else
+		{
+			++out.skipped;
+			continue;
+		}
+		want.gain = (float)atof(manifest.Get(prefix + "Gain", entry.first, "0").c_str());
+		want.on = manifest.Get(prefix + "Off", entry.first) != "1";
+		wanted[track->tableIndex] = want;
+	}
+
+	if (replaceEverything)
+	{
+		std::vector<int> stale;
+		for (const auto& entry : m_assignments)
+		{
+			if (wanted.find(entry.first) == wanted.end())
+				stale.push_back(entry.first);
+		}
+		for (int index : stale)
+			Unassign(index);
+		m_library.clear();
+	}
+
+	for (const auto& entry : manifest.Section(prefix + "Songs"))
+	{
+		auto it = songPath.find(entry.first);
+		if (it != songPath.end())
+			RememberInLibrary(it->second);
+	}
+	for (const auto& entry : manifest.Section(prefix + "GameTracks"))
+	{
+		const BgmReplaceableTrack* track = trackNamed(entry.first);
+		if (track && !track->originalDir.empty())
+			RememberInLibrary(GamePath(track->originalDir + "/" + track->fileName));
+	}
+
+	for (const auto& entry : wanted)
+	{
+		const Wanted& want = entry.second;
+		RememberInLibrary(want.source);
+		auto current = m_assignments.find(entry.first);
+		const bool alreadyThere = current != m_assignments.end() &&
+			_stricmp(current->second.sourcePath.c_str(), want.source.c_str()) == 0 &&
+			current->second.gainDb == want.gain &&
+			(current->second.state == BgmReplacementState::Active || current->second.state == BgmReplacementState::Off ||
+			 current->second.state == BgmReplacementState::Converting);
+		if (!alreadyThere)
+			Assign(entry.first, want.source, &want.gain);
+		SetEnabled(entry.first, want.on);
+		++out.applied;
+	}
+	Save();
+	return out;
+}
+
+bool BgmReplacementManager::ExportPack(const std::string& path)
+{
+	if (!m_initialized || IsPackBusy())
+		return false;
+
+	MusicPackage::Manifest manifest;
+	manifest.Add("Package", "Kind", kPackKind);
+	manifest.Add("Package", "Format", "1");
+	manifest.Add("Package", "Name", MusicPackage::StemOf(path));
+
+	std::vector<MusicPackage::SongFile> songs;
+	WriteSetup(manifest, songs, "");
+
+	m_packPath = path;
+	m_exportJob = MusicPackage::WriteAsync(path, manifest, songs, kPackKind);
+	LogRepl("Exporting %d song(s) and %d replacement(s) to \"%s\"\n",
+		(int)songs.size(), (int)manifest.Section("Replacements").size(), path.c_str());
+	return true;
+}
+
+bool BgmReplacementManager::ImportPack(const std::string& path, bool replaceEverything)
+{
+	if (!m_initialized || IsPackBusy())
+		return false;
+	m_packPath = path;
+	m_importReplace = replaceEverything;
+	// Each pack gets a folder of its own, so two packs with a song of the same name keep
+	// both, and importing the same pack again reuses what is already there.
+	const std::string stem = MusicPackage::StemOf(path);
+	m_importJob = MusicPackage::ReadAsync(path, kPackKind, [stem](const MusicPackage::Manifest& manifest) {
+		std::map<std::string, std::string> destinations;
+		AddSetupDestinations(manifest, "", stem, destinations);
+		return destinations;
+	});
+	LogRepl("Importing \"%s\" (%s)\n", path.c_str(), replaceEverything ? "replacing everything" : "added on top");
+	return true;
+}
+
+void BgmReplacementManager::FinishPackJobs()
+{
+	if (m_exportJob.valid() && m_exportJob.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready)
+	{
+		const MusicPackage::WriteResult result = m_exportJob.get();
+		if (!result.ok)
+			SetPackMessage("Could not export: " + result.error, false);
+		else if (!result.missingSongs.empty())
+			SetPackMessage("Exported " + std::to_string(result.songsWritten) + " song(s) to " + FileNameOf(m_packPath) +
+				". Left out " + std::to_string(result.missingSongs.size()) + " that are no longer on disk.", false);
+		else
+			SetPackMessage("Exported " + std::to_string(result.songsWritten) + " song(s) to " + FileNameOf(m_packPath) + ".", true);
+	}
+
+	if (!m_importJob.valid() || m_importJob.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		return;
+	const MusicPackage::ReadResult result = m_importJob.get();
+	if (!result.ok)
+	{
+		SetPackMessage("Could not import " + FileNameOf(m_packPath) + ": " + result.error, false);
+		return;
+	}
+
+	const SetupResult applied = ApplySetup(result, "", m_importReplace);
+	std::string message = "Imported " + FileNameOf(m_packPath) + ": " + std::to_string(applied.songs) +
+		" song(s), " + std::to_string(applied.applied) + " replacement(s)";
+	if (applied.skipped > 0)
+		message += ", " + std::to_string(applied.skipped) + " skipped (tracks not on this copy of the game)";
+	SetPackMessage(message + ".", applied.skipped == 0);
+}
+
+void BgmReplacementManager::SetPackMessage(const std::string& message, bool ok)
+{
+	LogRepl("%s\n", message.c_str());
+	m_packMessage = message;
+	m_packMessageOk = ok;
+	m_hasPackMessage = true;
+}
+
+bool BgmReplacementManager::ConsumePackMessage(std::string& message, bool& ok)
+{
+	if (!m_hasPackMessage)
+		return false;
+	message = m_packMessage;
+	ok = m_packMessageOk;
+	m_hasPackMessage = false;
+	return true;
 }

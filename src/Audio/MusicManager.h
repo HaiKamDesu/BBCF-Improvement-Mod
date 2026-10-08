@@ -8,6 +8,7 @@
 #include <atomic>
 #include <mutex>
 #include "CustomMusicConverter.h"
+#include "MusicPackage.h"
 
 struct MusicTrack {
     int id;
@@ -148,6 +149,26 @@ public:
     void SavePreferences();
     void LoadPreferences();
     void ResetPreferences();
+
+    // ---- Playlists (*.bbcfim-playlist) ----------------------------------------------
+    // A playlist is the Jukebox as it is set up now, in one file: which tracks are ticked,
+    // the rotation settings, and every custom song with its volume - the songs themselves
+    // included, so it works on another PC. Loading one swaps all of that in: tracks it
+    // does not mention are unticked, its custom songs are copied into the custom folder
+    // (once; loading it again reuses them) and nothing else there is deleted.
+    // The music replacement setup travels with it too - every replacement song, what it
+    // replaces, its volume and whether it is on - and loading the playlist puts exactly that
+    // setup back, so the file is the whole of your music on any PC.
+    bool ExportPlaylist(const std::string& path);
+    bool ImportPlaylist(const std::string& path);
+    bool IsPlaylistBusy() const { return m_playlistExport.valid() || m_playlistImport.valid() || m_playlistWaitingForSongs; }
+    // The outcome of the last save/load, once.
+    bool ConsumePlaylistMessage(std::string& message, bool& ok);
+    // Playlists saved or loaded before, newest first, for swapping between them quickly.
+    const std::vector<std::string>& GetRecentPlaylists() const { return m_recentPlaylists; }
+    void ForgetRecentPlaylist(const std::string& path);
+    // Finishes background saves/loads. Called from the game tick and the Jukebox draw.
+    void PollPlaylistJobs();
 
     // Dynamic track id ranges. Custom Jukebox songs and BGM replacements both appear in
     // the track list, and both need ids that can never collide with a native one or be
@@ -315,6 +336,24 @@ private:
     mutable std::mutex m_customMusicStatusMutex;
     std::string m_customMusicStatus = "Custom music loads when the Jukebox is opened";
     std::future<std::vector<CustomTrackInfo>> m_customMusicFuture;
+
+    // Playlists
+    std::future<MusicPackage::WriteResult> m_playlistExport;
+    std::future<MusicPackage::ReadResult> m_playlistImport;
+    std::string m_playlistPath;
+    // Set by a load, applied once the custom folder has been rescanned and the songs have
+    // ids: source file name -> ticked. Every custom song not listed ends up unticked.
+    std::map<std::string, bool> m_pendingPlaylistSongs;
+    bool m_playlistWaitingForSongs = false;
+    bool m_playlistRescanQueued = false;
+    std::vector<std::string> m_recentPlaylists;
+    std::string m_playlistMessage;
+    bool m_playlistMessageOk = true;
+    bool m_hasPlaylistMessage = false;
+    std::string m_playlistSetupNote;   // what the load did to the replacements, for its message
+    void RememberRecentPlaylist(const std::string& path);
+    void ApplyPendingPlaylistSongs();
+    void SetPlaylistMessage(const std::string& message, bool ok);
 
     MusicRotationMode m_rotationMode = MusicRotationMode::Sequential;
     bool m_repeatSingle = false;
