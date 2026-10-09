@@ -169,6 +169,15 @@ public:
     void ForgetRecentPlaylist(const std::string& path);
     // Finishes background saves/loads. Called from the game tick and the Jukebox draw.
     void PollPlaylistJobs();
+    // Where a playlist save or load has got, for a progress bar. A load goes through
+    // unpacking, then converting its custom songs and its music replacements.
+    struct PlaylistProgress {
+        enum Stage { None, Saving, Unpacking, CustomSongs, Replacements } stage = None;
+        int done = 0;
+        int total = 0;
+        float fraction = 0.0f;
+    };
+    PlaylistProgress GetPlaylistProgress() const;
 
     // Dynamic track id ranges. Custom Jukebox songs and BGM replacements both appear in
     // the track list, and both need ids that can never collide with a native one or be
@@ -302,6 +311,9 @@ private:
     bool IsTrackOverrideMode() const;
     void DetectSceneExitAndUnload();
     bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
+    // PlayTrackPhysically with every C++ exception caught: it runs on the game's main thread,
+    // where one that got out would reach BBCF's WinMain catch(...) and close the game.
+    bool PlayTrackPhysicallyGuarded(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
 
     std::vector<MusicTrack> m_tracks;
     // The dynamic rows, kept so RebuildDynamicTracks can re-append them without asking
@@ -340,6 +352,8 @@ private:
     // Playlists
     std::future<MusicPackage::WriteResult> m_playlistExport;
     std::future<MusicPackage::ReadResult> m_playlistImport;
+    std::shared_ptr<MusicPackage::Progress> m_playlistProgress;   // the save/load running now
+    bool m_playlistConvertingReplacements = false;   // a load's replacements still converting
     std::string m_playlistPath;
     // Set by a load, applied once the custom folder has been rescanned and the songs have
     // ids: source file name -> ticked. Every custom song not listed ends up unticked.

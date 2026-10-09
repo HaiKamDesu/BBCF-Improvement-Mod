@@ -121,6 +121,15 @@ static bool DecodeWithMiniaudio(const std::string& path,
     std::vector<unsigned char> chunk(static_cast<size_t>(chunkFrames) * frameSize);
 
     outPcm.clear();
+    // Sized once from the stream's length when it is known. Grown by appending instead,
+    // a 4-minute song passes through a run of ever bigger copies - for a moment both the
+    // old and the new one - and the 32-bit game may have no free block that large.
+    ma_uint64 knownFrames = 0;
+    if (ma_decoder_get_length_in_pcm_frames(&decoder, &knownFrames) == MA_SUCCESS &&
+        knownFrames > 0 && knownFrames < (ma_uint64)(0x7FFFFFFF / frameSize))
+    {
+        outPcm.reserve(static_cast<size_t>(knownFrames + chunkFrames) * frameSize);
+    }
     for (;;)
     {
         ma_uint64 framesRead = 0;
@@ -767,7 +776,17 @@ bool DecodeFile(const std::string& path,
         return false;
     }
 
-    if (DecodeWithMediaFoundation(path, targetRate, targetChannels, outPcm, err))
+    // Started here rather than trusted to the caller: a replacement built as PCM never
+    // starts Media Foundation (the PCM bank does not need it), so every .m4a/.wma failed
+    // to open (MF_E_PLATFORM_NOT_INITIALIZED) and was reported as a format Windows
+    // cannot decode. MFStartup and CoInitializeEx are both refcounted, so this nests
+    // harmlessly inside a caller that did start them.
+    const HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    const bool mfStarted = SUCCEEDED(MFStartup(MF_VERSION));
+    const bool mfDecoded = mfStarted && DecodeWithMediaFoundation(path, targetRate, targetChannels, outPcm, err);
+    if (mfStarted) MFShutdown();
+    if (SUCCEEDED(hrCo)) CoUninitialize();
+    if (mfDecoded)
     {
         const double seconds = (double)outPcm.size() / (targetRate * targetChannels * 2);
         LogAudio("AudioDecode: decoded %.1f s from '%s' (Media Foundation)\n", seconds, path.c_str());

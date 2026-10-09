@@ -757,16 +757,26 @@ void MusicManager::StartCustomMusicDiscovery() {
     }
     LogMusic("MusicManager: Starting custom music discovery\n");
     m_customMusicFuture = std::async(std::launch::async, [this]() {
-        return ConvertCustomMusicOnStartup([this](int current, int total, const std::string& status) {
-            m_customMusicCurrent = current;
-            m_customMusicTotal = total;
-            std::lock_guard<std::mutex> lock(m_customMusicStatusMutex);
-            m_customMusicStatus = status;
-        },
-        [this](const std::string& sourceName) {
-            auto it = m_customTrackVolume.find(sourceName);
-            return it == m_customTrackVolume.end() ? 0.0f : it->second;
-        });
+        // Each song's conversion already catches its own failures. This is the last line:
+        // whatever escapes here comes out of get() on the game's main thread, and BBCF's
+        // WinMain catch(...) closes the game for it - a 224 MB playlist did exactly that.
+        try {
+            return ConvertCustomMusicOnStartup([this](int current, int total, const std::string& status) {
+                m_customMusicCurrent = current;
+                m_customMusicTotal = total;
+                std::lock_guard<std::mutex> lock(m_customMusicStatusMutex);
+                m_customMusicStatus = status;
+            },
+            [this](const std::string& sourceName) {
+                auto it = m_customTrackVolume.find(sourceName);
+                return it == m_customTrackVolume.end() ? 0.0f : it->second;
+            });
+        } catch (const std::exception& e) {
+            LogMusic("MusicManager: custom music scan stopped: %s\n", e.what());
+        } catch (...) {
+            LogMusic("MusicManager: custom music scan stopped by an unknown exception\n");
+        }
+        return std::vector<CustomTrackInfo>();
     });
 }
 
@@ -1814,18 +1824,81 @@ static void ResolveBgmLoadName(const char* bgmName, bool mustBeWhatTheGameLoaded
 static unsigned char* LoadPacBytes(const char* path, DWORD* sizeOut) {
 	if (sizeOut) *sizeOut = 0;
 
-	std::string error;
-	std::vector<unsigned char> bytes;
-	if (!PacFile::Read(path, bytes, &error)) {
-		LogMusic("MusicManager: %s\n", error.c_str());
+	// Never lets an exception out: callers run on the game's main thread, where BBCF's
+	// WinMain catch(...) closes the game for one.
+	try {
+		std::string error;
+		std::vector<unsigned char> bytes;
+		if (!PacFile::Read(path, bytes, &error)) {
+			LogMusic("MusicManager: %s\n", error.c_str());
+			return nullptr;
+		}
+
+		unsigned char* buf = (unsigned char*)malloc(bytes.size());
+		if (!buf) return nullptr;
+		memcpy(buf, bytes.data(), bytes.size());
+		if (sizeOut) *sizeOut = (DWORD)bytes.size();
+		return buf;
+	} catch (const std::exception& e) {
+		LogMusic("MusicManager: could not load %s: %s\n", path, e.what());
 		return nullptr;
 	}
+}
 
-	unsigned char* buf = (unsigned char*)malloc(bytes.size());
-	if (!buf) return nullptr;
-	memcpy(buf, bytes.data(), bytes.size());
-	if (sizeOut) *sizeOut = (DWORD)bytes.size();
-	return buf;
+// The FPAC size of a .pac without reading it: the file's own size, or for a DFASFPAC
+// envelope the uncompressed size its header records.
+static bool PeekPacSize(const char* path, DWORD* sizeOut, bool* compressedOut) {
+	*sizeOut = 0;
+	*compressedOut = false;
+	HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (file == INVALID_HANDLE_VALUE) return false;
+	LARGE_INTEGER size = {};
+	unsigned char head[16] = {};
+	DWORD got = 0;
+	const bool ok = GetFileSizeEx(file, &size) && ReadFile(file, head, sizeof(head), &got, NULL);
+	CloseHandle(file);
+	if (!ok || size.QuadPart <= 0 || size.QuadPart > (LONGLONG)PacFile::kMaxUncompressedSize) return false;
+	if (got >= 16 && PacFile::IsCompressed(head, got)) {
+		*compressedOut = true;
+		*sizeOut = *(const DWORD*)(head + 0x08);
+		return *sizeOut > 0 && *sizeOut <= PacFile::kMaxUncompressedSize;
+	}
+	*sizeOut = (DWORD)size.QuadPart;
+	return true;
+}
+
+// Fills `dest` (exactly `size` bytes, from PeekPacSize) with the .pac's FPAC bytes. A plain
+// .pac is read straight into it: a converted PCM song is ~50 MB, and holding it a second
+// and third time on the way in is what ran the 32-bit game out of address space when the
+// Jukebox played one. Only an envelope needs a temporary buffer to inflate into.
+static bool ReadPacInto(const char* path, bool compressed, unsigned char* dest, DWORD size) {
+	try {
+		if (compressed) {
+			std::string error;
+			std::vector<unsigned char> bytes;
+			if (!PacFile::Read(path, bytes, &error) || bytes.size() != size) {
+				LogMusic("MusicManager: could not inflate %s: %s\n", path, error.c_str());
+				return false;
+			}
+			memcpy(dest, bytes.data(), size);
+			return true;
+		}
+		HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (file == INVALID_HANDLE_VALUE) return false;
+		DWORD done = 0;
+		bool ok = true;
+		while (ok && done < size) {
+			const DWORD chunk = (std::min)(size - done, (DWORD)(8u << 20));
+			DWORD got = 0;
+			ok = ReadFile(file, dest + done, chunk, &got, NULL) && got == chunk;
+			done += got;
+		}
+		CloseHandle(file);
+		return ok;
+	} catch (const std::exception& e) {
+		LogMusic("MusicManager: could not load %s: %s\n", path, e.what());
+		return false;
+	}
 }
 
 // The duration read below only touches a few hundred bytes of a normal .pac. A compressed
@@ -1963,6 +2036,18 @@ static int GetTrackDurationFramesFromPac(int trackId) {
 // array allocation; Clear releases all SBs (vtable[0x18]) and WB handles
 // (engine refcount table) and zeroes the counts. So after InitCues the bank
 // is empty and ready for exactly one custom SB/WB pair (registered below).
+bool MusicManager::PlayTrackPhysicallyGuarded(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride) {
+	try {
+		return PlayTrackPhysically(modBase, trackId, bgmName, outDurationFrames, presentedId, cueOverride);
+	} catch (const std::exception& e) {
+		LogMusic("MusicManager: playing %s failed: %s\n", bgmName ? bgmName : "(null)", e.what());
+	} catch (...) {
+		LogMusic("MusicManager: playing %s failed with an unknown exception\n", bgmName ? bgmName : "(null)");
+	}
+	if (outDurationFrames) *outDurationFrames = 0;
+	return false;
+}
+
 bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride) {
 	if (outDurationFrames) *outDurationFrames = 0;
 	uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
@@ -2107,10 +2192,9 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// the file itself does not tell you, and the slot has to be allocated for the bytes
 	// XACT will actually be handed.
 	DWORD fileSize = 0;
-	unsigned char* pacBytes = LoadPacBytes(physicalPath, &fileSize);
-	if (!pacBytes || fileSize == 0) {
+	bool pacCompressed = false;
+	if (!PeekPacSize(physicalPath, &fileSize, &pacCompressed) || fileSize == 0) {
 		LogMusic("MusicManager: FAIL - Cannot read physical BGM file: %s\n", physicalPath);
-		free(pacBytes);
 		return false;
 	}
 
@@ -2123,7 +2207,6 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 		LogMusic("MusicManager: RegisterBgm CRASHED! Exception 0x%08X\n", GetExceptionCode());
-		free(pacBytes);
 		return false;
 	}
 
@@ -2131,13 +2214,14 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	void* soundObj = getSoundObj((void*)soundSlotMgrAddr, BGM_SLOT_INDEX);
 	if (!soundObj) {
 		LogMusic("MusicManager: FAIL - GetSoundObjectPtr returned null\n");
-		free(pacBytes);
 		return false;
 	}
 
-	memcpy(soundObj, pacBytes, fileSize);
-	free(pacBytes);
-	LogMusic("MusicManager: Copied %d BGM bytes into slot buffer %p\n", fileSize, soundObj);
+	if (!ReadPacInto(physicalPath, pacCompressed, (unsigned char*)soundObj, fileSize)) {
+		LogMusic("MusicManager: FAIL - Could not read %s into the slot buffer\n", physicalPath);
+		return false;
+	}
+	LogMusic("MusicManager: Read %d BGM bytes into slot buffer %p\n", fileSize, soundObj);
 
 	// Parse the FPAC container to locate the .xsb (Sound Bank) and .xwb (Wave
 	// Bank) streams. Walks the file table so it works for ANY filename length
@@ -2347,7 +2431,7 @@ bool MusicManager::PlayTrack(int trackId, bool force) {
 		__except (EXCEPTION_EXECUTE_HANDLER) {}
 	}
 
-	if (!PlayTrackPhysically(modBase, trackId, bgmName, &m_currentTrackDurationFrames, m_anchorTrackId)) {
+	if (!PlayTrackPhysicallyGuarded(modBase, trackId, bgmName, &m_currentTrackDurationFrames, m_anchorTrackId)) {
 		LogMusic("MusicManager: PlayTrackPhysically failed\n");
 		return false;
 	}
@@ -2399,7 +2483,7 @@ bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string
 		relPathNoExt.c_str(), cueName.c_str());
 
 	int durationFrames = 0;
-	if (!PlayTrackPhysically(modBase, -1, relPathNoExt.c_str(), &durationFrames,
+	if (!PlayTrackPhysicallyGuarded(modBase, -1, relPathNoExt.c_str(), &durationFrames,
 			m_anchorTrackId, cueName.c_str())) {
 		LogMusic("MusicManager: PreviewPac FAILED for \"%s\"\n", relPathNoExt.c_str());
 		return false;
@@ -2607,7 +2691,7 @@ void MusicManager::RestoreAnchorForSceneExit() {
     // the game's Character Select transition reads a supported track and shows
     // the original song pre-selected (as if the playlist never cycled).
     int anchorDuration = 0;
-    bool restored = PlayTrackPhysically(modBase, m_anchorTrackId, anchorName, &anchorDuration, m_anchorTrackId);
+    bool restored = PlayTrackPhysicallyGuarded(modBase, m_anchorTrackId, anchorName, &anchorDuration, m_anchorTrackId);
     if (restored) {
         LogMusic("MusicManager: Restored anchor track %d (%s) for scene exit\n",
             m_anchorTrackId, anchorName);
@@ -2989,7 +3073,8 @@ bool MusicManager::ExportPlaylist(const std::string& path) {
     replacements.WriteSetup(manifest, songs, kPlaylistSetupPrefix);
 
     m_playlistPath = path;
-    m_playlistExport = MusicPackage::WriteAsync(path, manifest, songs, kPlaylistKind);
+    m_playlistProgress = std::make_shared<MusicPackage::Progress>();
+    m_playlistExport = MusicPackage::WriteAsync(path, manifest, songs, kPlaylistKind, m_playlistProgress);
     LogMusic("MusicManager: Saving playlist \"%s\" with %d custom song(s) and %d replacement song(s)\n",
         path.c_str(), customSongs, (int)songs.size() - customSongs);
     return true;
@@ -3001,6 +3086,7 @@ bool MusicManager::ImportPlaylist(const std::string& path) {
     std::string customDir = GamePath("data/Sound/BGM/custom");
     std::replace(customDir.begin(), customDir.end(), '/', '\\');
     const std::string stem = MusicPackage::StemOf(path);
+    m_playlistProgress = std::make_shared<MusicPackage::Progress>();
     m_playlistImport = MusicPackage::ReadAsync(path, kPlaylistKind, [customDir, stem](const MusicPackage::Manifest& manifest) {
         // Jukebox songs into the custom folder; replacement songs into a folder of their
         // own, where the custom-folder scan does not turn them into Jukebox songs as well.
@@ -3010,12 +3096,41 @@ bool MusicManager::ImportPlaylist(const std::string& path) {
                 customDir + "\\" + MusicPackage::SafeFileName(entry.second);
         BgmReplacementManager::AddSetupDestinations(manifest, kPlaylistSetupPrefix, stem, destinations);
         return destinations;
-    });
+    }, m_playlistProgress);
     LogMusic("MusicManager: Loading playlist \"%s\"\n", path.c_str());
     return true;
 }
 
+MusicManager::PlaylistProgress MusicManager::GetPlaylistProgress() const {
+    PlaylistProgress progress;
+    const bool packageRunning = m_playlistExport.valid() || m_playlistImport.valid();
+    if (packageRunning && m_playlistProgress) {
+        progress.stage = m_playlistExport.valid() ? PlaylistProgress::Saving : PlaylistProgress::Unpacking;
+        progress.done = m_playlistProgress->doneFiles.load();
+        progress.total = m_playlistProgress->totalFiles.load();
+        progress.fraction = m_playlistProgress->Fraction();
+        return progress;
+    }
+    if (m_playlistWaitingForSongs) {
+        progress.stage = PlaylistProgress::CustomSongs;
+        progress.done = m_customMusicCurrent.load();
+        progress.total = m_customMusicTotal.load();
+        progress.fraction = GetCustomMusicProgress();
+        return progress;
+    }
+    auto& replacements = BgmReplacementManager::GetInstance();
+    if (m_playlistConvertingReplacements && replacements.IsBusy()) {
+        progress.stage = PlaylistProgress::Replacements;
+        replacements.GetBatchCounts(progress.done, progress.total);
+        progress.fraction = replacements.GetBatchProgress();
+    }
+    return progress;
+}
+
 void MusicManager::PollPlaylistJobs() {
+    if (m_playlistConvertingReplacements && !BgmReplacementManager::GetInstance().IsBusy())
+        m_playlistConvertingReplacements = false;
+
     if (m_playlistExport.valid() &&
         m_playlistExport.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
         const MusicPackage::WriteResult result = m_playlistExport.get();
@@ -3074,6 +3189,7 @@ void MusicManager::PollPlaylistJobs() {
     std::string setupNote;
     if (manifest.Get("Package", "HasMusicSetup") == "1") {
         const BgmReplacementManager::SetupResult setup = replacements.ApplySetup(result, kPlaylistSetupPrefix, true);
+        m_playlistConvertingReplacements = replacements.IsBusy();
         setupNote = std::to_string(setup.applied) + " music replacement(s)";
         if (setup.skipped > 0)
             setupNote += " (" + std::to_string(setup.skipped) + " skipped: tracks not on this copy of the game)";

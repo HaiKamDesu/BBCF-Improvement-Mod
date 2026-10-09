@@ -76,6 +76,7 @@ void JukeboxWindow::Draw() {
 	PollPlaylistDialogs();
 	musicManager.PollPlaylistJobs();
 	PollRestartAfterVolume();
+	DrawConfirmLoadModal();
 
 	DrawCurrentTrackInfo();
 	ImGui::Spacing();
@@ -143,7 +144,27 @@ void JukeboxWindow::DrawControls() {
 		m_playlistMessage = message;
 		m_playlistMessageOk = ok;
 	}
-	if (musicManager.IsPlaylistBusy())
+	// A playlist can carry hundreds of megabytes of songs, all of which may need
+	// converting, so a load shows each stage and how far it has got.
+	const MusicManager::PlaylistProgress progress = musicManager.GetPlaylistProgress();
+	if (progress.stage != MusicManager::PlaylistProgress::None) {
+		const char* stage = "Working on the playlist";
+		switch (progress.stage) {
+		case MusicManager::PlaylistProgress::Saving:       stage = "Saving the playlist's songs"; break;
+		case MusicManager::PlaylistProgress::Unpacking:    stage = "Unpacking the playlist's songs"; break;
+		case MusicManager::PlaylistProgress::CustomSongs:  stage = "Converting custom songs"; break;
+		case MusicManager::PlaylistProgress::Replacements: stage = "Converting music replacements"; break;
+		default: break;
+		}
+		std::string label = L(stage);
+		if (progress.total > 0)
+			label += ": " + std::to_string((std::min)(progress.done + 1, progress.total)) + " / " + std::to_string(progress.total);
+		ImGui::TextColoredWrapped(ImVec4(1.0f, 0.85f, 0.35f, 1.0f), "%s", label.c_str());
+		char percent[16];
+		snprintf(percent, sizeof(percent), "%d%%", (int)(progress.fraction * 100.0f + 0.5f));
+		ImGui::ProgressBar(progress.fraction, ImVec2(-1, 0.0f), percent);
+	}
+	else if (musicManager.IsPlaylistBusy())
 		ImGui::TextColoredWrapped(ImVec4(1.0f, 0.85f, 0.35f, 1.0f), "%s", L("Working on the playlist, please wait...").c_str());
 	else if (!m_playlistMessage.empty())
 		ImGui::TextColoredWrapped(m_playlistMessageOk ? ImVec4(0.35f, 0.90f, 0.65f, 1.0f) : ImVec4(1.0f, 0.75f, 0.30f, 1.0f),
@@ -775,13 +796,15 @@ void JukeboxWindow::DrawPlaylistMenu() {
 		NativeFileDialog::Open(kPlaylistSaveOwner, request);
 	}
 	if (ImGui::IsItemHovered())
-		ImGui::SetTooltipWrapped(L("Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.").c_str());
+		ImGui::SetTooltipWrapped(L("Saves your whole music setup into one file: ticked tracks, every option, custom songs and music replacements, song files included.").c_str());
 	if (ImGui::MenuItem(L("Load playlist...").c_str(), nullptr, false, !busy)) {
 		NativeFileDialog::Request request;
 		request.title = L("Load a Jukebox playlist");
 		request.filters.push_back({ PlaylistFilterDescription(), std::string("*.") + MusicPackage::kPlaylistExtension });
 		NativeFileDialog::Open(kPlaylistLoadOwner, request);
 	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Replaces your whole music setup - Jukebox and music replacements - with the one in the file. You are asked first.").c_str());
 
 	// The recent ones, for swapping with one click.
 	const std::vector<std::string> recent = musicManager.GetRecentPlaylists();
@@ -794,8 +817,7 @@ void JukeboxWindow::DrawPlaylistMenu() {
 			const std::string name = MusicPackage::StemOf(path);
 			if (ImGui::MenuItem(exists ? name.c_str() : (name + "  (" + L("file not found") + ")").c_str(), nullptr, false, !busy)) {
 				if (exists) {
-					musicManager.ImportPlaylist(path);
-					m_playlistMessage.clear();
+					AskToLoadPlaylist(path);
 				} else {
 					musicManager.ForgetRecentPlaylist(path);
 				}
@@ -811,12 +833,88 @@ void JukeboxWindow::DrawPlaylistMenu() {
 void JukeboxWindow::PollPlaylistDialogs() {
 	MusicManager& musicManager = GetMusicManager();
 	NativeFileDialog::Result result;
-	if (NativeFileDialog::Consume(kPlaylistSaveOwner, &result) && result.accepted && !result.path.empty()) {
-		if (musicManager.ExportPlaylist(result.path))
+	if (NativeFileDialog::Consume(kPlaylistSaveOwner, &result)) {
+		if (result.accepted && !result.path.empty() && musicManager.ExportPlaylist(result.path))
 			m_playlistMessage.clear();
+		else if (m_savingBeforeLoad) {
+			// Saving was cancelled: back to the question rather than dropping it.
+			m_savingBeforeLoad = false;
+			m_openConfirmLoad = true;
+		}
 	}
-	if (NativeFileDialog::Consume(kPlaylistLoadOwner, &result) && result.accepted && !result.path.empty()) {
-		if (musicManager.ImportPlaylist(result.path))
+	if (NativeFileDialog::Consume(kPlaylistLoadOwner, &result) && result.accepted && !result.path.empty())
+		AskToLoadPlaylist(result.path);
+	// The save of the current setup has finished: ask about the load again.
+	if (m_savingBeforeLoad && !musicManager.IsPlaylistBusy()) {
+		m_savingBeforeLoad = false;
+		m_openConfirmLoad = true;
+	}
+}
+
+void JukeboxWindow::AskToLoadPlaylist(const std::string& path) {
+	m_confirmLoadPath = path;
+	m_openConfirmLoad = true;
+}
+
+void JukeboxWindow::DrawConfirmLoadModal() {
+	MusicManager& musicManager = GetMusicManager();
+	const std::string popupId = L("Load this playlist?") + "##confirm_load";
+	if (m_openConfirmLoad) {
+		ImGui::OpenPopup(popupId.c_str());
+		m_openConfirmLoad = false;
+	}
+	const ImVec2 display = ImGui::GetIO().DisplaySize;
+	ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowSize(ImVec2((std::min)(560.0f, display.x * 0.9f), 0.0f), ImGuiCond_Always);
+	MusicListStyle::OpaquePopup opaque;
+	if (!ImGui::BeginPopupModal(popupId.c_str(), nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize))
+		return;
+
+	const ImVec4 warn(1.0f, 0.75f, 0.30f, 1.0f);
+	ImGui::TextWrapped("%s", MusicPackage::FileNameOf(m_confirmLoadPath).c_str());
+	ImGui::Spacing();
+	ImGui::TextColoredWrapped(warn, "%s", L("This replaces your WHOLE music setup with the one in the file:").c_str());
+	ImGui::Bullet(); ImGui::TextWrapped("%s", L("Which Jukebox tracks are ticked, and every Jukebox option.").c_str());
+	const int replaced = BgmReplacementManager::GetInstance().GetAssignedCount();
+	std::string replacements = L("Every music replacement. The ones you have now are removed and their converted files deleted.");
+	if (replaced > 0)
+		replacements += " (" + L("You have") + " " + std::to_string(replaced) + " " + L("replaced track(s) now.") + ")";
+	ImGui::Bullet(); ImGui::TextWrapped("%s", replacements.c_str());
+	ImGui::Bullet(); ImGui::TextWrapped("%s", L("Its custom songs are added to your custom songs folder. The ones you have are kept.").c_str());
+	ImGui::Spacing();
+	ImGui::TextColoredWrapped(warn, "%s", L("This can't be undone. If you might want your current setup back, save it as a playlist first.").c_str());
+	ImGui::Spacing();
+
+	const bool busy = NativeFileDialog::IsOpen() || musicManager.IsPlaylistBusy();
+	ImGui::BeginDisabled(busy);
+	const std::string saveLabel = L("Save mine first...");
+	if (ImGui::Button(saveLabel.c_str())) {
+		NativeFileDialog::Request request;
+		request.save = true;
+		request.title = L("Save this Jukebox playlist");
+		request.filters.push_back({ PlaylistFilterDescription(), std::string("*.") + MusicPackage::kPlaylistExtension });
+		request.defaultExtension = MusicPackage::kPlaylistExtension;
+		request.initialPath = std::string("My setup before ") + MusicPackage::StemOf(m_confirmLoadPath) + "." + MusicPackage::kPlaylistExtension;
+		if (NativeFileDialog::Open(kPlaylistSaveOwner, request))
+			m_savingBeforeLoad = true;
+		ImGui::CloseCurrentPopup();
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltipWrapped(L("Saves your current setup as a playlist, then asks you again.").c_str());
+	const std::string loadLabel = L("Replace everything");
+	ImGui::SameLineOrWrap(ImGui::ButtonWidth(loadLabel.c_str()));
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.30f, 0.20f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.38f, 0.25f, 1.0f));
+	if (ImGui::Button(loadLabel.c_str())) {
+		if (musicManager.ImportPlaylist(m_confirmLoadPath))
 			m_playlistMessage.clear();
+		ImGui::CloseCurrentPopup();
 	}
+	ImGui::PopStyleColor(2);
+	ImGui::EndDisabled();
+	const std::string cancelLabel = L("Cancel");
+	ImGui::SameLineOrWrap(ImGui::ButtonWidth(cancelLabel.c_str()));
+	if (ImGui::Button(cancelLabel.c_str()))
+		ImGui::CloseCurrentPopup();
+	ImGui::EndPopup();
 }

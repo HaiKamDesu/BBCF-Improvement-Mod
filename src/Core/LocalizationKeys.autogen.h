@@ -2991,9 +2991,6 @@ struct LocalizationKeysAccessor
         // Undo everything
         inline const char* Undo_everything() const { return Get("Undo everything"); }
 
-        // Every song is back to normal.
-        inline const char* Every_song_is_back_to_normal() const { return Get("Every song is back to normal."); }
-
         // Puts every song back to the original and deletes the converted files.
         inline const char* Puts_every_song_back_to_the_original_and_deletes_the_converted_files() const { return Get("Puts every song back to the original and deletes the converted files."); }
 
@@ -3002,9 +2999,6 @@ struct LocalizationKeysAccessor
 
         // Converting...
         inline const char* Converting() const { return Get("Converting..."); }
-
-        // Still to do
-        inline const char* Still_to_do() const { return Get("Still to do"); }
 
         // Only replaced
         inline const char* Only_replaced() const { return Get("Only replaced"); }
@@ -5295,9 +5289,6 @@ struct LocalizationKeysAccessor
         // Export your music replacements
         inline const char* Export_your_music_replacements() const { return Get("Export your music replacements"); }
 
-        // Working on the music file, please wait...
-        inline const char* Working_on_the_music_file_please_wait() const { return Get("Working on the music file, please wait..."); }
-
         // file not found
         inline const char* file_not_found_2() const { return Get("file not found"); }
 
@@ -5367,9 +5358,6 @@ struct LocalizationKeysAccessor
         // Put every track back to normal
         inline const char* Put_every_track_back_to_normal() const { return Get("Put every track back to normal"); }
 
-        // Puts every song back to the original and deletes the converted files. Your songs stay in the list.
-        inline const char* Puts_every_song_back_to_the_original_and_deletes_the_converted_files_Your_songs_stay_in_the_list() const { return Get("Puts every song back to the original and deletes the converted files. Your songs stay in the list."); }
-
         // Switched off: the original plays.
         inline const char* Switched_off_the_original_plays() const { return Get("Switched off: the original plays."); }
 
@@ -5411,9 +5399,6 @@ struct LocalizationKeysAccessor
 
         // Double-click to play it now.
         inline const char* Double_click_to_play_it_now() const { return Get("Double-click to play it now."); }
-
-        // Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.
-        inline const char* Saves_everything_in_this_window_ticked_tracks_every_option_custom_songs_with_their_volume_into_one_file() const { return Get("Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file."); }
 
         // Double-click it during a match to play it.
         inline const char* Double_click_it_during_a_match_to_play_it() const { return Get("Double-click it during a match to play it."); }
@@ -5487,9 +5472,6 @@ struct LocalizationKeysAccessor
         // Put it on a track first to hear it.
         inline const char* Put_it_on_a_track_first_to_hear_it() const { return Get("Put it on a track first to hear it."); }
 
-        // Put its tracks back to normal
-        inline const char* Put_its_tracks_back_to_normal() const { return Get("Put its tracks back to normal"); }
-
         // Put this song on every track in this group, or take it off them all
         inline const char* Put_this_song_on_every_track_in_this_group_or_take_it_off_them_all() const { return Get("Put this song on every track in this group, or take it off them all"); }
 
@@ -5501,9 +5483,6 @@ struct LocalizationKeysAccessor
 
         // Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.
         inline const char* Swap_this_song_for_another_file_keeping_the_tracks_it_replaces_their_volume_and_their_switches_Handy_when_the_file_was_moved() const { return Get("Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved."); }
-
-        // The song stays in the list, replacing nothing.
-        inline const char* The_song_stays_in_the_list_replacing_nothing() const { return Get("The song stays in the list, replacing nothing."); }
 
         // This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.
         inline const char* This_song_s_file_is_gone_so_it_can_t_be_put_on_new_tracks_Right_click_it_and_use_a_different_file() const { return Get("This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file."); }
@@ -5532,9 +5511,6 @@ struct LocalizationKeysAccessor
         // instead:
         inline const char* instead() const { return Get("instead:"); }
 
-        // its tracks are back to normal.
-        inline const char* its_tracks_are_back_to_normal() const { return Get("its tracks are back to normal."); }
-
         // nothing yet
         inline const char* nothing_yet() const { return Get("nothing yet"); }
 
@@ -5544,11 +5520,107 @@ struct LocalizationKeysAccessor
         // now:
         inline const char* now() const { return Get("now:"); }
 
-        // song(s) added. Click Choose tracks on each to say what it replaces.
-        inline const char* song_s_added_Click_Choose_tracks_on_each_to_say_what_it_replaces() const { return Get("song(s) added. Click Choose tracks on each to say what it replaces."); }
-
         // track(s) ticked
         inline const char* track_s_ticked() const { return Get("track(s) ticked"); }
+
+        // Saving the playlist's songs
+        inline const char* Saving_the_playlist_s_songs() const { return Get("Saving the playlist's songs"); }
+
+        // Unpacking the playlist's songs
+        inline const char* Unpacking_the_playlist_s_songs() const { return Get("Unpacking the playlist's songs"); }
+
+        // Converting custom songs
+        inline const char* Converting_custom_songs() const { return Get("Converting custom songs"); }
+
+        // Converting music replacements
+        inline const char* Converting_music_replacements() const { return Get("Converting music replacements"); }
+
+        // Saving the music file's songs
+        inline const char* Saving_the_music_file_s_songs() const { return Get("Saving the music file's songs"); }
+
+        // Unpacking the music file's songs
+        inline const char* Unpacking_the_music_file_s_songs() const { return Get("Unpacking the music file's songs"); }
+
+        // There was not enough free memory to convert this song right now
+        inline const char* There_was_not_enough_free_memory_to_convert_this_song_right_now() const { return Get("There was not enough free memory to convert this song right now"); }
+
+        // Converts again every replacement marked as needing a rebuild or as failed, from the song it was set to.
+        inline const char* Converts_again_every_replacement_marked_as_needing_a_rebuild_or_as_failed_from_the_song_it_was_set_to() const { return Get("Converts again every replacement marked as needing a rebuild or as failed, from the song it was set to."); }
+
+        // Every music replacement. The ones you have now are removed and their converted files deleted.
+        inline const char* Every_music_replacement_The_ones_you_have_now_are_removed_and_their_converted_files_deleted() const { return Get("Every music replacement. The ones you have now are removed and their converted files deleted."); }
+
+        // Every track is back to normal.
+        inline const char* Every_track_is_back_to_normal() const { return Get("Every track is back to normal."); }
+
+        // Its custom songs are added to your custom songs folder. The ones you have are kept.
+        inline const char* Its_custom_songs_are_added_to_your_custom_songs_folder_The_ones_you_have_are_kept() const { return Get("Its custom songs are added to your custom songs folder. The ones you have are kept."); }
+
+        // Load this playlist?
+        inline const char* Load_this_playlist() const { return Get("Load this playlist?"); }
+
+        // Next song
+        inline const char* Next_song() const { return Get("Next song"); }
+
+        // Nothing ticked: this song leaves the list when you close this.
+        inline const char* Nothing_ticked_this_song_leaves_the_list_when_you_close_this() const { return Get("Nothing ticked: this song leaves the list when you close this."); }
+
+        // Puts every track back to the original, deletes the converted files and empties the list.
+        inline const char* Puts_every_track_back_to_the_original_deletes_the_converted_files_and_empties_the_list() const { return Get("Puts every track back to the original, deletes the converted files and empties the list."); }
+
+        // Rebuild the tracks that need it
+        inline const char* Rebuild_the_tracks_that_need_it() const { return Get("Rebuild the tracks that need it"); }
+
+        // Replaces your whole music setup - Jukebox and music replacements - with the one in the file. You are asked first.
+        inline const char* Replaces_your_whole_music_setup_Jukebox_and_music_replacements_with_the_one_in_the_file_You_are_asked_first() const { return Get("Replaces your whole music setup - Jukebox and music replacements - with the one in the file. You are asked first."); }
+
+        // Save mine first...
+        inline const char* Save_mine_first() const { return Get("Save mine first..."); }
+
+        // Saves your current setup as a playlist, then asks you again.
+        inline const char* Saves_your_current_setup_as_a_playlist_then_asks_you_again() const { return Get("Saves your current setup as a playlist, then asks you again."); }
+
+        // Saves your whole music setup into one file: ticked tracks, every option, custom songs and music replacements, song files included.
+        inline const char* Saves_your_whole_music_setup_into_one_file_ticked_tracks_every_option_custom_songs_and_music_replacements_song_files_included() const { return Get("Saves your whole music setup into one file: ticked tracks, every option, custom songs and music replacements, song files included."); }
+
+        // Song
+        inline const char* Song() const { return Get("Song"); }
+
+        // The original plays until this is fixed. Right-click and choose Rebuild.
+        inline const char* The_original_plays_until_this_is_fixed_Right_click_and_choose_Rebuild() const { return Get("The original plays until this is fixed. Right-click and choose Rebuild."); }
+
+        // This can't be undone. If you might want your current setup back, save it as a playlist first.
+        inline const char* This_can_t_be_undone_If_you_might_want_your_current_setup_back_save_it_as_a_playlist_first() const { return Get("This can't be undone. If you might want your current setup back, save it as a playlist first."); }
+
+        // This replaces your WHOLE music setup with the one in the file:
+        inline const char* This_replaces_your_WHOLE_music_setup_with_the_one_in_the_file() const { return Get("This replaces your WHOLE music setup with the one in the file:"); }
+
+        // Those tracks play the original music until they are fixed. Right-click the song and choose Rebuild, or use ... > Rebuild the tracks that need it.
+        inline const char* Those_tracks_play_the_original_music_until_they_are_fixed_Right_click_the_song_and_choose_Rebuild_or_use_Rebuild_the_tracks_that_need_it() const { return Get("Those tracks play the original music until they are fixed. Right-click the song and choose Rebuild, or use ... > Rebuild the tracks that need it."); }
+
+        // Which Jukebox tracks are ticked, and every Jukebox option.
+        inline const char* Which_Jukebox_tracks_are_ticked_and_every_Jukebox_option() const { return Get("Which Jukebox tracks are ticked, and every Jukebox option."); }
+
+        // You have
+        inline const char* You_have() const { return Get("You have"); }
+
+        // failed
+        inline const char* failed() const { return Get("failed"); }
+
+        // needs rebuilding
+        inline const char* needs_rebuilding() const { return Get("needs rebuilding"); }
+
+        // replaced track(s) now.
+        inline const char* replaced_track_s_now() const { return Get("replaced track(s) now."); }
+
+        // track(s)...
+        inline const char* track_s() const { return Get("track(s)..."); }
+
+        // Failed:
+        inline const char* Failed_2() const { return Get("Failed:"); }
+
+        // Needs rebuilding:
+        inline const char* Needs_rebuilding_2() const { return Get("Needs rebuilding:"); }
 };
 
 

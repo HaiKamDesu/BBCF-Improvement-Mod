@@ -32,6 +32,12 @@ private:
 	// Save / load / swap whole Jukebox setups as *.bbcfim-playlist files.
 	void DrawPlaylistMenu();
 	void PollPlaylistDialogs();
+	// Loading a playlist replaces the whole music setup, so it is asked for first.
+	void AskToLoadPlaylist(const std::string& path);
+	void DrawConfirmLoadModal();
+	std::string m_confirmLoadPath;
+	bool m_openConfirmLoad = false;
+	bool m_savingBeforeLoad = false;   // "save mine first" is running; ask again after
 	std::string m_playlistMessage;
 	bool m_playlistMessageOk = true;
 	// The volume button and popup for one row. Custom songs and BGM replacements keep their

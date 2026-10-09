@@ -1,5 +1,7 @@
 #pragma once
+#include <atomic>
 #include <functional>
+#include <memory>
 #include <future>
 #include <map>
 #include <string>
@@ -33,6 +35,17 @@ namespace MusicPackage
 		std::string Get(const std::string& section, const std::string& key, const std::string& fallback = "") const;
 	};
 
+	// How far a background write or read has got, for a progress bar. Filled by the worker,
+	// read by the UI; totals are 0 until the worker has worked them out.
+	struct Progress
+	{
+		std::atomic<long long> doneBytes{ 0 };
+		std::atomic<long long> totalBytes{ 0 };
+		std::atomic<int> doneFiles{ 0 };
+		std::atomic<int> totalFiles{ 0 };
+		float Fraction() const;   // 0..1 by bytes
+	};
+
 	struct SongFile
 	{
 		std::string sourcePath;    // where the song is on disk now
@@ -50,7 +63,8 @@ namespace MusicPackage
 	// Writes the archive. A song whose file is gone is left out and listed in the result,
 	// so one deleted download does not cost the whole export.
 	std::future<WriteResult> WriteAsync(const std::string& path, const Manifest& manifest,
-		const std::vector<SongFile>& songs, const std::string& kind);
+		const std::vector<SongFile>& songs, const std::string& kind,
+		std::shared_ptr<Progress> progress = nullptr);
 
 	struct ReadResult
 	{
@@ -70,7 +84,7 @@ namespace MusicPackage
 	// rather than copied again. One file can send songs to different folders - a playlist
 	// puts its Jukebox songs in the custom folder and its replacement songs elsewhere.
 	std::future<ReadResult> ReadAsync(const std::string& path, const std::string& kind,
-		DestinationsFor destinationsFor);
+		DestinationsFor destinationsFor, std::shared_ptr<Progress> progress = nullptr);
 
 	// "My pack.bbcfim-music" -> "My pack"
 	std::string StemOf(const std::string& path);

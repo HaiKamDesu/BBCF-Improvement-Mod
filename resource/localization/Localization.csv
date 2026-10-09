@@ -1173,11 +1173,9 @@ Songs replaced,Songs replaced,Canciones reemplazadas
 No songs replaced yet.,No songs replaced yet.,Todavía no reemplazaste ninguna canción.
 Nothing to undo,Nothing to undo,Nada que deshacer
 Undo everything,Undo everything,Deshacer todo
-Every song is back to normal.,Every song is back to normal.,Todas las canciones volvieron a la normalidad.
 Puts every song back to the original and deletes the converted files.,Puts every song back to the original and deletes the converted files.,Restaura todas las canciones originales y borra los archivos convertidos.
 Converting for,Converting for,Convirtiendo para
 Converting...,Converting...,Convirtiendo...
-Still to do,Still to do,Faltan
 Only replaced,Only replaced,Solo reemplazadas
 All groups,All groups,Todos los grupos
 Nothing matches that search.,Nothing matches that search.,No hay resultados para esa búsqueda.
@@ -1943,7 +1941,6 @@ Add songs,Add songs,Agregar canciones
 Import a music replacement file,Import a music replacement file,Importar un archivo de reemplazo de música
 "Load a music replacement file someone made, or one you exported before.","Load a music replacement file someone made, or one you exported before.","Carga un archivo de reemplazo de música que hizo otra persona, o uno que exportaste antes."
 Export your music replacements,Export your music replacements,Exportar tus reemplazos de música
-"Working on the music file, please wait...","Working on the music file, please wait...","Procesando el archivo de música, espera..."
 file not found,file not found,archivo no encontrado
 Replaces:,Replaces:,Reemplaza:
 was removed.,was removed.,fue quitada.
@@ -1967,7 +1964,6 @@ Import music file...,Import music file...,Importar archivo de música...
 Export music file...,Export music file...,Exportar archivo de música...
 "Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.","Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.","Guarda todo lo de aquí en un solo archivo - cada canción, lo que reemplaza, su volumen y si está activada - para que funcione en cualquier PC."
 Put every track back to normal,Put every track back to normal,Volver todas las pistas a la normalidad
-Puts every song back to the original and deletes the converted files. Your songs stay in the list.,Puts every song back to the original and deletes the converted files. Your songs stay in the list.,Vuelve a poner todas las canciones originales y borra los archivos convertidos. Tus canciones se quedan en la lista.
 Switched off: the original plays.,Switched off: the original plays.,Desactivada: suena la original.
 Restart the game to hear this one.,Restart the game to hear this one.,Reinicia el juego para oír esta.
 Put the original back,Put the original back,Volver a la original
@@ -1982,7 +1978,6 @@ this window,this window,esta ventana
 Nothing playing - the Jukebox plays during matches.,Nothing playing - the Jukebox plays during matches.,No suena nada - la Jukebox suena durante las partidas.
 Unknown track,Unknown track,Pista desconocida
 Double-click to play it now.,Double-click to play it now.,Doble clic para reproducirla ahora.
-"Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.","Saves everything in this window - ticked tracks, every option, custom songs with their volume - into one file.","Guarda todo lo de esta ventana - pistas marcadas, cada opción, canciones personalizadas con su volumen - en un solo archivo."
 Double-click it during a match to play it.,Double-click it during a match to play it.,Haz doble clic durante una partida para reproducirla.
 A song can't replace itself.,A song can't replace itself.,Una canción no puede reemplazarse a sí misma.
 Add from the game's soundtrack,Add from the game's soundtrack,Agregar de la banda sonora del juego
@@ -2007,12 +2002,10 @@ One of the game's own tracks.,One of the game's own tracks.,Una de las pistas de
 Pick as many songs as you like at once.,Pick as many songs as you like at once.,Elige tantas canciones como quieras a la vez.
 Play this song,Play this song,Reproducir esta canción
 Put it on a track first to hear it.,Put it on a track first to hear it.,Ponla en una pista primero para escucharla.
-Put its tracks back to normal,Put its tracks back to normal,Devolver sus pistas a la normalidad
 "Put this song on every track in this group, or take it off them all","Put this song on every track in this group, or take it off them all","Pon esta canción en todas las pistas de este grupo, o quítala de todas"
 Remove from the list,Remove from the list,Quitar de la lista
 "Show each track on its own, with its own switch and volume.","Show each track on its own, with its own switch and volume.","Muestra cada pista por separado, con su propio interruptor y volumen."
 "Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.","Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.","Cambia esta canción por otro archivo, conservando las pistas que reemplaza, su volumen y sus interruptores. Útil si el archivo se movió."
-"The song stays in the list, replacing nothing.","The song stays in the list, replacing nothing.","La canción se queda en la lista, sin reemplazar nada."
 "This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.","This song's file is gone, so it can't be put on new tracks. Right-click it and use a different file.","El archivo de esta canción ya no está, así que no se puede poner en pistas nuevas. Haz clic derecho y usa otro archivo."
 Ticking it hands it to this song.,Ticking it hands it to this song.,Marcarla se la pasa a esta canción.
 Tracks that play,Tracks that play,Pistas donde suena
@@ -2022,9 +2015,40 @@ Use a different file...,Use a different file...,Usar otro archivo...
 Use one of the game's own tracks in place of others.,Use one of the game's own tracks in place of others.,Usa una de las pistas del propio juego en lugar de otras.
 in your list,in your list,en tu lista
 instead:,instead:,en su lugar:
-its tracks are back to normal.,its tracks are back to normal.,sus pistas volvieron a la normalidad.
 nothing yet,nothing yet,nada todavía
 now plays in place of,now plays in place of,ahora suena en lugar de
 now:,now:,ahora:
-song(s) added. Click Choose tracks on each to say what it replaces.,song(s) added. Click Choose tracks on each to say what it replaces.,canción(es) agregada(s). Haz clic en Elegir pistas en cada una para decir qué reemplaza.
 track(s) ticked,track(s) ticked,pista(s) marcada(s)
+Saving the playlist's songs,Saving the playlist's songs,Guardando las canciones de la playlist
+Unpacking the playlist's songs,Unpacking the playlist's songs,Descomprimiendo las canciones de la playlist
+Converting custom songs,Converting custom songs,Convirtiendo canciones personalizadas
+Converting music replacements,Converting music replacements,Convirtiendo reemplazos de música
+Saving the music file's songs,Saving the music file's songs,Guardando las canciones del archivo de música
+Unpacking the music file's songs,Unpacking the music file's songs,Descomprimiendo las canciones del archivo de música
+There was not enough free memory to convert this song right now,There was not enough free memory to convert this song right now,No había suficiente memoria libre para convertir esta canción en este momento
+"Converts again every replacement marked as needing a rebuild or as failed, from the song it was set to.","Converts again every replacement marked as needing a rebuild or as failed, from the song it was set to.","Vuelve a convertir cada reemplazo marcado como que necesita reconstruirse o como fallido, desde la canción que tenía."
+Every music replacement. The ones you have now are removed and their converted files deleted.,Every music replacement. The ones you have now are removed and their converted files deleted.,Todos los reemplazos de música. Los que tienes ahora se quitan y se borran sus archivos convertidos.
+Every track is back to normal.,Every track is back to normal.,Todas las pistas volvieron a la normalidad.
+Its custom songs are added to your custom songs folder. The ones you have are kept.,Its custom songs are added to your custom songs folder. The ones you have are kept.,Sus canciones personalizadas se agregan a tu carpeta de canciones personalizadas. Las que tienes se conservan.
+Load this playlist?,Load this playlist?,¿Cargar esta playlist?
+Next song,Next song,Siguiente canción
+Nothing ticked: this song leaves the list when you close this.,Nothing ticked: this song leaves the list when you close this.,Nada marcado: esta canción sale de la lista al cerrar esto.
+"Puts every track back to the original, deletes the converted files and empties the list.","Puts every track back to the original, deletes the converted files and empties the list.","Devuelve todas las pistas a la original, borra los archivos convertidos y vacía la lista."
+Rebuild the tracks that need it,Rebuild the tracks that need it,Reconstruir las pistas que lo necesitan
+Replaces your whole music setup - Jukebox and music replacements - with the one in the file. You are asked first.,Replaces your whole music setup - Jukebox and music replacements - with the one in the file. You are asked first.,Reemplaza toda tu configuración de música - Jukebox y reemplazos de música - por la del archivo. Se te pregunta antes.
+Save mine first...,Save mine first...,Guardar la mía primero...
+"Saves your current setup as a playlist, then asks you again.","Saves your current setup as a playlist, then asks you again.",Guarda tu configuración actual como playlist y luego te vuelve a preguntar.
+"Saves your whole music setup into one file: ticked tracks, every option, custom songs and music replacements, song files included.","Saves your whole music setup into one file: ticked tracks, every option, custom songs and music replacements, song files included.","Guarda toda tu configuración de música en un archivo: pistas marcadas, todas las opciones, canciones personalizadas y reemplazos de música, con los archivos de las canciones incluidos."
+Song,Song,Canción
+The original plays until this is fixed. Right-click and choose Rebuild.,The original plays until this is fixed. Right-click and choose Rebuild.,Suena la original hasta que esto se arregle. Clic derecho y elige Reconstruir.
+"This can't be undone. If you might want your current setup back, save it as a playlist first.","This can't be undone. If you might want your current setup back, save it as a playlist first.","Esto no se puede deshacer. Si podrías querer tu configuración actual de vuelta, guárdala como playlist primero."
+This replaces your WHOLE music setup with the one in the file:,This replaces your WHOLE music setup with the one in the file:,Esto reemplaza TODA tu configuración de música por la del archivo:
+"Those tracks play the original music until they are fixed. Right-click the song and choose Rebuild, or use ... > Rebuild the tracks that need it.","Those tracks play the original music until they are fixed. Right-click the song and choose Rebuild, or use ... > Rebuild the tracks that need it.","Esas pistas suenan con la música original hasta que se arreglen. Clic derecho en la canción y elige Reconstruir, o usa ... > Reconstruir las pistas que lo necesitan."
+"Which Jukebox tracks are ticked, and every Jukebox option.","Which Jukebox tracks are ticked, and every Jukebox option.","Qué pistas del Jukebox están marcadas, y todas las opciones del Jukebox."
+You have,You have,Tienes
+failed,failed,falló
+needs rebuilding,needs rebuilding,necesita reconstruirse
+replaced track(s) now.,replaced track(s) now.,pista(s) reemplazada(s) ahora.
+track(s)...,track(s)...,pista(s)...
+Failed:,Failed:,Falló:
+Needs rebuilding:,Needs rebuilding:,Necesita reconstruirse:

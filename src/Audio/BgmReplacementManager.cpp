@@ -554,6 +554,7 @@ void BgmReplacementManager::StartNextJob()
 
 	const Job job = m_pending.front();
 	m_pending.pop_front();
+	m_inFlightJob = job;
 	m_convertingIndex = job.tableIndex;
 
 	LogRepl("Converting \"%s\" for entry %d...\n",
@@ -565,6 +566,10 @@ void BgmReplacementManager::StartNextJob()
 		JobResult result;
 		result.tableIndex = job.tableIndex;
 		std::string error;
+		// The converters catch everything themselves; this is the last line. Anything
+		// thrown here would come out of m_inFlight.get() on the game's main thread, where
+		// BBCF's WinMain catch(...) ends the game.
+		try {
 
 		if (IsPacPath(job.mp3Path))
 		{
@@ -580,6 +585,13 @@ void BgmReplacementManager::StartNextJob()
 				&error, &result.headroomDb, &tagGain);
 			result.tagGainDb = tagGain;
 			result.hasTagGain = (tagGain != 0.0f);
+		}
+		} catch (const std::bad_alloc&) {
+			result.ok = false;
+			error = kConvertOutOfMemory;
+		} catch (...) {
+			result.ok = false;
+			error = "The conversion failed";
 		}
 
 		result.error = error;
@@ -597,6 +609,22 @@ void BgmReplacementManager::Update()
 	{
 		const JobResult result = m_inFlight.get();
 		m_convertingIndex = -1;
+
+		// Out of memory is a moment, not a verdict: the song goes to the back of the queue
+		// and is tried again once the others are done and their buffers are gone.
+		auto waiting = m_assignments.find(result.tableIndex);
+		if (!result.ok && result.error == kConvertOutOfMemory && m_inFlightJob.attempts < 2 &&
+			waiting != m_assignments.end() && waiting->second.state == BgmReplacementState::Converting)
+		{
+			Job again = m_inFlightJob;
+			++again.attempts;
+			m_pending.push_back(again);
+			LogRepl("Entry %d ran out of memory converting; trying it again later (attempt %d)\n",
+				result.tableIndex, again.attempts + 1);
+			StartNextJob();
+			FinishPackJobs();
+			return;
+		}
 		++m_batchDone;
 
 		auto it = m_assignments.find(result.tableIndex);
@@ -900,6 +928,9 @@ void BgmReplacementManager::UnassignAll()
 		indices.push_back(entry.first);
 	for (int index : indices)
 		Unassign(index);
+	// Every song is now replacing nothing, so none of them stays in the list.
+	m_library.clear();
+	Save();
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1250,6 +1281,27 @@ void BgmReplacementManager::Load()
 	if (m_library.size() != listed)
 		LogRepl("Added %d song(s) in use to the library%s\n", (int)(m_library.size() - listed),
 			sawLibrary ? "" : " (first load since the library existed)");
+	// And only songs in use: an earlier build kept songs that replace nothing.
+	const size_t inUse = std::count_if(m_library.begin(), m_library.end(), [&](const std::string& song) {
+		for (const auto& entry : m_assignments)
+		{
+			if (_stricmp(entry.second.sourcePath.c_str(), song.c_str()) == 0)
+				return true;
+		}
+		return false;
+	});
+	if (inUse != m_library.size())
+	{
+		LogRepl("Dropped %d song(s) that replace nothing from the list\n", (int)(m_library.size() - inUse));
+		m_library.erase(std::remove_if(m_library.begin(), m_library.end(), [&](const std::string& song) {
+			for (const auto& entry : m_assignments)
+			{
+				if (_stricmp(entry.second.sourcePath.c_str(), song.c_str()) == 0)
+					return false;
+			}
+			return true;
+		}), m_library.end());
+	}
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1333,6 +1385,44 @@ void BgmReplacementManager::AssignSong(int tableIndex, const std::string& path)
 		AssignFromVanilla(tableIndex, vanilla);
 	else
 		Assign(tableIndex, path);
+}
+
+int BgmReplacementManager::PruneLibrary(const std::vector<std::string>& keep)
+{
+	const size_t before = m_library.size();
+	m_library.erase(std::remove_if(m_library.begin(), m_library.end(), [&](const std::string& song) {
+		for (const std::string& k : keep)
+		{
+			if (_stricmp(k.c_str(), song.c_str()) == 0)
+				return false;
+		}
+		for (const auto& entry : m_assignments)
+		{
+			if (_stricmp(entry.second.sourcePath.c_str(), song.c_str()) == 0)
+				return false;
+		}
+		return true;
+	}), m_library.end());
+	const int removed = (int)(before - m_library.size());
+	if (removed > 0)
+	{
+		LogRepl("Took %d song(s) that replace nothing out of the list\n", removed);
+		Save();
+	}
+	return removed;
+}
+
+std::vector<int> BgmReplacementManager::GetRebuildableTracks() const
+{
+	std::vector<int> tracks;
+	for (const auto& entry : m_assignments)
+	{
+		const BgmReplacementState state = entry.second.state;
+		if ((state == BgmReplacementState::Missing || state == BgmReplacementState::Failed) &&
+			!entry.second.sourcePath.empty() && FileExists(entry.second.sourcePath))
+			tracks.push_back(entry.first);
+	}
+	return tracks;
 }
 
 void BgmReplacementManager::RemoveFromLibrary(const std::string& path)
@@ -1533,6 +1623,8 @@ BgmReplacementManager::SetupResult BgmReplacementManager::ApplySetup(const Music
 		SetEnabled(entry.first, want.on);
 		++out.applied;
 	}
+	// A file can list songs that replace nothing; the list only holds songs in use.
+	PruneLibrary();
 	Save();
 	return out;
 }
@@ -1551,7 +1643,8 @@ bool BgmReplacementManager::ExportPack(const std::string& path)
 	WriteSetup(manifest, songs, "");
 
 	m_packPath = path;
-	m_exportJob = MusicPackage::WriteAsync(path, manifest, songs, kPackKind);
+	m_packProgress = std::make_shared<MusicPackage::Progress>();
+	m_exportJob = MusicPackage::WriteAsync(path, manifest, songs, kPackKind, m_packProgress);
 	LogRepl("Exporting %d song(s) and %d replacement(s) to \"%s\"\n",
 		(int)songs.size(), (int)manifest.Section("Replacements").size(), path.c_str());
 	return true;
@@ -1566,12 +1659,24 @@ bool BgmReplacementManager::ImportPack(const std::string& path, bool replaceEver
 	// Each pack gets a folder of its own, so two packs with a song of the same name keep
 	// both, and importing the same pack again reuses what is already there.
 	const std::string stem = MusicPackage::StemOf(path);
+	m_packProgress = std::make_shared<MusicPackage::Progress>();
 	m_importJob = MusicPackage::ReadAsync(path, kPackKind, [stem](const MusicPackage::Manifest& manifest) {
 		std::map<std::string, std::string> destinations;
 		AddSetupDestinations(manifest, "", stem, destinations);
 		return destinations;
-	});
+	}, m_packProgress);
 	LogRepl("Importing \"%s\" (%s)\n", path.c_str(), replaceEverything ? "replacing everything" : "added on top");
+	return true;
+}
+
+bool BgmReplacementManager::GetPackProgress(bool& exporting, int& done, int& total, float& fraction) const
+{
+	if (!IsPackBusy() || !m_packProgress)
+		return false;
+	exporting = m_exportJob.valid();
+	done = m_packProgress->doneFiles.load();
+	total = m_packProgress->totalFiles.load();
+	fraction = m_packProgress->Fraction();
 	return true;
 }
 

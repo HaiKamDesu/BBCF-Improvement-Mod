@@ -56,6 +56,11 @@ private:
 	// scrolling list, and a modal opened from in there would be parented to it.
 	std::string m_pickerSong;
 	bool m_openTrackPicker = false;
+	bool m_pickerShowing = false;      // the picker was open last frame
+	// Songs added together, waiting their turn in the picker. Each is kept in the list
+	// until its turn is over; one that ends up replacing nothing then leaves it.
+	std::vector<std::string> m_addQueue;
+	int m_addQueueTotal = 0;
 	char m_pickerSearch[64] = {};
 	std::map<std::string, bool> m_pickerCollapsed;   // category -> collapsed
 

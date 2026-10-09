@@ -7,6 +7,7 @@
 #include "miniz.h"
 
 #include <windows.h>
+#include <algorithm>
 #include <sstream>
 
 namespace MusicPackage
@@ -130,10 +131,9 @@ namespace MusicPackage
 		return fallback;
 	}
 
-	std::future<WriteResult> WriteAsync(const std::string& path, const Manifest& manifest,
-		const std::vector<SongFile>& songs, const std::string& kind)
+	static WriteResult WriteNow(const std::string& path, const Manifest& manifest,
+		const std::vector<SongFile>& songs, const std::string& kind, const std::shared_ptr<Progress>& progress)
 	{
-		return std::async(std::launch::async, [path, manifest, songs, kind]() {
 			WriteResult result;
 			// Written beside the target and moved over it at the end, so a failed export
 			// never leaves a half-written pack under the name the user chose.
@@ -151,6 +151,14 @@ namespace MusicPackage
 			if (stamped.Get("Package", "Kind").empty())
 				stamped.Add("Package", "Kind", kind);
 			const std::string text = Serialize(stamped, kind);
+			if (progress)
+			{
+				long long total = 0;
+				for (const SongFile& song : songs)
+					total += (std::max)(0LL, FileSize(song.sourcePath));
+				progress->totalBytes = total;
+				progress->totalFiles = static_cast<int>(songs.size());
+			}
 			bool ok = mz_zip_writer_add_mem(&zip, kManifestName, text.data(), text.size(), MZ_DEFAULT_COMPRESSION) != 0;
 			for (const SongFile& song : songs)
 			{
@@ -159,10 +167,16 @@ namespace MusicPackage
 				if (!FileExistsW(song.sourcePath))
 				{
 					result.missingSongs.push_back(song.sourcePath);
+					if (progress) ++progress->doneFiles;
 					continue;
 				}
 				ok = mz_zip_writer_add_file(&zip, song.archiveName.c_str(), song.sourcePath.c_str(),
 					nullptr, 0, MZ_NO_COMPRESSION) != 0;
+				if (progress)
+				{
+					progress->doneBytes += (std::max)(0LL, FileSize(song.sourcePath));
+					++progress->doneFiles;
+				}
 				if (ok)
 					++result.songsWritten;
 				else
@@ -188,13 +202,29 @@ namespace MusicPackage
 			LOG(1, "[MusicPackage] Wrote %s \"%s\": %d song(s), %d missing\n", kind.c_str(), path.c_str(),
 				result.songsWritten, static_cast<int>(result.missingSongs.size()));
 			return result;
+	}
+
+	std::future<WriteResult> WriteAsync(const std::string& path, const Manifest& manifest,
+		const std::vector<SongFile>& songs, const std::string& kind, std::shared_ptr<Progress> progress)
+	{
+		return std::async(std::launch::async, [path, manifest, songs, kind, progress]() {
+			// Whatever this throws would come out of get() on the game's main thread.
+			try
+			{
+				return WriteNow(path, manifest, songs, kind, progress);
+			}
+			catch (const std::exception& e)
+			{
+				WriteResult failed;
+				failed.error = std::string("Could not write the file: ") + e.what();
+				return failed;
+			}
 		});
 	}
 
-	std::future<ReadResult> ReadAsync(const std::string& path, const std::string& kind,
-		DestinationsFor destinationsFor)
+	static ReadResult ReadNow(const std::string& path, const std::string& kind,
+		const DestinationsFor& destinationsFor, const std::shared_ptr<Progress>& progress)
 	{
-		return std::async(std::launch::async, [path, kind, destinationsFor]() {
 			ReadResult result;
 			mz_zip_archive zip = {};
 			if (!mz_zip_reader_init_file(&zip, path.c_str(), 0))
@@ -220,6 +250,19 @@ namespace MusicPackage
 			}
 
 			const std::map<std::string, std::string> destinations = destinationsFor(result.manifest);
+			if (progress)
+			{
+				long long total = 0;
+				for (const auto& entry : destinations)
+				{
+					const int index = mz_zip_reader_locate_file(&zip, entry.first.c_str(), nullptr, 0);
+					mz_zip_archive_file_stat stat = {};
+					if (index >= 0 && mz_zip_reader_file_stat(&zip, index, &stat))
+						total += static_cast<long long>(stat.m_uncomp_size);
+				}
+				progress->totalBytes = total;
+				progress->totalFiles = static_cast<int>(destinations.size());
+			}
 			for (const auto& entry : destinations)
 			{
 				const int index = mz_zip_reader_locate_file(&zip, entry.first.c_str(), nullptr, 0);
@@ -233,6 +276,11 @@ namespace MusicPackage
 				if (slash != std::string::npos)
 					CreateFolders(entry.second.substr(0, slash));
 				const std::string dest = ChooseDestination(entry.second, static_cast<long long>(stat.m_uncomp_size));
+				if (progress)
+				{
+					progress->doneBytes += static_cast<long long>(stat.m_uncomp_size);
+					++progress->doneFiles;
+				}
 				if (FileExistsW(dest) && FileSize(dest) == static_cast<long long>(stat.m_uncomp_size))
 				{
 					result.extracted[entry.first] = dest; // already there from an earlier import
@@ -251,7 +299,33 @@ namespace MusicPackage
 			LOG(1, "[MusicPackage] Opened %s \"%s\": %d song(s) extracted\n", kind.c_str(), path.c_str(),
 				static_cast<int>(result.extracted.size()));
 			return result;
+	}
+
+	std::future<ReadResult> ReadAsync(const std::string& path, const std::string& kind,
+		DestinationsFor destinationsFor, std::shared_ptr<Progress> progress)
+	{
+		return std::async(std::launch::async, [path, kind, destinationsFor, progress]() {
+			// Whatever this throws would come out of get() on the game's main thread.
+			try
+			{
+				return ReadNow(path, kind, destinationsFor, progress);
+			}
+			catch (const std::exception& e)
+			{
+				ReadResult failed;
+				failed.error = std::string("Could not open the file: ") + e.what();
+				return failed;
+			}
 		});
+	}
+
+	float Progress::Fraction() const
+	{
+		const long long total = totalBytes.load();
+		if (total <= 0)
+			return 0.0f;
+		const float f = static_cast<float>(static_cast<double>(doneBytes.load()) / static_cast<double>(total));
+		return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
 	}
 
 	std::string FileNameOf(const std::string& path)

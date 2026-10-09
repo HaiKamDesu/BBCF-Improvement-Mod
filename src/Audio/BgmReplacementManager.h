@@ -127,6 +127,8 @@ public:
 	int  GetQueueLength() const;
 	// 0..1 across the current batch; 1 when idle.
 	float GetBatchProgress() const;
+	// Songs finished and in all of the current batch; both 0 when idle.
+	void GetBatchCounts(int& done, int& total) const { done = m_batchDone; total = m_batchTotal; }
 	// Track currently being converted, or -1.
 	int  GetConvertingIndex() const { return m_convertingIndex; }
 
@@ -198,6 +200,13 @@ public:
 	void RemoveFromLibrary(const std::string& path);
 	// Makes `path` the song for this track, whichever kind of song it is.
 	void AssignSong(int tableIndex, const std::string& path);
+	// Takes every song that replaces nothing out of the list, except those in `keep` (a
+	// song whose tracks are being chosen right now). The list is the replacements, not a
+	// shelf: a song with no tracks has no reason to be in it. Returns how many went.
+	int PruneLibrary(const std::vector<std::string>& keep = {});
+	// Tracks whose replacement is Missing or Failed but whose song is still on disk, so
+	// building them again can work.
+	std::vector<int> GetRebuildableTracks() const;
 
 	// ---- Packs (*.bbcfim-music) -----------------------------------------------------
 	// A pack is the whole setup in one file: every library song and what each replaces,
@@ -207,6 +216,9 @@ public:
 	// replacements are added on top, taking over only the tracks the pack sets.
 	bool ImportPack(const std::string& path, bool replaceEverything);
 	bool IsPackBusy() const { return m_exportJob.valid() || m_importJob.valid(); }
+	// How far the running export/import has got: songs and a 0..1 fraction by size.
+	// False when neither is running.
+	bool GetPackProgress(bool& exporting, int& done, int& total, float& fraction) const;
 	// The outcome of the last export/import, once: true when there is one to show.
 	bool ConsumePackMessage(std::string& message, bool& ok);
 
@@ -271,6 +283,7 @@ private:
 		std::string originalPac;
 		std::string outPac;
 		float gainDb = 0.0f;
+		int attempts = 0;   // conversions already tried; one that ran out of memory goes again
 	};
 
 	struct JobResult
@@ -321,6 +334,7 @@ private:
 
 	std::future<MusicPackage::WriteResult> m_exportJob;
 	std::future<MusicPackage::ReadResult>  m_importJob;
+	std::shared_ptr<MusicPackage::Progress> m_packProgress;
 	std::string m_packPath;
 	bool        m_importReplace = false;
 	std::string m_packMessage;
@@ -329,6 +343,7 @@ private:
 
 	std::deque<Job>        m_pending;
 	std::future<JobResult> m_inFlight;
+	Job                    m_inFlightJob;   // what m_inFlight is converting, to queue again
 	int                    m_convertingIndex = -1;
 	int                    m_batchTotal = 0;
 	int                    m_batchDone = 0;

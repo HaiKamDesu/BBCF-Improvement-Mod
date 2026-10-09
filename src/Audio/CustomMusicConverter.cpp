@@ -19,6 +19,9 @@
 #include <cctype>
 #include <vector>
 #include <string>
+#include <mutex>
+#include <new>
+#include <stdexcept>
 
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfreadwrite.lib")
@@ -480,9 +483,14 @@ static bool TranscodeToPcm(const std::string& srcPath,
 //   - no SeekTables segment: 1985 of the 1989 shipped PCM entries sit in banks that
 //     have none, and the other four mark their entry 0xFFFFFFFF. dwFlags still
 //     carries 0x00080000, which every shipped bank sets either way.
-static std::vector<unsigned char> BuildWaveBankPcm(const std::string& bankName,
-                                                   const std::vector<unsigned char>& pcmData,
-                                                   unsigned long long durationSamples) {
+// Everything of a PCM wave bank except the audio: the bank is this header, then the
+// samples, then `*tailPad` zero bytes. Kept apart so the samples - tens of megabytes for a
+// full song - can be written straight from the decode buffer instead of copied into one
+// more contiguous block, which a 32-bit game's fragmented address space may not have.
+static std::vector<unsigned char> BuildWaveBankPcmHeader(const std::string& bankName,
+                                                         size_t pcmBytes,
+                                                         unsigned long long durationSamples,
+                                                         size_t* tailPad) {
     const unsigned int blockAlign = TARGET_CHANNELS * 2;
     const unsigned int miniFormat = (0u & 0x3)                                  // PCM
                                   | ((TARGET_CHANNELS & 0x7) << 2)
@@ -505,7 +513,7 @@ static std::vector<unsigned char> BuildWaveBankPcm(const std::string& bankName,
     *(unsigned int*)&entryMeta[0]  = (unsigned int)((durationSamples & 0x0FFFFFFFull) << 4);
     *(unsigned int*)&entryMeta[4]  = miniFormat;
     *(unsigned int*)&entryMeta[8]  = 0;                                // PlayRegion offset
-    *(unsigned int*)&entryMeta[12] = (unsigned int)pcmData.size();     // PlayRegion length
+    *(unsigned int*)&entryMeta[12] = (unsigned int)pcmBytes;           // PlayRegion length
     *(unsigned int*)&entryMeta[16] = 0;                                // LoopRegion start
     *(unsigned int*)&entryMeta[20] = 0;                                // LoopRegion total
 
@@ -515,22 +523,21 @@ static std::vector<unsigned char> BuildWaveBankPcm(const std::string& bankName,
     const unsigned int seg2_off = 0, seg2_len = 0; // SeekTables: absent
     const unsigned int seg3_off = 0, seg3_len = 0; // EntryNames: absent
     const unsigned int seg4_off = (seg1_off + seg1_len + 3) & ~3u;
-    const unsigned int seg4_len = ((unsigned int)pcmData.size() + 3) & ~3u;
+    const unsigned int seg4_len = ((unsigned int)pcmBytes + 3) & ~3u;
 
-    std::vector<unsigned char> xwb(seg4_off + seg4_len, 0);
-    memcpy(&xwb[0], "WBND", 4);
-    *(unsigned int*)&xwb[4] = 46;
-    *(unsigned int*)&xwb[8] = 44;
-    *(unsigned int*)&xwb[12] = seg0_off; *(unsigned int*)&xwb[16] = seg0_len;
-    *(unsigned int*)&xwb[20] = seg1_off; *(unsigned int*)&xwb[24] = seg1_len;
-    *(unsigned int*)&xwb[28] = seg2_off; *(unsigned int*)&xwb[32] = seg2_len;
-    *(unsigned int*)&xwb[36] = seg3_off; *(unsigned int*)&xwb[40] = seg3_len;
-    *(unsigned int*)&xwb[44] = seg4_off; *(unsigned int*)&xwb[48] = seg4_len;
-    memcpy(&xwb[seg0_off], bankData.data(), bankData.size());
-    memcpy(&xwb[seg1_off], entryMeta.data(), entryMeta.size());
-    if (!pcmData.empty())
-        memcpy(&xwb[seg4_off], pcmData.data(), pcmData.size());
-    return xwb;
+    std::vector<unsigned char> header(seg4_off, 0);
+    memcpy(&header[0], "WBND", 4);
+    *(unsigned int*)&header[4] = 46;
+    *(unsigned int*)&header[8] = 44;
+    *(unsigned int*)&header[12] = seg0_off; *(unsigned int*)&header[16] = seg0_len;
+    *(unsigned int*)&header[20] = seg1_off; *(unsigned int*)&header[24] = seg1_len;
+    *(unsigned int*)&header[28] = seg2_off; *(unsigned int*)&header[32] = seg2_len;
+    *(unsigned int*)&header[36] = seg3_off; *(unsigned int*)&header[40] = seg3_len;
+    *(unsigned int*)&header[44] = seg4_off; *(unsigned int*)&header[48] = seg4_len;
+    memcpy(&header[seg0_off], bankData.data(), bankData.size());
+    memcpy(&header[seg1_off], entryMeta.data(), entryMeta.size());
+    *tailPad = seg4_len - pcmBytes;
+    return header;
 }
 
 // ============================================================================
@@ -731,9 +738,13 @@ static std::vector<unsigned char> BuildSoundBank(const std::string& cueName) {
 // Geometry is derived from the name length so it matches the native files for any
 // name: nameField = align4(len + 2), stride = align16(nameField + 16). Verified to
 // reproduce all 186 shipped .pac files byte-for-byte in the header and file table.
-static std::vector<unsigned char> BuildFpacContainer(const std::string& cueName,
-                                                     const std::vector<unsigned char>& xsb,
-                                                     const std::vector<unsigned char>& xwb) {
+// The FPAC header and file table for a .xsb of `xsbSize` bytes and a .xwb of `xwbSize`:
+// the container is this, then the .xsb, then zeros up to `*xwbGap`, then the .xwb. The
+// sub-files are written after it as they are, never copied into one buffer with it.
+static std::vector<unsigned char> BuildFpacHeader(const std::string& cueName,
+                                                  size_t xsbSizeIn,
+                                                  size_t xwbSizeIn,
+                                                  size_t* xwbGap) {
     std::string xsbName = cueName + ".xsb";
     std::string xwbName = cueName + ".xwb";
 
@@ -754,40 +765,157 @@ static std::vector<unsigned char> BuildFpacContainer(const std::string& cueName,
 
     // Sub-file offsets (relative to dataStart); .xwb starts 16-byte aligned
     unsigned int xsbOffset = 0;
-    unsigned int xsbSize = (unsigned int)xsb.size();
+    unsigned int xsbSize = (unsigned int)xsbSizeIn;
     unsigned int xwbOffset = (xsbSize + 0xF) & ~0xFu;
-    unsigned int xwbSize = (unsigned int)xwb.size();
+    unsigned int xwbSize = (unsigned int)xwbSizeIn;
 
     unsigned int totalSize = dataStart + xwbOffset + xwbSize;
-    std::vector<unsigned char> pac(totalSize, 0);
+    std::vector<unsigned char> header(dataStart, 0);
 
     // FPAC header
-    memcpy(&pac[0x00], "FPAC", 4);
-    *(unsigned int*)&pac[0x04] = dataStart;
-    *(unsigned int*)&pac[0x08] = totalSize;
-    *(unsigned int*)&pac[0x0C] = fileCount;
-    *(unsigned int*)&pac[0x10] = 1;          // constant 1 in every native file
-    *(unsigned int*)&pac[0x14] = nameField;
+    memcpy(&header[0x00], "FPAC", 4);
+    *(unsigned int*)&header[0x04] = dataStart;
+    *(unsigned int*)&header[0x08] = totalSize;
+    *(unsigned int*)&header[0x0C] = fileCount;
+    *(unsigned int*)&header[0x10] = 1;          // constant 1 in every native file
+    *(unsigned int*)&header[0x14] = nameField;
 
     // File table entry 0: .xsb
     unsigned int e0 = 0x20;
-    memcpy(&pac[e0], xsbName.c_str(), xsbName.size());
-    *(unsigned int*)&pac[e0 + nameField + 0] = 0;          // index
-    *(unsigned int*)&pac[e0 + nameField + 4] = xsbOffset;  // offset
-    *(unsigned int*)&pac[e0 + nameField + 8] = xsbSize;    // size
+    memcpy(&header[e0], xsbName.c_str(), xsbName.size());
+    *(unsigned int*)&header[e0 + nameField + 0] = 0;          // index
+    *(unsigned int*)&header[e0 + nameField + 4] = xsbOffset;  // offset
+    *(unsigned int*)&header[e0 + nameField + 8] = xsbSize;    // size
 
     // File table entry 1: .xwb
     unsigned int e1 = 0x20 + stride;
-    memcpy(&pac[e1], xwbName.c_str(), xwbName.size());
-    *(unsigned int*)&pac[e1 + nameField + 0] = 1;          // index
-    *(unsigned int*)&pac[e1 + nameField + 4] = xwbOffset;  // offset
-    *(unsigned int*)&pac[e1 + nameField + 8] = xwbSize;    // size
+    memcpy(&header[e1], xwbName.c_str(), xwbName.size());
+    *(unsigned int*)&header[e1 + nameField + 0] = 1;          // index
+    *(unsigned int*)&header[e1 + nameField + 4] = xwbOffset;  // offset
+    *(unsigned int*)&header[e1 + nameField + 8] = xwbSize;    // size
 
-    // Sub-file data
-    memcpy(&pac[dataStart + xsbOffset], xsb.data(), xsb.size());
-    memcpy(&pac[dataStart + xwbOffset], xwb.data(), xwb.size());
+    *xwbGap = xwbOffset - xsbSize;
+    return header;
+}
 
-    return pac;
+// One piece of a file being written: bytes from a buffer, or `zeros` zero bytes.
+struct FilePiece {
+    const unsigned char* data = nullptr;
+    size_t size = 0;
+    size_t zeros = 0;
+};
+
+// Writes the pieces to a temp file beside `outPacPath` and moves it over the target, so an
+// interrupted run never leaves a torn .pac behind and the old file stays until the new
+// one is whole.
+static bool WritePiecesAtomically(const std::vector<FilePiece>& pieces,
+                                  const std::string& outPacPath, std::string* errorOut) {
+    const std::string tmpPath = outPacPath + ".tmp";
+    HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hOut == INVALID_HANDLE_VALUE) {
+        char buf[320];
+        sprintf_s(buf, "Could not create '%s' (error %lu)", tmpPath.c_str(), GetLastError());
+        if (errorOut) *errorOut = buf;
+        return false;
+    }
+    static const unsigned char kZeros[16] = {};
+    bool ok = true;
+    for (const FilePiece& piece : pieces) {
+        size_t done = 0;
+        while (ok && done < piece.size) {
+            // In 16 MB slices: one WriteFile of a whole song is legal, but slices keep
+            // each kernel transfer modest.
+            const DWORD chunk = (DWORD)(std::min)(piece.size - done, (size_t)(16u << 20));
+            DWORD written = 0;
+            ok = WriteFile(hOut, piece.data + done, chunk, &written, NULL) && written == chunk;
+            done += chunk;
+        }
+        for (size_t z = 0; ok && z < piece.zeros; z += sizeof(kZeros)) {
+            const DWORD chunk = (DWORD)(std::min)(piece.zeros - z, sizeof(kZeros));
+            DWORD written = 0;
+            ok = WriteFile(hOut, kZeros, chunk, &written, NULL) && written == chunk;
+        }
+        if (!ok) break;
+    }
+    CloseHandle(hOut);
+    if (!ok) {
+        DeleteFileA(tmpPath.c_str());
+        if (errorOut) *errorOut = "Could not write the converted file (is the disk full?)";
+        return false;
+    }
+    if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+        DeleteFileA(tmpPath.c_str());
+        char buf[320];
+        sprintf_s(buf, "Could not move '%s' into place (error %lu)", tmpPath.c_str(), GetLastError());
+        if (errorOut) *errorOut = buf;
+        return false;
+    }
+    return true;
+}
+
+// Writes a .pac holding `xsb` and a wave bank of the converted audio. A PCM bank's samples
+// go to disk straight from `audioData`; only a WMA bank, a tenth of the size, is assembled.
+static bool WriteTrackPac(const std::string& outPacPath, const std::string& cueName,
+                          const std::vector<unsigned char>& xsb, BankFormat format,
+                          const std::vector<unsigned char>& audioData,
+                          const std::vector<unsigned int>& pktSamples,
+                          unsigned long long durationSamples, std::string* errorOut) {
+    std::vector<unsigned char> xwbHead;
+    size_t xwbTail = 0;
+    size_t xwbSize = 0;
+    if (format == BankFormat::Wma) {
+        xwbHead = BuildWaveBank(cueName, audioData, pktSamples, durationSamples);
+        xwbSize = xwbHead.size();
+    } else {
+        xwbHead = BuildWaveBankPcmHeader(cueName, audioData.size(), durationSamples, &xwbTail);
+        xwbSize = xwbHead.size() + audioData.size() + xwbTail;
+    }
+    size_t gap = 0;
+    const std::vector<unsigned char> fpac = BuildFpacHeader(cueName, xsb.size(), xwbSize, &gap);
+
+    std::vector<FilePiece> pieces;
+    pieces.push_back({ fpac.data(), fpac.size(), 0 });
+    pieces.push_back({ xsb.data(), xsb.size(), gap });
+    pieces.push_back({ xwbHead.data(), xwbHead.size(), 0 });
+    if (format == BankFormat::Pcm)
+        pieces.push_back({ audioData.data(), audioData.size(), xwbTail });
+    return WritePiecesAtomically(pieces, outPacPath, errorOut);
+}
+
+// ============================================================================
+// One conversion at a time, and never an exception out
+// ============================================================================
+// Custom songs and replacements convert on different threads. Each conversion holds a whole
+// song decoded in memory - up to ~50 MB for a long track, as ONE contiguous block - and the
+// game is a 32-bit process whose address space is already fragmented, so two at once can
+// find no room. The lock makes them take turns.
+//
+// Running out of memory anyway, or any other C++ exception, ends the conversion with
+// kConvertOutOfMemory / an error string rather than leaving the worker. An exception that
+// got out reached the game's main thread through std::future::get() and closed the game.
+static std::mutex g_conversionMutex;
+
+const char* const kConvertOutOfMemory =
+    "There was not enough free memory to convert this song right now";
+
+template <typename Body>
+static bool GuardedConversion(const char* what, const std::string& srcPath, std::string* errorOut, Body body) {
+    std::lock_guard<std::mutex> lock(g_conversionMutex);
+    try {
+        return body();
+    } catch (const std::bad_alloc&) {
+        LogCustom("%s '%s': OUT OF MEMORY - %s\n", what, srcPath.c_str(), kConvertOutOfMemory);
+        if (errorOut) *errorOut = kConvertOutOfMemory;
+    } catch (const std::exception& e) {
+        LogCustom("%s '%s': exception %s\n", what, srcPath.c_str(), e.what());
+        if (errorOut) *errorOut = std::string("The conversion failed: ") + e.what();
+    } catch (...) {
+        LogCustom("%s '%s': unknown exception\n", what, srcPath.c_str());
+        if (errorOut) *errorOut = "The conversion failed";
+    }
+    return false;
 }
 
 // ============================================================================
@@ -806,14 +934,14 @@ static unsigned int StableTrackHash(const std::string& filename) {
 // cue and FPAC sub-files all carry `cueName`. Assumes Media Foundation is already
 // started (see ConvertMp3ToPac for the standalone entry point). Writes via a temp file
 // so an interrupted run never leaves a torn .pac behind.
-static bool ConvertOneTrack(const std::string& srcPath,
-                            float gainDb,
-                            float* headroomOut,
-                            float* tagGainOut,
-                            const std::string& outPacPath,
-                            const std::string& cueName,
-                            unsigned long long* durationSamplesOut,
-                            std::string* errorOut) {
+static bool ConvertOneTrackImpl(const std::string& srcPath,
+                                float gainDb,
+                                float* headroomOut,
+                                float* tagGainOut,
+                                const std::string& outPacPath,
+                                const std::string& cueName,
+                                unsigned long long* durationSamplesOut,
+                                std::string* errorOut) {
     auto fail = [&](const std::string& msg) {
         if (errorOut) *errorOut = msg;
         LogCustom("%s\n", msg.c_str());
@@ -834,39 +962,27 @@ static bool ConvertOneTrack(const std::string& srcPath,
     if (durationSamples == 0 || durationSamples > 0x0FFFFFFFull)
         return fail("Implausible duration for '" + srcPath + "'");
 
-    std::vector<unsigned char> xwb = (format == BankFormat::Wma)
-        ? BuildWaveBank(cueName, audioData, pktSamples, durationSamples)
-        : BuildWaveBankPcm(cueName, audioData, durationSamples);
-    std::vector<unsigned char> xsb = BuildSoundBank(cueName);
-    std::vector<unsigned char> pac = BuildFpacContainer(cueName, xsb, xwb);
-
-    const std::string tmpPath = outPacPath + ".tmp";
-    HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
-        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hOut == INVALID_HANDLE_VALUE) {
-        char buf[320];
-        sprintf_s(buf, "Could not create '%s' (error %lu)", tmpPath.c_str(), GetLastError());
-        return fail(buf);
-    }
-    DWORD written = 0;
-    BOOL ok = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
-    CloseHandle(hOut);
-    if (!ok || written != (DWORD)pac.size()) {
-        DeleteFileA(tmpPath.c_str());
-        char buf[192];
-        sprintf_s(buf, "Short write (%lu of %zu bytes)", written, pac.size());
-        return fail(buf);
-    }
-    if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
-        DeleteFileA(tmpPath.c_str());
-        char buf[320];
-        sprintf_s(buf, "Could not move '%s' into place (error %lu)", tmpPath.c_str(), GetLastError());
-        return fail(buf);
-    }
+    const std::vector<unsigned char> xsb = BuildSoundBank(cueName);
+    std::string writeError;
+    if (!WriteTrackPac(outPacPath, cueName, xsb, format, audioData, pktSamples, durationSamples, &writeError))
+        return fail(writeError);
 
     if (durationSamplesOut) *durationSamplesOut = durationSamples;
     return true;
+}
+
+static bool ConvertOneTrack(const std::string& srcPath,
+                            float gainDb,
+                            float* headroomOut,
+                            float* tagGainOut,
+                            const std::string& outPacPath,
+                            const std::string& cueName,
+                            unsigned long long* durationSamplesOut,
+                            std::string* errorOut) {
+    return GuardedConversion("Converting", srcPath, errorOut, [&]() {
+        return ConvertOneTrackImpl(srcPath, gainDb, headroomOut, tagGainOut, outPacPath, cueName,
+            durationSamplesOut, errorOut);
+    });
 }
 
 // Pull one sub-file out of an FPAC container by extension, returning its bytes and its
@@ -949,37 +1065,10 @@ static bool RenameWaveBank(std::vector<unsigned char>& xwb, const std::string& b
 
 // Write `pac` to `outPacPath` via a temp file, so a failure never leaves a half-written
 // .pac where the game will find it - writing a pointer at one hangs the match load.
-static bool WritePacAtomically(const std::vector<unsigned char>& pac,
-                               const std::string& outPacPath, std::string* errorOut) {
-    const std::string tmpPath = outPacPath + ".tmp";
-    HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
-        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hOut == INVALID_HANDLE_VALUE) {
-        if (errorOut) *errorOut = "Could not create the output file";
-        return false;
-    }
-
-    DWORD written = 0;
-    const BOOL wrote = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
-    CloseHandle(hOut);
-    if (!wrote || written != (DWORD)pac.size()) {
-        DeleteFileA(tmpPath.c_str());
-        if (errorOut) *errorOut = "Short write on the output file";
-        return false;
-    }
-    if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
-        DeleteFileA(tmpPath.c_str());
-        if (errorOut) *errorOut = "Could not replace the existing file";
-        return false;
-    }
-    return true;
-}
-
-bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
-                                const std::string& originalPacPath,
-                                const std::string& outPacPath,
-                                std::string* errorOut) {
+static bool BuildReplacementPacFromPacImpl(const std::string& sourcePacPath,
+                                           const std::string& originalPacPath,
+                                           const std::string& outPacPath,
+                                           std::string* errorOut) {
     auto fail = [&](const std::string& msg) {
         if (errorOut) *errorOut = msg;
         LogCustom("%s\n", msg.c_str());
@@ -1017,22 +1106,37 @@ bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
     LogCustom("Replacement for \"%s\": transplanting the %zu-byte wave bank from \"%s\"\n",
         baseName.c_str(), sourceXwb.size(), sourceBaseName.c_str());
 
-    std::vector<unsigned char> pac = BuildFpacContainer(baseName, originalXsb, sourceXwb);
+    // The source .pac is no longer needed, and for a PCM bank it is as big as the song.
+    std::vector<unsigned char>().swap(sourcePac);
+    std::vector<unsigned char>().swap(originalPac);
 
+    size_t gap = 0;
+    const std::vector<unsigned char> fpac = BuildFpacHeader(baseName, originalXsb.size(), sourceXwb.size(), &gap);
     std::string writeError;
-    if (!WritePacAtomically(pac, outPacPath, &writeError))
+    if (!WritePiecesAtomically({ { fpac.data(), fpac.size(), 0 },
+                                 { originalXsb.data(), originalXsb.size(), gap },
+                                 { sourceXwb.data(), sourceXwb.size(), 0 } }, outPacPath, &writeError))
         return fail(writeError);
 
     return true;
 }
 
-bool ConvertAudioToReplacementPac(const std::string& srcPath,
-                                  float gainDb,
-                                  const std::string& originalPacPath,
-                                  const std::string& outPacPath,
-                                  std::string* errorOut,
-                                  float* headroomOut,
-                                  float* tagGainOut) {
+bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
+                                const std::string& originalPacPath,
+                                const std::string& outPacPath,
+                                std::string* errorOut) {
+    return GuardedConversion("Transplanting", sourcePacPath, errorOut, [&]() {
+        return BuildReplacementPacFromPacImpl(sourcePacPath, originalPacPath, outPacPath, errorOut);
+    });
+}
+
+static bool ConvertAudioToReplacementPacImpl(const std::string& srcPath,
+                                             float gainDb,
+                                             const std::string& originalPacPath,
+                                             const std::string& outPacPath,
+                                             std::string* errorOut,
+                                             float* headroomOut,
+                                             float* tagGainOut) {
     auto fail = [&](const std::string& msg) {
         if (errorOut) *errorOut = msg;
         LogCustom("%s\n", msg.c_str());
@@ -1061,6 +1165,7 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
 
     LogCustom("Replacement for \"%s\": reusing its %zu-byte sound bank verbatim\n",
         baseName.c_str(), originalXsb.size());
+    std::vector<unsigned char>().swap(originalPac); // only its sound bank was needed
 
     const BankFormat format = ChooseBankFormat();
 
@@ -1088,36 +1193,16 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
     if (ok) {
         // The wave bank must carry the SAME name, because the reused sound bank refers
         // to it by that name.
-        std::vector<unsigned char> xwb = (format == BankFormat::Wma)
-            ? BuildWaveBank(baseName, audioData, pktSamples, durationSamples)
-            : BuildWaveBankPcm(baseName, audioData, durationSamples);
-        std::vector<unsigned char> pac = BuildFpacContainer(baseName, originalXsb, xwb);
-
-        const std::string tmpPath = outPacPath + ".tmp";
-        HANDLE hOut = CreateFileA(tmpPath.c_str(), GENERIC_WRITE, 0, NULL,
-            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hOut == INVALID_HANDLE_VALUE) {
-            ok = false;
-            if (errorOut) *errorOut = "Could not create the output file";
+        std::string writeError;
+        ok = WriteTrackPac(outPacPath, baseName, originalXsb, format, audioData, pktSamples,
+                           durationSamples, &writeError);
+        if (!ok) {
+            if (errorOut) *errorOut = writeError;
         } else {
-            DWORD written = 0;
-            const BOOL wrote = WriteFile(hOut, pac.data(), (DWORD)pac.size(), &written, NULL);
-            CloseHandle(hOut);
-            if (!wrote || written != (DWORD)pac.size()) {
-                DeleteFileA(tmpPath.c_str());
-                ok = false;
-                if (errorOut) *errorOut = "Short write on the output file";
-            } else if (!MoveFileExA(tmpPath.c_str(), outPacPath.c_str(),
-                                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
-                DeleteFileA(tmpPath.c_str());
-                ok = false;
-                if (errorOut) *errorOut = "Could not move the converted file into place";
-            } else {
-                const int durSec = (int)(durationSamples / TARGET_RATE);
-                LogCustom("SUCCESS: '%s' replaces \"%s\" -> '%s' (~%02d:%02d)\n",
-                    srcPath.c_str(), baseName.c_str(), outPacPath.c_str(),
-                    durSec / 60, durSec % 60);
-            }
+            const int durSec = (int)(durationSamples / TARGET_RATE);
+            LogCustom("SUCCESS: '%s' replaces \"%s\" -> '%s' (~%02d:%02d)\n",
+                srcPath.c_str(), baseName.c_str(), outPacPath.c_str(),
+                durSec / 60, durSec % 60);
         }
     } else if (errorOut && errorOut->empty()) {
         *errorOut = "Could not decode '" + srcPath + "'";
@@ -1126,6 +1211,19 @@ bool ConvertAudioToReplacementPac(const std::string& srcPath,
     if (mfStarted) MFShutdown();
     if (coInitialized) CoUninitialize();
     return ok;
+}
+
+bool ConvertAudioToReplacementPac(const std::string& srcPath,
+                                  float gainDb,
+                                  const std::string& originalPacPath,
+                                  const std::string& outPacPath,
+                                  std::string* errorOut,
+                                  float* headroomOut,
+                                  float* tagGainOut) {
+    return GuardedConversion("Converting", srcPath, errorOut, [&]() {
+        return ConvertAudioToReplacementPacImpl(srcPath, gainDb, originalPacPath, outPacPath,
+            errorOut, headroomOut, tagGainOut);
+    });
 }
 
 bool ConvertAudioToPac(const std::string& srcPath,
@@ -1321,7 +1419,15 @@ std::vector<CustomTrackInfo> ConvertCustomMusicOnStartup(const CustomMusicProgre
         unsigned long long durationSamples = 0;
         std::string convertError;
         float tagGain = 0.0f;
-        if (!ConvertOneTrack(mp3Path, gainDb, nullptr, &tagGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError)) {
+        bool converted = ConvertOneTrack(mp3Path, gainDb, nullptr, &tagGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError);
+        if (!converted && convertError == kConvertOutOfMemory) {
+            // Memory comes and goes with what the game is loading; one more try a moment
+            // later usually finds room.
+            Sleep(1500);
+            convertError.clear();
+            converted = ConvertOneTrack(mp3Path, gainDb, nullptr, &tagGain, pacPath, CUSTOM_JUKEBOX_BANK_NAME, &durationSamples, &convertError);
+        }
+        if (!converted) {
             LogCustom("SKIPPING '%s': %s\n", mp3Filename.c_str(), convertError.c_str());
             continue;
         }

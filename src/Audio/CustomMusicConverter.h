@@ -94,6 +94,11 @@ bool BuildReplacementPacFromPac(const std::string& sourcePacPath,
                                 const std::string& outPacPath,
                                 std::string* errorOut = nullptr);
 
+// The error every conversion reports when it ran out of memory. Conversions never throw:
+// they run one at a time, and a failure of any kind comes back as false plus a message.
+// This one is worth trying again later, once memory has been freed.
+extern const char* const kConvertOutOfMemory;
+
 using CustomMusicProgressCallback = std::function<void(int, int, const std::string&)>;
 // The user's volume OFFSET for one custom track, in dB, by file name. Any ReplayGain tag
 // in the file is applied first and this is added to it. Returns 0 for an untouched track.

@@ -164,6 +164,28 @@ void BgmReplacementWindow::Draw()
 
 	PollDialogs();
 
+	// The next of several songs added together gets its turn once the picker is closed.
+	if (!m_pickerShowing && !m_openTrackPicker)
+	{
+		if (!m_addQueue.empty())
+		{
+			OpenTrackPicker(m_addQueue.front());
+			m_addQueue.erase(m_addQueue.begin());
+		}
+		else
+		{
+			m_addQueueTotal = 0;   // the batch is over; a later pick is a song of its own
+		}
+	}
+	// The list only holds songs that replace something. A song keeps its row while its
+	// tracks are being chosen, or while it waits for that turn.
+	{
+		std::vector<std::string> keep = m_addQueue;
+		if (m_pickerShowing || m_openTrackPicker)
+			keep.push_back(m_pickerSong);
+		mgr.PruneLibrary(keep);
+	}
+
 	DrawToolbar();
 	DrawStatus();
 	DrawSongList();
@@ -253,13 +275,23 @@ void BgmReplacementWindow::DrawToolbar()
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltipWrapped(L("Saves everything here into one file - every song, what it replaces, its volume and whether it is on - so it works on any PC.").c_str());
 		ImGui::Separator();
+		const std::vector<int> rebuildable = mgr.GetRebuildableTracks();
+		const std::string rebuildLabel = L("Rebuild the tracks that need it") + " (" + std::to_string(rebuildable.size()) + ")";
+		if (ImGui::MenuItem(rebuildLabel.c_str(), nullptr, false, !rebuildable.empty()))
+		{
+			for (int index : rebuildable)
+				mgr.Retry(index);
+			m_lastMessage = L("Rebuilding") + " " + std::to_string(rebuildable.size()) + " " + L("track(s)...");
+		}
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltipWrapped(L("Converts again every replacement marked as needing a rebuild or as failed, from the song it was set to.").c_str());
 		if (ImGui::MenuItem(L("Put every track back to normal").c_str(), nullptr, false, mgr.GetAssignedCount() > 0))
 		{
 			mgr.UnassignAll();
-			m_lastMessage = L("Every song is back to normal.");
+			m_lastMessage = L("Every track is back to normal.");
 		}
 		if (ImGui::IsItemHovered())
-			ImGui::SetTooltipWrapped(L("Puts every song back to the original and deletes the converted files. Your songs stay in the list.").c_str());
+			ImGui::SetTooltipWrapped(L("Puts every track back to the original, deletes the converted files and empties the list.").c_str());
 		ImGui::EndPopup();
 	}
 
@@ -282,9 +314,18 @@ void BgmReplacementWindow::DrawStatus()
 		m_packMessageOk = packOk;
 	}
 
-	if (mgr.IsPackBusy())
+	bool exporting = false;
+	int packDone = 0, packTotal = 0;
+	float packFraction = 0.0f;
+	if (mgr.GetPackProgress(exporting, packDone, packTotal, packFraction))
 	{
-		ImGui::TextColoredWrapped(kAmber, "%s", L("Working on the music file, please wait...").c_str());
+		std::string label = L(exporting ? "Saving the music file's songs" : "Unpacking the music file's songs");
+		if (packTotal > 0)
+			label += ": " + std::to_string((std::min)(packDone + 1, packTotal)) + " / " + std::to_string(packTotal);
+		ImGui::TextColoredWrapped(kAmber, "%s", label.c_str());
+		char percent[16];
+		snprintf(percent, sizeof(percent), "%d%%", (int)(packFraction * 100.0f + 0.5f));
+		ImGui::ProgressBar(packFraction, ImVec2(-1, 0.0f), percent);
 	}
 	else if (!m_packMessage.empty())
 	{
@@ -297,11 +338,12 @@ void BgmReplacementWindow::DrawStatus()
 		const int converting = mgr.GetConvertingIndex();
 		const BgmReplaceableTrack* track = converting >= 0 ? mgr.FindTrack(converting) : nullptr;
 		std::string text = track ? L("Converting for") + " " + track->displayName + "..." : L("Converting...");
-		const int queued = mgr.GetQueueLength();
-		if (queued > 1)
-			text += "  (" + L("Still to do") + ": " + std::to_string(queued - 1) + ")";
+		int done = 0, total = 0;
+		mgr.GetBatchCounts(done, total);
+		if (total > 1)
+			text += "  " + std::to_string((std::min)(done + 1, total)) + " / " + std::to_string(total);
 		ImGui::TextColored(StateColor(BgmReplacementState::Converting), "%s", text.c_str());
-		ImGui::ProgressBar(mgr.GetBatchProgress(), ImVec2(-1, 3.0f), "");
+		ImGui::ProgressBar(mgr.GetBatchProgress(), ImVec2(-1, total > 1 ? 0.0f : 3.0f), total > 1 ? nullptr : "");
 	}
 	else if (!m_lastMessage.empty())
 	{
@@ -465,18 +507,21 @@ void BgmReplacementWindow::DrawReplacesButton(const LibrarySong& song, float wid
 		label = first ? first->displayName : "?";
 		if (song.replaces.size() > 1)
 			label += "  +" + std::to_string(song.replaces.size() - 1);
-		bool problem = false, converting = false, anyOn = false;
+		int missing = 0, failed = 0;
+		bool converting = false, anyOn = false;
 		for (int index : song.replaces)
 		{
 			const BgmReplacementState state = mgr.GetState(index);
-			problem = problem || state == BgmReplacementState::Missing || state == BgmReplacementState::Failed ||
-				state == BgmReplacementState::Unavailable;
+			if (state == BgmReplacementState::Missing) ++missing;
+			if (state == BgmReplacementState::Failed || state == BgmReplacementState::Unavailable) ++failed;
 			converting = converting || state == BgmReplacementState::Converting;
 			anyOn = anyOn || mgr.IsEnabled(index);
 		}
-		if (problem)
+		if (failed > 0 || missing > 0)
 		{
-			label = "! " + label;
+			// Said in words, and in front where a narrow column cannot cut it off: a bare
+			// "!" told nobody what was wrong or what to do.
+			label = L(failed > 0 ? "Failed:" : "Needs rebuilding:") + " " + label;
 			color = StateColor(BgmReplacementState::Failed);
 		}
 		else if (converting)
@@ -492,11 +537,24 @@ void BgmReplacementWindow::DrawReplacesButton(const LibrarySong& song, float wid
 		std::string tip = L("Replaces:");
 		if (song.replaces.empty())
 			tip += " " + L("nothing yet");
+		bool anyProblem = false;
 		for (int index : song.replaces)
 		{
-			if (const BgmReplaceableTrack* track = mgr.FindTrack(index))
-				tip += "\n  " + track->displayName;
+			const BgmReplaceableTrack* track = mgr.FindTrack(index);
+			if (!track)
+				continue;
+			tip += "\n  " + track->displayName;
+			const BgmReplacementState state = mgr.GetState(index);
+			if (state == BgmReplacementState::Missing || state == BgmReplacementState::Failed ||
+				state == BgmReplacementState::Unavailable)
+			{
+				anyProblem = true;
+				tip += "  -  " + L(state == BgmReplacementState::Missing ? "needs rebuilding" : "failed") + ": " +
+					mgr.GetError(index);
+			}
 		}
+		if (anyProblem)
+			tip += "\n\n" + L("Those tracks play the original music until they are fixed. Right-click the song and choose Rebuild, or use ... > Rebuild the tracks that need it.");
 		tip += "\n\n" + L("Click to choose the tracks.");
 		ImGui::SetTooltipWrapped(tip.c_str());
 	}
@@ -572,14 +630,6 @@ void BgmReplacementWindow::DrawSongContextMenu(const LibrarySong& song)
 		ImGui::SetTooltipWrapped(L("Swap this song for another file, keeping the tracks it replaces, their volume and their switches. Handy when the file was moved.").c_str());
 
 	ImGui::Separator();
-	if (ImGui::MenuItem(L("Put its tracks back to normal").c_str(), nullptr, false, !song.replaces.empty()))
-	{
-		for (int index : std::vector<int>(song.replaces))
-			mgr.Unassign(index);
-		m_lastMessage = song.name + ": " + L("its tracks are back to normal.");
-	}
-	if (ImGui::IsItemHovered())
-		ImGui::SetTooltipWrapped(L("The song stays in the list, replacing nothing.").c_str());
 	if (ImGui::MenuItem(L("Remove from the list").c_str()))
 	{
 		mgr.RemoveFromLibrary(song.path);
@@ -615,8 +665,10 @@ void BgmReplacementWindow::DrawReplacedTrackRow(const BgmReplaceableTrack& track
 	std::string label = track.displayName;
 	if (state == BgmReplacementState::Converting)
 		label += "  (" + L("converting...") + ")";
-	else if (state == BgmReplacementState::Missing || state == BgmReplacementState::Failed)
-		label = "! " + label;
+	else if (state == BgmReplacementState::Missing)
+		label = L("Needs rebuilding:") + " " + label;
+	else if (state == BgmReplacementState::Failed)
+		label = L("Failed:") + " " + label;
 	ImGui::Selectable((label + "##name").c_str(), false, ImGuiSelectableFlags_AllowOverlap, ImVec2(nameWidth, 0.0f));
 	ImGui::PopStyleColor();
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -631,7 +683,8 @@ void BgmReplacementWindow::DrawReplacedTrackRow(const BgmReplaceableTrack& track
 		}
 		else if (state == BgmReplacementState::Missing || state == BgmReplacementState::Failed ||
 			state == BgmReplacementState::Unavailable)
-			tip += "\n" + mgr.GetError(tableIndex);
+			tip += "\n" + mgr.GetError(tableIndex) + "\n" +
+				L("The original plays until this is fixed. Right-click and choose Rebuild.");
 		else if (state == BgmReplacementState::Off)
 			tip += "\n" + L("Switched off: the original plays.");
 		ImGui::SetTooltipWrapped(tip.c_str());
@@ -853,7 +906,8 @@ void BgmReplacementWindow::DrawTrackPickerModal()
 	const ImVec2 display = ImGui::GetIO().DisplaySize;
 	ImGui::SetNextWindowSize(ImVec2((std::min)(600.0f, display.x * 0.9f), (std::min)(600.0f, display.y * 0.85f)), ImGuiCond_Appearing);
 	MusicListStyle::OpaquePopup opaque;
-	if (!ImGui::BeginPopupModal(popupId.c_str(), nullptr, ImGuiWindowFlags_NoSavedSettings))
+	m_pickerShowing = ImGui::BeginPopupModal(popupId.c_str(), nullptr, ImGuiWindowFlags_NoSavedSettings);
+	if (!m_pickerShowing)
 		return;
 
 	LibrarySong song;
@@ -875,6 +929,9 @@ void BgmReplacementWindow::DrawTrackPickerModal()
 		return;
 	}
 
+	if (m_addQueueTotal > 1)
+		ImGui::TextDisabled("%s", (L("Song") + " " + std::to_string(m_addQueueTotal - (int)m_addQueue.size()) +
+			" / " + std::to_string(m_addQueueTotal)).c_str());
 	ImGui::TextWrapped("%s", (L("Tracks that play") + " " + song.name + " " + L("instead:")).c_str());
 	if (!song.exists)
 		ImGui::TextColoredWrapped(StateColor(BgmReplacementState::Failed), "%s",
@@ -970,7 +1027,11 @@ void BgmReplacementWindow::DrawTrackPickerModal()
 				else if (!canReplace)
 					tip += "\n" + L("A song can't replace itself.");
 				if (!other.empty())
-					tip += "\n" + L("Now plays:") + " " + other + "\n" + L("Ticking it hands it to this song.");
+				{
+					tip += "\n" + L("Now plays:") + " " + other;
+					if (canReplace)
+						tip += "\n" + L("Ticking it hands it to this song.");
+				}
 				ImGui::SetTooltipWrapped(tip.c_str());
 			}
 			if (!other.empty())
@@ -1000,10 +1061,14 @@ void BgmReplacementWindow::DrawTrackPickerModal()
 
 	ImGui::EndChild();
 
-	if (ImGui::Button(L("Done").c_str(), ImVec2(120, 0)))
+	const bool more = !m_addQueue.empty();
+	if (ImGui::Button(L(more ? "Next song" : "Done").c_str(), ImVec2(120, 0)))
 		ImGui::CloseCurrentPopup();
 	ImGui::SameLine();
-	ImGui::TextDisabled("%s", (std::to_string(song.replaces.size()) + " " + L("track(s) ticked")).c_str());
+	if (song.replaces.empty())
+		ImGui::TextColored(kAmber, "%s", L("Nothing ticked: this song leaves the list when you close this.").c_str());
+	else
+		ImGui::TextDisabled("%s", (std::to_string(song.replaces.size()) + " " + L("track(s) ticked")).c_str());
 
 	ImGui::EndPopup();
 }
@@ -1089,6 +1154,7 @@ void BgmReplacementWindow::DrawSoundtrackModal()
 	if (!picked.empty())
 	{
 		ImGui::CloseCurrentPopup();
+		m_addQueueTotal = 1;
 		OpenTrackPicker(picked);
 	}
 	ImGui::EndPopup();
@@ -1205,17 +1271,12 @@ void BgmReplacementWindow::PollDialogs()
 
 	if (NativeFileDialog::Consume(kAddSongsToken, &result) && result.accepted && !result.paths.empty())
 	{
-		const int added = mgr.AddToLibrary(result.paths);
-		if (result.paths.size() == 1)
-		{
-			// One song: go straight on to what it replaces.
-			OpenTrackPicker(result.paths.front());
-		}
-		else
-		{
-			m_lastMessage = std::to_string(added) + " " +
-				L("song(s) added. Click Choose tracks on each to say what it replaces.");
-		}
+		mgr.AddToLibrary(result.paths);
+		// Straight on to what each one replaces, one song after another.
+		m_addQueue = result.paths;
+		m_addQueueTotal = (int)result.paths.size();
+		OpenTrackPicker(m_addQueue.front());
+		m_addQueue.erase(m_addQueue.begin());
 	}
 
 	if (NativeFileDialog::Consume(kImportPackToken, &result) && result.accepted && !result.path.empty())
