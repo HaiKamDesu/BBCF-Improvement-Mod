@@ -99,6 +99,7 @@
     <ClCompile Include="src\Game\FrameStallWatchdog.cpp" />
     <ClCompile Include="src\Game\NetplayArenaKeeper.cpp" />
     <ClCompile Include="src\Game\GlyphAtlasGuard.cpp" />
+    <ClCompile Include="src\Game\DesyncDiagnostics.cpp" />
     <ClCompile Include="src\Game\NetworkStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\SpectatorSyncDiagnostics.cpp" />
     <ClCompile Include="src\Game\Player.cpp" />
@@ -307,6 +308,7 @@
     <ClInclude Include="src\Game\FrameStallWatchdog.h" />
     <ClInclude Include="src\Game\NetplayArenaKeeper.h" />
     <ClInclude Include="src\Game\GlyphAtlasGuard.h" />
+    <ClInclude Include="src\Game\DesyncDiagnostics.h" />
     <ClInclude Include="src\Game\NetworkStallDiagnostics.h" />
     <ClInclude Include="src\Game\SpectatorSyncDiagnostics.h" />
     <ClInclude Include="src\Game\Player.h" />

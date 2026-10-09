@@ -9,6 +9,7 @@
 #include "Game/MatchState.h"
 #include "Game/GlyphAtlasGuard.h"
 #include "Game/NetplayArenaKeeper.h"
+#include "Game/DesyncDiagnostics.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Game/SpectatorSyncDiagnostics.h"
 #include "Game/gamestates.h"
@@ -9276,6 +9277,7 @@ void __declspec(naked)GetFrameCounter()
 	RankedProbeTickFrameState();
 	RankedAutomationHarness::Tick();
 	GetMusicManager().Update();
+	DesyncDiagnostics::Tick();
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
 	{
 		UnlimitedReplayTakeoverManager::Instance().Tick();

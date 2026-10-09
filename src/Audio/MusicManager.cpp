@@ -6,6 +6,8 @@
 #include "Core/utils.h"
 #include "Game/gamestates.h"
 #include "Core/interfaces.h"
+#include "Game/DesyncDiagnostics.h"
+#include "Network/RoomManager.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 
 #include <windows.h>
@@ -49,7 +51,11 @@ std::vector<MusicManager::ReplacementTrackFile> MusicManager::s_replacementTrack
 // Track id ranges live on MusicManager itself; see MusicManager.h.
 
 // Audio engine constants (from reverse engineering BBCF.exe)
+// Not an audio manager: this is the object GetCharSelectStruct (0x47E860) returns. Only +0x1690
+// (the selected BGM id) is audio. +0x118 onward is the per-player setup blocks the battle reads,
+// so never write there - see the note in PlayTrackPhysically STEP 1.
 static constexpr uintptr_t AUDIO_MGR_RVA = 0x008903B0;
+static void FormatPlayerSetupBlocks(char* buf, size_t size); // defined by DescribeForDiagnostics
 static constexpr uintptr_t BGM_ID_OFFSET = 0x1690;
 static constexpr uintptr_t LOADER_RVA = 0x0014FEE0;
 static constexpr uintptr_t REGISTER_RVA = 0x0007C930;
@@ -1071,7 +1077,7 @@ void MusicManager::Update() {
             } else if (++m_dialogClosedTimer >= 45) { // ~0.75s still in match => cancelled
                 if (m_preDialogTrackId >= 0 && m_preDialogTrackId != m_currentTrackId) {
                     LogMusic("MusicManager: Confirm dialog cancelled -> re-playing track %d\n", m_preDialogTrackId);
-                    PlayTrack(m_preDialogTrackId);
+                    PlayTrack(m_preDialogTrackId, false, "confirm-dialog-cancelled");
                 }
                 m_preDialogTrackId = -1;
                 m_dialogClosedTimer = 0;
@@ -1472,7 +1478,7 @@ void MusicManager::ChangeMusicIfNeeded() {
 		int current = m_currentTrackId;
 		if (current >= 0) {
 			m_currentTrackId = -1;          // bypass the "already playing" guard
-			PlayTrack(current);             // replay the same track
+			PlayTrack(current, false, "repeat-single"); // replay the same track
 		}
 		return;
 	}
@@ -1487,7 +1493,7 @@ void MusicManager::ChangeMusicIfNeeded() {
 	int candidates = (int)GetEnabledTracks().size();
 	int nextTrackId = SelectNextTrack();
 	while (nextTrackId >= 0 && candidates-- > 0) {
-		if (PlayTrack(nextTrackId))
+		if (PlayTrack(nextTrackId, false, "rotation-track-ended"))
 			return;
 		LogMusic("MusicManager: Track %d could not be played; skipping it in the rotation\n",
 			nextTrackId);
@@ -1610,7 +1616,7 @@ void MusicManager::ApplyPendingRematchTrack() {
     // used to drop the choice on the floor - the match then ran on the game's own song,
     // which is the whole thing the user asked not to happen. Bounded so a track that can
     // never play (file deleted mid-session) costs a few seconds of retries, not the match.
-    if (PlayTrack(trackId)) {
+    if (PlayTrack(trackId, false, "queued-match-track")) {
         LogMusic("MusicManager: Applied queued match track %d after %d attempt(s)\n",
             trackId, m_pendingTrackAttempts + 1);
         m_pendingRematchTrackId = -1;
@@ -2080,11 +2086,11 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 
 	// --- STEP 1: Stop the current BGM audio and clear playController references ---
 	__try {
-		// Deactivate BGM Slot 0 in audioManager to prevent race conditions
-		*(int*)(audioMgrAddr + 0x118 + 0x00) = 0;   // active = 0
-		*(int*)(audioMgrAddr + 0x118 + 0x04) = 0;   // state = 0
-		*(int*)(audioMgrAddr + 0x118 + 0x10) = -1;  // voice = -1
-		LogMusic("MusicManager: Deactivated BGM Slot 0\n");
+		// Nothing at AUDIO_MGR_RVA + 0x118 is touched. That is not a BGM slot: it is P1's
+		// player-setup block (0x710 bytes per player, ctor 0x47CBC0), +0 is IsPlayerActive
+		// (0x47DF90) read by battle char setup, and the character it feeds is in the GGPO
+		// checksum. Writing it here (and "restoring" it from a once-per-process capture)
+		// desynced online matches whenever that capture came from outside a match.
 
 		// Stop the BGM audio in XACT Bank[13]
 		void** bankArray = *(void***)(soundEngineAddr + 0x04);
@@ -2370,26 +2376,13 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 	// cursor is a row/column, so it is moved to wherever that track sits.
 	MusicSelectMenu::SelectTrack(presentedId);
 
-	// Restore audioManager BGM slot 0 to its native (active) state.
-	// We deactivated it in STEP 1 to prevent race conditions during loading/registration.
-	// The game's training mode position reset checks if this slot is active.
-	__try {
-		if (m_audioSlot0Captured) {
-			*(int*)(audioMgrAddr + 0x118 + 0x00) = m_origSlot0Active;
-			*(int*)(audioMgrAddr + 0x118 + 0x04) = m_origSlot0State;
-		}
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
-		LogMusic("MusicManager: Failed to restore Slot 0 active status\n");
-	}
-
 	m_songStartTime = std::chrono::steady_clock::now();
 	LogMusic("MusicManager: PlayTrackPhysically completed\n");
 	return true;
 }
 
-bool MusicManager::PlayTrack(int trackId, bool force) {
-	LogMusic("MusicManager: PlayTrack(%d)\n", trackId);
+bool MusicManager::PlayTrack(int trackId, bool force, const char* reason) {
+	LogMusic("MusicManager: PlayTrack(%d) reason=%s\n", trackId, reason ? reason : "other");
 
 	HMODULE hMod = GetModuleHandleA("BBCF.exe");
 	if (!hMod) {
@@ -2416,21 +2409,6 @@ bool MusicManager::PlayTrack(int trackId, bool force) {
 
 	LogMusic("MusicManager: Changing BGM from %d to %d (%s)\n", m_currentTrackId, trackId, bgmName);
 
-	// Capture the native audioManager BGM slot 0 state ONCE, before we ever
-	// deactivate it (PlayTrackPhysically STEP 1 does), so scene exit can restore
-	// it and the game's native Character Select BGM init finds an active slot.
-	if (!m_audioSlot0Captured) {
-		__try {
-			uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
-			m_origSlot0Active = *(int*)(audioMgrAddr + 0x118 + 0x00);
-			m_origSlot0State  = *(int*)(audioMgrAddr + 0x118 + 0x04);
-			m_audioSlot0Captured = true;
-			LogMusic("MusicManager: Captured native audioMgr slot0 (active=%d, state=%d)\n",
-				m_origSlot0Active, m_origSlot0State);
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER) {}
-	}
-
 	if (!PlayTrackPhysicallyGuarded(modBase, trackId, bgmName, &m_currentTrackDurationFrames, m_anchorTrackId)) {
 		LogMusic("MusicManager: PlayTrackPhysically failed\n");
 		return false;
@@ -2455,7 +2433,72 @@ bool MusicManager::PlayTrack(int trackId, bool force) {
 	if (m_currentTrack) {
 		LogMusic("MusicManager: Track = \"%s\"\n", m_currentTrack->name.c_str());
 	}
+
+	// Everything a desync report needs about this change in one line, and handed to the
+	// desync log so a checksum mismatch can name the last change before it.
+	char blocks[96];
+	FormatPlayerSetupBlocks(blocks, sizeof(blocks));
+	char diag[320];
+	sprintf_s(diag, sizeof(diag),
+		"track %d (%s, %s) reason=%s online=%d matchState=%d sessionFrame=%d %s",
+		trackId, bgmName, TrackKind(trackId, bgmName), reason ? reason : "other",
+		(g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional()) ? 1 : 0,
+		m_lastMatchState, DesyncDiagnostics::GetSessionFrame(), blocks);
+	LogMusic("[Jukebox] changed to %s\n", diag);
+	DesyncDiagnostics::NoteMusicChange(diag);
 	return true;
+}
+
+// The "BGM slot 0" fields at AUDIO_MGR_RVA + 0x118 are really the start of the per-player
+// setup blocks (0x710 bytes each, ctor 0x47CBC0): +0 is read by IsPlayerActive (0x47DF90,
+// == 1) during battle char setup, +4 by script-VM queries. The mod writes P1's, so the
+// values go in every Jukebox log line, both players, as active/state/+0x10.
+static void FormatPlayerSetupBlocks(char* buf, size_t size) {
+	int v[6] = { -99, -99, -99, -99, -99, -99 };
+	__try {
+		const uintptr_t base = (uintptr_t)GetModuleHandleA("BBCF.exe") + AUDIO_MGR_RVA + 0x118;
+		for (int p = 0; p < 2; p++) {
+			const uintptr_t block = base + (uintptr_t)p * 0x710;
+			v[p * 3 + 0] = *(int*)(block + 0x00);
+			v[p * 3 + 1] = *(int*)(block + 0x04);
+			v[p * 3 + 2] = *(int*)(block + 0x10);
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {}
+	sprintf_s(buf, size, "p1Setup=%d/%d/%d p2Setup=%d/%d/%d", v[0], v[1], v[2], v[3], v[4], v[5]);
+}
+
+const char* MusicManager::TrackKind(int trackId, const char* bgmName) const {
+	if (bgmName && strncmp(bgmName, "BBCFIM_Music/", 13) == 0) return "replacement";
+	if (m_customTrackSource.count(trackId)) return "custom";
+	return "game";
+}
+
+std::string MusicManager::DescribeForDiagnostics() const {
+	static const char* kRotation[] = { "random", "sequential", "shuffle" };
+	static const char* kChoice[] = { "charselect-track", "next-playlist-track", "last-played-track" };
+	const int rotation = (int)m_rotationMode;
+	const int start = (int)m_matchStartTrackChoice;
+	const int rematch = (int)m_rematchTrackChoice;
+	const char* currentName = GetBgmFilename(m_currentTrackId);
+
+	char blocks[96];
+	FormatPlayerSetupBlocks(blocks, sizeof(blocks));
+	char buf[480];
+	sprintf_s(buf, sizeof(buf),
+		"rotation=%s (%s) repeatSingle=%d matchStart=%s rematch=%s enabledTracks=%d customTracks=%d "
+		"replacementsActive=%d playing=%d (%s, %s) controlling=%d %s",
+		m_enabled ? "on" : "off",
+		(rotation >= 0 && rotation < 3) ? kRotation[rotation] : "?",
+		m_repeatSingle ? 1 : 0,
+		(start >= 0 && start < 3) ? kChoice[start] : "?",
+		(rematch >= 0 && rematch < 3) ? kChoice[rematch] : "?",
+		(int)GetEnabledTracks().size(), m_customTrackCount.load(),
+		BgmReplacementManager::GetInstance().GetActiveCount(),
+		m_currentTrackId, currentName ? currentName : "?",
+		currentName ? TrackKind(m_currentTrackId, currentName) : "?",
+		IsControllingBgm() ? 1 : 0, blocks);
+	return buf;
 }
 
 bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string& cueName) {
@@ -2468,16 +2511,6 @@ bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string
 	HMODULE hMod = GetModuleHandleA("BBCF.exe");
 	if (!hMod) return false;
 	const uintptr_t modBase = (uintptr_t)hMod;
-
-	if (!m_audioSlot0Captured) {
-		__try {
-			const uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
-			m_origSlot0Active = *(int*)(audioMgrAddr + 0x118 + 0x00);
-			m_origSlot0State  = *(int*)(audioMgrAddr + 0x118 + 0x04);
-			m_audioSlot0Captured = true;
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER) {}
-	}
 
 	LogMusic("MusicManager: PreviewPac path=\"%s\" cue=\"%s\"\n",
 		relPathNoExt.c_str(), cueName.c_str());
@@ -2517,7 +2550,7 @@ void MusicManager::PlayNextTrack() {
         LogMusic("MusicManager: PlayNextTrack - no enabled tracks\n");
         return;
     }
-    PlayTrack(nextTrackId);
+    PlayTrack(nextTrackId, false, "next-track");
 }
 
 void MusicManager::ShufflePlaylist() {
@@ -2788,15 +2821,6 @@ void MusicManager::ClearBgmForSceneExit() {
         *(int*)(soundSlotMgrAddr + SCRATCH_SLOT * 8 + 4) = 0;
         // Present the selectable anchor id to the game-facing state.
         *(int*)(audioMgrAddr + 0x1690) = m_anchorTrackId;
-        // Restore audioManager BGM slot 0 to its native (active) state. The mod
-        // deactivated it on every play; the game's native Character Select BGM
-        // init needs it active to (re)load the original track. voice = -1 so the
-        // native reload assigns a fresh cue (the old one was destroyed).
-        if (m_audioSlot0Captured) {
-            *(int*)(audioMgrAddr + 0x118 + 0x00) = m_origSlot0Active;
-            *(int*)(audioMgrAddr + 0x118 + 0x04) = m_origSlot0State;
-            *(int*)(audioMgrAddr + 0x118 + 0x10) = -1;
-        }
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         LogMusic("MusicManager: Exception during ClearBgmForSceneExit (continuing)\n");

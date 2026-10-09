@@ -372,7 +372,7 @@ void JukeboxWindow::PollRestartAfterVolume() {
 		return;
 
 	if (musicManager.IsInMatch())
-		musicManager.PlayTrack(trackId, true);
+		musicManager.PlayTrack(trackId, true, "volume-change-reload");
 }
 
 // A small button per row opening a volume popup. A slider on every row would swamp a list
@@ -749,7 +749,7 @@ void JukeboxWindow::DrawTrackList() {
 			// Inside a match only: playing a track anywhere else takes the game's BGM slot
 			// over and breaks the next character select (no cursor, no input).
 			if (musicManager.IsInMatch())
-				musicManager.PlayTrack(track->id);
+				musicManager.PlayTrack(track->id, false, "user-pick");
 		}
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {

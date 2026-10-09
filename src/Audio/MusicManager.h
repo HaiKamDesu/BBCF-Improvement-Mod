@@ -68,7 +68,13 @@ public:
     // Returns false when the track could not be started at all (no such filename, or the
     // .pac behind it is missing/unreadable). Rotation uses that to move past a track it
     // cannot play instead of asking for it again forever.
-    bool PlayTrack(int trackId, bool force = false);
+    // `reason` names the caller in DEBUG.txt (user pick, rotation, queued match track...),
+    // so a report can tell what changed the music and why without asking.
+    bool PlayTrack(int trackId, bool force = false, const char* reason = "other");
+
+    // One line of Jukebox state for DEBUG.txt: on/off, rotation, match-start choices, the
+    // track playing and what kind it is, and how many replacements are active.
+    std::string DescribeForDiagnostics() const;
 
     // Play an arbitrary .pac for auditioning, given a path relative to data/Sound/BGM/
     // (without the .pac extension) and the cue name inside it. Used by the replacement
@@ -309,6 +315,8 @@ private:
     // the rematch override has always covered, plus Training. Story and Arcade are left
     // alone on purpose - their BGM is part of a scripted scene, not a match's song.
     bool IsTrackOverrideMode() const;
+    // "game", "custom" (Jukebox import) or "replacement" (BBCFIM_Music/), for the logs.
+    const char* TrackKind(int trackId, const char* bgmName) const;
     void DetectSceneExitAndUnload();
     bool PlayTrackPhysically(uintptr_t modBase, int trackId, const char* bgmName, int* outDurationFrames, int presentedId, const char* cueOverride = nullptr);
     // PlayTrackPhysically with every C++ exception caught: it runs on the game's main thread,
@@ -400,13 +408,6 @@ private:
     bool m_modControllingBgm = false; // true once the mod is the authority on the current track
     int m_anchorTrackId = 0;        // supported track id presented to the game (never a vs/old/sys id)
 
-    // Native audioManager BGM slot 0 (+0x118) state captured before we first
-    // deactivate it, so scene exit can restore it. The game's native Character
-    // Select BGM init needs this slot active; leaving it deactivated is what
-    // produces the red debug Character Select.
-    int m_origSlot0Active = 1;
-    int m_origSlot0State = 0;
-    bool m_audioSlot0Captured = false;
     std::chrono::steady_clock::time_point m_songStartTime;
 
     // "Return to Character Select?" confirm-dialog handling: restore the anchor
