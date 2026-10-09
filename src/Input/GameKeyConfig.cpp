@@ -260,11 +260,6 @@ namespace LocalInput
 			};
 			SideEditor g_editor[2];
 
-			std::string g_kbOwner;             // the keyboard whose records are staged
-			int g_kbOwnerSide = -1;
-			GameBinds g_kbOwnerBinds;
-			HeldKeys g_kbOwnerHeld;
-
 			struct KeyboardCandidate
 			{
 				std::string id;
@@ -272,6 +267,20 @@ namespace LocalInput
 				HeldKeys held;
 			};
 			KeyboardCandidate g_kbCandidate[2];
+
+			// The keyboard each side edits in Button Settings, with its keys as they are now.
+			// An empty id: that side has no keyboard of its own and edits the game's own
+			// keyboard config (g_gameKb), as in vanilla.
+			//
+			// The game keeps ONE set of keyboard records, shared by both players' keyboard
+			// panels. So that both players can have a keyboard panel open at once, each panel
+			// is handed its own side's keys only while its own code runs: its tick and confirm
+			// are wrapped (LoadKeyboardRecords before, SaveKeyboardRecords after), and the item
+			// drawer reads the side's keys directly instead of the records.
+			KeyboardCandidate g_kbEdit[2];
+			GameBinds g_gameKb;
+			constexpr int kGameKeyboard = 2;
+			int g_kbStaged = -1;               // whose keys are in the records: 0/1, kGameKeyboard, -1 unknown
 
 			std::vector<std::pair<std::string, GameBinds>> g_pendingChanges;
 
@@ -309,8 +318,11 @@ namespace LocalInput
 				ReadImage(opt, g_staged);
 				g_editor[0] = SideEditor();
 				g_editor[1] = SideEditor();
-				g_kbOwner.clear();
-				g_kbOwnerSide = -1;
+				g_kbEdit[0] = KeyboardCandidate();
+				g_kbEdit[1] = KeyboardCandidate();
+				std::memcpy(g_gameKb.setB, opt + kKbSetB, 40);
+				std::memcpy(g_gameKb.setA, opt + kKbSetA, 40);
+				g_kbStaged = kGameKeyboard;
 			}
 
 			void __cdecl NoteSaveLoaded()
@@ -347,25 +359,86 @@ namespace LocalInput
 				return text;
 			}
 
-			void StageKeyboard(int side, const KeyboardCandidate& kb)
+			// The keys a side's keyboard panel shows and edits.
+			GameBinds& KeyboardKeysFor(int side)
+			{
+				return g_kbEdit[side & 1].id.empty() ? g_gameKb : g_kbEdit[side & 1].binds;
+			}
+
+			// Puts a side's keyboard keys into the game's shared records, right before that side's
+			// keyboard panel code runs.
+			void LoadKeyboardRecords(int side)
 			{
 				uint8_t* const opt = OptData();
-				if (!opt || kb.id.empty())
+				if (!opt)
 					return;
-				// Records that no longer hold this keyboard's keys mean the game rewrote them since
-				// they were last staged (or another keyboard had them).
-				const bool replaced = std::memcmp(opt + kKbSetB, kb.binds.setB, 40) != 0 ||
-					std::memcmp(opt + kKbSetA, kb.binds.setA, 40) != 0;
-				g_kbOwner = kb.id;
-				g_kbOwnerSide = side;
-				g_kbOwnerBinds = kb.binds;
-				g_kbOwnerHeld = kb.held;
-				std::memcpy(opt + kKbSetB, kb.binds.setB, 40);
-				std::memcpy(opt + kKbSetA, kb.binds.setA, 40);
-				std::memcpy(g_staged.kbB, kb.binds.setB, 40);
-				std::memcpy(g_staged.kbA, kb.binds.setA, 40);
-				LOG(1, "[GameKeyConfig] keyboard records -> %s (P%d)%s: %s\n", kb.id.c_str(), side + 1,
-					replaced ? ", replacing different keys that were in them" : "", RecordHex(kb.binds.setB[0]).c_str());
+				const GameBinds& keys = KeyboardKeysFor(side);
+				const int who = g_kbEdit[side & 1].id.empty() ? kGameKeyboard : (side & 1);
+				if (who != g_kbStaged || std::memcmp(opt + kKbSetB, keys.setB, 40) != 0 ||
+					std::memcmp(opt + kKbSetA, keys.setA, 40) != 0)
+				{
+					std::memcpy(opt + kKbSetB, keys.setB, 40);
+					std::memcpy(opt + kKbSetA, keys.setA, 40);
+					std::memcpy(g_staged.kbB, keys.setB, 40);
+					std::memcpy(g_staged.kbA, keys.setA, 40);
+				}
+				g_kbStaged = who;
+			}
+
+			// Takes whatever changed in the records back to whose keys they are: a side's keyboard
+			// (0/1) or the game's own (kGameKeyboard).
+			void SaveKeyboardRecordsOf(int who)
+			{
+				uint8_t* const opt = OptData();
+				if (!opt || who < 0)
+					return;
+				const int side = who == kGameKeyboard ? 0 : (who & 1);
+				static const KeyboardCandidate kNobody;
+				const KeyboardCandidate& kb = who == kGameKeyboard ? kNobody : g_kbEdit[side];
+				GameBinds& keys = kb.id.empty() ? g_gameKb : g_kbEdit[side].binds;
+				if (std::memcmp(opt + kKbSetB, keys.setB, 40) != 0 || std::memcmp(opt + kKbSetA, keys.setA, 40) != 0)
+				{
+					const std::string before = RecordHex(keys.setB[0]);
+					std::memcpy(keys.setB, opt + kKbSetB, 40);
+					std::memcpy(keys.setA, opt + kKbSetA, 40);
+					if (!kb.id.empty())
+					{
+						Sanitize(keys, BindClass::Keyboard);
+						g_pendingChanges.emplace_back(kb.id, keys);
+					}
+					else
+					{
+						// The game's own config is what keyboards without settings of their own use.
+						for (GameBinds& vanilla : g_vanilla[1])
+						{
+							std::memcpy(vanilla.setB, keys.setB, 40);
+							std::memcpy(vanilla.setA, keys.setA, 40);
+							Sanitize(vanilla, BindClass::Keyboard);
+						}
+					}
+					LOG(1, "[GameKeyConfig] %s: keyboard settings changed (P%d): %s (was %s)\n",
+						kb.id.empty() ? "the game's own keyboard config" : kb.id.c_str(), side + 1,
+						RecordHex(opt + kKbSetB).c_str(), before.c_str());
+				}
+				std::memcpy(g_staged.kbB, opt + kKbSetB, 40);
+				std::memcpy(g_staged.kbA, opt + kKbSetA, 40);
+			}
+
+			// After a side's keyboard panel code ran: its edits go to that side's keys.
+			void SaveKeyboardRecords(int side)
+			{
+				SaveKeyboardRecordsOf(g_kbEdit[side & 1].id.empty() ? kGameKeyboard : (side & 1));
+			}
+
+			// The side a keyboard panel belongs to (its editor slot's id), or -1.
+			int KeyboardPanelSide(const uint8_t* panel, int family)
+			{
+				if (!panel)
+					return -1;
+				const int slot = *reinterpret_cast<const int32_t*>(panel + 0x1F8);
+				return family == 0
+					? EditorSlotSide(kSetBStateRva, kSetBStateGuardRva, slot)
+					: EditorSlotSide(kSetAStateRva, kSetAStateGuardRva, slot);
 			}
 
 			// ---------------------------------------------------------------- patches
@@ -418,34 +491,31 @@ namespace LocalInput
 
 			FakeKeyboard g_fakeKeyboard = {};
 			FakeRegistry g_fakeRegistry = { nullptr, 0, 0, &g_fakeKeyboard };
-			uint32_t g_lastKbCaptureCur[4] = {};
-			ULONGLONG g_lastKbCaptureMs = 0;
+			uint32_t g_lastKbCaptureCur[2][4] = {};
+			ULONGLONG g_lastKbCaptureMs[2] = {};
 
 			FakeRegistry* __cdecl FakeKeyboardRegistryFor(const uint8_t* panel, int family)
 			{
 				if (!g_loaded || !panel)
 					return nullptr;
-				const int slot = *reinterpret_cast<const int32_t*>(panel + 0x1F8);
-				const int side = family == 0
-					? EditorSlotSide(kSetBStateRva, kSetBStateGuardRva, slot)
-					: EditorSlotSide(kSetAStateRva, kSetAStateGuardRva, slot);
-				if (side < 0)
+				const int side = KeyboardPanelSide(panel, family);
+				// A side with no keyboard of its own captures from the game's keyboard, as in vanilla.
+				if (side < 0 || g_kbEdit[side].id.empty())
 					return nullptr;
-				if (g_kbOwnerSide != side && !g_kbCandidate[side].id.empty())
-					StageKeyboard(side, g_kbCandidate[side]);
 				// Edge = held now and not at the previous call (the capture runs every frame
 				// while listening). On the first call nothing counts as new, so the key that
-				// started the capture is not bound by accident.
+				// started the capture is not bound by accident. Kept per side: both players can
+				// be capturing at once.
 				const ULONGLONG now = GetTickCount64();
-				const bool recent = now - g_lastKbCaptureMs < 100;
+				const bool recent = now - g_lastKbCaptureMs[side] < 100;
 				for (int i = 0; i < 4; ++i)
 				{
-					const uint32_t cur = g_kbOwnerSide == side ? g_kbOwnerHeld.bits[i] : 0;
+					const uint32_t cur = g_kbEdit[side].held.bits[i];
 					g_fakeKeyboard.cur[i] = cur;
-					g_fakeKeyboard.prev[i] = recent ? g_lastKbCaptureCur[i] : cur;
-					g_lastKbCaptureCur[i] = cur;
+					g_fakeKeyboard.prev[i] = recent ? g_lastKbCaptureCur[side][i] : cur;
+					g_lastKbCaptureCur[side][i] = cur;
 				}
-				g_lastKbCaptureMs = now;
+				g_lastKbCaptureMs[side] = now;
 				return &g_fakeRegistry;
 			}
 
@@ -456,13 +526,8 @@ namespace LocalInput
 			{
 				if (id != 0 && id != 1)
 					return 0;
-				// The keyboard records are shared (there is one per profile, not per id), so only
-				// one keyboard panel may be open at a time: the drawer and the screen would show
-				// and edit the other player's keys. +0x08 is the panel's shown flag (0x006BDB95).
-				const uint8_t* const otherPanel = reinterpret_cast<const uint8_t*>(
-					Base() + kKbPanelRva[family & 1] + ((slot & 1) ^ 1) * 0x1FC);
-				if (*reinterpret_cast<const int32_t*>(otherPanel + 0x08) != 0)
-					return 0;
+				// Both players may have a keyboard panel open at once: each panel's code is handed
+				// its own side's keys while it runs (see g_kbEdit).
 				// The keyboard panels are built with controller id 0 (0x006A79B8), and the menu
 				// framework navigates a panel with the inputs of its +0x1C0 id - so a keyboard
 				// panel opened for Player 2 would follow Player 1. Give it its editor's id.
@@ -479,12 +544,15 @@ namespace LocalInput
 				{
 					if (id != 0)
 						return 0;             // id 1 needs a keyboard on Player 2
-					g_kbOwner.clear();        // nobody to store Player 1's keyboard edits in
-					g_kbOwnerSide = -1;
+					g_kbEdit[0] = KeyboardCandidate();   // Player 1 edits the game's own keyboard config
 					setPanelId();
 					return 1;
 				}
-				StageKeyboard(id, g_kbCandidate[id]);
+				if (g_kbEdit[id].id != g_kbCandidate[id].id)
+				{
+					g_kbEdit[id] = g_kbCandidate[id];
+					LOG(1, "[GameKeyConfig] P%d keyboard panel edits %s\n", id + 1, g_kbEdit[id].id.c_str());
+				}
 				setPanelId();
 				return 1;
 			}
@@ -503,10 +571,10 @@ namespace LocalInput
 				if (!g_loaded)
 					return;
 				g_staged.flags[id] = opt[kTypeBFlag + id];
-				if (!g_kbOwner.empty() && g_kbOwnerSide == id)
+				if (!g_kbEdit[id].id.empty())
 				{
-					g_kbOwnerBinds.typeB = opt[kTypeBFlag + id] & 1;
-					g_pendingChanges.emplace_back(g_kbOwner, g_kbOwnerBinds);
+					g_kbEdit[id].binds.typeB = opt[kTypeBFlag + id] & 1;
+					g_pendingChanges.emplace_back(g_kbEdit[id].id, g_kbEdit[id].binds);
 				}
 			}
 
@@ -721,6 +789,107 @@ namespace LocalInput
 				std::memcpy(bytes + 1, &abs, 4);
 				return Matches(site, bytes, 5);
 			}
+
+			// ---------------------------------------------------------------- both keyboard panels at once
+
+			// The keyboard panels' tick (browse, clear, capture) and confirm (defaults, Type B):
+			// everything that edits the keyboard records. fastcall(panel), plain ret.
+			using PanelFn = int(__fastcall*)(uint8_t* panel);
+			PanelFn g_kbTick[2] = {};      // battle 0x006A98F0, menu 0x00516C30
+			PanelFn g_kbConfirm[2] = {};   // battle 0x006A9AD0, menu 0x00516DC0
+
+			int RunAsSide(uint8_t* panel, int family, PanelFn original)
+			{
+				const int side = g_loaded ? KeyboardPanelSide(panel, family) : -1;
+				if (side < 0)
+					return original(panel);
+				LoadKeyboardRecords(side);
+				const int result = original(panel);
+				SaveKeyboardRecords(side);
+				return result;
+			}
+
+			int __fastcall KbTickSetB(uint8_t* panel) { return RunAsSide(panel, 0, g_kbTick[0]); }
+			int __fastcall KbTickSetA(uint8_t* panel) { return RunAsSide(panel, 1, g_kbTick[1]); }
+			int __fastcall KbConfirmSetB(uint8_t* panel) { return RunAsSide(panel, 0, g_kbConfirm[0]); }
+			int __fastcall KbConfirmSetA(uint8_t* panel) { return RunAsSide(panel, 1, g_kbConfirm[1]); }
+
+			// Replaces the vtable entry holding `original` (searched for within `slots` entries
+			// of the vtable) with `wrapper`; returns the original.
+			PanelFn PatchVtableEntry(const char* label, uintptr_t vtable, int slots, uintptr_t original, void* wrapper)
+			{
+				uint32_t* const entries = reinterpret_cast<uint32_t*>(vtable);
+				if (IsBadReadPtr(entries, slots * 4))
+					return nullptr;
+				for (int i = 0; i < slots; ++i)
+				{
+					if (entries[i] != original)
+						continue;
+					DWORD old = 0;
+					if (!VirtualProtect(&entries[i], 4, PAGE_READWRITE, &old))
+						return nullptr;
+					entries[i] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(wrapper));
+					VirtualProtect(&entries[i], 4, old, &old);
+					return reinterpret_cast<PanelFn>(original);
+				}
+				LOG(1, "[GameKeyConfig] %s: not in its vtable, skipped\n", label);
+				return nullptr;
+			}
+
+			// The item drawer reads a keyboard row's key straight from the records
+			// (0x006BB1ED battle, 0x006BBDF3 menu: mov al,[eax+ecx*4+record], eax = optData +
+			// row-3, ecx = profile*5, panel at [ebp-6180h]). Both panels draw after both have
+			// ticked, so the records hold only the last one's keys: give each its own.
+			int __cdecl KeyboardRowKeyForDraw(const uint8_t* panel, int family, const uint8_t* rowAddr, int profile5)
+			{
+				const uintptr_t recordOffset = family == 0 ? kKbSetB : kKbSetA;
+				const uint8_t* const vanilla = rowAddr + profile5 * 4 + recordOffset;
+				const uint8_t* const opt = OptData();
+				const int side = g_loaded && opt ? KeyboardPanelSide(panel, family) : -1;
+				const int index = opt ? static_cast<int>(rowAddr - opt) + profile5 * 4 : -1;
+				if (side < 0 || index < 0 || index >= 40)
+					return *vanilla;
+				const GameBinds& keys = KeyboardKeysFor(side);
+				return family == 0 ? keys.setB[index / 20][index % 20] : keys.setA[index / 20][index % 20];
+			}
+
+			DWORD g_drawBack[2] = {};
+
+			void __declspec(naked) KeyboardRowDrawSetB()
+			{
+				__asm
+				{
+					push ecx
+					push edx
+					push ecx
+					push eax
+					push 0
+					push dword ptr[ebp - 6180h]
+					call KeyboardRowKeyForDraw
+					add esp, 16
+					pop edx
+					pop ecx
+					jmp[g_drawBack]
+				}
+			}
+
+			void __declspec(naked) KeyboardRowDrawSetA()
+			{
+				__asm
+				{
+					push ecx
+					push edx
+					push ecx
+					push eax
+					push 1
+					push dword ptr[ebp - 6180h]
+					call KeyboardRowKeyForDraw
+					add esp, 16
+					pop edx
+					pop ecx
+					jmp[g_drawBack + 4]
+				}
+			}
 		}
 
 		// ---------------------------------------------------------------- public
@@ -790,7 +959,29 @@ namespace LocalInput
 					reinterpret_cast<void*>(ApplyAllKeyConfigHook));
 				ok += g_loadedBack != 0;
 			}
-			LOG(1, "[GameKeyConfig] %d/10 patches in place\n", ok);
+			// Both players' keyboard panels at once: per-side keys for the panel code and the drawer.
+			g_kbTick[0] = PatchVtableEntry("keyboard panel tick (battle)", base + 0x005748D8, 24, base + 0x002A98F0, reinterpret_cast<void*>(KbTickSetB));
+			g_kbConfirm[0] = PatchVtableEntry("keyboard panel confirm (battle)", base + 0x005748D8, 24, base + 0x002A9AD0, reinterpret_cast<void*>(KbConfirmSetB));
+			g_kbTick[1] = PatchVtableEntry("keyboard panel tick (menu)", base + 0x0054BF4C, 24, base + 0x00116C30, reinterpret_cast<void*>(KbTickSetA));
+			g_kbConfirm[1] = PatchVtableEntry("keyboard panel confirm (menu)", base + 0x0054BF4C, 24, base + 0x00116DC0, reinterpret_cast<void*>(KbConfirmSetA));
+			ok += (g_kbTick[0] != nullptr) + (g_kbConfirm[0] != nullptr) + (g_kbTick[1] != nullptr) + (g_kbConfirm[1] != nullptr);
+			static const uint8_t kDrawReadB[] = { 0x8A, 0x84, 0x88, 0x56, 0x42, 0x00, 0x00 };   // mov al,[eax+ecx*4+4256h]
+			static const uint8_t kDrawReadA[] = { 0x8A, 0x84, 0x88, 0xA7, 0x4A, 0x05, 0x00 };   // mov al,[eax+ecx*4+54AA7h]
+			if (Matches(base + 0x002BB1ED, kDrawReadB, sizeof(kDrawReadB)))
+			{
+				g_drawBack[0] = HookManager::SetHook("GameKeyConfigKbDrawSetB", static_cast<DWORD>(base + 0x002BB1ED), 7,
+					reinterpret_cast<void*>(KeyboardRowDrawSetB));
+				ok += g_drawBack[0] != 0;
+			}
+			if (Matches(base + 0x002BBDF3, kDrawReadA, sizeof(kDrawReadA)))
+			{
+				g_drawBack[1] = HookManager::SetHook("GameKeyConfigKbDrawSetA", static_cast<DWORD>(base + 0x002BBDF3), 7,
+					reinterpret_cast<void*>(KeyboardRowDrawSetA));
+				ok += g_drawBack[1] != 0;
+			}
+			if (!g_kbTick[0] || !g_kbConfirm[0] || !g_kbTick[1] || !g_kbConfirm[1] || !g_drawBack[0] || !g_drawBack[1])
+				LOG(1, "[GameKeyConfig] not every per-side keyboard patch is in place; both keyboard panels at once may show or edit the other player's keys\n");
+			LOG(1, "[GameKeyConfig] %d/16 patches in place\n", ok);
 		}
 
 		bool SaveLoaded() { return g_loaded; }
@@ -975,10 +1166,12 @@ namespace LocalInput
 					c = KeyboardCandidate();
 				}
 			}
-			if (!g_kbOwner.empty())
+			for (KeyboardCandidate& kb : g_kbEdit)
 			{
-				const DeviceRef* owner = find(g_kbOwner);
-				g_kbOwnerHeld = owner ? HeldGameKeys(owner->kind, owner->controls) : HeldKeys();
+				if (kb.id.empty())
+					continue;
+				const DeviceRef* ref = find(kb.id);
+				kb.held = ref ? HeldGameKeys(ref->kind, ref->controls) : HeldKeys();
 			}
 
 			for (const auto& pending : g_pendingChanges)
@@ -1009,22 +1202,24 @@ namespace LocalInput
 				}
 				// The menu set also belongs to the keyboard being edited for that side (the
 				// keyboard panel's Type B toggle is handled by KeyboardPanelToggleTypeB).
-				if (active && menuSet && !g_kbOwner.empty() && g_kbOwnerSide == side)
+				if (active && menuSet && !g_kbEdit[side].id.empty())
 				{
-					g_kbOwnerBinds.menuSet = now.menuSet[side] & 1;
-					record(g_kbOwner, g_kbOwnerBinds);
+					g_kbEdit[side].binds.menuSet = now.menuSet[side] & 1;
+					record(g_kbEdit[side].id, g_kbEdit[side].binds);
 				}
 			}
 			const bool anyOpen = open[0] || open[1] || g_editor[0].open || g_editor[1].open;
-			if (anyOpen && !g_kbOwner.empty() &&
+			// The keyboard records are normally edited only inside a wrapped panel tick or
+			// confirm, which saves the change itself. Anything else that touches them is taken
+			// as an edit to the keys last loaded.
+			if (anyOpen && (g_kbStaged == 0 || g_kbStaged == 1 || g_kbStaged == kGameKeyboard) &&
 				(std::memcmp(now.kbB, g_staged.kbB, 40) != 0 || std::memcmp(now.kbA, g_staged.kbA, 40) != 0))
 			{
-				std::memcpy(g_kbOwnerBinds.setB, now.kbB, 40);
-				std::memcpy(g_kbOwnerBinds.setA, now.kbA, 40);
-				Sanitize(g_kbOwnerBinds, BindClass::Keyboard);
-				record(g_kbOwner, g_kbOwnerBinds);
-				LOG(1, "[GameKeyConfig] %s: keyboard settings changed (P%d): %s (was %s)\n", g_kbOwner.c_str(), g_kbOwnerSide + 1,
-					RecordHex(now.kbB).c_str(), RecordHex(g_staged.kbB).c_str());
+				SaveKeyboardRecordsOf(g_kbStaged);
+				for (const auto& pending : g_pendingChanges)
+					record(pending.first, pending.second);
+				g_pendingChanges.clear();
+				ReadImage(opt, now);
 			}
 			// The menu editor's Current Set applies live through engine+0x25D8 and only reaches
 			// optData on close; follow it while the editor is open.
@@ -1041,10 +1236,10 @@ namespace LocalInput
 					editor.padBinds.menuSet = live;
 					record(editor.padOwner, editor.padBinds);
 				}
-				if (!g_kbOwner.empty() && g_kbOwnerSide == side && g_kbOwnerBinds.menuSet != live)
+				if (!g_kbEdit[side].id.empty() && g_kbEdit[side].binds.menuSet != live)
 				{
-					g_kbOwnerBinds.menuSet = live;
-					record(g_kbOwner, g_kbOwnerBinds);
+					g_kbEdit[side].binds.menuSet = live;
+					record(g_kbEdit[side].id, g_kbEdit[side].binds);
 				}
 			}
 			g_staged = now;
@@ -1068,7 +1263,7 @@ namespace LocalInput
 					if (!editor.open)
 						LOG(1, "[GameKeyConfig] P%d Button Settings opened%s; Type B flags %d/%d, keyboard records hold %s (%s)\n", side + 1,
 							best ? "" : " - that player has no usable pad right now (keyboard or nothing)",
-							opt[kTypeBFlag] & 1, opt[kTypeBFlag + 1] & 1, g_kbOwner.empty() ? "nobody's keys" : g_kbOwner.c_str(),
+							opt[kTypeBFlag] & 1, opt[kTypeBFlag + 1] & 1, g_kbStaged == kGameKeyboard ? "the game's own keys" : g_kbStaged < 0 ? "unknown keys" : g_kbEdit[g_kbStaged].id.c_str(),
 							RecordHex(opt + kKbSetB).c_str());
 					editor.open = true;
 					if (best)
@@ -1079,24 +1274,21 @@ namespace LocalInput
 						StagePad(side, editor.padBinds);
 						LOG(1, "[GameKeyConfig] P%d editor: pad records -> %s\n", side + 1, best->id.c_str());
 					}
-					// Stage this player's keyboard right away, so the keyboard panel shows its keys
-					// even before the switch hook runs - always, not only when another keyboard
-					// had the records: the game may have rewritten them since they were staged,
-					// and its panel would then show (and save) other keys over this keyboard's.
-					// Only while the other player's editor is not showing its own keyboard.
+					// The keyboard this player edits: their most recently used one. Its keys are
+					// handed to their keyboard panel whenever that panel's code runs.
 					const KeyboardCandidate& kb = g_kbCandidate[side];
-					const DeviceRef* kbRef = kb.id.empty() ? nullptr : find(kb.id);
-					const bool otherHasKeyboard = g_kbOwnerSide == (side ^ 1) && g_editor[side ^ 1].open;
-					if (kbRef && !otherHasKeyboard)
-						StageKeyboard(side, kb);
+					if (!kb.id.empty() && find(kb.id) && g_kbEdit[side].id != kb.id)
+					{
+						g_kbEdit[side] = kb;
+						LOG(1, "[GameKeyConfig] P%d editor: keyboard -> %s\n", side + 1, kb.id.c_str());
+					}
 				}
 				else if (!open[side] && editor.open)
 				{
 					LOG(1, "[GameKeyConfig] P%d Button Settings closed%s\n", side + 1,
 						editor.padOwner.empty() ? " (no pad was being edited)" : (" (was editing " + editor.padOwner + ")").c_str());
 					editor = SideEditor();
-					if (g_kbOwnerSide == side)
-						g_kbOwnerSide = -1;   // the records stay staged; the next editor re-picks
+					g_kbEdit[side] = KeyboardCandidate();   // the next editor re-picks
 				}
 				if (editor.open && !editor.padOwner.empty())
 				{
@@ -1105,11 +1297,25 @@ namespace LocalInput
 				}
 			}
 
+			// Every editor closed: the records hold the game's own keyboard config again, which is
+			// what the game saves as its own, rather than the keys of whichever player's keyboard
+			// panel ran last.
+			const bool anyEditor = open[0] || open[1] || g_editor[0].open || g_editor[1].open;
+			if (!anyEditor && g_kbStaged != kGameKeyboard && g_kbStaged >= 0)
+			{
+				std::memcpy(opt + kKbSetB, g_gameKb.setB, 40);
+				std::memcpy(opt + kKbSetA, g_gameKb.setA, 40);
+				std::memcpy(g_staged.kbB, g_gameKb.setB, 40);
+				std::memcpy(g_staged.kbA, g_gameKb.setA, 40);
+				g_kbStaged = kGameKeyboard;
+				LOG(1, "[GameKeyConfig] Button Settings closed: keyboard records back to the game's own config\n");
+			}
+
 			// 3. Outside the editors, char select reads the Type B flag per id: allow Type B for
 			// a side when any of its devices has it enabled.
 			for (int side = 0; side < 2; ++side)
 			{
-				if (g_editor[side].open || (side == 0 && g_kbOwnerSide == 1 && g_editor[1].open))
+				if (g_editor[side].open)
 					continue;
 				bool any = false;
 				bool hasDevice = false;

@@ -1479,6 +1479,31 @@ input from set B). One thing 6.6 missed, **confirmed**:
 - Both capture functions keep their panel at `[ebp-158h]`; the keyboard-capture thunk reads it to
   find the slot (`panel+0x1F8`) and from it the side.
 
+### 6.7.2 Both players' keyboard panels at once (2026-10-09)
+
+The keyboard records (+0x4256 set B, +0x54AA7 set A) exist once, not per id, so two keyboard
+panels open together would edit and show the same 40 bytes. Every writer of those records is a
+keyboard panel method that gets its panel in ECX, and only through the vtable (no direct callers):
+
+| | Battle | Menu |
+|---|---|---|
+| Tick (browse, clear, capture) | 0x006A98F0 | 0x00516C30 |
+| Confirm (Restore Defaults, Type B) | 0x006A9AD0 | 0x00516DC0 |
+| Drawer read of a row's key | 0x006BB1ED `8A 84 88 56 42 00 00` | 0x006BBDF3 `8A 84 88 A7 4A 05 00` |
+
+All four methods are fastcall(panel) with a plain `ret`. In the drawer, `eax` = optData + row-3,
+`ecx` = profile*5 and the panel is at `[ebp-6180h]`; no branch lands inside either 7-byte read.
+
+**Correction:** the battle keyboard panel's vtable starts at 0x009748DC, not 0x009748E0 as listed
+above (0x009748E0 holds slot 1). Read from 0x009748E0, the menu twin's offsets look off by one.
+
+The mod wraps the four methods to load that side's keys into the records first and save them
+back afterwards, and the two drawer reads return the side's keys. A side with no keyboard of
+its own edits the game's own config. When every editor is closed, the records go back to the
+game's own config. `GameKeyConfig.cpp`, `g_kbEdit`. Verified in-game with two keyboards (a
+HIDMaestro steam-controller-2 keyboard on P1 and injected input on P2): simultaneous rebinds,
+Restore Defaults on one side only, reopen, battle and menu editors.
+
 ### 6.8 Functions added in this pass
 
 | VA | Name | Size | Level | Notes |
