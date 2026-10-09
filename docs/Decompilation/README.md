@@ -35,7 +35,9 @@ rewrite (record that, with the reason).
 
 ## Progress
 
-Run `python3 tools/decomp_progress.py` for the live numbers. At 2026-10-07:
+Run `python3 tools/decomp_progress.py` for the live numbers. At 2026-10-09 (after the lobby
+map), 1,988 functions are referenced with meaning in src/ or docs/, 15.4% of the code. The table
+below is from 2026-10-07:
 
 | | Functions | Code |
 |---|---|---|
@@ -52,6 +54,7 @@ Run `python3 tools/decomp_progress.py` for the live numbers. At 2026-10-07:
 | Network-entry profile sync (D-Code sync task) | [ProfileSync.md](ProfileSync.md) | **rewritten** (task L3, helpers L2) | `src/Network/ProfileSync.cpp` |
 | Profile transport (tus/read, tus/write, session, latch) | `docs/Research/DCodeNetworkStallBug.md` | partial L1/L2 | hooks only |
 | Controllers and input assignment | [Controllers.md](Controllers.md) | **core L2** (256 fn: L2 135, L1 121, L0 0; 18.2% of its code at L2+). Device layer, controller tasks, wrappers, id getters, named queries and key-config apply are L2. Section 6 maps the game's key-config screens (battle/menu editors, char-select Current Set, capture, glyphs) and the per-device binding design. Their open, capture and page handlers are L2; the editor bodies, DInput internals, id-writer bodies and JVS remain L1 | none yet (rewrite answers in sections 0 and 6) |
+| Online lobby system (ranked, player rooms, Steam lobbies, Arc server client, network task, GGPO connection, matchmaking UI) | [Lobby.md](Lobby.md) + parts `Lobby_A`..`Lobby_F` | **mapped** (1,289 fn: L2 333, L1 956, L0 0). Every create/search/join/leave/connect/timeout/failure path is L2; verdict per symptom and confirmed bugs in Lobby.md | none yet (fix order proposed in Lobby.md) |
 | Ranked / LP | `docs/Research/RankedProgress.md` | partial L1 | none |
 | Effect palettes / renderer palette lookup | `tools/build_effect_palette_map.py` | partial L2 | offline map |
 | Spectator input sync | `docs/Research/SpectatorDesyncInvestigation.md` | one function L2 | none |
