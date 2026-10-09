@@ -287,9 +287,47 @@ namespace
 		return orig_TerminateProcess(process, exitCode);
 	}
 
+	// The game's background file reader (AAWin_CFileReader_Thread, a lazy static at RVA
+	// 0x65C140 with its guard bit at 0x65C198) keeps loading after the main loop ends. A
+	// compressed file is inflated straight into the requester's buffer (0x0044FB70 ->
+	// 0x00814AA0), and exit's static destructors free requesters before the reader's own
+	// destructor stops the thread, so quitting mid-load wrote into freed memory
+	// (Crash_20261008_211441: inflate at BBCF+0x4182b4, main thread in the reader's
+	// destructor 0x0044FA30). Let it finish its queue first: +0x2C is the queue count, which
+	// the thread sets back to 0 once it has nothing left; +0x0C is the thread handle.
+	void WaitForGameFileReader()
+	{
+		constexpr uintptr_t kReaderRva = 0x0065C140;
+		constexpr uintptr_t kReaderGuardRva = 0x0065C198;
+		constexpr DWORD kLimitMs = 3000;
+		const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+		const uint32_t* const guard = reinterpret_cast<const uint32_t*>(base + kReaderGuardRva);
+		const uint8_t* const reader = reinterpret_cast<const uint8_t*>(base + kReaderRva);
+		if (IsBadReadPtr(guard, 4) || !(*guard & 1) || IsBadReadPtr(reader, 0x58))
+			return;
+		const HANDLE thread = *reinterpret_cast<const HANDLE*>(reader + 0x0C);
+		const volatile int32_t* const queued = reinterpret_cast<const volatile int32_t*>(reader + 0x2C);
+		DWORD code = 0;
+		if (!thread || !GetExitCodeThread(thread, &code) || code != STILL_ACTIVE)
+			return;
+		if (*queued == 0)
+		{
+			ExitDiagnostics::Note("The game's file reader was idle at exit");
+			return;
+		}
+		const ULONGLONG start = GetTickCount64();
+		const int32_t atStart = *queued;
+		while (*queued != 0 && GetTickCount64() - start < kLimitMs &&
+			GetExitCodeThread(thread, &code) && code == STILL_ACTIVE)
+			Sleep(5);
+		ExitDiagnostics::Note("Waited %llu ms for the game's file reader to finish %d queued load(s) before exit%s",
+			GetTickCount64() - start, atStart, *queued != 0 ? " - gave up, it is still busy" : "");
+	}
+
 	void __cdecl hook_BbcfExit(int exitCode)
 	{
 		MarkExiting();
+		WaitForGameFileReader();
 		const uintptr_t caller = reinterpret_cast<uintptr_t>(_ReturnAddress());
 		const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 		if (caller == base + kAfterWinMainExitReturnRva)
