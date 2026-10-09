@@ -271,6 +271,21 @@ void InstallNetplayArenaKeeper()
 		static_cast<unsigned>(kReserveSize), reserve);
 }
 
+bool ReleaseNetplayArenaReserve(const char* forWhat)
+{
+	void* reserve = g_reserve.exchange(nullptr);
+	if (reserve == nullptr)
+	{
+		return false;
+	}
+	VirtualFree(reserve, 0, MEM_RELEASE);
+	// Not straight back on the next tick: whatever needed the room has to get it first.
+	g_lastReReserveAttemptMs = GetTickCount();
+	LOG(0, "[NetplayArena] %s did not fit; released the address-space reserve at 0x%p for it.\n",
+		forWhat, reserve);
+	return true;
+}
+
 void TickNetplayArenaKeeper()
 {
 	if (!g_installed.load() || g_reserve.load() != nullptr)

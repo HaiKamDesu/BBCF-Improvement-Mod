@@ -1,4 +1,5 @@
 #include "ID3D9EXWrapper_Device.h"
+#include "Game/NetplayArenaKeeper.h"
 
 #include "Core/ExitDiagnostics.h"
 #include "Core/interfaces.h"
@@ -218,7 +219,25 @@ void APIENTRY Direct3DDevice9ExWrapper::GetGammaRamp(UINT iSwapChaiTn, D3DGAMMAR
 HRESULT APIENTRY Direct3DDevice9ExWrapper::CreateTexture(UINT Width, UINT Height, UINT Levels, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool, IDirect3DTexture9** ppTexture, HANDLE* pSharedHandle)
 {
 	LOG(7, "CreateTexture %u %u %u\n", Width, Height, Levels);
-	return m_Direct3DDevice9Ex->CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
+	HRESULT hr = m_Direct3DDevice9Ex->CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
+	// Out of room in the 32-bit address space. The game stores the failed texture and later
+	// dereferences it (the character select glyph atlas, BBCF.exe+0x4c90f), so give back
+	// the mod's own address-space reserve and try once more before it gets to.
+	if (hr == E_OUTOFMEMORY || hr == D3DERR_OUTOFVIDEOMEMORY)
+	{
+		char what[96];
+		snprintf(what, sizeof(what), "A %ux%u texture (pool %d)", Width, Height, (int)Pool);
+		if (ReleaseNetplayArenaReserve(what))
+		{
+			hr = m_Direct3DDevice9Ex->CreateTexture(Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
+			LOG(0, "[D3D] %s %s after the release (hr=0x%08lX)\n", what, SUCCEEDED(hr) ? "created" : "still failed", (unsigned long)hr);
+		}
+		else
+		{
+			LOG(0, "[D3D] %s could not be created: out of memory (hr=0x%08lX)\n", what, (unsigned long)hr);
+		}
+	}
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::CreateVolumeTexture(UINT Width, UINT Height, UINT Depth, UINT Levels, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool, IDirect3DVolumeTexture9** ppVolumeTexture, HANDLE* pSharedHandle)

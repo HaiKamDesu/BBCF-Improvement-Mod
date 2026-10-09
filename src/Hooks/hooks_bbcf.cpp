@@ -7,6 +7,7 @@
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/MatchState.h"
+#include "Game/GlyphAtlasGuard.h"
 #include "Game/NetplayArenaKeeper.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Game/SpectatorSyncDiagnostics.h"
@@ -9926,6 +9927,7 @@ bool placeHooks_bbcf()
 	// or the 62 MB char-select stage buffer finding no hole big enough. Holds 100 MB of
 	// address space from boot and gives it to them only when they would otherwise throw.
 	InstallNetplayArenaKeeper();
+	InstallGlyphAtlasGuard();
 
 	//HookManager::RegisterHook
 	//UploadReplayToEndpointJmpBackAddr = HookManager::SetHook("UploadReplayToEndpoint", "\xA1\x40\x0C\x44\x01", "xxxxx", 5, UploadReplayToEndpoint);

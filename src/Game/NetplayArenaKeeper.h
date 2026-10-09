@@ -8,3 +8,7 @@ void InstallNetplayArenaKeeper();
 // Re-reserves after a release once a 100 MB hole exists again. Call once per rendered frame;
 // it does nothing most frames.
 void TickNetplayArenaKeeper();
+// Gives the reserve up for something else that did not fit - a texture the game cannot
+// create otherwise. Returns false when no reserve is held. The 5 s tick takes it back once
+// a big enough hole exists again.
+bool ReleaseNetplayArenaReserve(const char* forWhat);
