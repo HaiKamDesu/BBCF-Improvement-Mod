@@ -156,6 +156,7 @@ public:
 		RoomClosed,       // Steam says the lobby no longer exists (join would fail response=2)
 		RoomFull,         // lobby already has 2+ members (join would fail response=4)
 		RoomBroken,       // join succeeded but the host's game never engaged (zombie room)
+		RoomStuck,        // host's game refused the join as full while its Steam lobby had a free slot
 	};
 	struct HiddenPeerInfo
 	{
@@ -168,6 +169,9 @@ public:
 	};
 	void GetHiddenPeers(std::vector<HiddenPeerInfo>* outPeers) const;
 	void RestorePeer(uint64_t steamId);
+	// The host of the lobby being joined answered with a 0x34 refusal (LobbyFixes reads it
+	// off the wire). Judged when the game then leaves the lobby.
+	void OnHostRefusedJoin(uint64_t hostSteamId, int reason);
 	void RestoreAllPeers();
 	void GetLastListCounts(size_t* outShown, size_t* outHidden) const;
 
@@ -292,6 +296,7 @@ private:
 		unsigned long long markTickMs = 0;
 		int failCount = 0;
 		std::string reason;
+		bool stuck = false; // RoomStuck rather than RoomBroken
 	};
 
 	// The delivery pipeline (proxy + reorder/compaction) runs when EITHER the
@@ -478,4 +483,7 @@ private:
 
 	uint64_t m_pendingConnectionTarget = 0;
 	uint64_t m_pendingLobbyId = 0;
+	int m_pendingPreJoinMembers = -1; // Steam lobby members before our join; -1 = unknown
+	int m_pendingPreJoinMax = 0;
+	int m_pendingRefusal = 0;         // 0x34 reason from the host, 0 = none
 };

@@ -1,6 +1,7 @@
 #include "LobbyFixes.h"
 
 #include "LobbyTrace.h"
+#include "RankedListConnectionFilter.h"
 
 #include "Core/Settings.h"
 #include "Core/interfaces.h"
@@ -456,7 +457,7 @@ namespace LobbyFixes
 
 	bool DropIncoming(uint64_t remote, const void* data, uint32_t size, int channel)
 	{
-		if (!Enabled() || channel != 0 || !data || size < 6)
+		if (channel != 0 || !data || size < 6)
 			return false;
 		const uint8_t* b = static_cast<const uint8_t*>(data);
 		const uint16_t length = *reinterpret_cast<const uint16_t*>(b + 2);
@@ -470,7 +471,14 @@ namespace LobbyFixes
 		}
 		if (!message)
 			return false;
-		if (LobbyTrace::IsOwnerOfJoinedLobby(remote))
+		const bool fromHost = LobbyTrace::IsOwnerOfJoinedLobby(remote);
+		// The ranked list filter hides a host whose room is stuck (refused as full while its
+		// lobby had a free slot); it needs the refusal whether or not the fixes are on.
+		if (fromHost && type == 0x34 && size >= 8)
+			RankedListConnectionFilter::GetInstance().OnHostRefusedJoin(remote, *reinterpret_cast<const uint16_t*>(b + 6));
+		if (!Enabled())
+			return false;
+		if (fromHost)
 		{
 			// Ranked shows every refusal as "failed to connect". Reason 2/3/4 is the host's game
 			// saying its room is full: in 2026-10-09 ranked, two hosts whose Steam lobby held

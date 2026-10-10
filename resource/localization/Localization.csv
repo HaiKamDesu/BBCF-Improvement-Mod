@@ -400,6 +400,7 @@ unreachable,unreachable,inalcanzable
 room closed,room closed,sala cerrada
 room full,room full,sala llena
 room broken (host stuck),room broken (host stuck),sala rota (host trabado)
+"stuck room (says full, lobby has a free slot)","stuck room (says full, lobby has a free slot)","sala trabada (dice llena, el lobby tiene lugar)"
 Ranked ladder,Ranked ladder,Escalera clasificatoria
 Ranked ladder###RankedLadder,Ranked ladder###RankedLadder,Escalera clasificatoria###RankedLadder
 "Opens the ranked ladder window, including known LP thresholds and population estimates.","Opens the ranked ladder window, including known LP thresholds and population estimates.",Abre la ventana de escalera clasificatoria con umbrales de LP conocidos y estimaciones de población.

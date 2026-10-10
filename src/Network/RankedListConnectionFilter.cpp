@@ -1630,10 +1630,11 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			}
 			if (rowCandidate != nullptr)
 			{
-				if (m_brokenLobbies.find(rowCandidate->lobbyId) != m_brokenLobbies.end())
+				const auto brokenIt = m_brokenLobbies.find(rowCandidate->lobbyId);
+				if (brokenIt != m_brokenLobbies.end())
 				{
 					hide = true;
-					reason = HiddenReason::RoomBroken;
+					reason = brokenIt->second.stuck ? HiddenReason::RoomStuck : HiddenReason::RoomBroken;
 				}
 				else
 				{
@@ -2615,6 +2616,17 @@ void RankedListConnectionFilter::OnJoinLobbyAttempt(uint64_t lobbyId, uint64_t l
 	m_pendingLobbyId = lobbyId;
 	m_pendingConnectionTarget = lobbyOwnerSteamId;
 	m_pendingJoinTickMs = GetTickCount64();
+	m_pendingRefusal = 0;
+	m_pendingPreJoinMembers = -1;
+	m_pendingPreJoinMax = 0;
+	{
+		const auto livenessIt = m_lobbyLiveness.find(lobbyId);
+		if (livenessIt != m_lobbyLiveness.end() && livenessIt->second.known && livenessIt->second.exists)
+		{
+			m_pendingPreJoinMembers = livenessIt->second.members;
+			m_pendingPreJoinMax = livenessIt->second.memberMax > 0 ? livenessIt->second.memberMax : 2;
+		}
+	}
 
 	// Layer-3 instrumentation: the exact pre-join matchmaking state, so every
 	// failure that follows can be discriminated post-mortem from the log.
@@ -2692,8 +2704,39 @@ void RankedListConnectionFilter::OnLobbyEnter(LobbyEnter_t* pParam)
 	NotifyConnectionAttemptFailed(reason);
 }
 
+void RankedListConnectionFilter::OnHostRefusedJoin(uint64_t hostSteamId, int reason)
+{
+	if (hostSteamId != 0 && hostSteamId == m_pendingConnectionTarget && m_pendingLobbyId != 0)
+	{
+		m_pendingRefusal = reason;
+	}
+}
+
 void RankedListConnectionFilter::OnLeaveLobby(uint64_t lobbyId)
 {
+	if (lobbyId != 0 && lobbyId == m_pendingLobbyId && m_pendingConnectionTarget != 0 && m_pendingRefusal != 0)
+	{
+		// The host answered, so the connection worked: this is never "unreachable". A full
+		// room is only suspicious when Steam showed a free slot before we joined - that is the
+		// stuck room (Lobby.md: a room snapshot from an old host replaced theirs, and their
+		// game now counts a player who is gone). It stays hidden as long as that lobby is
+		// listed; the hidden-players popup can restore it.
+		const bool fullRefusal = m_pendingRefusal >= 2 && m_pendingRefusal <= 4;
+		const bool hadFreeSlot = m_pendingPreJoinMembers >= 0 && m_pendingPreJoinMembers < m_pendingPreJoinMax;
+		LOG(1, "[RankedListFilter] join outcome: host refused (0x34 reason %d), lobby had %d/%d before the join\n",
+			m_pendingRefusal, m_pendingPreJoinMembers, m_pendingPreJoinMax);
+		if (fullRefusal && hadFreeSlot)
+		{
+			MarkLobbyBroken(lobbyId, m_pendingConnectionTarget,
+				"stuck room: its game refused the join as full while its lobby had a free slot");
+			m_brokenLobbies[lobbyId].stuck = true;
+		}
+		m_pendingLobbyId = 0;
+		m_pendingConnectionTarget = 0;
+		m_pendingJoinTickMs = 0;
+		m_pendingRefusal = 0;
+		return;
+	}
 	if (lobbyId != 0 && lobbyId == m_pendingLobbyId && m_pendingConnectionTarget != 0)
 	{
 		const unsigned long long now = GetTickCount64();

@@ -792,6 +792,9 @@ struct LocalizationKeysAccessor
         // room broken (host stuck)
         inline const char* room_broken_host_stuck() const { return Get("room broken (host stuck)"); }
 
+        // stuck room (says full, lobby has a free slot)
+        inline const char* stuck_room_says_full_lobby_has_a_free_slot() const { return Get("stuck room (says full, lobby has a free slot)"); }
+
         // Ranked ladder
         inline const char* Ranked_ladder() const { return Get("Ranked ladder"); }
 

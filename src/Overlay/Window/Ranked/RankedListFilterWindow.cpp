@@ -275,6 +275,9 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 			case RankedListConnectionFilter::HiddenReason::RoomBroken:
 				reasonText = L("room broken (host stuck)");
 				break;
+			case RankedListConnectionFilter::HiddenReason::RoomStuck:
+				reasonText = L("stuck room (says full, lobby has a free slot)");
+				break;
 			default:
 				reasonText = L("unreachable");
 				break;
