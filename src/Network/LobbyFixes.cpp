@@ -55,10 +55,19 @@ namespace LobbyFixes
 
 		// The game's join handshake on P2P channel 0. On the wire every message is preceded by a
 		// u16 data length (CNetworker_FlushSendQueue 0x0041D260), so: +0 wire length, +2 message
-		// length, +4 type. These three only
+		// length, +4 type. These only
 		// ever come from the host of the room being joined; the game accepts them from anyone
 		// (Server_OnPacket 0x0046EC00), so a late one from a previous host kicks you out of
 		// the room you are in now, or overwrites it.
+		//
+		// The room snapshot (msg 2) is the worst of them. The host broadcasts it about once a
+		// second to every member it still lists, and Msg2_RoomSnapshot (0x0049C000) applies it
+		// with no sender or role check; a new room's revision is 0, so it always passes. A
+		// player who left a room before its host dropped them, then hosts ranked, gets their
+		// new room replaced by the old one: count 2, the old host as host, themselves a
+		// plain member. Their Steam lobby stays listed with only them in it, every join is
+		// refused with "room full", and nothing heals it because they no longer hold the host
+		// bit (2026-10-09: two such hosts in one ranked list).
 		struct HostOnlyMessage
 		{
 			uint16_t type;
@@ -69,6 +78,7 @@ namespace LobbyFixes
 			{ 0x34, 0x0006, "join rejected" },
 			{ 0x35, 0x0388, "room info" },
 			{ 0x37, 0x0004, "room closed" },
+			{ 0x02, 0x03A8, "room snapshot" },
 		};
 
 		ISteamMatchmaking* RealMatchmaking()
@@ -458,8 +468,33 @@ namespace LobbyFixes
 			if (m.type == type && m.length == length)
 				message = &m;
 		}
-		if (!message || LobbyTrace::IsOwnerOfJoinedLobby(remote))
+		if (!message)
 			return false;
+		if (LobbyTrace::IsOwnerOfJoinedLobby(remote))
+		{
+			// Ranked shows every refusal as "failed to connect". Reason 2/3/4 is the host's game
+			// saying its room is full: in 2026-10-09 ranked, two hosts whose Steam lobby held
+			// only themselves refused that way, again and again - their game still counted a
+			// player who had left. Say so, so it does not read as a connection problem.
+			if (type == 0x34 && size >= 8)
+			{
+				const uint16_t reason = *reinterpret_cast<const uint16_t*>(b + 6);
+				const char* name = g_interfaces.pSteamFriendsWrapper
+					? g_interfaces.pSteamFriendsWrapper->GetFriendPersonaName(CSteamID(remote)) : nullptr;
+				if (!name || !*name)
+					name = "The host";
+				if (g_notificationBar && reason >= 2 && reason <= 4)
+				{
+					g_notificationBar->AddNotification("Could not join: %s's game says its room is full. If their room "
+						"showed a free slot, their game is stuck holding a player who left; try someone else.", name);
+				}
+				else if (g_notificationBar && reason == 1)
+				{
+					g_notificationBar->AddNotification("Could not join: %s is no longer hosting.", name);
+				}
+			}
+			return false;
+		}
 
 		static std::map<uint64_t, ULONGLONG> s_lastLog;
 		const ULONGLONG now = GetTickCount64();

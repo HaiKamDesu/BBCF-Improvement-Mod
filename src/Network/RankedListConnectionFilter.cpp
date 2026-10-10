@@ -2520,8 +2520,19 @@ void RankedListConnectionFilter::OnSteamCallbacksPump()
 	PollLobbyLiveness();
 
 	// Periodic whole-list reachability recheck - hidden entries included, so
-	// recovered peers get restored live (see kListRecheckIntervalMs).
-	if (m_hasRemapResult && !m_candidates.empty() && IsPipelineActive())
+	// recovered peers get restored live (see kListRecheckIntervalMs). Only on
+	// the ranked menu (network task 4): the candidates are the last list seen,
+	// and 2026-10-09 it kept opening P2P sessions to unreachable strangers
+	// every 15-30 s through ten minutes of matches, including hosts whose
+	// lobby had already closed.
+	bool onRankedMenu = false;
+	{
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		const int32_t* const task = moduleBase != 0
+			? reinterpret_cast<const int32_t*>(moduleBase + kRankedNetworkStructRva) : nullptr;
+		onRankedMenu = task != nullptr && !IsBadReadPtr(task, sizeof(int32_t)) && *task == 4;
+	}
+	if (m_hasRemapResult && !m_candidates.empty() && IsPipelineActive() && onRankedMenu)
 	{
 		const unsigned long long now = GetTickCount64();
 		if (m_lastListRecheckTickMs == 0)
