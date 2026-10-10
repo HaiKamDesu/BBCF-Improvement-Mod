@@ -979,62 +979,6 @@ void ScrWindow::RunPendingSaveStateRequests()
 
 bool ScrWindow::s_swapCoordsToggle = false;
 
-namespace {
-// TEMPORARY diagnostic for the Izanami time-stop side swap: while swap mode is on, logs both
-// characters whenever one jumps, they cross, a facing/input side flips or the time-stop phase
-// changes, with the previous tick for context.
-struct SideSample {
-    int frame, phase;
-    int x[2], y[2], facing[2], inputSide[2];
-    char action[2][32];
-};
-
-void LogSideSample(const char* tag, const SideSample& s) {
-    LOG(1, "[SideTrace] %s f=%d phase=%d | P1 %s x=%d y=%d face=%d in=%d | P2 %s x=%d y=%d face=%d in=%d\n",
-        tag, s.frame, s.phase,
-        s.action[0], s.x[0], s.y[0], s.facing[0], s.inputSide[0],
-        s.action[1], s.x[1], s.y[1], s.facing[1], s.inputSide[1]);
-}
-
-void TraceSides(int frame, int phase, bool swapOn) {
-    static bool have_prev = false;
-    static SideSample prev;
-    if (!swapOn) {
-        have_prev = false;
-        return;
-    }
-    CharData* chars[2] = { g_interfaces.player1.GetData(), g_interfaces.player2.GetData() };
-    if (!chars[0] || !chars[1]) {
-        return;
-    }
-    SideSample s{};
-    s.frame = frame;
-    s.phase = phase;
-    for (int i = 0; i < 2; ++i) {
-        s.x[i] = chars[i]->position_x;
-        s.y[i] = chars[i]->position_y;
-        s.facing[i] = chars[i]->facingLeft;
-        s.inputSide[i] = chars[i]->facingLeft2;
-        memcpy(s.action[i], chars[i]->currentAction, sizeof(s.action[i]));
-        s.action[i][sizeof(s.action[i]) - 1] = '\0';
-    }
-    if (have_prev && frame != prev.frame) {
-        bool notable = s.phase != prev.phase
-            || ((s.x[0] < s.x[1]) != (prev.x[0] < prev.x[1]));
-        for (int i = 0; i < 2; ++i) {
-            notable = notable || abs(s.x[i] - prev.x[i]) > 50000
-                || s.facing[i] != prev.facing[i] || s.inputSide[i] != prev.inputSide[i];
-        }
-        if (notable) {
-            LogSideSample("prev", prev);
-            LogSideSample("now ", s);
-        }
-    }
-    prev = s;
-    have_prev = true;
-}
-} // namespace
-
 void ScrWindow::TickTrainingResetSwap() {
     // Holding a direction while pressing the reset bind, where that direction is set to
     // "Swap sides" (ResetLab*Action settings - Up by default), toggles the always-swap
@@ -1073,11 +1017,14 @@ void ScrWindow::TickTrainingResetSwap() {
     //                   FUN_005DA5C0 on every round start / training reset
     //   2 -> 3 = active set by TimestopEffect (0x58F610), timer 0, 2 becomes 3 next tick
     //   4 = fading out  set from 3 by EndTimestopEffect (0x58F390), timer 0
+    //   1 = faded       set by the effect's own update once the fade-out finishes, timer 0
+    //                   (seen in-game ~14 ticks after 4; it stays 1 until the next reset)
     // The timer runs every battle tick and is zeroed at every reset, which is why it works as
     // "frames since reset" - until Izanami stops time. Her time-stop supers restart it, and
     // when it reached 5 again the swap below teleported both characters mid-super.
-    // So a drop only counts as a reset when the phase says so: a drop into 2/3/4 is the
-    // effect starting or ending, and a drop into 5 out of an active time stop is her
+    // So a drop only counts as a reset when the phase says so: only a reset lands in 5, so a
+    // drop into any other phase is the effect starting, ending or finishing its fade, and a
+    // drop into 5 out of an active time stop is her
     // StopTimestopEffect (Astral, Burst DD, other DD), unless a reset was pressed.
     const int phase = reinterpret_cast<const int*>(g_gameVals.pFrameCount)[-1];
 
@@ -1088,8 +1035,6 @@ void ScrWindow::TickTrainingResetSwap() {
     static bool last_drop_was_timestop = false;
 
     int current_frame_count = *g_gameVals.pFrameCount;
-
-    TraceSides(current_frame_count, phase, s_swapCoordsToggle);
 
     if (PollTrainingResetPressed()) {
         armed_at_ms = GetTickCount64();
@@ -1104,9 +1049,9 @@ void ScrWindow::TickTrainingResetSwap() {
     if (last_frame_count != -1 && current_frame_count < last_frame_count) {
         constexpr ULONGLONG kArmWindowMs = 3000;
         const bool reset_pressed = armed_at_ms != 0 && GetTickCount64() - armed_at_ms <= kArmWindowMs;
-        const bool timestop_running = phase == 2 || phase == 3 || phase == 4;
+        const bool timestop_phase = phase != 5;
         const bool timestop_cancelled = phase == 5 && (last_phase == 2 || last_phase == 3) && !reset_pressed;
-        last_drop_was_timestop = timestop_running || timestop_cancelled;
+        last_drop_was_timestop = timestop_phase || timestop_cancelled;
 
         if (last_drop_was_timestop) {
             LOG(1, "[ResetSwap] frame counter %d -> %d is the time-stop effect (phase %d -> %d), not a reset\n",
@@ -1128,7 +1073,7 @@ void ScrWindow::TickTrainingResetSwap() {
     last_phase = phase;
 
     if (s_swapCoordsToggle && current_frame_count == 5 && !last_drop_was_timestop) {
-        LOG(1, "[SideTrace] swap-on-reset firing\n");
+        LOG(1, "[ResetSwap] swapping sides after reset\n");
         ScrWindow::swap_character_coordinates();
     }
 }
