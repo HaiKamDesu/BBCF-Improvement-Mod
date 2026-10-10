@@ -11,6 +11,8 @@
 #include "D3D9EXWrapper/ID3D9EXWrapper.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Hooks/hooks_bbcf.h"
+#include "Network/LobbyFixes.h"
+#include "Network/LobbyTrace.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "SteamApiWrapper/steamApiWrappers.h"
 
@@ -1594,6 +1596,9 @@ void __cdecl hook_SteamAPI_RunCallbacks()
 	// probe progress and deliver the count-patched result to the game's own
 	// handler once settled. Bounded internally by the probe timeout.
 	RankedListConnectionFilter::GetInstance().OnSteamCallbacksPump();
+
+	LobbyTrace::Tick();
+	LobbyFixes::Tick();
 }
 
 void __cdecl hook_SteamAPI_RegisterCallResult(CCallbackBase* pCallback, SteamAPICall_t hAPICall)
@@ -1608,7 +1613,9 @@ void __cdecl hook_SteamAPI_RegisterCallResult(CCallbackBase* pCallback, SteamAPI
 	// (including the mod's own CCallResults) passes through untouched.
 	CCallbackBase* const actual = RankedListConnectionFilter::GetInstance().SubstituteRegisterCallResult(
 		pCallback, static_cast<uint64_t>(hAPICall));
-	orig_SteamAPI_RegisterCallResult(actual, hAPICall);
+	// The lobby trace wraps whatever is registered for a lobby create/join/list result, so
+	// it sees the outcome first and then passes it on unchanged.
+	orig_SteamAPI_RegisterCallResult(LobbyTrace::WrapRegisterCallResult(actual, static_cast<uint64_t>(hAPICall)), hAPICall);
 }
 
 void __cdecl hook_SteamAPI_UnregisterCallResult(CCallbackBase* pCallback, SteamAPICall_t hAPICall)
@@ -1620,7 +1627,7 @@ void __cdecl hook_SteamAPI_UnregisterCallResult(CCallbackBase* pCallback, SteamA
 
 	CCallbackBase* const actual = RankedListConnectionFilter::GetInstance().SubstituteUnregisterCallResult(
 		pCallback, static_cast<uint64_t>(hAPICall));
-	orig_SteamAPI_UnregisterCallResult(actual, hAPICall);
+	orig_SteamAPI_UnregisterCallResult(LobbyTrace::MapUnregisterCallResult(actual, static_cast<uint64_t>(hAPICall)), hAPICall);
 }
 
 HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName,

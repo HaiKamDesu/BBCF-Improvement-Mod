@@ -1,4 +1,8 @@
 #include "SteamNetworkingWrapper.h"
+#include "Network/LobbyFixes.h"
+#include "Network/LobbyTrace.h"
+
+#include <intrin.h>
 
 #include "Core/interfaces.h"
 #include "Core/logger.h"
@@ -29,12 +33,16 @@ bool SteamNetworkingWrapper::SendP2PPacket(CSteamID steamIDRemote, const void *p
 	// Log outgoing data:
 	// LOG(2, "\t- %s\n", RawMemoryArrayToString((unsigned char*)pubData, cubData));
 
-	return m_SteamNetworking->SendP2PPacket(steamIDRemote, pubData, cubData, eP2PSendType, nChannel);
+	const bool ok = m_SteamNetworking->SendP2PPacket(steamIDRemote, pubData, cubData, eP2PSendType, nChannel);
+	LobbyTrace::OnSendP2P(steamIDRemote.ConvertToUint64(), pubData, cubData, static_cast<int>(eP2PSendType), nChannel, ok);
+	return ok;
 }
 
 bool SteamNetworkingWrapper::IsP2PPacketAvailable(uint32 *pcubMsgSize, int nChannel)
 { 
 	LOG(7, "SteamNetworkingWrapper IsP2PPacketAvailable\n"); 
+	if (LobbyFixes::PeekInjected(pcubMsgSize, nChannel))
+		return true;
 	return m_SteamNetworking->IsP2PPacketAvailable(pcubMsgSize, nChannel);
 }
 
@@ -42,7 +50,27 @@ bool SteamNetworkingWrapper::ReadP2PPacket(void *pubDest, uint32 cubDest, uint32
 { 
 	LOG(7, "SteamNetworkingWrapper ReadP2PPacket\n");
 
+	uint64 injectedFrom = 0;
+	if (LobbyFixes::TakeInjected(pubDest, cubDest, pcubMsgSize, &injectedFrom, nChannel))
+	{
+		if (psteamIDRemote)
+			psteamIDRemote->SetFromUint64(injectedFrom);
+		return true;
+	}
+
 	bool ret = m_SteamNetworking->ReadP2PPacket(pubDest, cubDest, pcubMsgSize, psteamIDRemote, nChannel);
+	while (ret && psteamIDRemote && pcubMsgSize)
+	{
+		LobbyTrace::OnReadP2P(psteamIDRemote->ConvertToUint64(), pubDest, *pcubMsgSize, nChannel);
+		if (!LobbyFixes::DropIncoming(psteamIDRemote->ConvertToUint64(), pubDest, *pcubMsgSize, nChannel))
+			break;
+		// Dropped: hand the game the next packet instead, or nothing if there is none that fits.
+		uint32 next = 0;
+		ret = m_SteamNetworking->IsP2PPacketAvailable(&next, nChannel) && next <= cubDest &&
+			m_SteamNetworking->ReadP2PPacket(pubDest, cubDest, pcubMsgSize, psteamIDRemote, nChannel);
+		if (!ret)
+			*pcubMsgSize = 0;
+	}
 
 	// Log incoming data:
 	// LOG(2, "\t- %s\n", RawMemoryArrayToString((unsigned char*)pubDest, *pcubMsgSize));
@@ -53,17 +81,21 @@ bool SteamNetworkingWrapper::ReadP2PPacket(void *pubDest, uint32 cubDest, uint32
 bool SteamNetworkingWrapper::AcceptP2PSessionWithUser(CSteamID steamIDRemote)
 {
 	LOG(7, "SteamNetworkingWrapper AcceptP2PSessionWithUser\n"); 
-	return m_SteamNetworking->AcceptP2PSessionWithUser(steamIDRemote);
+	const bool ok = m_SteamNetworking->AcceptP2PSessionWithUser(steamIDRemote);
+	LobbyTrace::OnAcceptP2P(steamIDRemote.ConvertToUint64(), ok, _ReturnAddress());
+	return ok;
 }
 
 bool SteamNetworkingWrapper::CloseP2PSessionWithUser(CSteamID steamIDRemote)
 {
+	LobbyTrace::OnCloseP2P(steamIDRemote.ConvertToUint64(), -1, _ReturnAddress());
 	LOG(7, "SteamNetworkingWrapper CloseP2PSessionWithUser\n");
 	return m_SteamNetworking->CloseP2PSessionWithUser(steamIDRemote);
 }
 
 bool SteamNetworkingWrapper::CloseP2PChannelWithUser(CSteamID steamIDRemote, int nChannel)
 {
+	LobbyTrace::OnCloseP2P(steamIDRemote.ConvertToUint64(), nChannel, _ReturnAddress());
 	LOG(7, "SteamNetworkingWrapper CloseP2PChannelWithUser\n");
 	return m_SteamNetworking->CloseP2PChannelWithUser(steamIDRemote, nChannel);
 }
@@ -76,6 +108,7 @@ bool SteamNetworkingWrapper::GetP2PSessionState(CSteamID steamIDRemote, P2PSessi
 
 bool SteamNetworkingWrapper::AllowP2PPacketRelay(bool bAllow)
 {
+	LobbyTrace::OnAllowRelay(bAllow);
 	LOG(7, "SteamNetworkingWrapper AllowP2PPacketRelay\n");
 	return m_SteamNetworking->AllowP2PPacketRelay(bAllow);
 }

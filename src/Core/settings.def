@@ -85,6 +85,19 @@ SETTING(bool, rankedStaleRoomDetect, "RankedStaleRoomDetect", "1");
 // the mod has ever left a lobby on the game's behalf, so this is proven in the
 // field before it is turned on for everyone.
 SETTING(bool, rankedStaleRoomAutoLeave, "RankedStaleRoomAutoLeave", "0");
+// Writes a running account of the online lobby system to DEBUG.txt ([LobbyTrace]): every
+// Steam lobby call and its result, Steam's lobby and P2P events, P2P traffic per peer, the
+// game's lobby messages, the network task's states and dialogs, the room member table and
+// GGPO assertions. Observation only - it changes nothing the game does. Used to find out
+// where joins and connections fail; see docs/Decompilation/Lobby.md.
+SETTING(bool, lobbyTrace, "LobbyTrace", "1");
+// Client-side fixes to the online lobby system (docs/Decompilation/Lobby.md, "Fixes in the
+// mod"): searches skip full lobbies, every listed lobby gets its connection rating (lost
+// pings are re-sent), the join handshake only accepts reject / room info /
+// room closed from the room's host, the ranked pre-match upload gets its timeout back, and
+// profile requests are no longer re-sent while the first is still running (sign-in drops).
+// Nothing changes on the wire, so it plays with vanilla clients. 0 = vanilla behaviour.
+SETTING(bool, lobbyFixes, "LobbyFixes", "1");
 SETTING(bool, rankedAutomationHarnessEnabled, "RankedAutomationHarnessEnabled", "0");
 SETTING(std::string, rankedAutomationHarnessHotkey, "RankedAutomationHarnessHotkey", "F8");
 SETTING(std::string, toggleJukeboxButton, "ToggleJukeboxButton", "F10");

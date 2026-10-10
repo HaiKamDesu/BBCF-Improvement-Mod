@@ -137,6 +137,8 @@
     <ClCompile Include="src\Overlay\Window\ControllerSettings\DeviceArt.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
+    <ClCompile Include="src\Network\LobbyFixes.cpp" />
+    <ClCompile Include="src\Network\LobbyTrace.cpp" />
     <ClCompile Include="src\Network\RoomManager.cpp" />
     <ClCompile Include="src\Overlay\fonts.cpp" />
     <ClCompile Include="src\Overlay\imgui_utils.cpp" />
@@ -349,6 +351,8 @@
     <ClInclude Include="src\Overlay\Window\ControllerSettings\DeviceArt.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
+    <ClInclude Include="src\Network\LobbyFixes.h" />
+    <ClInclude Include="src\Network\LobbyTrace.h" />
     <ClInclude Include="src\Network\RoomManager.h" />
     <ClInclude Include="src\Overlay\fonts.h" />
     <ClInclude Include="src\Overlay\imgui_utils.h" />

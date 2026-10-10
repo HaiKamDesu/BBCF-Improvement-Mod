@@ -712,7 +712,20 @@ namespace
 		}
 		if (g_lastReloginMs != 0 && (now - g_lastReloginMs) < kReloginCooldownMs)
 		{
-			return;
+			// The cooldown stops a stale answer for the token we already logged away from
+			// from driving a second login. A refusal of a token minted since then is a new
+			// rejection: 2026-10-09 21:05:48, the login's own token was refused 10 s after
+			// it landed, the cooldown swallowed it and the dead token stayed in use for
+			// three minutes. The per-window cap still bounds this.
+			const uint8_t* const client = WebApiClient(moduleBase);
+			const uint32_t held = client != nullptr ? WebApiSessionFingerprint(client, nullptr) : 0;
+			const bool refusedNow = g_sessionRejectedAtMs != 0 && (now - g_sessionRejectedAtMs) < 2000;
+			if (!refusedNow || held == 0 || held == g_poisonedSessionHash)
+			{
+				return;
+			}
+			IncidentPrintf("[WebApi] the token from the last re-login (%08X) was refused too; re-login despite the cooldown\n",
+				held);
 		}
 
 		// Only ever from the thread that ticks the strategies.

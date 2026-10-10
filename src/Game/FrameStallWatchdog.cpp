@@ -204,20 +204,35 @@ namespace
 
 	unsigned char g_stackBuffer[kStackScanBytes];
 
-	// Kept free of C++ objects on purpose: SEH (__try) cannot coexist with
-	// unwindable locals in the same function under MSVC.
+	// Runs while the sampled thread is suspended, so it must never raise an exception.
+	// It used to memcpy until it faulted off the top of the stack; dispatching that fault
+	// walks the loaded-module list (RtlPcToFileHeader), and if the suspended thread was
+	// inside a DLL load or unload it holds that lock: the sampler waited forever and the
+	// main thread was never resumed. 2026-10-09: the game hung on close that way, in
+	// CoUninitialize unloading DLLs. VirtualQuery bounds the copy to the committed region
+	// and ReadProcessMemory reports a failure instead of faulting; both are plain syscalls.
 	size_t CopyStackTop(uintptr_t stackPointer, unsigned char* out, size_t maxBytes)
 	{
+		MEMORY_BASIC_INFORMATION region = {};
+		if (VirtualQuery(reinterpret_cast<const void*>(stackPointer), &region, sizeof(region)) == 0 ||
+			region.State != MEM_COMMIT || (region.Protect & PAGE_GUARD) != 0)
+		{
+			return 0;
+		}
+		const uintptr_t regionEnd = reinterpret_cast<uintptr_t>(region.BaseAddress) + region.RegionSize;
+		if (regionEnd - stackPointer < maxBytes)
+		{
+			maxBytes = regionEnd - stackPointer;
+		}
+
 		size_t copied = 0;
 		while (copied + kStackCopyChunk <= maxBytes)
 		{
-			__try
+			SIZE_T read = 0;
+			if (!ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(stackPointer + copied),
+				out + copied, kStackCopyChunk, &read) || read != kStackCopyChunk)
 			{
-				memcpy(out + copied, reinterpret_cast<const void*>(stackPointer + copied), kStackCopyChunk);
-			}
-			__except (EXCEPTION_EXECUTE_HANDLER)
-			{
-				break; // ran off the end of the committed stack; keep what we have
+				break;
 			}
 			copied += kStackCopyChunk;
 		}

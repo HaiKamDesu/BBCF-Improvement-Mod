@@ -7,6 +7,8 @@
 #include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Game/MatchState.h"
+#include "Network/LobbyFixes.h"
+#include "Network/LobbyTrace.h"
 #include "Game/GlyphAtlasGuard.h"
 #include "Game/NetplayArenaKeeper.h"
 #include "Game/DesyncDiagnostics.h"
@@ -9930,6 +9932,8 @@ bool placeHooks_bbcf()
 	// address space from boot and gives it to them only when they would otherwise throw.
 	InstallNetplayArenaKeeper();
 	InstallGlyphAtlasGuard();
+	LobbyTrace::InstallGameHooks();
+	LobbyFixes::InstallGamePatches();
 
 	//HookManager::RegisterHook
 	//UploadReplayToEndpointJmpBackAddr = HookManager::SetHook("UploadReplayToEndpoint", "\xA1\x40\x0C\x44\x01", "xxxxx", 5, UploadReplayToEndpoint);

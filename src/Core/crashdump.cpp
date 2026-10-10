@@ -148,12 +148,31 @@ namespace
                 return JoinPath(exeDir, L"BBCF_IM\\CrashReports");
         }
 
+        // Plain CreateDirectoryW, one level at a time. SHCreateDirectoryExW initialises COM,
+        // and a bundle is often written while the main thread is stuck holding COM's lock
+        // (2026-10-09: the close-hang watchdog waited on it forever inside CoUninitialize,
+        // so the process it was meant to end stayed alive).
         void EnsureDirectory(const std::wstring& path)
         {
-                const int result = SHCreateDirectoryExW(nullptr, path.c_str(), nullptr);
-                if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
+                for (size_t i = 0; i <= path.size(); ++i)
                 {
-                        CrashProgress("[Crash] Failed to ensure directory %s (err=%d)\n", ToUtf8(path).c_str(), result);
+                        if (i != path.size() && path[i] != L'\\' && path[i] != L'/')
+                        {
+                                continue;
+                        }
+                        if (i == 0 || (i == 2 && path[1] == L':'))
+                        {
+                                continue; // root of a drive or of a UNC/relative path
+                        }
+                        const std::wstring prefix = path.substr(0, i);
+                        if (!CreateDirectoryW(prefix.c_str(), nullptr))
+                        {
+                                const DWORD error = GetLastError();
+                                if (error != ERROR_ALREADY_EXISTS && error != ERROR_ACCESS_DENIED && i == path.size())
+                                {
+                                        CrashProgress("[Crash] Failed to ensure directory %s (err=%lu)\n", ToUtf8(path).c_str(), error);
+                                }
+                        }
                 }
         }
 
@@ -832,52 +851,76 @@ namespace
                 out.esp = context.Esp;
                 out.ebp = context.Ebp;
 
-                __try
+                // Copy the stack while the thread is suspended, analyse it after resuming.
+                // Nothing here may fault: dispatching an exception walks the loaded-module
+                // list, and a thread suspended inside a DLL load or unload holds that lock,
+                // so the fault never finishes and the thread is never resumed (2026-10-09,
+                // the frame-stall sampler hung the game's close exactly that way).
+                static unsigned char stackCopy[0x8000];
+                size_t stackBytes = 0;
+                MEMORY_BASIC_INFORMATION region{};
+                if (VirtualQuery(reinterpret_cast<const void*>(context.Esp), &region, sizeof(region)) != 0 &&
+                    region.State == MEM_COMMIT && (region.Protect & PAGE_GUARD) == 0)
                 {
-                        out.chain[out.chainCount++] = context.Eip;
-                        uintptr_t frame = context.Ebp;
-                        while (out.chainCount < static_cast<int>(_countof(out.chain)))
+                        const uintptr_t regionEnd = reinterpret_cast<uintptr_t>(region.BaseAddress) + region.RegionSize;
+                        size_t want = regionEnd - context.Esp;
+                        if (want > sizeof(stackCopy))
                         {
-                                if (frame == 0 || (frame & 3) != 0 || frame < context.Esp ||
-                                    frame > context.Esp + 0x100000)
-                                {
-                                        break;
-                                }
-                                const uintptr_t next = *reinterpret_cast<const uintptr_t*>(frame);
-                                const uintptr_t returnAddress = *reinterpret_cast<const uintptr_t*>(frame + 4);
-                                if (returnAddress == 0)
-                                {
-                                        break;
-                                }
-                                out.chain[out.chainCount++] = returnAddress;
-                                if (next <= frame)
-                                {
-                                        break;
-                                }
-                                frame = next;
+                                want = sizeof(stackCopy);
+                        }
+                        SIZE_T read = 0;
+                        if (ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(context.Esp),
+                                              stackCopy, want, &read))
+                        {
+                                stackBytes = read & ~static_cast<size_t>(3);
                         }
                 }
-                __except (EXCEPTION_EXECUTE_HANDLER)
+                ResumeThread(thread);
+
+                const uintptr_t stackLow = context.Esp;
+                const uintptr_t stackHigh = context.Esp + stackBytes;
+                auto readStack = [&](uintptr_t address, uintptr_t& value) -> bool
                 {
+                        if (address < stackLow || address + sizeof(uintptr_t) > stackHigh)
+                        {
+                                return false;
+                        }
+                        memcpy(&value, stackCopy + (address - stackLow), sizeof(value));
+                        return true;
+                };
+
+                out.chain[out.chainCount++] = context.Eip;
+                uintptr_t frame = context.Ebp;
+                while (out.chainCount < static_cast<int>(_countof(out.chain)))
+                {
+                        uintptr_t next = 0;
+                        uintptr_t returnAddress = 0;
+                        if ((frame & 3) != 0 || !readStack(frame, next) || !readStack(frame + 4, returnAddress) ||
+                            returnAddress == 0)
+                        {
+                                break;
+                        }
+                        out.chain[out.chainCount++] = returnAddress;
+                        if (next <= frame)
+                        {
+                                break;
+                        }
+                        frame = next;
                 }
 
-                __try
+                for (size_t offset = 0; offset + sizeof(uintptr_t) <= stackBytes &&
+                     out.scanCount < static_cast<int>(_countof(out.scan)); offset += sizeof(uintptr_t))
                 {
-                        const uintptr_t* slot = reinterpret_cast<const uintptr_t*>(context.Esp);
-                        for (int i = 0; i < 8192 && out.scanCount < static_cast<int>(_countof(out.scan)); ++i, ++slot)
+                        uintptr_t value = 0;
+                        memcpy(&value, stackCopy + offset, sizeof(value));
+                        if (InRange(value, gameBegin, gameEnd) || InRange(value, modBegin, modEnd))
                         {
-                                const uintptr_t value = *slot;
-                                if (InRange(value, gameBegin, gameEnd) || InRange(value, modBegin, modEnd))
-                                {
-                                        out.scan[out.scanCount++] = value;
-                                }
+                                out.scan[out.scanCount++] = value;
                         }
                 }
-                __except (EXCEPTION_EXECUTE_HANDLER)
-                {
-                }
-#endif
+#else
                 ResumeThread(thread);
+#endif
         }
 
         // A stack slot is only worth printing if it is a return address, i.e. the bytes

@@ -453,7 +453,29 @@ namespace
 	constexpr DWORD kQuitToExitDeadlineMs = 15000;
 	constexpr DWORD kQuitWatchStepMs = 250;
 	constexpr DWORD kExitHangPseudoCode = 0xE0484E47; // "HNG"
+	// The bundle itself can hang: it runs while the main thread is stuck, possibly holding a
+	// lock the bundle needs (2026-10-09: COM's, and the process stayed alive for hours). A
+	// second thread ends the process regardless once the bundle has had this long. It does
+	// nothing but wait and terminate, so it needs no lock at all.
+	constexpr DWORD kQuitBundleBudgetMs = 20000;
 	std::atomic<bool> g_quitWatchStarted{ false };
+
+	DWORD WINAPI QuitBackstopThread(LPVOID)
+	{
+		for (DWORD waited = 0; waited < kQuitToExitDeadlineMs + kQuitBundleBudgetMs; waited += kQuitWatchStepMs)
+		{
+			if (g_exiting.load())
+			{
+				return 0;
+			}
+			Sleep(kQuitWatchStepMs);
+		}
+		if (!g_exiting.load())
+		{
+			TerminateProcess(GetCurrentProcess(), 0);
+		}
+		return 0;
+	}
 
 	DWORD WINAPI QuitWatchdogThread(LPVOID)
 	{
@@ -494,6 +516,13 @@ namespace
 		{
 			g_quitWatchStarted.store(false);
 		}
+		// Created now, while nothing holds the loader lock: a thread started once the main
+		// thread is stuck in a DLL unload would itself wait on that lock before running.
+		HANDLE backstop = CreateThread(nullptr, 0, QuitBackstopThread, nullptr, 0, nullptr);
+		if (backstop)
+		{
+			CloseHandle(backstop);
+		}
 	}
 
 	LRESULT CALLBACK GetMessageHook(int code, WPARAM wParam, LPARAM lParam)
@@ -505,6 +534,10 @@ namespace
 			{
 				ExitDiagnostics::Note("WM_QUIT retrieved by the main loop (exit code %d) - the game is about to close",
 					static_cast<int>(message->wParam));
+				// The stall sampler suspends the main thread; during teardown the main thread
+				// unloads DLLs, and a suspension that lands in the middle of one is the worst
+				// case for anything the sampler does. Nothing is rendered past here anyway.
+				FrameStallWatchdog::Stop();
 				StartQuitWatchdog();
 			}
 			else if (message->message == WM_CLOSE)

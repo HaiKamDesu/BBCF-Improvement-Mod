@@ -6,9 +6,10 @@ symptom can be put on one of three sides: the **server** (Arc System Works' web 
 Steam's backend), the **client** (the game's own logic), or **peer-to-peer** (the connection
 between the two players).
 
-Status (2026-10-09): **mapped**. All 1,289 functions are L1 or higher, and 333 are L2. L2
-covers every create, search, join, enter, leave, connect, timeout and failure path. Nothing has
-been rewritten yet. The part docs were written by six parallel reverse-engineering passes over
+Status (2026-10-09): **mapped**, first fixes in. All 1,289 functions are L1 or higher, and 333
+are L2. L2 covers every create, search, join, enter, leave, connect, timeout and failure path.
+The instrumentation build (`LobbyTrace`) and the first client-side fixes (`LobbyFixes`) are in
+the mod; see [Fixes in the mod](#fixes-in-the-mod). The part docs were written by six parallel reverse-engineering passes over
 the archive decompile and the disassembly. Where this page says *checked*, the claim was
 re-verified by hand in the disassembly. Everything else is code reading, not yet confirmed
 in-game.
@@ -111,22 +112,77 @@ Then: a few hours of real ranked and room play from testers, plus the stale-room
 to member+0x2C/+0x78 (C). That turns the "medium" rows above into numbers and tells us which
 fixes matter most.
 
-## Proposed fix order (design not started)
+## Fixes in the mod
+
+`src/Network/LobbyFixes.cpp`, setting `LobbyFixes` (default 1; 0 = vanilla). Nothing changes
+on the wire: a delivered message is byte-identical to the one the peer would have sent, so
+players with and without the mod still play together.
+
+| Fix | Bug it closes | How | Verified |
+|---|---|---|---|
+| Searches skip full lobbies | "Failed to connect" from full rooms and ranked hosts already in a match (D bug 6) | `AddRequestLobbyListFilterSlotsAvailable(1)` before the game's only `RequestLobbyList` (0x0041C270, ranked and rooms) | In-game: the filter goes out with the ranked search and the list comes back (4 and 7 hosts, all 1/2) |
+| Handshake messages only from the host | A late 0x34 reject / 0x35 room info / 0x37 room closed from a previous host kicks you out of, or overwrites, the room you are in now (C) | The P2P read drops these three (matched on type and exact length; on the wire every message is `u16 wire length, u16 length, u16 type`, from 0x0041D260, and the mod's own are type 0x95) unless the sender owns a Steam lobby we are in; the next packet is read in its place | Code path runs on live channel-0 traffic; a real drop needs a second player |
+| Missed leaves delivered | Members that never leave, a guest stuck in a room whose host crashed (C, "Membership via Steam callbacks") | Listens to `LobbyChatUpdate_t`. When Steam says a peer left and the game still has them 2 s later, on the menus only (never mid-match, where GGPO handles it), it hands the game the peer's own message: 0x36 to a host, 0x37 to a guest whose host left. The host matches 0x36 by sender address `{id64, 1000}`, which the injected packet carries like a real one | Needs a second player |
+| Join failures say why | Ranked shows every `LobbyEnter_t` failure as "failed to connect" | Notification with the Steam reason (full, gone, blocked, limited...) | Needs a failing join |
+| Every lobby gets a connection rating | Ranked/room list Delay ratings that stay blank until a manual refresh (C bug 5) | Each result needs 5 ping/pong samples and `QoS_PumpPings` (0x004702E0) never re-sends, so one lost ping (typically the first, sent while Steam opens the P2P session) blanks that row for good. A ping unanswered after 1 s is re-armed (`ts[k] = 0`) so the pump re-sends it; a late pong for the old one matches nothing. Up to 15 re-sends per row. The listener also has only 20 rows (`QoS_AddRow` 0x0046F720 drops the rest): on the ranked and player match lists, finished rows are handed to results still waiting | In-game: a host missed ping 1 twice, was re-sent, and got rated (7 out / 7 in). The past-20 path needs a list of more than 20 |
+| Ranked upload timeout | State 0x37 tests +0x20 instead of +0x14, so its 3000-frame timeout never fires (B bug 2) | `83 7F 20 00` -> `83 7F 14 00` at 0x004AF78F, byte-checked | Patch installs in-game |
+| No profile re-send on a live token | "Dropped your sign-in", failed profile uploads and empty D-code cards after a slow server answer (A bug 5's re-request, with a token race) | The TUS workers (download 0x00422B00, upload 0x00423A50) give up after 300 x Sleep(10), about 3 s, and re-submit with the same session token while curl still runs the first request (10 s limit). The server mints a new token with each answer, so when the first lands the re-send is refused with `param.status` 3. `cmp edi,300` -> `cmp edi,1100` at 0x00422BC2 and 0x00423B10, byte-checked: a re-send only follows a finished request. Also no use-after-free of the abandoned descriptor on this path | Log evidence (2026-10-09, 9 player matches over 2 h): 6 of 6 answers slower than 3 s were followed by a refusal; every refusal but one (a cooldown gap, fixed in NetworkStallDiagnostics) followed one. Untested in-game |
+| No freeze on a full message queue | Channel-0 drain spins forever (`jmp $`, 0x0041D1E0) when the game's queue is full (D, E) | `EB FE` -> `EB 00`: leave the drain loop; that one packet is lost, the rest wait in Steam's queue for the next frame | Patch installs in-game |
+
+`src/Network/LobbyTrace.cpp`, setting `LobbyTrace` (default 1), writes `[LobbyTrace]` lines to
+DEBUG.txt:
+- every lobby call (who called, the filters, the call handle), its result and how long Steam
+  took, calls Steam never answers (warnings at 10, 30 and 120 s), and calls the game abandons;
+- the lobby lists with members/limit and keys;
+- Steam's membership and P2P events, flagged when they disagree with the game's room table;
+- P2P traffic per peer and channel (10 s summaries, silences over 2 s);
+- the game's lobby messages by type;
+- `GetP2PSessionState` for room members;
+- the network task's states, dialogs and toasts, the automatch steps, the net server's state
+  bytes and the room table;
+- GGPO assertions (0x00781890);
+- Arc server requests with endpoint, HTTP code and time (0x00438BB0).
+
+Lobby membership is tracked whenever either setting is on, because the fixes need it.
+
+### What testers should do
+
+Two players, both on this build, `GenerateDebugLogs=1`. Each scenario, then send DEBUG.txt:
+1. **Ranked:** join from the list a few times; also leave a host waiting in the list until it
+   auto-matches. Expected: no full hosts listed; any failure shows "Could not join: ...".
+2. **Room, guest quits hard:** guest joins a player room, then kills the game (Task Manager).
+   Expected on the host: within about 2 s of Steam noticing, `[LobbyFixes] ... delivering their
+   leave` and the member disappears from the room.
+3. **Room, host quits hard:** same with the host killed. Expected on the guest:
+   `[LobbyFixes] the host ... left ... delivering "room closed"` and the guest is returned to the
+   room list instead of sitting in a dead room.
+4. **Plain play for an hour** in ranked and rooms. Grep for `FAILED`, `STILL no answer`,
+   `abandoned`, `silence`, `GGPO assert`, `ignored "`. These are the counts the open questions
+   below need.
+
+## Proposed fix order
+
+Done items are in [Fixes in the mod](#fixes-in-the-mod).
 
 1. **Pure client bugs with no protocol change:**
-   - capture the lobby ID at click time;
-   - give each failure its own specific message;
-   - add a slots-available filter;
-   - make the ranked 0x37 timer real;
-   - always `LeaveLobby` on failure;
-   - drop 0x34/0x35/0x37 from non-hosts;
-   - fix `Socket_PollConnect`.
+   - capture the lobby ID at click time (the race is about one click in 600 frames; low priority);
+   - ~~give each failure its own specific message~~ (notification; the game's own dialog is
+     unchanged);
+   - ~~add a slots-available filter~~;
+   - ~~make the ranked 0x37 timer real~~;
+   - always `LeaveLobby` on failure (the trace flags `JoinLobby ... while still in lobby`, which
+     measures how often this matters);
+   - ~~drop 0x34/0x35/0x37 from non-hosts~~;
+   - fix `Socket_PollConnect` (2D Lobby only).
 2. **Watchdogs:** a timeout and a reset for every create, search, join and leave wait, and for
-   wedged session objects, with a visible error instead of an endless spinner.
-3. **Membership:** register `LobbyChatUpdate_t` and `LobbyKicked_t` and remove members Steam
-   says have left; clear the room table when a guest role ends; never host and join at once.
+   wedged session objects, with a visible error instead of an endless spinner. Wait for the
+   trace: `STILL no answer` lines say which waits actually hang, and for how long.
+3. **Membership:** ~~register `LobbyChatUpdate_t` and remove members Steam says have left~~;
+   `LobbyKicked_t`; clear the room table when a guest role ends; never host and join at once.
 4. **Connection:**
-   - reject P2P sessions from non-members;
+   - ~~reject P2P sessions from non-members~~ **dropped**: the trace shows the game pinging every
+     listed host (message 0x10, plus channel 200) before joining any lobby, to rate connections.
+     Those peers are not members, so rejecting them breaks the list's connection ratings;
    - react to `P2PSessionConnectFail_t`;
    - check the P2P session state before READY;
    - add a both-sides barrier before the match.

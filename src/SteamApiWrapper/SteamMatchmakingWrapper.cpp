@@ -9,6 +9,8 @@
 #include "Hooks/RankedAutomationHarness.h"
 #include "Network/LobbyLinkManager.h"
 #include "Network/RankedListConnectionFilter.h"
+#include "Network/LobbyFixes.h"
+#include "Network/LobbyTrace.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -20,6 +22,20 @@
 
 namespace
 {
+	const char* LobbyComparisonText(ELobbyComparison c)
+	{
+		switch (c)
+		{
+		case k_ELobbyComparisonEqualToOrLessThan: return "<=";
+		case k_ELobbyComparisonLessThan: return "<";
+		case k_ELobbyComparisonEqual: return "==";
+		case k_ELobbyComparisonGreaterThan: return ">";
+		case k_ELobbyComparisonEqualToOrGreaterThan: return ">=";
+		case k_ELobbyComparisonNotEqual: return "!=";
+		default: return "?";
+		}
+	}
+
 	std::string ToLowerCopy(const char* text)
 	{
 		if (!text)
@@ -296,8 +312,10 @@ uint64_t SteamMatchmakingWrapper::ResolveLobbyOwnerSteamId(CSteamID steamIDLobby
 
 SteamAPICall_t SteamMatchmakingWrapper::RequestLobbyList()
 {
+	LobbyFixes::BeforeRequestLobbyList();
 	const SteamAPICall_t call = m_SteamMatchmaking->RequestLobbyList();
 	LOG(7, "[Lobby] RequestLobbyList call=%llu\n", static_cast<unsigned long long>(call));
+	LobbyTrace::OnRequestLobbyList(static_cast<uint64_t>(call), _ReturnAddress());
 	RankedListConnectionFilter::GetInstance().OnLobbyListRequestIssued(static_cast<uint64_t>(call));
 	if (Settings::settingsIni.enableInDevelopmentFeatures && Settings::settingsIni.rankedAutomationHarnessEnabled)
 	{
@@ -311,6 +329,11 @@ void SteamMatchmakingWrapper::AddRequestLobbyListStringFilter(const char *pchKey
 	LOG(7, "%s AddRequestLobbyListStringFilter key='%s' value='%s' cmp=%d\n",
 		GetLobbyTag(pchKeyToMatch), pchKeyToMatch ? pchKeyToMatch : "<null>",
 		pchValueToMatch ? pchValueToMatch : "<null>", static_cast<int>(eComparisonType));
+	{
+		char d[160];
+		snprintf(d, sizeof(d), "%s %s '%s'", pchKeyToMatch ? pchKeyToMatch : "?", LobbyComparisonText(eComparisonType), pchValueToMatch ? pchValueToMatch : "");
+		LobbyTrace::OnListFilter(d);
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListStringFilter(pchKeyToMatch, pchValueToMatch, eComparisonType);
 }
 
@@ -319,29 +342,54 @@ void SteamMatchmakingWrapper::AddRequestLobbyListNumericalFilter(const char *pch
 	LOG(7, "%s AddRequestLobbyListNumericalFilter key='%s' value=%d cmp=%d\n",
 		GetLobbyTag(pchKeyToMatch), pchKeyToMatch ? pchKeyToMatch : "<null>",
 		nValueToMatch, static_cast<int>(eComparisonType));
+	{
+		char d[160];
+		snprintf(d, sizeof(d), "%s %s %d", pchKeyToMatch ? pchKeyToMatch : "?", LobbyComparisonText(eComparisonType), nValueToMatch);
+		LobbyTrace::OnListFilter(d);
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListNumericalFilter(pchKeyToMatch, nValueToMatch, eComparisonType);
 }
 void SteamMatchmakingWrapper::AddRequestLobbyListNearValueFilter(const char *pchKeyToMatch, int nValueToBeCloseTo)
 {
 	LOG(7, "%s AddRequestLobbyListNearValueFilter key='%s' value=%d\n",
 		GetLobbyTag(pchKeyToMatch), pchKeyToMatch ? pchKeyToMatch : "<null>", nValueToBeCloseTo);
+	{
+		char d[160];
+		snprintf(d, sizeof(d), "%s near %d", pchKeyToMatch ? pchKeyToMatch : "?", nValueToBeCloseTo);
+		LobbyTrace::OnListFilter(d);
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListNearValueFilter(pchKeyToMatch, nValueToBeCloseTo);
 }
 void SteamMatchmakingWrapper::AddRequestLobbyListFilterSlotsAvailable(int nSlotsAvailable)
 {
 	LOG(7, "SteamMatchmakingWrapper AddRequestLobbyListFilterSlotsAvailable\n");
+	{
+		char d[64];
+		snprintf(d, sizeof(d), "slots available >= %d", nSlotsAvailable);
+		LobbyTrace::OnListFilter(d);
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListFilterSlotsAvailable(nSlotsAvailable);
 }
 
 void SteamMatchmakingWrapper::AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter eLobbyDistanceFilter)
 {
 	LOG(7, "SteamMatchmakingWrapper AddRequestLobbyListDistanceFilter\n");
+	{
+		static const char* const kDistance[] = { "close", "default", "far", "worldwide" };
+		const int d = static_cast<int>(eLobbyDistanceFilter);
+		LobbyTrace::OnListFilter((std::string("distance ") + (d >= 0 && d < 4 ? kDistance[d] : "?")).c_str());
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListDistanceFilter(eLobbyDistanceFilter);
 }
 
 void SteamMatchmakingWrapper::AddRequestLobbyListResultCountFilter(int cMaxResults)
 {
 	LOG(7, "SteamMatchmakingWrapper AddRequestLobbyListResultCountFilter\n");
+	{
+		char d[64];
+		snprintf(d, sizeof(d), "at most %d results", cMaxResults);
+		LobbyTrace::OnListFilter(d);
+	}
 	return m_SteamMatchmaking->AddRequestLobbyListResultCountFilter(cMaxResults);
 }
 
@@ -376,7 +424,9 @@ CSteamID SteamMatchmakingWrapper::GetLobbyByIndex(int iLobby)
 SteamAPICall_t SteamMatchmakingWrapper::CreateLobby(ELobbyType eLobbyType, int cMaxMembers)
 {
 	LOG(7, "SteamMatchmakingWrapper CreateLobby\n");
-	return m_SteamMatchmaking->CreateLobby(eLobbyType, cMaxMembers);
+	const SteamAPICall_t call = m_SteamMatchmaking->CreateLobby(eLobbyType, cMaxMembers);
+	LobbyTrace::OnCreateLobby(static_cast<int>(eLobbyType), cMaxMembers, static_cast<uint64_t>(call), _ReturnAddress());
+	return call;
 }
 
 SteamAPICall_t SteamMatchmakingWrapper::JoinLobby(CSteamID steamIDLobby)
@@ -391,12 +441,15 @@ SteamAPICall_t SteamMatchmakingWrapper::JoinLobby(CSteamID steamIDLobby)
 		static_cast<unsigned long long>(ownerSteamId));
 	RankedListConnectionFilter::GetInstance().OnJoinLobbyAttempt(steamIDLobby.ConvertToUint64(), ownerSteamId);
 
-	return m_SteamMatchmaking->JoinLobby(steamIDLobby);
+	const SteamAPICall_t call = m_SteamMatchmaking->JoinLobby(steamIDLobby);
+	LobbyTrace::OnJoinLobby(steamIDLobby.ConvertToUint64(), ownerSteamId, static_cast<uint64_t>(call), _ReturnAddress());
+	return call;
 }
 
 void SteamMatchmakingWrapper::LeaveLobby(CSteamID steamIDLobby)
 {
 	LOG(7, "SteamMatchmakingWrapper LeaveLobby\n");
+	LobbyTrace::OnLeaveLobby(steamIDLobby.ConvertToUint64(), _ReturnAddress());
 	RankedListConnectionFilter::GetInstance().OnLeaveLobby(steamIDLobby.ConvertToUint64());
 	LobbyLinkManager::GetInstance().OnLeaveLobby(steamIDLobby.ConvertToUint64());
 	return m_SteamMatchmaking->LeaveLobby(steamIDLobby);
@@ -443,6 +496,7 @@ const char* SteamMatchmakingWrapper::GetLobbyData(CSteamID steamIDLobby, const c
 
 bool SteamMatchmakingWrapper::SetLobbyData(CSteamID steamIDLobby, const char *pchKey, const char *pchValue)
 {
+	LobbyTrace::OnSetLobbyData(steamIDLobby.ConvertToUint64(), pchKey, pchValue);
 	LOG(7, "SteamMatchmakingWrapper SetLobbyData\n");
 	return m_SteamMatchmaking->SetLobbyData(steamIDLobby, pchKey, pchValue);
 }
@@ -551,6 +605,7 @@ bool SteamMatchmakingWrapper::GetLobbyGameServer(CSteamID steamIDLobby, uint32 *
 
 bool SteamMatchmakingWrapper::SetLobbyMemberLimit(CSteamID steamIDLobby, int cMaxMembers)
 {
+	LobbyTrace::OnLobbySetting("SetLobbyMemberLimit", steamIDLobby.ConvertToUint64(), cMaxMembers);
 	LOG(7, "SteamMatchmakingWrapper SetLobbyMemberLimit\n");
 	return m_SteamMatchmaking->SetLobbyMemberLimit(steamIDLobby, cMaxMembers);
 }
@@ -563,12 +618,14 @@ int SteamMatchmakingWrapper::GetLobbyMemberLimit(CSteamID steamIDLobby)
 
 bool SteamMatchmakingWrapper::SetLobbyType(CSteamID steamIDLobby, ELobbyType eLobbyType)
 {
+	LobbyTrace::OnLobbySetting("SetLobbyType", steamIDLobby.ConvertToUint64(), static_cast<int>(eLobbyType));
 	LOG(7, "SteamMatchmakingWrapper SetLobbyType\n");
 	return m_SteamMatchmaking->SetLobbyType(steamIDLobby, eLobbyType);
 }
 
 bool SteamMatchmakingWrapper::SetLobbyJoinable(CSteamID steamIDLobby, bool bLobbyJoinable)
 {
+	LobbyTrace::OnLobbySetting("SetLobbyJoinable", steamIDLobby.ConvertToUint64(), bLobbyJoinable ? 1 : 0);
 	LOG(7, "SteamMatchmakingWrapper SetLobbyJoinable\n");
 	return m_SteamMatchmaking->SetLobbyJoinable(steamIDLobby, bLobbyJoinable);
 }
