@@ -2,6 +2,7 @@
 
 #include "UpdateModels.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -57,4 +58,22 @@ namespace Updater
 		std::wstring& outHandoffPath,
 		std::string& error);
 	bool LaunchUpdaterAndExitGame(const std::wstring& handoffPath, std::string& error);
+
+	enum StagePhase
+	{
+		StagePhase_Verifying,
+		StagePhase_Staging
+	};
+
+	// Download, SHA-256 check, zip validation, extraction and the updater handoff: everything
+	// between "the player chose to update" and LaunchUpdaterAndExitGame. Shared by the overlay's
+	// update popup and the native dialog shown on an unsupported game build. onPhase is called as
+	// each step after the download starts; progressPercent tracks the download.
+	bool DownloadAndStageUpdate(
+		const AvailableUpdate& update,
+		const std::string& userAgent,
+		volatile long* progressPercent,
+		const std::function<void(StagePhase)>& onPhase,
+		std::wstring& outHandoffPath,
+		std::string& error);
 }

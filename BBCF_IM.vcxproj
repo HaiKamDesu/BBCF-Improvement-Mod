@@ -114,6 +114,8 @@
     <ClCompile Include="src\Core\ExitDiagnostics.cpp" />
     <ClCompile Include="src\Core\ControllerOverrideManager.cpp" />
     <ClCompile Include="src\Core\RuntimePlatform.cpp" />
+    <ClCompile Include="src\Core\GameBuildGuard.cpp" />
+    <ClCompile Include="src\Updater\UnsupportedBuildFlow.cpp" />
     <ClCompile Include="src\Core\WineCheck.cpp" />
     <ClCompile Include="src\Core\XInputRuntime.cpp" />
     <ClCompile Include="src\Core\DirectInputWrapper.cpp" />
@@ -328,6 +330,9 @@
     <ClInclude Include="src\Core\ControllerOverrideManager.h" />
     <ClInclude Include="src\Core\DirectInputWrapper.h" />
     <ClInclude Include="src\Core\RuntimePlatform.h" />
+    <ClInclude Include="src\Core\GameBuildGuard.h" />
+    <ClInclude Include="src\Core\SupportedGameBuild.h" />
+    <ClInclude Include="src\Updater\UnsupportedBuildFlow.h" />
     <ClInclude Include="src\Core\WineCheck.h" />
     <ClInclude Include="src\Core\XInputRuntime.h" />
     <ClInclude Include="src\Core\dllmain.h" />

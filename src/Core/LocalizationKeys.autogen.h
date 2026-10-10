@@ -5624,6 +5624,81 @@ struct LocalizationKeysAccessor
 
         // Needs rebuilding:
         inline const char* Needs_rebuilding_2() const { return Get("Needs rebuilding:"); }
+
+        // The mod is off for this version of the game
+        inline const char* The_mod_is_off_for_this_version_of_the_game() const { return Get("The mod is off for this version of the game"); }
+
+        // BlazBlue Centralfiction has been updated, and this version of the BBCF Improvement Mod (%s) does not support the new game version yet. The mod has turned itself off, so the game runs without it. Nothing in the game has been changed.
+        inline const char* BlazBlue_Centralfiction_has_been_updated_and_this_version_of_the_BBCF_Improvement_Mod_s_does_not_support_the_new_game_version_yet_The_mod_has_turned_itself_off_so_the_game_runs_without_it_Nothing_in_the_game_has_been_changed() const { return Get("BlazBlue Centralfiction has been updated, and this version of the BBCF Improvement Mod (%s) does not support the new game version yet. The mod has turned itself off, so the game runs without it. Nothing in the game has been changed."); }
+
+        // Open the mod's releases on GitHub
+        inline const char* Open_the_mod_s_releases_on_GitHub() const { return Get("Open the mod's releases on GitHub"); }
+
+        // Don't show this again for this game version
+        inline const char* Don_t_show_this_again_for_this_game_version() const { return Get("Don't show this again for this game version"); }
+
+        // Press Cancel to stop showing this for this game version.
+        inline const char* Press_Cancel_to_stop_showing_this_for_this_game_version() const { return Get("Press Cancel to stop showing this for this game version."); }
+
+        // The full release notes are on GitHub.
+        inline const char* The_full_release_notes_are_on_GitHub() const { return Get("The full release notes are on GitHub."); }
+
+        // A mod update for the new game version is available
+        inline const char* A_mod_update_for_the_new_game_version_is_available() const { return Get("A mod update for the new game version is available"); }
+
+        // BlazBlue Centralfiction has been updated, and this version of the BBCF Improvement Mod (%s) does not support it, so the mod is off for now. %s supports the new game version.
+        inline const char* BlazBlue_Centralfiction_has_been_updated_and_this_version_of_the_BBCF_Improvement_Mod_s_does_not_support_it_so_the_mod_is_off_for_now_s_supports_the_new_game_version() const { return Get("BlazBlue Centralfiction has been updated, and this version of the BBCF Improvement Mod (%s) does not support it, so the mod is off for now. %s supports the new game version."); }
+
+        // Yes: update to %s now (the game closes and restarts)\nNo: ask me again next time\nCancel: skip this version
+        inline const char* Yes_update_to_s_now_the_game_closes_and_restarts_No_ask_me_again_next_time_Cancel_skip_this_version() const { return Get("Yes: update to %s now (the game closes and restarts)\nNo: ask me again next time\nCancel: skip this version"); }
+
+        // Update now
+        inline const char* Update_now() const { return Get("Update now"); }
+
+        // Downloads %s, closes the game, installs the update and starts the game again.
+        inline const char* Downloads_s_closes_the_game_installs_the_update_and_starts_the_game_again() const { return Get("Downloads %s, closes the game, installs the update and starts the game again."); }
+
+        // Play without the mod this time. You will be asked again the next time you start the game.
+        inline const char* Play_without_the_mod_this_time_You_will_be_asked_again_the_next_time_you_start_the_game() const { return Get("Play without the mod this time. You will be asked again the next time you start the game."); }
+
+        // Do not offer %s again. Newer releases will still be offered.
+        inline const char* Do_not_offer_s_again_Newer_releases_will_still_be_offered() const { return Get("Do not offer %s again. Newer releases will still be offered."); }
+
+        // Show release notes
+        inline const char* Show_release_notes() const { return Get("Show release notes"); }
+
+        // Hide release notes
+        inline const char* Hide_release_notes() const { return Get("Hide release notes"); }
+
+        // Open the release on GitHub
+        inline const char* Open_the_release_on_GitHub() const { return Get("Open the release on GitHub"); }
+
+        // Checking the download...
+        inline const char* Checking_the_download() const { return Get("Checking the download..."); }
+
+        // Preparing the update...
+        inline const char* Preparing_the_update() const { return Get("Preparing the update..."); }
+
+        // Downloading... %d%%
+        inline const char* Downloading_d() const { return Get("Downloading... %d%%"); }
+
+        // The update could not be installed
+        inline const char* The_update_could_not_be_installed() const { return Get("The update could not be installed"); }
+
+        // The game keeps running without the mod. You will be asked again the next time you start the game, or you can download the release from GitHub.
+        inline const char* The_game_keeps_running_without_the_mod_You_will_be_asked_again_the_next_time_you_start_the_game_or_you_can_download_the_release_from_GitHub() const { return Get("The game keeps running without the mod. You will be asked again the next time you start the game, or you can download the release from GitHub."); }
+
+        // Updating to %s
+        inline const char* Updating_to_s() const { return Get("Updating to %s"); }
+
+        // Update checks are turned off (CheckUpdates in settings.ini), so the mod cannot look for a release that supports this game version. Check the mod's releases on GitHub.
+        inline const char* Update_checks_are_turned_off_CheckUpdates_in_settings_ini_so_the_mod_cannot_look_for_a_release_that_supports_this_game_version_Check_the_mod_s_releases_on_GitHub() const { return Get("Update checks are turned off (CheckUpdates in settings.ini), so the mod cannot look for a release that supports this game version. Check the mod's releases on GitHub."); }
+
+        // Automatic updates are not available under Wine/Proton. Check the mod's releases on GitHub for one that supports this game version.
+        inline const char* Automatic_updates_are_not_available_under_Wine_Proton_Check_the_mod_s_releases_on_GitHub_for_one_that_supports_this_game_version() const { return Get("Automatic updates are not available under Wine/Proton. Check the mod's releases on GitHub for one that supports this game version."); }
+
+        // When a mod release that supports this game version comes out, the mod will offer to install it here the next time you start the game.
+        inline const char* When_a_mod_release_that_supports_this_game_version_comes_out_the_mod_will_offer_to_install_it_here_the_next_time_you_start_the_game() const { return Get("When a mod release that supports this game version comes out, the mod will offer to install it here the next time you start the game."); }
 };
 
 

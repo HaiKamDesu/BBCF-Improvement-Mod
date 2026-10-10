@@ -5,6 +5,7 @@
 #include "PackageStager.h"
 #include "UpdateStateStore.h"
 
+#include "Core/GameBuildGuard.h"
 #include "Core/info.h"
 #include "Core/Localization.h"
 #include "Core/RuntimePlatform.h"
@@ -245,6 +246,15 @@ namespace Updater
 			return;
 		}
 
+		// A release built for a different game build would switch itself off on this one.
+		if (!ManifestSupportsGameBuild(result.update.manifest, GameBuildGuard::CurrentBuildId()))
+		{
+			LOG(1, "[UPDATER] %s does not support this game build (%s); not offering it.\n",
+				result.update.release.tagName.c_str(), GameBuildGuard::CurrentBuildId());
+			store.Save(state);
+			return;
+		}
+
 		state.lastSeenReleaseTag = result.update.release.tagName;
 		state.lastSeenReleaseVersion = result.update.manifest.version;
 		store.Save(state);
@@ -273,57 +283,25 @@ namespace Updater
 		}
 
 		std::string error;
-		const std::wstring updaterRoot = GetUpdaterRoot();
-		const std::wstring downloadsRoot = CombinePath(updaterRoot, L"downloads");
-		const std::wstring stageRoot = CombinePath(updaterRoot, L"stage");
-		EnsureDirectoryRecursive(downloadsRoot);
-		EnsureDirectoryRecursive(stageRoot);
-
-		const std::wstring packagePath = CombinePath(downloadsRoot, Utf8ToWide(update.manifest.assetName));
-		const std::wstring tempPath = packagePath + L".tmp";
-		if (!DownloadFileWithProgress(update.packageAsset.browserDownloadUrl, tempPath, packagePath, BuildUserAgent(), &m_progressPercent, error))
-		{
-			SetErrorLocked(error);
-			return;
-		}
-
-		EnterCriticalSection(&m_lock);
-		m_snapshot.state = UpdateUiState_Verifying;
-		m_snapshot.statusText = "Verifying SHA-256...";
-		LeaveCriticalSection(&m_lock);
-
-		std::string sha256;
-		if (!ComputeFileSha256Hex(packagePath, sha256, error))
-		{
-			SetErrorLocked(error);
-			return;
-		}
-		if (_stricmp(sha256.c_str(), update.manifest.sha256.c_str()) != 0)
-		{
-			SetErrorLocked("Downloaded package SHA-256 did not match the update manifest. The download may be corrupted or blocked. Add your BlazBlue Centralfiction installation folder as an antivirus exclusion, then retry.");
-			return;
-		}
-
-		ZipValidationResult zip = ValidateUpdateZip(packagePath);
-		if (!zip.valid)
-		{
-			SetErrorLocked(zip.error);
-			return;
-		}
-
-		EnterCriticalSection(&m_lock);
-		m_snapshot.state = UpdateUiState_Staging;
-		m_snapshot.statusText = "Extracting staged update...";
-		LeaveCriticalSection(&m_lock);
-
-		if (!ExtractUpdateZip(packagePath, zip, stageRoot, error))
-		{
-			SetErrorLocked(error);
-			return;
-		}
-
 		std::wstring handoff;
-		if (!WriteUpdaterHandoff(update, stageRoot, packagePath, handoff, error))
+		const bool staged = DownloadAndStageUpdate(update, BuildUserAgent(), &m_progressPercent,
+			[this](StagePhase phase)
+			{
+				EnterCriticalSection(&m_lock);
+				if (phase == StagePhase_Verifying)
+				{
+					m_snapshot.state = UpdateUiState_Verifying;
+					m_snapshot.statusText = "Verifying SHA-256...";
+				}
+				else
+				{
+					m_snapshot.state = UpdateUiState_Staging;
+					m_snapshot.statusText = "Extracting staged update...";
+				}
+				LeaveCriticalSection(&m_lock);
+			},
+			handoff, error);
+		if (!staged)
 		{
 			SetErrorLocked(error);
 			return;
@@ -418,6 +396,13 @@ namespace Updater
 		if (!ValidateUpdateManifest(manifest, error))
 		{
 			SetErrorLocked(error);
+			return;
+		}
+
+		if (!ManifestSupportsGameBuild(manifest, GameBuildGuard::CurrentBuildId()))
+		{
+			SetErrorLocked(release.tagName + " was made for a different version of BlazBlue Centralfiction "
+				"than the one installed, so it would turn itself off. Not installing it.");
 			return;
 		}
 

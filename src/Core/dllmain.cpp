@@ -11,6 +11,7 @@
 #include "ControllerOverrideManager.h"
 #include "DirectInputWrapper.h"
 #include "ExitDiagnostics.h"
+#include "GameBuildGuard.h"
 #include "Localization.h"
 #include "RuntimePlatform.h"
 #include "WineCheck.h"
@@ -69,6 +70,13 @@ HRESULT WINAPI DirectInput8Create(HINSTANCE hinstHandle, DWORD version, const II
 	HRESULT ret = orig_DirectInput8Create(hinstHandle, version, r_iid, outWrapper, pUnk);
 
 	ForceLog("[Init] Returned from orig_DirectInput8Create (hr=0x%08X)", ret);
+
+	// Unknown game build: a plain forwarder (GameBuildGuard.h).
+	if (!GameBuildGuard::IsSupported())
+	{
+		return ret;
+	}
+	GameBuildGuard::LogOverrideOnce();
 
 	if (IsControllerHooksRuntimeAllowed() && SUCCEEDED(ret) && outWrapper && *outWrapper)
 	{
@@ -385,6 +393,16 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
         DisableThreadLibraryCalls(hinstDLL);
         ForceLog("[Init] DisableThreadLibraryCalls done");
 
+        // Before anything that touches the game. Every address the mod patches belongs to one
+        // BBCF.exe build; on any other, stay a plain dinput8 forwarder (GameBuildGuard.h).
+        GameBuildGuard::Evaluate();
+        if (!GameBuildGuard::IsSupported())
+        {
+                ForceLog("[Init] Unsupported BBCF.exe build; mod stays inert");
+                GameBuildGuard::StartUnsupportedBuildFlow();
+                break;
+        }
+
         // Static import of BBCF.exe: this is the thread that goes on to run WinMain.
         ExitDiagnostics::RecordMainThread();
 
@@ -412,6 +430,10 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 }
 
                 case DLL_PROCESS_DETACH:
+                        if (!GameBuildGuard::IsSupported())
+                        {
+                                break;
+                        }
                         if (lpReserved == nullptr && !g_cleanShutdown)
                         {
                                 WriteCrashBundle("DLL unloaded unexpectedly (lpReserved == nullptr)", nullptr, false);

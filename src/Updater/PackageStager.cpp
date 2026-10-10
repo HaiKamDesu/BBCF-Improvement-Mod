@@ -742,4 +742,52 @@ namespace Updater
 		ExitProcess(0);
 		return true;
 	}
+
+	bool DownloadAndStageUpdate(
+		const AvailableUpdate& update,
+		const std::string& userAgent,
+		volatile long* progressPercent,
+		const std::function<void(StagePhase)>& onPhase,
+		std::wstring& outHandoffPath,
+		std::string& error)
+	{
+		error.clear();
+		const std::wstring updaterRoot = CombinePath(GetInstallRoot(), L"BBCF_IM\\Updater");
+		const std::wstring downloadsRoot = CombinePath(updaterRoot, L"downloads");
+		const std::wstring stageRoot = CombinePath(updaterRoot, L"stage");
+		EnsureDirectoryRecursive(downloadsRoot);
+		EnsureDirectoryRecursive(stageRoot);
+
+		const std::wstring packagePath = CombinePath(downloadsRoot, Utf8ToWide(update.manifest.assetName));
+		const std::wstring tempPath = packagePath + L".tmp";
+		if (!DownloadFileWithProgress(update.packageAsset.browserDownloadUrl, tempPath, packagePath, userAgent, progressPercent, error))
+			return false;
+
+		if (onPhase)
+			onPhase(StagePhase_Verifying);
+
+		std::string sha256;
+		if (!ComputeFileSha256Hex(packagePath, sha256, error))
+			return false;
+		if (_stricmp(sha256.c_str(), update.manifest.sha256.c_str()) != 0)
+		{
+			error = "Downloaded package SHA-256 did not match the update manifest. The download may be corrupted or blocked. Add your BlazBlue Centralfiction installation folder as an antivirus exclusion, then retry.";
+			return false;
+		}
+
+		ZipValidationResult zip = ValidateUpdateZip(packagePath);
+		if (!zip.valid)
+		{
+			error = zip.error;
+			return false;
+		}
+
+		if (onPhase)
+			onPhase(StagePhase_Staging);
+
+		if (!ExtractUpdateZip(packagePath, zip, stageRoot, error))
+			return false;
+
+		return WriteUpdaterHandoff(update, stageRoot, packagePath, outHandoffPath, error);
+	}
 }

@@ -154,4 +154,21 @@ namespace Updater
 
 		return true;
 	}
+
+	bool ManifestSupportsGameBuild(const UpdateManifest& manifest, const std::string& gameBuildId)
+	{
+		// Steam build 11073075. Fixed here on purpose, not taken from SupportedGameBuild.h: it
+		// describes the releases already out there, which never change.
+		static const char* const kPreManifestFieldGameBuild = "6442636E-0160C000-003A557A";
+
+		if (manifest.supportedGameBuilds.empty())
+			return EqualsIgnoreCase(gameBuildId, kPreManifestFieldGameBuild);
+
+		for (const std::string& build : manifest.supportedGameBuilds)
+		{
+			if (EqualsIgnoreCase(build, gameBuildId))
+				return true;
+		}
+		return false;
+	}
 }

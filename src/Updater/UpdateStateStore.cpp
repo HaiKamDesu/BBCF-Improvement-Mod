@@ -114,6 +114,7 @@ namespace Updater
 		state.lastSeenReleaseVersion = ReadIniString(m_statePath, L"LastSeenReleaseVersion");
 		state.lastCheckUtc = ReadIniString(m_statePath, L"LastCheckUtc");
 		state.lastFailureUtc = ReadIniString(m_statePath, L"LastFailureUtc");
+		state.dismissedUnsupportedGameBuild = ReadIniString(m_statePath, L"DismissedUnsupportedGameBuild");
 		return true;
 	}
 
@@ -129,6 +130,7 @@ namespace Updater
 		ok = WriteIniString(m_statePath, L"LastSeenReleaseVersion", state.lastSeenReleaseVersion) && ok;
 		ok = WriteIniString(m_statePath, L"LastCheckUtc", state.lastCheckUtc) && ok;
 		ok = WriteIniString(m_statePath, L"LastFailureUtc", state.lastFailureUtc) && ok;
+		ok = WriteIniString(m_statePath, L"DismissedUnsupportedGameBuild", state.dismissedUnsupportedGameBuild) && ok;
 		return ok;
 	}
 

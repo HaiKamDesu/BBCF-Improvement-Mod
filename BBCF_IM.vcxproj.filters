@@ -94,6 +94,9 @@
     <ClCompile Include="src\Core\DirectInputWrapper.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\GameBuildGuard.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\WineCheck.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -284,6 +287,9 @@
     <ClCompile Include="src\Updater\JsonValue.cpp">
       <Filter>src\Updater</Filter>
     </ClCompile>
+    <ClCompile Include="src\Updater\UnsupportedBuildFlow.cpp">
+      <Filter>src\Updater</Filter>
+    </ClCompile>
     <ClCompile Include="src\Updater\PackageStager.cpp">
       <Filter>src\Updater</Filter>
     </ClCompile>
@@ -358,6 +364,12 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\DirectInputWrapper.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\SupportedGameBuild.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\GameBuildGuard.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\WineCheck.h">
@@ -564,6 +576,9 @@
       <Filter>src\Updater</Filter>
     </ClInclude>
     <ClInclude Include="src\Updater\JsonValue.h">
+      <Filter>src\Updater</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Updater\UnsupportedBuildFlow.h">
       <Filter>src\Updater</Filter>
     </ClInclude>
     <ClInclude Include="src\Updater\PackageStager.h">

@@ -199,6 +199,18 @@ namespace Updater
 		manifest.sha256 = GetStringField(root, "sha256");
 		manifest.entryDll = GetStringField(root, "entryDll");
 		manifest.minimumSupportedVersion = GetStringField(root, "minimumSupportedVersion");
+		manifest.gameSteamBuild = GetStringField(root, "gameSteamBuild");
+		if (const JsonValue* builds = root.Find("supportedGameBuilds"))
+		{
+			if (builds->IsArray())
+			{
+				for (const JsonValue& build : builds->AsArray())
+				{
+					if (build.IsString() && !build.AsString().empty())
+						manifest.supportedGameBuilds.push_back(build.AsString());
+				}
+			}
+		}
 
 		const JsonValue* schemaVersion = root.Find("schemaVersion");
 		if (schemaVersion && schemaVersion->IsNumber())

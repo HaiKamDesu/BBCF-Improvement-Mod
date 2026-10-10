@@ -24,6 +24,19 @@ if ($infoText -notmatch '#define\s+MOD_MINIMUM_FROM_VERSION\s+"([^"]+)"') {
 }
 $minimumFromVersion = $Matches[1]
 
+# The game build this release is written against. An installed mod that finds itself on that
+# build reads this list to know the release can be installed over it (UnsupportedBuildFlow.h).
+$gameBuildPath = Join-Path $repoRoot "src\Core\SupportedGameBuild.h"
+$gameBuildText = Get-Content -Raw $gameBuildPath
+if ($gameBuildText -notmatch '#define\s+BBCF_SUPPORTED_GAME_BUILD_ID\s+"([0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8})"') {
+    throw "Could not read BBCF_SUPPORTED_GAME_BUILD_ID from $gameBuildPath"
+}
+$supportedGameBuild = $Matches[1]
+if ($gameBuildText -notmatch '#define\s+BBCF_SUPPORTED_GAME_STEAM_BUILD\s+"(\d+)"') {
+    throw "Could not read BBCF_SUPPORTED_GAME_STEAM_BUILD from $gameBuildPath"
+}
+$gameSteamBuild = $Matches[1]
+
 if ($Tag -notmatch '^v?\d+\.\d+(\.\d+)?(\.\d+)?$') {
     throw "Tag must be semantic version text, e.g. v5.0"
 }
@@ -64,6 +77,8 @@ $manifest = [ordered]@{
     sha256 = $sha
     entryDll = "dinput8.dll"
     minimumSupportedVersion = $minimumFromVersion
+    supportedGameBuilds = @($supportedGameBuild)
+    gameSteamBuild = $gameSteamBuild
 }
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 4
