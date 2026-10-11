@@ -109,6 +109,11 @@ namespace
 	// Touched from whichever thread allocates and from the render-loop tick.
 	std::atomic<void*> g_reserve{ nullptr };
 	std::atomic<bool> g_installed{ false };
+	// While an arena is alive: the free space right after it, up to kReserveSize from its
+	// start. See KeepArenaTail.
+	std::atomic<void*> g_arenaTail{ nullptr };
+	// A freed arena kept instead of freed, while no reserve is held. See ArenaFree.
+	std::atomic<void*> g_parkedArena{ nullptr };
 	DWORD g_lastReReserveAttemptMs = 0;
 
 	void* TryReserve()
@@ -116,10 +121,35 @@ namespace
 		return VirtualAlloc(nullptr, kReserveSize, MEM_RESERVE, PAGE_NOACCESS);
 	}
 
+	void ReleaseArenaTail()
+	{
+		if (void* tail = g_arenaTail.exchange(nullptr))
+			VirtualFree(tail, 0, MEM_RELEASE);
+	}
+
+	// Really frees a parked arena so something else can have its address space.
+	bool FreeParkedArena(const char* forWhat)
+	{
+		void* parked = g_parkedArena.exchange(nullptr);
+		if (parked == nullptr)
+			return false;
+		g_gameDelete(parked);
+		ReleaseArenaTail();
+		LOG(0, "[NetplayArena] %s did not fit; freed the kept arena at 0x%p for it.\n", forWhat, parked);
+		return true;
+	}
+
 	void* __cdecl RescuingAlloc(size_t size, const char* what)
 	{
 		if (void* block = g_crtMalloc(size))
 		{
+			return block;
+		}
+
+		if (FreeParkedArena(what))
+		{
+			void* block = g_gameOperatorNew(size); // throws as vanilla would if even that fails
+			LOG(0, "[NetplayArena] %s placed at 0x%p after freeing the kept arena.\n", what, block);
 			return block;
 		}
 
@@ -141,9 +171,58 @@ namespace
 		return block;
 	}
 
+	// The heap gives a block this big its own VirtualAlloc of the size plus a random offset
+	// of up to 64 KB, at the bottom of the hole. When that hole was our released reserve, the
+	// ~1 MB after the arena is left free, and something small takes it during the match.
+	// Then the freed arena leaves a hole smaller than kReserveSize, ArenaFree cannot take it
+	// back (err=8), the versus screen chops it up, and the next arena throws
+	// (Crash_20261010_185545: freed 18:55:30, largest free block 93 MB at 18:55:45).
+	// Reserving the exact vacated range is not enough either: the next arena gets a new
+	// random offset, and in a 32-bit test it fit the previous one's range 3 times in 40.
+	// So hold the tail while the arena lives, and give it back the moment the arena is
+	// freed: the hole is then the full kReserveSize again (200 of 200 in the same test).
+	void KeepArenaTail(void* arena)
+	{
+		MEMORY_BASIC_INFORMATION info = {};
+		if (arena == nullptr || VirtualQuery(arena, &info, sizeof(info)) != sizeof(info))
+			return;
+		BYTE* const base = static_cast<BYTE*>(info.AllocationBase);
+		BYTE* end = base;
+		while (VirtualQuery(end, &info, sizeof(info)) == sizeof(info) && info.AllocationBase == base)
+			end += info.RegionSize;
+
+		// Reservations start on 64 KB boundaries; the pages before the next one are unusable
+		// to anyone and come back with the arena anyway.
+		BYTE* const tail = reinterpret_cast<BYTE*>((reinterpret_cast<uintptr_t>(end) + 0xFFFF) & ~uintptr_t(0xFFFF));
+		BYTE* const wantedEnd = base + kReserveSize;
+		if (tail >= wantedEnd || VirtualQuery(tail, &info, sizeof(info)) != sizeof(info) || info.State != MEM_FREE)
+			return;
+		size_t size = static_cast<size_t>(wantedEnd - tail);
+		if (info.RegionSize < size)
+			size = info.RegionSize;
+		void* kept = VirtualAlloc(tail, size, MEM_RESERVE, PAGE_NOACCESS);
+		LOG(1, "[NetplayArena] Arena at 0x%p; holding the %u bytes after it at 0x%p until it is freed (err=%lu).\n",
+			arena, static_cast<unsigned>(size), kept, kept ? 0ul : GetLastError());
+		void* previous = g_arenaTail.exchange(kept);
+		if (previous != nullptr)
+			VirtualFree(previous, 0, MEM_RELEASE);
+	}
+
 	void* __cdecl ArenaAlloc(size_t size)
 	{
-		return RescuingAlloc(size, "Netplay arena");
+		// The arena is always the same constant size, so a kept one is exactly what the game
+		// is asking for. The game initialises the whole block itself, as it does a new one.
+		if (size == kArenaSize)
+		{
+			if (void* parked = g_parkedArena.exchange(nullptr))
+			{
+				LOG(1, "[NetplayArena] Netplay arena reuses the kept block at 0x%p.\n", parked);
+				return parked;
+			}
+		}
+		void* arena = RescuingAlloc(size, "Netplay arena");
+		KeepArenaTail(arena);
+		return arena;
 	}
 
 	void* __cdecl FileSlotAlloc(size_t size)
@@ -156,9 +235,37 @@ namespace
 	// nowhere to go (Crash_20261007_230314: freed 23:03:00, hole taken by a 4 MB and a 28 MB
 	// block, arena threw 23:03:14). The 5 s tick was too slow; take the hole back the moment
 	// the game frees the arena, while it is still one piece.
+	//
+	// Even with the tail held, a free with no reserve held lost the hole once
+	// (Crash_20261010_210536, a replay: the mod's replay rewind builds an arena per replay).
+	// The full-size hole re-formed only for the moment between the free and our reserve, and
+	// everything below it was packed solid, so any thread reserving memory in that moment got
+	// the bottom of it. So when no reserve is held, do not free the arena at all: keep the
+	// block and hand it to the next arena request. Its address space never becomes free, so
+	// nothing can take it. The pages are marked discardable, so a kept arena costs no RAM,
+	// only commit charge the game already uses during every match. Anything that then fails
+	// to fit (the 62 MB stage file, a texture) frees the kept arena for itself, the way
+	// vanilla time-shares that space.
 	void __cdecl ArenaFree(void* block)
 	{
+		if (block != nullptr && g_installed.load() && g_reserve.load() == nullptr)
+		{
+			void* expected = nullptr;
+			if (g_parkedArena.compare_exchange_strong(expected, block))
+			{
+				// Whole pages only, so the heap's block header before it and anything the heap
+				// keeps after it are untouched.
+				const uintptr_t first = (reinterpret_cast<uintptr_t>(block) + 0xFFF) & ~uintptr_t(0xFFF);
+				const uintptr_t last = (reinterpret_cast<uintptr_t>(block) + kArenaSize) & ~uintptr_t(0xFFF);
+				if (last > first)
+					VirtualAlloc(reinterpret_cast<void*>(first), last - first, MEM_RESET, PAGE_READWRITE);
+				LOG(1, "[NetplayArena] Arena freed with no reserve held; kept its block at 0x%p for the next one.\n", block);
+				return;
+			}
+		}
+
 		g_gameDelete(block);
+		ReleaseArenaTail();
 		if (!g_installed.load() || g_reserve.load() != nullptr)
 		{
 			return;
@@ -276,7 +383,10 @@ bool ReleaseNetplayArenaReserve(const char* forWhat)
 	void* reserve = g_reserve.exchange(nullptr);
 	if (reserve == nullptr)
 	{
-		return false;
+		if (!FreeParkedArena(forWhat))
+			return false;
+		g_lastReReserveAttemptMs = GetTickCount();
+		return true;
 	}
 	VirtualFree(reserve, 0, MEM_RELEASE);
 	// Not straight back on the next tick: whatever needed the room has to get it first.
@@ -288,7 +398,8 @@ bool ReleaseNetplayArenaReserve(const char* forWhat)
 
 void TickNetplayArenaKeeper()
 {
-	if (!g_installed.load() || g_reserve.load() != nullptr)
+	// A kept arena already holds a 100 MB range.
+	if (!g_installed.load() || g_reserve.load() != nullptr || g_parkedArena.load() != nullptr)
 	{
 		return;
 	}
