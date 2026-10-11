@@ -9,8 +9,10 @@
 // thing that still runs is UnsupportedBuildFlow, on its own thread: it tells the player, and
 // offers a release that supports this build once one is published.
 //
-// Set the environment variable BBCF_IM_ALLOW_UNKNOWN_GAME_BUILD=1 to skip the check (porting
-// work, or the LoadLibrary test host, whose main module is not BBCF.exe).
+// AllowUnknownGameBuild = 1 in settings.ini skips the check, for players who want to see how
+// much breaks on a new game version. It is ini-only on purpose (not in the F1 menu). The
+// environment variable BBCF_IM_ALLOW_UNKNOWN_GAME_BUILD=1 does the same without touching the
+// ini (porting work, or the LoadLibrary test host, whose main module is not BBCF.exe).
 
 namespace GameBuildGuard
 {

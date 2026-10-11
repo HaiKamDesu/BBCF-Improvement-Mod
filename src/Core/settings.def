@@ -289,6 +289,10 @@ SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
 SETTING(bool, newControllerSystem, "NewControllerSystem", "1");
 SETTING(bool, EnableControllerHooks, "EnableControllerHooks", "1");
 SETTING(bool, ForceEnableControllerSettingHooks, "ForceEnableControllerSettingHooks", "0");
+// Lets the mod run on a BBCF.exe it was not built for (GameBuildGuard). Read straight from
+// settings.ini in DllMain, before this struct is loaded; listed here so it keeps its place
+// in the file. Deliberately not shown in the F1 menu.
+SETTING(bool, allowUnknownGameBuild, "AllowUnknownGameBuild", "0");
 // Whether the user has answered the Wine/Proton controller prompt. 0 = not asked yet, so
 // the popup appears once on a Wine/Proton launch; 1 = they picked, and it stays shut for
 // good. Set it back to 0 to be asked again. Without this the prompt had no way to record

@@ -2,6 +2,7 @@
 
 #include "SupportedGameBuild.h"
 #include "logger.h"
+#include "utils.h"
 #include "Updater/UnsupportedBuildFlow.h"
 
 #include <atomic>
@@ -17,6 +18,7 @@ namespace
 	char g_currentId[32] = "unreadable";
 	bool g_supported = true;
 	bool g_overridden = false;
+	const char* g_overrideSource = "";
 	std::atomic<bool> g_overrideLogged{ false };
 
 	bool ReadMainModuleId(char* out, size_t outSize)
@@ -41,11 +43,24 @@ namespace
 		return true;
 	}
 
+	// Read only once the exe has already failed the check, so on the supported build this never
+	// runs. settings.ini is read straight from disk: the mod's settings are not loaded yet in
+	// DllMain, and GetPrivateProfileIntW is safe under the loader lock.
 	bool OverrideRequested()
 	{
 		wchar_t value[8] = {};
 		const DWORD len = GetEnvironmentVariableW(L"BBCF_IM_ALLOW_UNKNOWN_GAME_BUILD", value, 8);
-		return len > 0 && len < 8 && value[0] == L'1';
+		if (len > 0 && len < 8 && value[0] == L'1')
+		{
+			g_overrideSource = "the BBCF_IM_ALLOW_UNKNOWN_GAME_BUILD environment variable";
+			return true;
+		}
+		if (GetPrivateProfileIntW(L"Settings", L"AllowUnknownGameBuild", 0, GamePathW(L"settings.ini").c_str()) == 1)
+		{
+			g_overrideSource = "AllowUnknownGameBuild = 1 in settings.ini";
+			return true;
+		}
+		return false;
 	}
 
 	DWORD WINAPI UnsupportedBuildThread(LPVOID)
@@ -91,7 +106,8 @@ namespace GameBuildGuard
 			return;
 
 		ForceLog("[BuildGuard] Unknown game build %s (this mod supports %s, Steam build %s) allowed by "
-			"BBCF_IM_ALLOW_UNKNOWN_GAME_BUILD; hooks will patch it anyway.\n",
-			g_currentId, BBCF_SUPPORTED_GAME_BUILD_ID, BBCF_SUPPORTED_GAME_STEAM_BUILD);
+			"%s; hooks will patch it anyway. Crashes and desyncs on this build are expected and are not "
+			"mod bugs.\n",
+			g_currentId, BBCF_SUPPORTED_GAME_BUILD_ID, BBCF_SUPPORTED_GAME_STEAM_BUILD, g_overrideSource);
 	}
 }
