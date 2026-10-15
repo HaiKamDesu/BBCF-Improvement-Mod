@@ -146,6 +146,21 @@ void WriteEmbeddedConfigFiles()
 }
 
 
+bool Settings::WaitUntilLoaded(DWORD timeoutMs, const char* waiter)
+{
+	const volatile bool& loaded = settingsFileLoaded;
+	if (loaded)
+		return true;
+	const ULONGLONG start = GetTickCount64();
+	while (!loaded && GetTickCount64() - start < timeoutMs)
+		Sleep(1);
+	const bool ok = loaded;
+	MemoryBarrier();
+	ForceLog("[Init][Settings] %s waited %llu ms for settings.ini (%s)\n", waiter,
+		GetTickCount64() - start, ok ? "loaded" : "TIMED OUT, using defaults as read so far");
+	return ok;
+}
+
 void Settings::applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters)
 {
 	if (settingsIni.viewport != VIEWPORT_DEFAULT)
@@ -339,6 +354,7 @@ bool Settings::loadSettingsFile()
                 LOG(1, "Settings::loadSettingsFile - SwapControllerPos forced off due to a known startup crash issue.\n");
         }
         settingsIni.swapControllerPos = false;
+	MemoryBarrier();
 	settingsFileLoaded = true;
 	ForceLog("[Init][Settings] loadSettingsFile success\n");
 

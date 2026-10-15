@@ -17,6 +17,7 @@
 #include "SteamApiWrapper/steamApiWrappers.h"
 
 #include <detours.h>
+#include <atomic>
 #include <intrin.h>
 #include <sstream>
 #include <tlhelp32.h>
@@ -823,8 +824,11 @@ namespace
 			FormatBytes(current, sizeof(current)).c_str());
 		LogJumpTarget(watch.target, watch.name, "evicted");
 
-		// enum: 0 = Off, 1 = Automatic, 2 = Always (settings.def D3D9IatFallbackHook)
-		if (watch.isDirect3DCreate9Ex && Settings::settingsIni.d3d9IatFallbackHook != 0)
+		// enum: 0 = Off, 1 = Automatic, 2 = Always (settings.def D3D9IatFallbackHook).
+		// The detours go in before settings.ini is read, so until it has been the setting
+		// reads 0; treat that as the default, Automatic.
+		const int iatMode = Settings::settingsFileLoaded ? Settings::settingsIni.d3d9IatFallbackHook : 1;
+		if (watch.isDirect3DCreate9Ex && iatMode != 0)
 		{
 			InstallD3DIatHook("export detour evicted");
 		}
@@ -860,6 +864,20 @@ namespace
 	// were called; nothing left to protect) or the fallback is in. A 5-byte compare every
 	// few ms for a few seconds; it exits on its own and never runs on a machine where the
 	// fallback was installed up front.
+	DWORD WINAPI EarlyEvictionWatchThread(LPVOID);
+	std::atomic<bool> g_earlyEvictionWatchStarted{ false };
+
+	void StartEarlyEvictionWatch()
+	{
+		if (g_earlyEvictionWatchStarted.exchange(true))
+			return;
+		const HANDLE watcher = CreateThread(nullptr, 0, EarlyEvictionWatchThread, nullptr, 0, nullptr);
+		if (watcher != nullptr)
+			CloseHandle(watcher);
+		else
+			g_earlyEvictionWatchStarted.store(false);
+	}
+
 	DWORD WINAPI EarlyEvictionWatchThread(LPVOID)
 	{
 		const ULONGLONG start = GetTickCount64();
@@ -1652,10 +1670,35 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 		// it) create windows of their own first, so the count lands on one of those. Kept
 		// only as a stand-in until the D3D device says which window it presents to, which
 		// AdoptGameWindow treats as authoritative.
+		// The game's own window, matched exactly: BBCF.exe creates it in FUN_0044F060
+		// (RegisterClassExW with WndProc 0x0044F2D0, then CreateWindowExW with style
+		// 0x00CA0000, no parent and its own module as hInstance). Unlike the count this cannot land on a DirectShow, IME or overlay window,
+		// so it corrects an earlier wrong guess. On 2026-10-14 the count latched 0x00151D30,
+		// no device ever reported (the factory hook was late), and the game ran in
+		// 0x050419A6 the whole session with the overlay and the keyboard pointed elsewhere.
+		static bool s_gameWindowMatched = false;
+		const HMODULE gameModule = GetModuleHandleW(nullptr);
+		HMODULE callerModule = nullptr;
+		GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			reinterpret_cast<LPCWSTR>(_ReturnAddress()), &callerModule);
+		// The caller check alone would miss it if another overlay hooks CreateWindowExW on
+		// top of us, hence the style as an alternative.
+		const bool gameCreated = callerModule == gameModule || dwStyle == 0x00CA0000;
+		if (!s_gameWindowMatched && hWndParent == nullptr && hInstance == gameModule && gameCreated)
+		{
+			s_gameWindowMatched = true;
+			LOG(1, "[GameWindow] CreateWindowExW #%d is the game's own window 0x%p (created by BBCF.exe with its own hInstance)\n",
+				counter, hWnd);
+			AdoptGameWindow(hWnd, false, "CreateWindowExW (game's window class)");
+		}
+
 		if (counter == 2)
 		{
 			LOG(2, "Correct window: 0x%p\n", hWnd);
-			AdoptGameWindow(hWnd, false, "CreateWindowExW #2");
+			if (!s_gameWindowMatched)
+			{
+				AdoptGameWindow(hWnd, false, "CreateWindowExW #2");
+			}
 
 			// Second sweep, now that the game is past early startup: catches a
 			// d3d9/dxgi proxy loaded after placeHooks_detours ran, and shows
@@ -1713,6 +1756,8 @@ HWND WINAPI hook_CreateWindowExW(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR l
 // Idempotent, and safe to fail: if d3d9.dll is not loaded yet there is nothing to
 // hook and no device to miss, and placeHooks_detours calls this again at the point
 // it always used to install them.
+static bool s_d3d9ExportForeignOwnedAtStartup = false;
+
 bool placeD3D9FactoryHooks_detours()
 {
 	static bool s_placed = false;
@@ -1743,6 +1788,7 @@ bool placeD3D9FactoryHooks_detours()
 
 	// Sampled before our own detour lands, or the answer is always "us".
 	const bool foreignOwnerAtStartup = IsExportForeignOwned(pDirect3DCreate9Ex, hM_d3d9);
+	s_d3d9ExportForeignOwnedAtStartup = foreignOwnerAtStartup;
 	if (foreignOwnerAtStartup)
 	{
 		LOG(0, "[HookDiag] Direct3DCreate9Ex is already hooked by another module before we install\n");
@@ -1752,6 +1798,27 @@ bool placeD3D9FactoryHooks_detours()
 	orig_Direct3DCreate9 = (Direct3DCreate9_t)InstallDetour(pDirect3DCreate9, (LPBYTE)hook_Direct3DCreate9, "Direct3DCreate9");
 	ArmWatchdog(g_watchedD3DCreate9Ex, pDirect3DCreate9Ex, "Direct3DCreate9Ex", true);
 	ArmWatchdog(g_watchedD3DCreate9, pDirect3DCreate9, "Direct3DCreate9");
+	// Watched from the moment the detour lands, not once settings are loaded. Hooking this
+	// early, other hookers that used to patch the export before us (a heap trampoline at
+	// 0x76860C4A on the dev machine, 90 ms later) now patch it after us, and the fallback
+	// policy below only runs once settings.ini has been read - up to ~400 ms on a cold disk.
+	StartEarlyEvictionWatch();
+	return true;
+}
+
+// The import-table fallback half of the D3D9 factory hooks. Split out because it reads
+// D3D9IatFallbackHook, and the detours above now go in before settings.ini is read (on a
+// cold disk reading it took ~380 ms, long enough for the game to create its device first).
+// Runs once settings are loaded; idempotent, and a no-op if the detours never went in.
+bool applyD3D9IatFallbackPolicy_detours()
+{
+	static bool s_applied = false;
+	if (s_applied || !orig_Direct3DCreate9Ex)
+	{
+		return s_applied;
+	}
+	s_applied = true;
+	const bool foreignOwnerAtStartup = s_d3d9ExportForeignOwnedAtStartup;
 
 	// Decide up front whether the export is contested. Waiting for the
 	// watchdog to observe an eviction is a race we can lose - on the reporting
@@ -1786,11 +1853,7 @@ bool placeD3D9FactoryHooks_detours()
 
 	if (iatMode == 1 && !g_iatHookInstalled)
 	{
-		const HANDLE watcher = CreateThread(nullptr, 0, EarlyEvictionWatchThread, nullptr, 0, nullptr);
-		if (watcher != nullptr)
-		{
-			CloseHandle(watcher);
-		}
+		StartEarlyEvictionWatch(); // normally already running since the detours went in
 	}
 
 	return true;
@@ -1927,6 +1990,7 @@ bool placeHooks_detours()
 	// this is a no-op. Still called here so the hooks land even if d3d9.dll had not
 	// been loaded yet at that point - this is where they always used to be installed.
 	placeD3D9FactoryHooks_detours();
+	applyD3D9IatFallbackPolicy_detours();
 
 	orig_D3DXCreateEffect = (D3DXCreateEffect_t)InstallDetour(pD3DXCreateEffect, (LPBYTE)hook_D3DXCreateEffect, "D3DXCreateEffect");
 	orig_D3DXCreateSprite = (D3DXCreateSprite_t)InstallDetour(pD3DXCreateSprite, (LPBYTE)hook_D3DXCreateSprite, "D3DXCreateSprite");

@@ -167,6 +167,23 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	openLogger();
 
 	ForceLog("[Init] BBCF_IM_Start thread entered");
+
+	// The D3D9 factory and SteamAPI_Init hooks go in before anything else, settings.ini
+	// included. The game creates its D3D device within roughly 400 ms of here and calls
+	// Direct3DCreate9Ex exactly once; if our detour is not in place by then the overlay
+	// never attaches, and with no device to name the game window the mod keeps a wrong
+	// one, which also leaves the keyboard dead (2026-10-14: settings.ini took 380 ms off
+	// a cold disk, the hook landed at +430 ms, NVIDIA's driver was already loaded and
+	// no device ever came through us; the warm relaunch read it in 30 ms and was fine).
+	// Neither hook reads a setting; the IAT fallback, which does, is applied below once
+	// settings are loaded. Logging is switched on for these lines and settings switch it
+	// off again below when the install asked for no log.
+	SetLoggingEnabled(true);
+	const bool earlyD3D9Hooks = placeD3D9FactoryHooks_detours();
+	const bool earlySteamHook = placeSteamInitHook_detours();
+	ForceLog("[Init] D3D9 factory hooks %s, SteamAPI_Init hook %s, before settings.ini\n",
+		earlyD3D9Hooks ? "placed" : "deferred (d3d9.dll not loaded)",
+		earlySteamHook ? "placed" : "deferred (steam_api.dll not loaded)");
 	LogStartupEnvironment();
 
 	try
@@ -257,7 +274,10 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	// against a five-second margin, and it does not move that step later relative to the
 	// game's audio init, which is the thing that must not regress. Cheap and idempotent;
 	// placeHooks_detours calls it again where these hooks always used to be installed.
+	// Normally already placed at the top of this function (no-ops then); repeated here in
+	// case d3d9.dll or steam_api.dll was not loaded yet at that point.
 	placeD3D9FactoryHooks_detours();
+	applyD3D9IatFallbackPolicy_detours();
 	// Same reasoning, same deadline problem: the game calls SteamAPI_Init once and
 	// early, and missing it leaves the overlay unable to draw for the whole session.
 	placeSteamInitHook_detours();

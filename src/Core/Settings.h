@@ -36,6 +36,11 @@ public:
         // now opens before settings are read.
         static bool settingsFileLoaded;
 
+        // Blocks the calling thread until loadSettingsFile has finished, up to timeoutMs.
+        // The D3D9 factory hooks go in before settings.ini is read, so the game can reach
+        // CreateDevice while the init thread is still reading it. Returns true if loaded.
+        static bool WaitUntilLoaded(DWORD timeoutMs, const char* waiter);
+
         static void applySettingsIni(D3DPRESENT_PARAMETERS* pPresentationParameters);
         static void applyRuntimeSettings();
         static bool loadSettingsFile();

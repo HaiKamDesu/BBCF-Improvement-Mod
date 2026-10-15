@@ -153,6 +153,7 @@ namespace
 
 HRESULT APIENTRY Direct3D9ExWrapper::CreateDevice(UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS *pPresentationParameters, IDirect3DDevice9 **ppReturnedDeviceInterface)
 {
+	Settings::WaitUntilLoaded(5000, "CreateDevice");
 	LOG(1, "CreateDevice\n")
 
 	if (pPresentationParameters != nullptr && ppReturnedDeviceInterface != nullptr)
@@ -217,6 +218,7 @@ HRESULT APIENTRY Direct3D9ExWrapper::GetAdapterDisplayModeEx(UINT Adapter, D3DDI
 
 HRESULT APIENTRY Direct3D9ExWrapper::CreateDeviceEx(UINT Adapter, D3DDEVTYPE DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters, D3DDISPLAYMODEEX* pFullscreenDisplayMode, IDirect3DDevice9Ex** ppReturnedDeviceInterface)
 {
+	Settings::WaitUntilLoaded(5000, "CreateDeviceEx");
 	LOG(1, "CreateDeviceEx:\n");
 	LOG(1, "\tAdapter: %d\n\tDeviceType: %d\n\thFocusWindow: 0x%p\n\tBehaviorFlags: 0x%p\n",
 		Adapter, DeviceType, hFocusWindow, BehaviorFlags);
