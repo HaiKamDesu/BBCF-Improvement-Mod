@@ -112,7 +112,7 @@ namespace
 	// While an arena is alive: the free space right after it, up to kReserveSize from its
 	// start. See KeepArenaTail.
 	std::atomic<void*> g_arenaTail{ nullptr };
-	// A freed arena kept instead of freed, while no reserve is held. See ArenaFree.
+	// A freed arena kept instead of freed. See ArenaFree.
 	std::atomic<void*> g_parkedArena{ nullptr };
 	DWORD g_lastReReserveAttemptMs = 0;
 
@@ -240,15 +240,22 @@ namespace
 	// (Crash_20261010_210536, a replay: the mod's replay rewind builds an arena per replay).
 	// The full-size hole re-formed only for the moment between the free and our reserve, and
 	// everything below it was packed solid, so any thread reserving memory in that moment got
-	// the bottom of it. So when no reserve is held, do not free the arena at all: keep the
+	// the bottom of it. So do not free the arena at all: keep the
 	// block and hand it to the next arena request. Its address space never becomes free, so
 	// nothing can take it. The pages are marked discardable, so a kept arena costs no RAM,
 	// only commit charge the game already uses during every match. Anything that then fails
 	// to fit (the 62 MB stage file, a texture) frees the kept arena for itself, the way
 	// vanilla time-shares that space.
+	//
+	// Keep it even while a reserve is held. Freeing it then let the versus screen chop the
+	// old arena's hole up, and the char-select glyph-atlas texture spent the reserve 17 s
+	// later, so the next arena had neither (Crash_20261012_132628, Huues: largest free block
+	// 62 MB). Kept, the texture frees the kept arena instead (ReleaseNetplayArenaReserve) and
+	// the reserve survives for the next arena. Between matches this holds the same two
+	// 100 MB ranges a match does: the arena and the reserve.
 	void __cdecl ArenaFree(void* block)
 	{
-		if (block != nullptr && g_installed.load() && g_reserve.load() == nullptr)
+		if (block != nullptr && g_installed.load())
 		{
 			void* expected = nullptr;
 			if (g_parkedArena.compare_exchange_strong(expected, block))
@@ -259,7 +266,8 @@ namespace
 				const uintptr_t last = (reinterpret_cast<uintptr_t>(block) + kArenaSize) & ~uintptr_t(0xFFF);
 				if (last > first)
 					VirtualAlloc(reinterpret_cast<void*>(first), last - first, MEM_RESET, PAGE_READWRITE);
-				LOG(1, "[NetplayArena] Arena freed with no reserve held; kept its block at 0x%p for the next one.\n", block);
+				LOG(1, "[NetplayArena] Arena freed; kept its block at 0x%p for the next one (reserve %s).\n",
+					block, g_reserve.load() != nullptr ? "held" : "not held");
 				return;
 			}
 		}
@@ -380,14 +388,16 @@ void InstallNetplayArenaKeeper()
 
 bool ReleaseNetplayArenaReserve(const char* forWhat)
 {
-	void* reserve = g_reserve.exchange(nullptr);
-	if (reserve == nullptr)
+	// The kept arena goes first, as in RescuingAlloc: the reserve is what the next arena
+	// needs, and a texture or a file fits in either.
+	if (FreeParkedArena(forWhat))
 	{
-		if (!FreeParkedArena(forWhat))
-			return false;
 		g_lastReReserveAttemptMs = GetTickCount();
 		return true;
 	}
+	void* reserve = g_reserve.exchange(nullptr);
+	if (reserve == nullptr)
+		return false;
 	VirtualFree(reserve, 0, MEM_RELEASE);
 	// Not straight back on the next tick: whatever needed the room has to get it first.
 	g_lastReReserveAttemptMs = GetTickCount();
