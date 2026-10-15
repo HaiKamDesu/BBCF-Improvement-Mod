@@ -299,7 +299,7 @@ namespace
 	{
 		constexpr uintptr_t kReaderRva = 0x0065C140;
 		constexpr uintptr_t kReaderGuardRva = 0x0065C198;
-		constexpr DWORD kLimitMs = 3000;
+		constexpr DWORD kLimitMs = 5000;   // under the quit watchdog's 15 s
 		const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 		const uint32_t* const guard = reinterpret_cast<const uint32_t*>(base + kReaderGuardRva);
 		const uint8_t* const reader = reinterpret_cast<const uint8_t*>(base + kReaderRva);
@@ -312,7 +312,11 @@ namespace
 			return;
 		if (*queued == 0)
 		{
-			ExitDiagnostics::Note("The game's file reader was idle at exit");
+			// Once is enough: it runs at WM_QUIT and again in exit().
+			static bool s_idleNoted = false;
+			if (!s_idleNoted)
+				ExitDiagnostics::Note("The game's file reader was idle at exit");
+			s_idleNoted = true;
 			return;
 		}
 		const ULONGLONG start = GetTickCount64();
@@ -539,6 +543,11 @@ namespace
 				// case for anything the sampler does. Nothing is rendered past here anyway.
 				FrameStallWatchdog::Stop();
 				StartQuitWatchdog();
+				// Here, not only in exit(): WinMain frees a lot between the end of its loop and
+				// exit() (Crash_20261015_005941: closed mid rematch load with 16 loads queued,
+				// the reader inflated into a 12 MB buffer WinMain's teardown had already
+				// released, ~0.7 s after WM_QUIT and before exit() was reached).
+				WaitForGameFileReader();
 			}
 			else if (message->message == WM_CLOSE)
 			{
