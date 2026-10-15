@@ -141,4 +141,6 @@ namespace LocalInput
 	// controllers. False when the game code is not the RE'd build.
 	bool InstallGameInputBridge();
 	bool ResolveControllerWord(void* controller, uint32_t* word);
+	// The game's own text box (GAMESTEAM_VirtualKeyboard: chat, names) is open.
+	bool GameTextEntryOpen();
 }

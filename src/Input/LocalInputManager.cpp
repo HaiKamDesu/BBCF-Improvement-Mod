@@ -50,6 +50,9 @@ namespace LocalInput
 		ULONGLONG lastInputMs = 0;
 		uint32_t buttons = 0;       // battle word (what the UI shows)
 		uint32_t menuWord = 0;
+		// Typed into the game's text box: keys held when it closed stay out of the game
+		// until released, so the Enter that sent a chat line is not also a fresh press.
+		bool textEntryHoldoff = false;
 		// Diagnostics
 		ULONGLONG connectedAt = 0;
 		bool firstInputLogged = false;  // since it last (re)connected or changed side
@@ -66,6 +69,7 @@ namespace LocalInput
 		std::vector<std::unique_ptr<Manager::Device>> g_devices;
 		std::unordered_map<std::string, Profile> g_profiles;
 		uint32_t g_words[2][2] = {};   // [side][0 menus, 1 battle]
+		bool g_lastGameTextEntry = false;
 		bool g_hasDevice[2] = {};
 
 		std::string g_captureId;
@@ -799,6 +803,15 @@ namespace LocalInput
 		uint32_t words[2][2] = {};
 		bool hasDevice[2] = {};
 		const bool capturing = !g_captureId.empty();
+		const bool gameTextEntry = GameTextEntryOpen();
+		if (gameTextEntry != g_lastGameTextEntry)
+		{
+			g_lastGameTextEntry = gameTextEntry;
+			LOG(1, "[LocalInput] the game's text box %s [%s]\n",
+				gameTextEntry ? "opened: keyboards send no buttons while it is open (pads still do)" : "closed",
+				WhereInGame().c_str());
+			RecordEvent("game text box %s", gameTextEntry ? "opened" : "closed");
+		}
 		for (const auto& device : g_devices)
 		{
 			device->buttons = 0;
@@ -860,6 +873,18 @@ namespace LocalInput
 				continue; // rebinding: nothing reaches the game
 			if (device->snap.kind == DeviceKind::Keyboard && m_overlayWantsKeyboard)
 				continue; // typing into the overlay
+			if (device->snap.kind == DeviceKind::Keyboard)
+			{
+				// Typing into the game's own text box (chat, names). Its confirm and cancel
+				// read the pad-slot controller, which in vanilla never carries the keyboard,
+				// so a keyboard's J/O there would submit or cancel the text box.
+				if (gameTextEntry)
+					device->textEntryHoldoff = true;
+				else if (device->textEntryHoldoff && (device->menuWord | device->buttons) == 0)
+					device->textEntryHoldoff = false;
+				if (device->textEntryHoldoff)
+					continue;
+			}
 			words[device->side][0] |= device->menuWord;
 			words[device->side][1] |= device->buttons;
 		}
@@ -1179,6 +1204,7 @@ namespace LocalInput
 			WhereInGame().c_str(), Settings::settingsIni.autoUpdateControllers ? "on" : "off",
 			g_backend && g_backend->SteamInputLikely() ? "ACTIVE" : "not seen",
 			m_overlayWantsKeyboard ? "yes" : "no", g_captureId.empty() ? "no" : g_captureId.c_str());
+		LOG(1, "[LocalInput] game text box open: %s\n", GameTextEntryOpen() ? "yes (keyboards send no buttons)" : "no");
 		for (int side = 0; side < 2; ++side)
 			LOG(1, "[LocalInput] P%d: has device %s; menus get %s; battle gets %s\n", side + 1, g_hasDevice[side] ? "yes" : "NO",
 				ButtonsText(g_words[side][0]).c_str(), ButtonsText(g_words[side][1]).c_str());

@@ -292,4 +292,27 @@ namespace LocalInput
 	{
 		return TryOurWord(controller, word);
 	}
+
+	// GAMESTEAM_VirtualKeyboard, the one text box every text entry in the game uses (chat,
+	// names): a singleton at VA 0x00A64DB8 (built by FUN_004746E0, vtable 0x0089E09C), +4 =
+	// open. Opening it (FUN_004747A0 / FUN_00474890) sets +4 = 1 and pushes the input focus
+	// "SteamEditBox"; its tick FUN_004744D0 reads confirm (bit 12) and cancel (bit 13) as
+	// just-pressed on the pad-slot menu controller [sysMgr + 0x10 + 4 * active id] with no
+	// focus check. In vanilla that controller only ever carries pads, so typing never
+	// touched it; with keyboards fed through a player, a keyboard's O cancelled the text
+	// box and J submitted it. Characters arrive through window messages into the IME edit
+	// box, not through the player words.
+	bool GameTextEntryOpen()
+	{
+		constexpr uintptr_t kVirtualKeyboardRva = 0x00664DB8;
+		constexpr uintptr_t kVirtualKeyboardVtableRva = 0x0049E09C;
+		const uintptr_t base = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (!base)
+			return false;
+		const uint8_t* const vk = reinterpret_cast<const uint8_t*>(base + kVirtualKeyboardRva);
+		// Not yet constructed (static local), or not the RE'd build.
+		if (*reinterpret_cast<const uintptr_t*>(vk) != base + kVirtualKeyboardVtableRva)
+			return false;
+		return *reinterpret_cast<const int32_t*>(vk + 4) != 0;
+	}
 }
