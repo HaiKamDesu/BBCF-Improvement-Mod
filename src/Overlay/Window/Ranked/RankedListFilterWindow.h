@@ -1,7 +1,11 @@
 #pragma once
 
+#include "Network/RankedListConnectionFilter.h"
 #include "Overlay/Window/IWindow.h"
 
+// "Ranked List Config" / "Player Room List Config" window - one class, two
+// instances, each with its own settings (see RoomListKind).
+//
 // "Ranked List Config" window. Holds all ranked-list-filter controls: the
 // enable checkbox, the sort-order dropdown, and the live list of hidden
 // players with per-player Restore. These were moved here out of the F1
@@ -15,8 +19,8 @@
 class RankedListFilterWindow : public IWindow
 {
 public:
-	RankedListFilterWindow(const std::string& windowTitle, bool windowClosable, ImGuiWindowFlags windowFlags = 0)
-		: IWindow(windowTitle, windowClosable, windowFlags)
+	RankedListFilterWindow(RoomListKind kind, const std::string& windowTitle, bool windowClosable, ImGuiWindowFlags windowFlags = 0)
+		: IWindow(windowTitle, windowClosable, windowFlags), m_kind(kind)
 	{
 	}
 
@@ -29,6 +33,24 @@ protected:
 	void AfterDraw() override;
 
 private:
+	bool IsPlayerRooms() const { return m_kind == RoomListKind::PlayerRooms; }
+
+	// The settings this instance reads and writes: the ranked or the player
+	// room copy.
+	bool& ShowWindowSetting() const;
+	bool& ShowHiddenPopupSetting() const;
+	int& SortModeSetting() const;
+	int& NetworkFilterSetting() const;
+	bool& HideUnmetSetting() const;
+	const char* IniKey(const char* rankedKey, const char* playerRoomKey) const
+	{
+		return IsPlayerRooms() ? playerRoomKey : rankedKey;
+	}
+
+	void DrawSortCombo();
+
+	RoomListKind m_kind;
+
 	// Draws the separate "Hidden players" modal (opened by clicking the
 	// "N hidden" status text) with its scrollable restore list.
 	void DrawHiddenPlayersPopup();

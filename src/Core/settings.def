@@ -268,6 +268,15 @@ SETTING(bool, showRankedListHiddenPopup, "ShowRankedListHiddenPopup", "0");
 SETTING(int, rankedListSortMode, "RankedListSortMode", "0");
 SETTING(int, rankedListNetworkFilter, "RankedListNetworkFilter", "0");
 SETTING(bool, hideUnmetRequirementRooms, "HideUnmetRequirementRooms", "0");
+// The player room list (Network > Player Match > Search) gets its own copy of the list
+// config: same window, separate state. No reachability probing here - only the ranked list
+// probes hosts, so there is no "hide unreachable" switch for rooms.
+SETTING(bool, showPlayerRoomListFilterWindow, "ShowPlayerRoomListFilterWindow", "1");
+SETTING(bool, showPlayerRoomListHiddenPopup, "ShowPlayerRoomListHiddenPopup", "0");
+// enum: PlayerRoomListSortMode_ in Network/RankedListConnectionFilter.h
+SETTING(int, playerRoomListSortMode, "PlayerRoomListSortMode", "0");
+SETTING(int, playerRoomListNetworkFilter, "PlayerRoomListNetworkFilter", "0");
+SETTING(bool, playerRoomListHideUnmetRequirement, "PlayerRoomListHideUnmetRequirement", "0");
 SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
 // -1 = unset (the mod asks once via an in-game popup), 0 = deny, 1 = allow.
 // Frames of GGPO input delay in online matches. The game hardcodes 2 regardless of ping.

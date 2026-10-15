@@ -40,6 +40,31 @@ namespace
 	}
 }
 
+bool& RankedListFilterWindow::ShowWindowSetting() const
+{
+	return IsPlayerRooms() ? Settings::settingsIni.showPlayerRoomListFilterWindow : Settings::settingsIni.showRankedListFilterWindow;
+}
+
+bool& RankedListFilterWindow::ShowHiddenPopupSetting() const
+{
+	return IsPlayerRooms() ? Settings::settingsIni.showPlayerRoomListHiddenPopup : Settings::settingsIni.showRankedListHiddenPopup;
+}
+
+int& RankedListFilterWindow::SortModeSetting() const
+{
+	return IsPlayerRooms() ? Settings::settingsIni.playerRoomListSortMode : Settings::settingsIni.rankedListSortMode;
+}
+
+int& RankedListFilterWindow::NetworkFilterSetting() const
+{
+	return IsPlayerRooms() ? Settings::settingsIni.playerRoomListNetworkFilter : Settings::settingsIni.rankedListNetworkFilter;
+}
+
+bool& RankedListFilterWindow::HideUnmetSetting() const
+{
+	return IsPlayerRooms() ? Settings::settingsIni.playerRoomListHideUnmetRequirement : Settings::settingsIni.hideUnmetRequirementRooms;
+}
+
 void RankedListFilterWindow::UpdateAutoVisibility()
 {
 	// The window hosts the filter's own enable toggle, so it must be available
@@ -47,20 +72,85 @@ void RankedListFilterWindow::UpdateAutoVisibility()
 	// currently on - otherwise a user who disabled the filter inside it could
 	// never bring it back from here.
 	const bool shouldShow =
-		Settings::settingsIni.showRankedListFilterWindow &&
-		RankedListConnectionFilter::GetInstance().IsLobbyListLikelyOpen();
+		ShowWindowSetting() &&
+		RankedListConnectionFilter::GetInstance().IsListOpen(m_kind);
 
 	if (shouldShow && !IsOpen())
 	{
-		LOG(1, "[RankedListFilter] config window opening (showSetting=%d)\n",
-			Settings::settingsIni.showRankedListFilterWindow ? 1 : 0);
+		LOG(1, "[RankedListFilter] %s config window opening (showSetting=%d)\n",
+			IsPlayerRooms() ? "player room" : "ranked", ShowWindowSetting() ? 1 : 0);
 		Open();
 	}
 	else if (!shouldShow && IsOpen())
 	{
-		LOG(1, "[RankedListFilter] config window closing (showSetting=%d)\n",
-			Settings::settingsIni.showRankedListFilterWindow ? 1 : 0);
+		LOG(1, "[RankedListFilter] %s config window closing (showSetting=%d)\n",
+			IsPlayerRooms() ? "player room" : "ranked", ShowWindowSetting() ? 1 : 0);
 		Close();
+	}
+}
+
+void RankedListFilterWindow::DrawSortCombo()
+{
+	std::vector<std::string> labels;
+	if (IsPlayerRooms())
+	{
+		// Same order as PlayerRoomListSortMode_.
+		labels = {
+			L("Default"),
+			L("Best to Worst Connection"),
+			L("Worst to Best Connection"),
+			L("Most to Fewest Players"),
+			L("Fewest to Most Players"),
+			L("Largest to Smallest Room"),
+			L("Smallest to Largest Room"),
+			L("Names in A-Z Order"),
+			L("Names in Z-A Order"),
+		};
+	}
+	else
+	{
+		// Same order as RankedListSortMode_.
+		labels = {
+			L("Default"),
+			L("Best to Worst Connection"),
+			L("Worst to Best Connection"),
+			L("Closest to Furthest from my Level"),
+			L("Furthest to Closest from my Level"),
+			L("Highest to Lowest Level"),
+			L("Lowest to Highest Level"),
+			L("Names in A-Z Order"),
+			L("Names in Z-A Order"),
+		};
+	}
+	std::vector<const char*> items;
+	for (const std::string& label : labels)
+	{
+		items.push_back(label.c_str());
+	}
+	const int count = static_cast<int>(items.size());
+
+	int& setting = SortModeSetting();
+	int sortMode = setting;
+	if (sortMode < 0 || sortMode >= count)
+	{
+		sortMode = 0;
+	}
+	ImGui::PushItemWidth(260.0f);
+	const std::string comboLabel = IsPlayerRooms() ? L("Sort room list") : L("Sort ranked list");
+	if (ImGui::Combo(comboLabel.c_str(), &sortMode, items.data(), count))
+	{
+		setting = sortMode;
+		Settings::changeSetting(IniKey("RankedListSortMode", "PlayerRoomListSortMode"), std::to_string(sortMode));
+	}
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
+	if (IsPlayerRooms())
+	{
+		ImGui::ShowHelpMarker(L("Reorders the player room list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a room, updating as it changes. Player counts are the ones the list itself shows, as of the last search.").c_str());
+	}
+	else
+	{
+		ImGui::ShowHelpMarker(L("Reorders the ranked search list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a player, updating as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank.").c_str());
 	}
 }
 
@@ -69,39 +159,7 @@ void RankedListFilterWindow::Draw()
 	RankedListConnectionFilter& filter = RankedListConnectionFilter::GetInstance();
 
 	// --- Sorting (independent of the filters) ---
-	const std::string sortModeLabels[RankedListSortMode_COUNT] = {
-		L("Default"),
-		L("Best to Worst Connection"),
-		L("Worst to Best Connection"),
-		L("Closest to Furthest from my Level"),
-		L("Furthest to Closest from my Level"),
-		L("Highest to Lowest Level"),
-		L("Lowest to Highest Level"),
-		L("Names in A-Z Order"),
-		L("Names in Z-A Order"),
-	};
-	const char* sortModeItems[RankedListSortMode_COUNT];
-	for (int i = 0; i < RankedListSortMode_COUNT; ++i)
-	{
-		sortModeItems[i] = sortModeLabels[i].c_str();
-	}
-
-	int sortMode = Settings::settingsIni.rankedListSortMode;
-	if (sortMode < 0 || sortMode >= RankedListSortMode_COUNT)
-	{
-		sortMode = RankedListSortMode_Default;
-	}
-	ImGui::PushItemWidth(260.0f);
-	if (ImGui::Combo(L("Sort ranked list").c_str(), &sortMode, sortModeItems, RankedListSortMode_COUNT))
-	{
-		Settings::settingsIni.rankedListSortMode = sortMode;
-		char sortModeValue[8];
-		snprintf(sortModeValue, sizeof(sortModeValue), "%d", sortMode);
-		Settings::changeSetting("RankedListSortMode", sortModeValue);
-	}
-	ImGui::PopItemWidth();
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(L("Reorders the ranked search list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a player, updating as it changes; falls back to the mod's own reachability check timing as a rough estimate until then. Level order uses each player's advertised rank.").c_str());
+	DrawSortCombo();
 
 	ImGui::Separator();
 
@@ -120,7 +178,7 @@ void RankedListFilterWindow::Draw()
 	{
 		networkFilterItems[i] = networkFilterLabels[i].c_str();
 	}
-	int networkFilter = Settings::settingsIni.rankedListNetworkFilter;
+	int networkFilter = NetworkFilterSetting();
 	if (networkFilter < 0 || networkFilter > 4)
 	{
 		networkFilter = 0;
@@ -128,29 +186,34 @@ void RankedListFilterWindow::Draw()
 	ImGui::PushItemWidth(260.0f);
 	if (ImGui::Combo(L("Network Filter").c_str(), &networkFilter, networkFilterItems, 5))
 	{
-		Settings::settingsIni.rankedListNetworkFilter = networkFilter;
-		char networkFilterValue[8];
-		snprintf(networkFilterValue, sizeof(networkFilterValue), "%d", networkFilter);
-		Settings::changeSetting("RankedListNetworkFilter", networkFilterValue);
+		NetworkFilterSetting() = networkFilter;
+		Settings::changeSetting(IniKey("RankedListNetworkFilter", "PlayerRoomListNetworkFilter"), std::to_string(networkFilter));
 	}
 	ImGui::PopItemWidth();
 	ImGui::SameLine();
-	ImGui::ShowHelpMarker(L("Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.").c_str());
+	ImGui::ShowHelpMarker(IsPlayerRooms()
+		? L("Hides rooms whose Delay rating (0-4) is below the selected level. Rooms whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.").c_str()
+		: L("Hides players whose Delay rating (0-4) is below the selected level. Players whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.").c_str());
 
-	bool enableFilter = Settings::settingsIni.enableRankedListConnectionFilter;
-	if (ImGui::Checkbox(L("Hide unreachable players from ranked list").c_str(), &enableFilter))
+	// Reachability probing is ranked-only (it opens P2P sessions to the hosts),
+	// so the player room list has no "hide unreachable" switch.
+	bool enableFilter = !IsPlayerRooms() && Settings::settingsIni.enableRankedListConnectionFilter;
+	if (!IsPlayerRooms())
 	{
-		Settings::settingsIni.enableRankedListConnectionFilter = enableFilter;
-		Settings::changeSetting("EnableRankedListConnectionFilter", enableFilter ? "1" : "0");
+		if (ImGui::Checkbox(L("Hide unreachable players from ranked list").c_str(), &enableFilter))
+		{
+			Settings::settingsIni.enableRankedListConnectionFilter = enableFilter;
+			Settings::changeSetting("EnableRankedListConnectionFilter", enableFilter ? "1" : "0");
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. Everyone (hidden players included) is re-checked every 15 seconds, so players whose connection recovers reappear on their own. Click the hidden counter below to see and restore hidden players manually.").c_str());
 	}
-	ImGui::SameLine();
-	ImGui::ShowHelpMarker(L("Checks in the background whether listed players are actually reachable and hides confirmed-unreachable ones from the ranked search list. Everyone (hidden players included) is re-checked every 15 seconds, so players whose connection recovers reappear on their own. Click the hidden counter below to see and restore hidden players manually.").c_str());
 
-	bool hideUnmet = Settings::settingsIni.hideUnmetRequirementRooms;
+	bool hideUnmet = HideUnmetSetting();
 	if (ImGui::Checkbox(L("Hide rooms with unmet network requirements").c_str(), &hideUnmet))
 	{
-		Settings::settingsIni.hideUnmetRequirementRooms = hideUnmet;
-		Settings::changeSetting("HideUnmetRequirementRooms", hideUnmet ? "1" : "0");
+		HideUnmetSetting() = hideUnmet;
+		Settings::changeSetting(IniKey("HideUnmetRequirementRooms", "PlayerRoomListHideUnmetRequirement"), hideUnmet ? "1" : "0");
 	}
 	ImGui::SameLine();
 	ImGui::ShowHelpMarker(L("Some rooms require a minimum connection quality and show \"The room's connectivity requirements are not met\" when you try to enter. This hides those rooms once your Delay rating to them is measured, so everything left in the list is actually joinable.").c_str());
@@ -195,10 +258,10 @@ void RankedListFilterWindow::Draw()
 	if (ImGui::IsItemClicked())
 	{
 		m_showHiddenPopup = !m_showHiddenPopup;
-		Settings::settingsIni.showRankedListHiddenPopup = m_showHiddenPopup;
-		Settings::changeSetting("ShowRankedListHiddenPopup", m_showHiddenPopup ? "1" : "0");
+		ShowHiddenPopupSetting() = m_showHiddenPopup;
+		Settings::changeSetting(IniKey("ShowRankedListHiddenPopup", "ShowPlayerRoomListHiddenPopup"), m_showHiddenPopup ? "1" : "0");
 	}
-	else if (!m_showHiddenPopup && Settings::settingsIni.showRankedListHiddenPopup)
+	else if (!m_showHiddenPopup && ShowHiddenPopupSetting())
 	{
 		// Reopen automatically - the setting says the user wants this
 		// visible whenever there are hidden players to show.
@@ -208,12 +271,12 @@ void RankedListFilterWindow::Draw()
 	if (m_showHiddenPopup)
 	{
 		DrawHiddenPlayersPopup();
-		if (!m_showHiddenPopup && Settings::settingsIni.showRankedListHiddenPopup)
+		if (!m_showHiddenPopup && ShowHiddenPopupSetting())
 		{
 			// Closed via the popup's own X - persist so it stays closed
 			// until manually reopened.
-			Settings::settingsIni.showRankedListHiddenPopup = false;
-			Settings::changeSetting("ShowRankedListHiddenPopup", "0");
+			ShowHiddenPopupSetting() = false;
+			Settings::changeSetting(IniKey("ShowRankedListHiddenPopup", "ShowPlayerRoomListHiddenPopup"), "0");
 		}
 	}
 }
@@ -223,7 +286,11 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 	RankedListConnectionFilter& filter = RankedListConnectionFilter::GetInstance();
 
 	ImGui::SetNextWindowSize(ImVec2(380.0f, 260.0f), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin(L("Hidden players").c_str(), &m_showHiddenPopup))
+	// Separate ImGui ids so the two lists' popups keep their own position/size.
+	const std::string popupTitle = IsPlayerRooms()
+		? L("Hidden rooms") + "###PlayerRoomListHidden"
+		: L("Hidden players") + "###RankedListHidden";
+	if (!ImGui::Begin(popupTitle.c_str(), &m_showHiddenPopup))
 	{
 		ImGui::End();
 		return;
@@ -234,7 +301,9 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 
 	if (hiddenPeers.empty())
 	{
-		ImGui::TextDisabled("%s", L("No players are currently hidden.").c_str());
+		ImGui::TextDisabled("%s", IsPlayerRooms()
+			? L("No rooms are currently hidden.").c_str()
+			: L("No players are currently hidden.").c_str());
 		ImGui::End();
 		return;
 	}
@@ -306,6 +375,13 @@ void RankedListFilterWindow::DrawHiddenPlayersPopup()
 				ImGui::SameLine();
 			}
 
+			// Room occupancy (player rooms only).
+			if (peer.members >= 0 && peer.memberMax > 0)
+			{
+				ImGui::TextDisabled("%d/%d", peer.members, peer.memberMax);
+				ImGui::SameLine();
+			}
+
 			// Connection tag (0-4 Delay digit), colored per spec.
 			if (peer.delayDigit >= 0)
 			{
@@ -338,9 +414,9 @@ void RankedListFilterWindow::AfterDraw()
 	// AfterDraw only runs on frames where the window was open going into
 	// Update(); m_windowOpen turning false here means the user clicked the X.
 	// Per design, that is equivalent to unchecking the "show window" setting.
-	if (!m_windowOpen && Settings::settingsIni.showRankedListFilterWindow)
+	if (!m_windowOpen && ShowWindowSetting())
 	{
-		Settings::settingsIni.showRankedListFilterWindow = false;
-		Settings::changeSetting("ShowRankedListFilterWindow", "0");
+		ShowWindowSetting() = false;
+		Settings::changeSetting(IniKey("ShowRankedListFilterWindow", "ShowPlayerRoomListFilterWindow"), "0");
 	}
 }

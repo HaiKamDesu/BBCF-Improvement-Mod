@@ -62,6 +62,38 @@ enum RankedListSortMode_
 	RankedListSortMode_COUNT,
 };
 
+// Sort order for the player room list (Network > Player Match > Search), the
+// same in-place mechanism with its own settings. Values persist in
+// settings.ini as PlayerRoomListSortMode; keep the window's labels in this
+// order.
+enum PlayerRoomListSortMode_
+{
+	PlayerRoomListSortMode_Default = 0,
+	PlayerRoomListSortMode_BestConnection,  // game-measured RTT asc
+	PlayerRoomListSortMode_WorstConnection,
+	PlayerRoomListSortMode_MostPlayers,     // current members desc
+	PlayerRoomListSortMode_FewestPlayers,
+	PlayerRoomListSortMode_LargestRoom,     // member limit desc
+	PlayerRoomListSortMode_SmallestRoom,
+	PlayerRoomListSortMode_NameAZ,          // room name, host name when it has none
+	PlayerRoomListSortMode_NameZA,
+	PlayerRoomListSortMode_COUNT,
+};
+
+// Which of the game's two lobby lists a delivered list belongs to. Both are
+// the same list struct, node class, walker and widget layout
+// (docs/Decompilation/Lobby_F_MatchmakingUI.md); only one exists at a time.
+// The ranked list keeps everything it always had (reachability probing,
+// join tracking, stale/broken rooms); the player room list only gets the
+// sort and the Delay/requirement hides - nothing that opens P2P sessions or
+// judges a join, which is what broke player rooms before (463a430).
+enum class RoomListKind
+{
+	None,
+	Ranked,
+	PlayerRooms,
+};
+
 // Gated behind Settings::settingsIni.enableRankedListConnectionFilter.
 class RoomMemberEntry; // Game/Room/RoomMemberEntry.h; only pointers are used here
 
@@ -166,6 +198,8 @@ public:
 		uint8_t netColor = 0xFF;    // entry+0x74, the row's native square icon color; 0xFF = unknown
 		int rank = -1;              // internalRankLevel (visible level - 1); -1 = unknown
 		int delayDigit = -1;        // 0-4 Delay/connection tag; -1 = unresolved
+		int members = -1;           // player rooms: current members; -1 = not a room / unknown
+		int memberMax = -1;         // player rooms: member limit
 	};
 	void GetHiddenPeers(std::vector<HiddenPeerInfo>* outPeers) const;
 	void RestorePeer(uint64_t steamId);
@@ -181,6 +215,10 @@ public:
 	// cadence. A short grace period debounces the brief moment the game rebuilds
 	// the array between refreshes.
 	bool IsLobbyListLikelyOpen();
+	// Per-list version of the above for the two config windows.
+	bool IsListOpen(RoomListKind kind);
+	// The list the hidden peers / counts above belong to.
+	RoomListKind GetCurrentListKind() const { return m_listKind; }
 
 private:
 	RankedListConnectionFilter();
@@ -256,6 +294,10 @@ private:
 		uint64_t ownerSteamId = 0;
 		std::string ownerName;     // from "ownerName" lobby metadata, for user-facing notifications
 		int internalRankLevel = -1; // from "RANK_HOST_LEVEL" lobby metadata (visible level - 1); -1 = unknown
+		// Player rooms (refreshed from the game's node every live pass):
+		int members = -1;          // node+0x6D, GetNumLobbyMembers at delivery
+		int memberMax = -1;        // node+0x6C, PLAYER_MEMBER_MAX
+		std::string roomName;      // node+0x10, PLAYER_ROOM_NAME (UTF-8)
 	};
 
 	// Matchmaking-layer liveness of one listed lobby, refreshed by the
@@ -303,6 +345,8 @@ private:
 	// hide-unreachable filter or a non-default sort order is active - the two
 	// features are independent.
 	bool IsPipelineActive() const;
+	// Same question for one list's own settings.
+	static bool IsPipelineActiveFor(RoomListKind kind);
 	// Counts currently-populated rows in the game's ranked search row array.
 	int CountPopulatedGameRows() const;
 	// DIAGNOSTIC ONLY: logs the raw pointer value at the candidate ranked-list
@@ -346,6 +390,11 @@ private:
 	// nullptr when the UI context isn't built or the ranked container isn't
 	// in use. All guards IsBadReadPtr-based, no allocation.
 	uint8_t* ResolveRankedResultWidget() const;
+	// The player room list's widget ("Room Search Result"), same layout.
+	uint8_t* ResolvePlayerRoomResultWidget() const;
+	// Whichever of the two belongs to m_listKind.
+	uint8_t* ResolveCurrentResultWidget() const;
+	uint8_t* ResolveResultWidgetByConfig(uintptr_t configStrRva) const;
 	// Rewrites the ranked result widget's item count / page bounds / cursor /
 	// per-slot active flags to match the given row count, so scrolling and
 	// selection can never reach past the live-shrunk list. Write-on-change only.
@@ -361,6 +410,8 @@ private:
 	// logOrder=false suppresses the per-call "sort order" log line (used by the
 	// high-frequency live path, which logs only when the order actually changes).
 	void SortShownCandidates(std::vector<const LobbyCandidate*>* shown, bool logOrder = true) const;
+	// The player room list's comparator (PlayerRoomListSortMode_).
+	void SortPlayerRoomCandidates(std::vector<const LobbyCandidate*>* shown) const;
 	// Orders the hidden-players list (served to the UI) using the same
 	// Settings::settingsIni.rankedListSortMode the visible list uses, so the
 	// two stay consistent - "whatever order you pick" applies everywhere.
@@ -397,6 +448,9 @@ private:
 	void PollInMatchRoomDump();
 	// One-line dump of a lobby's cached liveness for the join-window logs.
 	std::string DescribeLobbyLiveness(uint64_t lobbyId) const;
+
+	// The list the current delivery belongs to, set when the game requests it.
+	RoomListKind m_listKind = RoomListKind::None;
 
 	std::unordered_map<uint64_t, PeerVerdict> m_verdicts;
 	// steamId -> probe start tick, for measuring establishment time.

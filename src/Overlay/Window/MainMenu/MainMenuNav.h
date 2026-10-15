@@ -63,6 +63,7 @@ namespace MainMenu
 
 		Online_Window,
 		Online_Ranked,
+		Online_PlayerRooms,
 		Online_RoomSettings,
 		Online_Avatar,
 		Online_ForeignPalettes,
@@ -120,6 +121,10 @@ namespace MainMenu
 	// still opens - people have to be able to find out a feature exists before they can want
 	// it.
 	bool BeginSection(EntryId entry, bool available = true);
+
+	// True while the search is about to jump to this entry (not consumed). Lets a section
+	// open itself when the target is one of the groups drawn inside it.
+	bool IsFocusPending(EntryId entry);
 
 	// An always-visible heading for a declared Item_Group.
 	void GroupLabel(EntryId entry, bool available = true);

@@ -5699,6 +5699,45 @@ struct LocalizationKeysAccessor
 
         // When a mod release that supports this game version comes out, the mod will offer to install it here the next time you start the game.
         inline const char* When_a_mod_release_that_supports_this_game_version_comes_out_the_mod_will_offer_to_install_it_here_the_next_time_you_start_the_game() const { return Get("When a mod release that supports this game version comes out, the mod will offer to install it here the next time you start the game."); }
+
+        // Player Rooms
+        inline const char* Player_Rooms() const { return Get("Player Rooms"); }
+
+        // Show player room list config window
+        inline const char* Show_player_room_list_config_window() const { return Get("Show player room list config window"); }
+
+        // Automatically opens a window while the player room list is on screen, with sorting (connection, player count, room size, name) and filters for that list. It keeps its own settings, separate from the ranked list's. Closing that window is the same as unchecking this.
+        inline const char* Automatically_opens_a_window_while_the_player_room_list_is_on_screen_with_sorting_connection_player_count_room_size_name_and_filters_for_that_list_It_keeps_its_own_settings_separate_from_the_ranked_list_s_Closing_that_window_is_the_same_as_unchecking_this() const { return Get("Automatically opens a window while the player room list is on screen, with sorting (connection, player count, room size, name) and filters for that list. It keeps its own settings, separate from the ranked list's. Closing that window is the same as unchecking this."); }
+
+        // Player Room List Config
+        inline const char* Player_Room_List_Config() const { return Get("Player Room List Config"); }
+
+        // Sort room list
+        inline const char* Sort_room_list() const { return Get("Sort room list"); }
+
+        // Most to Fewest Players
+        inline const char* Most_to_Fewest_Players() const { return Get("Most to Fewest Players"); }
+
+        // Fewest to Most Players
+        inline const char* Fewest_to_Most_Players() const { return Get("Fewest to Most Players"); }
+
+        // Largest to Smallest Room
+        inline const char* Largest_to_Smallest_Room() const { return Get("Largest to Smallest Room"); }
+
+        // Smallest to Largest Room
+        inline const char* Smallest_to_Largest_Room() const { return Get("Smallest to Largest Room"); }
+
+        // Reorders the player room list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a room, updating as it changes. Player counts are the ones the list itself shows, as of the last search.
+        inline const char* Reorders_the_player_room_list_itself_Connection_order_matches_the_list_s_own_Delay_rating_0_4_once_the_game_has_measured_it_for_a_room_updating_as_it_changes_Player_counts_are_the_ones_the_list_itself_shows_as_of_the_last_search() const { return Get("Reorders the player room list itself. Connection order matches the list's own Delay rating (0-4) once the game has measured it for a room, updating as it changes. Player counts are the ones the list itself shows, as of the last search."); }
+
+        // Hides rooms whose Delay rating (0-4) is below the selected level. Rooms whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change.
+        inline const char* Hides_rooms_whose_Delay_rating_0_4_is_below_the_selected_level_Rooms_whose_rating_hasn_t_been_measured_yet_stay_visible_until_it_resolves_rows_are_hidden_and_restored_live_as_ratings_change() const { return Get("Hides rooms whose Delay rating (0-4) is below the selected level. Rooms whose rating hasn't been measured yet stay visible until it resolves; rows are hidden and restored live as ratings change."); }
+
+        // Hidden rooms
+        inline const char* Hidden_rooms() const { return Get("Hidden rooms"); }
+
+        // No rooms are currently hidden.
+        inline const char* No_rooms_are_currently_hidden() const { return Get("No rooms are currently hidden."); }
 };
 
 

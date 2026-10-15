@@ -45,6 +45,7 @@ namespace MainMenu
 
 			{ Page_Online, Item_Loose,   "Open the online window",              "room window who is in the room players list spectator" },
 			{ Page_Online, Item_Section, "Ranked",                              "ranked lp rank ladder leaderboard prediction square color progress" },
+			{ Page_Online, Item_Section, "Player Rooms",                        "player match room list search sort filter host players" },
 			{ Page_Online, Item_Group,   "Room settings",                       "rematch ft2 ft3 ft5 ft10 room host" },
 			{ Page_Online, Item_Group,   "Lobby avatar",                        "avatar icon color accessory lobby" },
 			{ Page_Online, Item_Loose,   "Load other players' custom palettes", "foreign palettes crash ranked stability stopgap" },
@@ -143,6 +144,11 @@ namespace MainMenu
 			ImGui::VerticalSpacing(2);
 
 		return open;
+	}
+
+	bool IsFocusPending(EntryId entry)
+	{
+		return g_pendingFocus == entry;
 	}
 
 	void GroupLabel(EntryId entry, bool available)

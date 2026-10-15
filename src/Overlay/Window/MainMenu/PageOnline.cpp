@@ -91,6 +91,19 @@ namespace MainMenu
 			}
 		}
 
+		// Same window as the ranked list's, with its own settings.
+		void DrawPlayerRoomListToggle()
+		{
+			ImGui::HorizontalSpacing();
+			bool show = Settings::settingsIni.showPlayerRoomListFilterWindow;
+			if (ImGui::CheckboxWrapped(L("Show player room list config window").c_str(), &show))
+			{
+				Settings::settingsIni.showPlayerRoomListFilterWindow = show;
+				Settings::changeSetting("ShowPlayerRoomListFilterWindow", show ? "1" : "0");
+			}
+			ImGui::ShowHelpMarkerSameLine(L("Automatically opens a window while the player room list is on screen, with sorting (connection, player count, room size, name) and filters for that list. It keeps its own settings, separate from the ranked list's. Closing that window is the same as unchecking this.").c_str());
+		}
+
 		void DrawAvatar()
 		{
 			if (g_gameVals.playerAvatarAddr == NULL && g_gameVals.playerAvatarColAddr == NULL
@@ -166,18 +179,28 @@ namespace MainMenu
 			DrawRankedMatchesMainMenuSection();
 		}
 
-		const bool inRoom = g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional();
-
-		GroupLabel(Online_RoomSettings, inRoom);
-		if (scr)
+		// Room settings and the avatar live in here, so a search that lands on either has
+		// to open the section first or the jump has nothing to scroll to.
+		if (IsFocusPending(Online_RoomSettings) || IsFocusPending(Online_Avatar))
+			ImGui::SetNextItemOpen(true);
+		if (BeginSection(Online_PlayerRooms))
 		{
-			ImGui::HorizontalSpacing();
-			scr->DrawRoomSettingsBody();
-		}
+			DrawPlayerRoomListToggle();
 
-		ImGui::VerticalSpacing(4);
-		GroupLabel(Online_Avatar, g_gameVals.playerAvatarAddr != NULL);
-		DrawAvatar();
+			const bool inRoom = g_interfaces.pRoomManager && g_interfaces.pRoomManager->IsRoomFunctional();
+
+			ImGui::VerticalSpacing(4);
+			GroupLabel(Online_RoomSettings, inRoom);
+			if (scr)
+			{
+				ImGui::HorizontalSpacing();
+				scr->DrawRoomSettingsBody();
+			}
+
+			ImGui::VerticalSpacing(4);
+			GroupLabel(Online_Avatar, g_gameVals.playerAvatarAddr != NULL);
+			DrawAvatar();
+		}
 
 		ImGui::VerticalSpacing(8);
 		ImGui::Separator();

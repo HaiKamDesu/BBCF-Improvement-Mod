@@ -100,6 +100,10 @@ namespace
 	constexpr uintptr_t kUiContainerInUseOffset = 0x8C;
 	constexpr uintptr_t kUiContainerConfigOffset = 0x90;
 	constexpr uintptr_t kRankedResultConfigStrRva = 0x566238;
+	// "Room Search Result" (VA 0x0096611C): the player room list's widget,
+	// built by FUN_0064C160 - byte-for-byte the ranked builder, only the
+	// geometry differs, so every widget offset below applies to both.
+	constexpr uintptr_t kPlayerRoomResultConfigStrRva = 0x56611C;
 	constexpr uintptr_t kUiContainerWidgetOffset = 0x68;
 	constexpr uintptr_t kWidgetScrollTopOffset = 0x3C;
 	constexpr uintptr_t kWidgetSlotArrayOffset = 0x40;
@@ -160,6 +164,34 @@ namespace
 			return false;
 		}
 		return *reinterpret_cast<const int32_t*>(network) == 4;
+	}
+
+	// Player match side of the Network menu (task outer state 6, FUN_004AC6C0).
+	// Sub states, decimal: 73 (0x49) searching, 74 (0x4A) room list, 75 (0x4B)
+	// requirement-fail dialog, 77 (0x4D) joining, 78 (0x4E) join-error dialog.
+	constexpr int32_t kNetTaskPlayerMatch = 6;
+	constexpr int32_t kPlayerMatchRoomList = 0x4A;
+	constexpr int32_t kPlayerMatchRequirementDialog = 0x4B;
+	constexpr int32_t kPlayerMatchJoining = 0x4D;
+	constexpr int32_t kPlayerMatchJoinErrorDialog = 0x4E;
+	// task+0x1C: 1 while the task waits for a UI request. The room list's
+	// confirm (0x00717D90) stores the visible slot at task+0x1EC, clears this
+	// and pushes request 1; the task resolves perm[slot] on its next tick.
+	constexpr uintptr_t kNetTaskAwaitingInputOffset = 0x1C;
+
+	bool IsInPlayerMatchNetworkFlow()
+	{
+		const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+		if (moduleBase == 0)
+		{
+			return false;
+		}
+		const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
+		if (IsBadReadPtr(network, sizeof(int32_t)))
+		{
+			return false;
+		}
+		return *reinterpret_cast<const int32_t*>(network) == kNetTaskPlayerMatch;
 	}
 
 	// Game's ranked-search row array layout (RVA/offsets confirmed via
@@ -522,17 +554,32 @@ void RankedListConnectionFilter::OnLobbyListRequestIssued(uint64_t apiCallHandle
 	m_restoreExemptions.clear();
 	m_liveHiddenPeers.clear();
 
-	// The player room list requests lobbies through the same call; leave it to
-	// the game untouched (no proxy, no remap, no sort, no hiding).
-	if (!IsInRankedNetworkFlow())
+	// The player room list requests lobbies through the same call. It gets its
+	// own settings and only the sort/hide half of this file (see RoomListKind);
+	// any other caller is left to the game untouched.
+	if (IsInRankedNetworkFlow())
 	{
-		LOG(1, "[RankedListFilter] lobby-list request outside the ranked screens - not filtered\n");
+		m_listKind = RoomListKind::Ranked;
+	}
+	else if (IsInPlayerMatchNetworkFlow())
+	{
+		m_listKind = RoomListKind::PlayerRooms;
+	}
+	else
+	{
+		m_listKind = RoomListKind::None;
+		LOG(1, "[RankedListFilter] lobby-list request outside the ranked and player room screens - not filtered\n");
 		m_pipelineState = PipelineState::Idle;
 		m_pendingApiCall = 0;
 		return;
 	}
 
-	if (!IsPipelineActive() || apiCallHandle == 0)
+	// The player room list is captured even with every option off: the
+	// delivery is then the game's own list in the game's own order, and
+	// having it lets a sort or filter picked while the list is open apply
+	// right away instead of on the next search.
+	const bool capture = IsPipelineActive() || m_listKind == RoomListKind::PlayerRooms;
+	if (!capture || apiCallHandle == 0)
 	{
 		m_pipelineState = PipelineState::Idle;
 		m_pendingApiCall = 0;
@@ -661,8 +708,23 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 				verdictIt->second.lastKnownName = candidate.ownerName;
 			}
 		}
+		if (m_listKind == RoomListKind::PlayerRooms)
+		{
+			// Seed the sort keys for the delivery-time order; the live pass
+			// replaces them with what the game's node actually holds.
+			candidate.members = raw->GetNumLobbyMembers(lobby);
+			const char* const memberMax = raw->GetLobbyData(lobby, "PLAYER_MEMBER_MAX");
+			if (memberMax != nullptr && memberMax[0] != '\0')
+			{
+				candidate.memberMax = std::atoi(memberMax);
+			}
+		}
 		m_candidates.push_back(candidate);
-		StartProbeIfNeeded(candidate.ownerSteamId);
+		// Reachability probes open a P2P session to the host - ranked only.
+		if (m_listKind == RoomListKind::Ranked)
+		{
+			StartProbeIfNeeded(candidate.ownerSteamId);
+		}
 
 		// Seed/refresh the matchmaking-layer liveness entry. Being listed in a
 		// fresh delivery counts as existing (Steam just returned it), but the
@@ -899,6 +961,22 @@ void RankedListConnectionFilter::WriteIdentityGamePermutation()
 
 uint8_t* RankedListConnectionFilter::ResolveRankedResultWidget() const
 {
+	return ResolveResultWidgetByConfig(kRankedResultConfigStrRva);
+}
+
+uint8_t* RankedListConnectionFilter::ResolvePlayerRoomResultWidget() const
+{
+	return ResolveResultWidgetByConfig(kPlayerRoomResultConfigStrRva);
+}
+
+uint8_t* RankedListConnectionFilter::ResolveCurrentResultWidget() const
+{
+	return (m_listKind == RoomListKind::PlayerRooms)
+		? ResolvePlayerRoomResultWidget() : ResolveRankedResultWidget();
+}
+
+uint8_t* RankedListConnectionFilter::ResolveResultWidgetByConfig(uintptr_t configStrRva) const
+{
 	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
 	if (moduleBase == 0)
 	{
@@ -921,7 +999,7 @@ uint8_t* RankedListConnectionFilter::ResolveRankedResultWidget() const
 		return nullptr;
 	}
 	const void* const rankedConfigStr =
-		reinterpret_cast<const void*>(moduleBase + kRankedResultConfigStrRva);
+		reinterpret_cast<const void*>(moduleBase + configStrRva);
 
 	for (int i = 0; i < 4; ++i)
 	{
@@ -952,7 +1030,7 @@ void RankedListConnectionFilter::FixupRankedResultWidget(int32_t shownCount)
 	{
 		return;
 	}
-	uint8_t* const widget = ResolveRankedResultWidget();
+	uint8_t* const widget = ResolveCurrentResultWidget();
 	if (widget == nullptr)
 	{
 		return;
@@ -1064,6 +1142,22 @@ namespace
 
 		const int32_t state = *reinterpret_cast<const int32_t*>(network + 0x00);
 		const int32_t state1 = *reinterpret_cast<const int32_t*>(network + 0x04);
+		if (state == kNetTaskPlayerMatch)
+		{
+			// Player room list: browsing is 0x4A while the task is waiting for
+			// input. The click clears task+0x1C in the UI handler and the task
+			// reads perm[task+0x1EC] on its next tick (0x4ACA45), then again
+			// when 0x4D latches the join (0x4A89FB) - both through perm, so
+			// holding perm and the payloads still from the click to the end of
+			// the join is all the click needs. 0x4B/0x4D/0x4E (dialogs, join)
+			// fall outside and freeze too.
+			if (state1 != kPlayerMatchRoomList ||
+				IsBadReadPtr(network + kNetTaskAwaitingInputOffset, sizeof(int32_t)))
+			{
+				return false;
+			}
+			return *reinterpret_cast<const int32_t*>(network + kNetTaskAwaitingInputOffset) == 1;
+		}
 		if (state != 4)
 		{
 			return true;
@@ -1095,7 +1189,7 @@ void RankedListConnectionFilter::OnRankedRowClickLatch(void* screenCtrl)
 	{
 		return;
 	}
-	uint8_t* const widget = ResolveRankedResultWidget();
+	uint8_t* const widget = ResolveCurrentResultWidget();
 	if (widget == nullptr ||
 		IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)) ||
 		IsBadReadPtr(widget + kWidgetCountOffset, sizeof(int32_t)))
@@ -1161,7 +1255,7 @@ int32_t RankedListConnectionFilter::ResolveClickedLogicalRow(void* screenCtrl)
 		return fallback;
 	};
 
-	uint8_t* const widget = ResolveRankedResultWidget();
+	uint8_t* const widget = ResolveCurrentResultWidget();
 	uint8_t* const listStruct = ResolveGameRowListStruct();
 	if (widget == nullptr || listStruct == nullptr ||
 		IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)) ||
@@ -1216,7 +1310,7 @@ void RankedListConnectionFilter::LogClickResolutionSnapshot()
 
 	int32_t cursor = -1;
 	int32_t scrollTop = -1;
-	uint8_t* const widget = ResolveRankedResultWidget();
+	uint8_t* const widget = ResolveCurrentResultWidget();
 	if (widget != nullptr && !IsBadReadPtr(widget + kWidgetCursorOffset, sizeof(int32_t)))
 	{
 		cursor = *reinterpret_cast<const int32_t*>(widget + kWidgetCursorOffset);
@@ -1301,6 +1395,13 @@ void RankedListConnectionFilter::LogClickResolutionSnapshot()
 
 void RankedListConnectionFilter::PollGameListAndApplyOrder()
 {
+	// A player room list is only touched on the player match screens. Once a
+	// room is joined (task 7) or the menu is left, the list is dead weight the
+	// game may still read back; the next search starts from identity anyway.
+	if (m_listKind == RoomListKind::PlayerRooms && !IsInPlayerMatchNetworkFlow())
+	{
+		return;
+	}
 	const bool safeToMutate = IsRankedListSafeToMutate();
 	if (m_liveOrderFrozen == safeToMutate)
 	{
@@ -1443,14 +1544,20 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		int16_t rttFilter = 0;     // entry+0x10a, RANK_RTT_FILTER (host requirement)
 		int16_t areaFilter = 0;    // entry+0x5e, RANK_AREA_FILTER (secondary requirement)
 		uint8_t netColor = 0xFF;   // entry+0x74, HOST_NETCOLOR - the row's native square icon
+		// Player rooms only (same node class, room fields; parsed by FUN_0046FCC0):
+		int32_t sessionFlag = 0;   // entry+0x64, PLAYER_SESSION_FLAG; &0xF000 = required Delay digit
+		int memberMax = -1;        // entry+0x6C, PLAYER_MEMBER_MAX (2..8)
+		int members = -1;          // entry+0x6D, GetNumLobbyMembers at delivery
+		std::string roomName;      // entry+0x10, wchar[20] PLAYER_ROOM_NAME
 	};
+	const bool playerRooms = m_listKind == RoomListKind::PlayerRooms;
 	// Cursor follow, part 1: remember which PHYSICAL row (node-chain position)
 	// the widget cursor currently sits on, before any payload moves. Without
 	// this, the cursor keeps its raw slot INDEX across the partition/re-sort
 	// below, so the highlighted player silently changes under the user right
 	// as they navigate/confirm - the other half of the wrong-player-selected
 	// bug (the user aims at one name, the click resolves to another).
-	uint8_t* const resultWidget = ResolveRankedResultWidget();
+	uint8_t* const resultWidget = ResolveCurrentResultWidget();
 	int32_t cursorSlotBefore = -1;
 	int32_t cursorPhysBefore = -1;
 	if (resultWidget != nullptr &&
@@ -1501,6 +1608,30 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		row.rttFilter = *reinterpret_cast<const int16_t*>(row.node + 0x10a);
 		row.areaFilter = *reinterpret_cast<const int16_t*>(row.node + 0x5e);
 		row.netColor = *reinterpret_cast<const uint8_t*>(row.node + 0x74);
+		if (playerRooms)
+		{
+			row.sessionFlag = *reinterpret_cast<const int32_t*>(row.node + 0x64);
+			row.memberMax = *reinterpret_cast<const uint8_t*>(row.node + 0x6C);
+			row.members = *reinterpret_cast<const uint8_t*>(row.node + 0x6D);
+			wchar_t wideName[21] = {};
+			memcpy(wideName, row.node + 0x10, sizeof(wchar_t) * 20);
+			char utf8Name[64] = {};
+			if (WideCharToMultiByte(CP_UTF8, 0, wideName, -1, utf8Name, sizeof(utf8Name), nullptr, nullptr) > 0)
+			{
+				row.roomName = utf8Name;
+			}
+			// Keep the sort keys current: the comparator reads candidates.
+			for (LobbyCandidate& candidate : m_candidates)
+			{
+				if (row.steamId != 0 && candidate.ownerSteamId == row.steamId)
+				{
+					candidate.members = row.members;
+					candidate.memberMax = row.memberMax;
+					candidate.roomName = row.roomName;
+					break;
+				}
+			}
+		}
 
 		if (row.steamId != 0)
 		{
@@ -1566,12 +1697,14 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	// cache stay untouched. Restores are the same mechanism in reverse: a
 	// peer no longer hidden simply stops being partitioned out, the count
 	// grows back, and their parked payload re-enters the visible region.
-	const bool filterEnabled = Settings::settingsIni.enableRankedListConnectionFilter;
+	// Reputation and room-liveness hides judge hosts and joins - ranked only.
+	const bool filterEnabled = !playerRooms && Settings::settingsIni.enableRankedListConnectionFilter;
 	// Network tier filter: 0 = All (off), 1-3 = "N and above", 4 = "4 only".
 	// Hides rows whose CURRENT Delay digit is below the floor. Rows whose RTT
 	// hasn't resolved yet (digit unknown) are shown - benefit of the doubt,
 	// they get hidden within ~400ms of the digit resolving if it's too low.
-	int networkFloor = Settings::settingsIni.rankedListNetworkFilter;
+	int networkFloor = playerRooms
+		? Settings::settingsIni.playerRoomListNetworkFilter : Settings::settingsIni.rankedListNetworkFilter;
 	if (networkFloor < 0 || networkFloor > 4)
 	{
 		networkFloor = 0;
@@ -1592,7 +1725,11 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 	// preemptively. Unresolved RTT (digit unknown) rows are shown - the
 	// game itself waits in "RMSR_CheckingRTT" rather than rejecting in
 	// that state.
-	const bool hideUnmet = Settings::settingsIni.hideUnmetRequirementRooms;
+	// Player rooms carry a single requirement, PLAYER_SESSION_FLAG & 0xF000
+	// (0-4), and the room-list join gate (FUN_004AC6C0 case 0x4A) rejects with
+	// SearchSelectError when our Delay digit is below it.
+	const bool hideUnmet = playerRooms
+		? Settings::settingsIni.playerRoomListHideUnmetRequirement : Settings::settingsIni.hideUnmetRequirementRooms;
 	std::vector<bool> hiddenAt(static_cast<size_t>(orig), false);
 	m_liveHiddenPeers.clear();
 	for (int32_t logical = 0; logical < orig; ++logical)
@@ -1666,26 +1803,33 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		if (!hide && !restoreExempt && hideUnmet && delayDigit >= 0)
 		{
 			int requiredDigit = 0;
-			if (row.rttFilter != 0)
+			if (playerRooms)
 			{
-				requiredDigit = (row.rttFilter >= 1 && row.rttFilter <= 4)
-					? row.rttFilter : 4;
+				requiredDigit = (row.sessionFlag & 0xF000) >> 12;
 			}
-			if (row.areaFilter == 1)
+			else
 			{
-				requiredDigit = (std::max)(requiredDigit, 2);
-			}
-			else if (row.areaFilter == 2)
-			{
-				requiredDigit = (std::max)(requiredDigit, 3);
+				if (row.rttFilter != 0)
+				{
+					requiredDigit = (row.rttFilter >= 1 && row.rttFilter <= 4)
+						? row.rttFilter : 4;
+				}
+				if (row.areaFilter == 1)
+				{
+					requiredDigit = (std::max)(requiredDigit, 2);
+				}
+				else if (row.areaFilter == 2)
+				{
+					requiredDigit = (std::max)(requiredDigit, 3);
+				}
 			}
 			if (delayDigit < requiredDigit)
 			{
 				hide = true;
 				reason = HiddenReason::Requirement;
-				LOG(1, "[RankedListFilter] requirement hide: %llu rttFilter=%d areaFilter=%d needs digit %d, ours %d\n",
+				LOG(1, "[RankedListFilter] requirement hide: %llu rttFilter=%d areaFilter=%d sessionFlag=0x%X needs digit %d, ours %d\n",
 					static_cast<unsigned long long>(row.steamId), static_cast<int>(row.rttFilter),
-					static_cast<int>(row.areaFilter), requiredDigit, delayDigit);
+					static_cast<int>(row.areaFilter), static_cast<unsigned>(row.sessionFlag), requiredDigit, delayDigit);
 			}
 		}
 		// NOTE: an earlier build refused to live-hide the row under the
@@ -1702,8 +1846,14 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 			info.reason = reason;
 			info.netColor = row.netColor;
 			info.delayDigit = delayDigit;
+			if (playerRooms)
+			{
+				info.members = row.members;
+				info.memberMax = row.memberMax;
+				info.name = row.roomName;
+			}
 			const auto verdictIt = m_verdicts.find(row.steamId);
-			if (verdictIt != m_verdicts.end() && !verdictIt->second.lastKnownName.empty())
+			if (info.name.empty() && verdictIt != m_verdicts.end() && !verdictIt->second.lastKnownName.empty())
 			{
 				info.name = verdictIt->second.lastKnownName;
 			}
@@ -2010,12 +2160,32 @@ void RankedListConnectionFilter::PollGameListAndApplyOrder()
 		{
 			delay = it->second.gameTier;
 		}
-		char part[96];
-		// req=rtt/area: the host's RANK_RTT_FILTER / RANK_AREA_FILTER words,
-		// so a "requirements are not met" popup on a shown row can be
-		// diagnosed from the log.
-		snprintf(part, sizeof(part), " #%d %s(delay=%d req=%d/%d)", slot, name, delay,
-			static_cast<int>(shownRow.rttFilter), static_cast<int>(shownRow.areaFilter));
+		char part[128];
+		if (playerRooms)
+		{
+			// Only steamId follows a row through the partition swaps, so the
+			// room's own fields come from its candidate.
+			const LobbyCandidate* room = nullptr;
+			for (const LobbyCandidate& candidate : m_candidates)
+			{
+				if (candidate.ownerSteamId == steamId)
+				{
+					room = &candidate;
+					break;
+				}
+			}
+			snprintf(part, sizeof(part), " #%d \"%s\" host=%s(delay=%d players=%d/%d)", slot,
+				room != nullptr ? room->roomName.c_str() : "", name, delay,
+				room != nullptr ? room->members : -1, room != nullptr ? room->memberMax : -1);
+		}
+		else
+		{
+			// req=rtt/area: the host's RANK_RTT_FILTER / RANK_AREA_FILTER words,
+			// so a "requirements are not met" popup on a shown row can be
+			// diagnosed from the log.
+			snprintf(part, sizeof(part), " #%d %s(delay=%d req=%d/%d)", slot, name, delay,
+				static_cast<int>(shownRow.rttFilter), static_cast<int>(shownRow.areaFilter));
+		}
 		orderDump += part;
 	}
 	LOG(1, "[RankedListFilter] live order applied (%d shown, %d hidden live):%s\n",
@@ -2060,6 +2230,11 @@ bool RankedListConnectionFilter::ShouldHidePeer(uint64_t steamId, unsigned long 
 
 void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCandidate*>* shown, bool logOrder) const
 {
+	if (m_listKind == RoomListKind::PlayerRooms)
+	{
+		SortPlayerRoomCandidates(shown);
+		return;
+	}
 	const int mode = Settings::settingsIni.rankedListSortMode;
 	if (shown == nullptr || shown->size() < 2 ||
 		mode <= RankedListSortMode_Default || mode >= RankedListSortMode_COUNT)
@@ -2287,8 +2462,117 @@ void RankedListConnectionFilter::SortShownCandidates(std::vector<const LobbyCand
 	LOG(1, "[RankedListFilter] sort order (mode=%d):%s\n", mode, orderDump.c_str());
 }
 
+void RankedListConnectionFilter::SortPlayerRoomCandidates(std::vector<const LobbyCandidate*>* shown) const
+{
+	// enum: PlayerRoomListSortMode_ (same order as the window's labels).
+	const int mode = Settings::settingsIni.playerRoomListSortMode;
+	if (shown == nullptr || shown->size() < 2 ||
+		mode <= PlayerRoomListSortMode_Default || mode >= PlayerRoomListSortMode_COUNT)
+	{
+		return;
+	}
+
+	struct Key
+	{
+		bool known = false;
+		long long number = 0;
+		std::string text;
+	};
+	const auto keyOf = [this, mode](const LobbyCandidate* room) -> Key
+	{
+		Key key;
+		switch (mode)
+		{
+		case PlayerRoomListSortMode_BestConnection:
+		case PlayerRoomListSortMode_WorstConnection:
+		{
+			// The game's own measured RTT to the host (node+0x78), the value
+			// behind the row's Delay glyph. The 600-frame re-ping keeps it fresh.
+			const auto it = m_verdicts.find(room->ownerSteamId);
+			if (it != m_verdicts.end() && it->second.gameRttMs >= 0)
+			{
+				key.known = true;
+				key.number = it->second.gameRttMs;
+			}
+			break;
+		}
+		case PlayerRoomListSortMode_MostPlayers:
+		case PlayerRoomListSortMode_FewestPlayers:
+			key.known = room->members >= 0;
+			key.number = room->members;
+			break;
+		case PlayerRoomListSortMode_LargestRoom:
+		case PlayerRoomListSortMode_SmallestRoom:
+			key.known = room->memberMax > 0;
+			key.number = room->memberMax;
+			break;
+		default:
+		{
+			// The name the row shows: the room's own name, or the host's when
+			// the room has none.
+			const std::string& name = room->roomName.empty() ? room->ownerName : room->roomName;
+			key.known = !name.empty();
+			key.text = name;
+			std::transform(key.text.begin(), key.text.end(), key.text.begin(),
+				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			break;
+		}
+		}
+		return key;
+	};
+
+	const bool descending =
+		mode == PlayerRoomListSortMode_WorstConnection ||
+		mode == PlayerRoomListSortMode_MostPlayers ||
+		mode == PlayerRoomListSortMode_LargestRoom ||
+		mode == PlayerRoomListSortMode_NameZA;
+	const bool textual = mode == PlayerRoomListSortMode_NameAZ || mode == PlayerRoomListSortMode_NameZA;
+
+	std::vector<std::pair<Key, const LobbyCandidate*>> entries;
+	entries.reserve(shown->size());
+	for (const LobbyCandidate* const room : *shown)
+	{
+		entries.emplace_back(keyOf(room), room);
+	}
+	// Unknown keys sink to the end in their original order, whatever the
+	// direction - an unmeasured room is not the "worst connection".
+	std::stable_sort(entries.begin(), entries.end(),
+		[descending, textual](const std::pair<Key, const LobbyCandidate*>& a, const std::pair<Key, const LobbyCandidate*>& b)
+		{
+			if (a.first.known != b.first.known)
+			{
+				return a.first.known;
+			}
+			if (!a.first.known)
+			{
+				return false;
+			}
+			if (textual)
+			{
+				return descending ? (b.first.text < a.first.text) : (a.first.text < b.first.text);
+			}
+			return descending ? (b.first.number < a.first.number) : (a.first.number < b.first.number);
+		});
+
+	shown->clear();
+	for (const auto& entry : entries)
+	{
+		shown->push_back(entry.second);
+	}
+}
+
 void RankedListConnectionFilter::SortHiddenPeers(std::vector<HiddenPeerInfo>* peers) const
 {
+	if (m_listKind == RoomListKind::PlayerRooms)
+	{
+		// The hidden-rooms popup is short; name order is enough there.
+		if (peers != nullptr)
+		{
+			std::stable_sort(peers->begin(), peers->end(),
+				[](const HiddenPeerInfo& a, const HiddenPeerInfo& b) { return _stricmp(a.name.c_str(), b.name.c_str()) < 0; });
+		}
+		return;
+	}
 	const int mode = Settings::settingsIni.rankedListSortMode;
 	if (peers == nullptr || peers->size() < 2 ||
 		mode <= RankedListSortMode_Default || mode >= RankedListSortMode_COUNT)
@@ -2436,9 +2720,11 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 
 	m_lastShownCount = m_reachableLobbies.size();
 	m_lastHiddenCount = 0; // live pass recomputes both within ~400ms
-	LOG(1, "[RankedListFilter] delivering (%s): %zu lobbies (full list, live pass filters), sortMode=%d\n",
+	LOG(1, "[RankedListFilter] delivering %s list (%s): %zu lobbies (full list, live pass filters), sortMode=%d\n",
+		m_listKind == RoomListKind::PlayerRooms ? "player room" : "ranked",
 		reason, m_reachableLobbies.size(),
-		Settings::settingsIni.rankedListSortMode);
+		m_listKind == RoomListKind::PlayerRooms
+			? Settings::settingsIni.playerRoomListSortMode : Settings::settingsIni.rankedListSortMode);
 
 	m_hasRemapResult = true;
 	m_pipelineState = PipelineState::Idle;
@@ -3028,10 +3314,25 @@ void RankedListConnectionFilter::GetLastListCounts(size_t* outShown, size_t* out
 
 bool RankedListConnectionFilter::IsPipelineActive() const
 {
-	return Settings::settingsIni.enableRankedListConnectionFilter ||
-		Settings::settingsIni.rankedListSortMode != RankedListSortMode_Default ||
-		Settings::settingsIni.rankedListNetworkFilter != 0 ||
-		Settings::settingsIni.hideUnmetRequirementRooms;
+	return IsPipelineActiveFor(m_listKind);
+}
+
+bool RankedListConnectionFilter::IsPipelineActiveFor(RoomListKind kind)
+{
+	switch (kind)
+	{
+	case RoomListKind::Ranked:
+		return Settings::settingsIni.enableRankedListConnectionFilter ||
+			Settings::settingsIni.rankedListSortMode != RankedListSortMode_Default ||
+			Settings::settingsIni.rankedListNetworkFilter != 0 ||
+			Settings::settingsIni.hideUnmetRequirementRooms;
+	case RoomListKind::PlayerRooms:
+		return Settings::settingsIni.playerRoomListSortMode != PlayerRoomListSortMode_Default ||
+			Settings::settingsIni.playerRoomListNetworkFilter != 0 ||
+			Settings::settingsIni.playerRoomListHideUnmetRequirement;
+	default:
+		return false;
+	}
 }
 
 int RankedListConnectionFilter::CountPopulatedGameRows() const
@@ -3307,6 +3608,38 @@ void RankedListConnectionFilter::DiagnosticLogRankedListMgrSlot() const
 	RankedListMgrDiagnostic().Report(FormatDiagnostic(
 		"mgr=0x%p vtable=0x%p rowCount=%d shownCount=%zu tiers:%s",
 		mgr, vtable, rowCount, m_lastShownCount, tierDump.c_str()));
+}
+
+bool RankedListConnectionFilter::IsListOpen(RoomListKind kind)
+{
+	if (kind == RoomListKind::Ranked)
+	{
+		return IsLobbyListLikelyOpen();
+	}
+	if (kind != RoomListKind::PlayerRooms || g_gameVals.pGameState == nullptr ||
+		*g_gameVals.pGameState != GameState_MainMenu)
+	{
+		return false;
+	}
+	const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress());
+	if (moduleBase == 0)
+	{
+		return false;
+	}
+	const uint8_t* const network = reinterpret_cast<const uint8_t*>(moduleBase + kRankedNetworkStructRva);
+	if (IsBadReadPtr(network, 0x08))
+	{
+		return false;
+	}
+	if (*reinterpret_cast<const int32_t*>(network) != kNetTaskPlayerMatch)
+	{
+		return false;
+	}
+	// The room list and the dialogs/join drawn over it. 0x49 (searching) is
+	// left out: the list is empty then and the window would only flicker.
+	const int32_t sub = *reinterpret_cast<const int32_t*>(network + 0x04);
+	return sub == kPlayerMatchRoomList || sub == kPlayerMatchRequirementDialog ||
+		sub == kPlayerMatchJoining || sub == kPlayerMatchJoinErrorDialog;
 }
 
 bool RankedListConnectionFilter::IsLobbyListLikelyOpen()

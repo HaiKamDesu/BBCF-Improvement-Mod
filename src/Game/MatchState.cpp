@@ -230,11 +230,14 @@ void MatchState::OnUpdate()
 
 	if (WindowManager::GetInstance().IsInitialized())
 	{
-		RankedListFilterWindow* const filterWindow = WindowManager::GetInstance().GetWindowContainer()
-			->GetWindow<RankedListFilterWindow>(WindowType_RankedListFilter);
-		if (filterWindow != nullptr)
+		for (const WindowType_ type : { WindowType_RankedListFilter, WindowType_PlayerRoomListFilter })
 		{
-			filterWindow->UpdateAutoVisibility();
+			RankedListFilterWindow* const filterWindow = WindowManager::GetInstance().GetWindowContainer()
+				->GetWindow<RankedListFilterWindow>(type);
+			if (filterWindow != nullptr)
+			{
+				filterWindow->UpdateAutoVisibility();
+			}
 		}
 	}
 

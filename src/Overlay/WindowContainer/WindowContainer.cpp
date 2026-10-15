@@ -128,7 +128,11 @@ WindowContainer::WindowContainer()
                 new ReleaseCheckerWindow("Releases##checker", true, ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_RankedListFilter,
-                new RankedListFilterWindow((L("Ranked List Config") + "###RankedListFilter").c_str(), true,
+                new RankedListFilterWindow(RoomListKind::Ranked, (L("Ranked List Config") + "###RankedListFilter").c_str(), true,
+                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse));
+
+        AddWindow(WindowType_PlayerRoomListFilter,
+                new RankedListFilterWindow(RoomListKind::PlayerRooms, (L("Player Room List Config") + "###PlayerRoomListFilter").c_str(), true,
                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_RankedLeaderboard,
