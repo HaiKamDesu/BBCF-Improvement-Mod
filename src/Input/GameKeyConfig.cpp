@@ -1106,6 +1106,26 @@ namespace LocalInput
 			if (!opt)
 				return;
 
+			// Which button-settings profile each side's battle input is read with, against what
+			// the game set up for the match (Kakuy 2026-10-13/14: "my controls change when a
+			// match starts, back gives barrier, fixed after the first round or by opening the
+			// mod"; nothing in the log said which Type each side was on). Logged on change.
+			{
+				const int32_t* const setB = EngineInts(kEngineSetBProfile);
+				const int32_t* const setA = EngineInts(kEngineSetAProfile);
+				const int32_t* const sideId = EngineInts(0x25F4);
+				const int now[8] = { setB[0], setB[1], setA[0], setA[1], sideId[0], sideId[1],
+					opt[kTypeBFlag] & 1, opt[kTypeBFlag + 1] & 1 };
+				static int last[8] = { -100, -100, -100, -100, -100, -100, -100, -100 };
+				if (std::memcmp(now, last, sizeof(now)) != 0)
+				{
+					std::memcpy(last, now, sizeof(now));
+					LOG(1, "[GameKeyConfig] battle profile (Type) in use: id0=%d id1=%d; menu set id0=%d id1=%d; "
+						"controller id per side P1=%d P2=%d; Type B allowed P1=%d P2=%d\n",
+						now[0], now[1], now[2], now[3], now[4], now[5], now[6], now[7]);
+				}
+			}
+
 			// Which sides have an editor open, in either family.
 			bool open[2] = {};
 			for (int slot = 0; slot < 2; ++slot)

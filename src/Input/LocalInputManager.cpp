@@ -915,6 +915,35 @@ namespace LocalInput
 			}
 		}
 
+		// The start of every match, press by press: what each side's battle word became and
+		// which device made it. Bounded per match. For reports of controls that act differently
+		// once a match starts (Kakuy, 2026-10-14), where nothing showed what the game was sent.
+		{
+			const bool inMatch = g_gameVals.pGameState && *g_gameVals.pGameState == GameState_InMatch;
+			static bool wasInMatch = false;
+			static int matchLines = 0;
+			if (inMatch && !wasInMatch)
+				matchLines = 0;
+			wasInMatch = inMatch;
+			for (int side = 0; side < 2 && inMatch && matchLines < 60; ++side)
+			{
+				const uint32_t battle = CleanDirections(words[side][1]);
+				if (battle == g_words[side][1])
+					continue;
+				++matchLines;
+				std::string from;
+				for (const auto& device : g_devices)
+				{
+					if (device->side != side || !device->snap.connected || !device->snap.controls.any())
+						continue;
+					from += (from.empty() ? "" : "; ") + device->snap.id + " " + HeldText(device->snap) + " -> " +
+						ButtonsText(device->buttons) + (device->textEntryHoldoff ? " (held back)" : "");
+				}
+				LOG(1, "[LocalInput] in match: P%d battle input %s (from %s)%s\n", side + 1, ButtonsText(battle).c_str(),
+					from.empty() ? "no device" : from.c_str(), matchLines == 60 ? " [last line for this match]" : "");
+			}
+		}
+
 		for (int side = 0; side < 2; ++side)
 			for (int set = 0; set < 2; ++set)
 				g_words[side][set] = CleanDirections(words[side][set]);
