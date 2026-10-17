@@ -1536,9 +1536,34 @@ bool TasManager::TryParseCommand(const std::string& text, std::vector<uint16_t>*
         }
     };
 
+    // 360 and 720 are the usual names for one and two full circles, written as the circle a
+    // 360-command super needs: 412369874 and 41236987412369874. 0 is not a direction, so neither
+    // can be read any other way, and anything they precede attaches to their last frame (8).
+    static const struct { const char* name; const char* motion; } kCircles[] = {
+        { "360", "412369874" },
+        { "720", "41236987412369874" },
+    };
+
     for (size_t i = 0; i < text.size(); ) {
         const char ch = static_cast<char>(std::toupper(static_cast<unsigned char>(text[i])));
-        if (ch >= '1' && ch <= '9') {
+        const char* circle = nullptr;
+        for (const auto& entry : kCircles) {
+            if (text.compare(i, 3, entry.name) == 0) {
+                circle = entry.motion;
+                break;
+            }
+        }
+        if (circle != nullptr) {
+            if (pendingButtons && !out->empty()) {
+                out->back() = static_cast<uint16_t>(out->back() + pendingButtons);
+                pendingButtons = 0;
+            }
+            for (const char* d = circle; *d != '\0'; ++d) {
+                out->push_back(static_cast<uint16_t>(*d - '0'));
+            }
+            sawDirection = true;
+            i += 3;
+        } else if (ch >= '1' && ch <= '9') {
             if (pendingButtons && !out->empty()) {
                 out->back() = static_cast<uint16_t>(out->back() + pendingButtons);
                 pendingButtons = 0;

@@ -5738,6 +5738,9 @@ struct LocalizationKeysAccessor
 
         // No rooms are currently hidden.
         inline const char* No_rooms_are_currently_hidden() const { return Get("No rooms are currently hidden."); }
+
+        // 360 and 720 are shorthand for full circles: 360 is 412369874 and 720 is 41236987412369874, so 360A is a 360 super with A on its last frame.
+        inline const char* _360_and_720_are_shorthand_for_full_circles_360_is_412369874_and_720_is_41236987412369874_so_360A_is_a_360_super_with_A_on_its_last_frame() const { return Get("360 and 720 are shorthand for full circles: 360 is 412369874 and 720 is 41236987412369874, so 360A is a 360 super with A on its last frame."); }
 };
 
 
