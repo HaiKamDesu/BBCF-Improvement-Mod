@@ -1,4 +1,5 @@
 ﻿#include "WindowManager.h"
+#include "Core/LaaStress.h"
 #include "Input/LocalInputManager.h"
 
 #include "Branding.h"
@@ -1038,6 +1039,7 @@ void WindowManager::HandleButtons()
 	// Puts the 100 MB address-space reserve back after the netplay arena or a big file
 	// buffer had to be given it. Cheap: one atomic load on almost every frame.
 	TickNetplayArenaKeeper();
+	LaaStress::Tick();
 
 	// Same reason as above: the lobby avatar only exists on menu screens, where the frame
 	// counter hook never fires.

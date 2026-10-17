@@ -12,6 +12,9 @@
 #include "DirectInputWrapper.h"
 #include "ExitDiagnostics.h"
 #include "GameBuildGuard.h"
+#include "HighMemoryReserve.h"
+#include "LaaStress.h"
+#include "LargeAddressAware.h"
 #include "Localization.h"
 #include "RuntimePlatform.h"
 #include "WineCheck.h"
@@ -253,6 +256,9 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 		Settings::settingsIni.urtReTraceMaxFileMB,
 		Settings::settingsIni.urtReTraceMaxBackups);
 	ForceLog("[Init] Set logging OK");
+	LargeAddressAware::LogStatus();
+	LaaStress::LogSummary();
+	HighMemoryReserve::LogSummary();
 	ForceLog("[Init] Logging configured (generateDebugLogs=%d, urtReTrace=%d level=%d maxMB=%d backups=%d).\n",
 		Settings::settingsIni.generateDebugLogs,
 		urtReTraceEnabled ? 1 : 0,
@@ -422,6 +428,17 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
                 GameBuildGuard::StartUnsupportedBuildFlow();
                 break;
         }
+
+        // On a large-address-aware exe, before the game creates its first D3DX effect.
+        LargeAddressAware::InstallD3DXEffectFlag();
+
+        // Test only (BBCF_IM_LAA_STRESS=1 on a large-address-aware exe): before the game's CRT
+        // creates its heaps, so they start above 2 GB.
+        LaaStress::OnProcessAttach();
+
+        // On a large-address-aware exe: hold everything above 2 GB until the game would run out
+        // below it, so the memory layout stays the stock one until then (HighMemoryReserve.h).
+        HighMemoryReserve::OnProcessAttach();
 
         // Static import of BBCF.exe: this is the thread that goes on to run WinMain.
         ExitDiagnostics::RecordMainThread();

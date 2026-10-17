@@ -1,11 +1,13 @@
 #include "NetplayArenaKeeper.h"
 
+#include "Core/HighMemoryReserve.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
 
 #include <Windows.h>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 // ---------------------------------------------------------------------------------------
@@ -103,6 +105,12 @@ namespace
 	// call first is the one it would have called.
 	const BYTE kRealOperatorNewHead[] = { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0xEB, 0x0D };   // push ebp; mov ebp,esp; sub esp,10h; jmp +0Dh
 	constexpr uintptr_t kRealOperatorNewMallocCallOffset = 0x18;                               // 0x0079E09E: call 0x007A106D
+	// The loop's other half: `push [ebp+8]; call _callnewh; pop ecx; test eax,eax; je throw`.
+	// A nonzero return makes operator new retry malloc.
+	constexpr uintptr_t kRealOperatorNewCallNewhOffset = 0x0B;                                 // 0x0079E091: call 0x007AD412
+	constexpr uintptr_t kCallNewhRva = 0x003AD412;
+	const BYTE kCallNewhSiteBefore[] = { 0xFF, 0x75, 0x08 };                                  // push [ebp+8]
+	const BYTE kCallNewhSiteAfter[] = { 0x59, 0x85, 0xC0, 0x74, 0x0F };                       // pop ecx; test eax,eax; je 0x0079E0AA
 
 	using Alloc_t = void* (__cdecl*)(size_t);
 	using Free_t = void(__cdecl*)(void*);
@@ -110,6 +118,8 @@ namespace
 	Alloc_t g_gameOperatorNew = nullptr;
 	Free_t g_gameDelete = nullptr;
 	Alloc_t g_crtMalloc = nullptr;
+	using CallNewh_t = int(__cdecl*)(size_t);
+	CallNewh_t g_callNewh = nullptr;
 
 	// Touched from whichever thread allocates and from the render-loop tick.
 	std::atomic<void*> g_reserve{ nullptr };
@@ -159,6 +169,18 @@ namespace
 		if (void* block = g_crtMalloc(size))
 		{
 			return block;
+		}
+
+		// On a large-address-aware exe, the upper 2 GB before anything below it.
+		char why[128];
+		snprintf(why, sizeof(why), "%s of %u bytes did not fit", what, static_cast<unsigned>(size));
+		if (HighMemoryReserve::Release(why))
+		{
+			if (void* block = g_crtMalloc(size))
+			{
+				LOG(0, "[NetplayArena] %s placed at 0x%p above 2 GB.\n", what, block);
+				return block;
+			}
 		}
 
 		if (FreeParkedArena(what))
@@ -368,6 +390,20 @@ namespace
 		}
 	}
 
+	// Every operator new in the game that fails to get its block lands here before it throws
+	// std::bad_alloc - which WinMain's catch(...) turns into the game closing. Give it address
+	// space and let it retry: the upper 2 GB on a large-address-aware exe, else the kept arena or
+	// the reserve. Each release can only happen once, so a request that still fails ends up in the
+	// game's own _callnewh and throws, as vanilla.
+	int __cdecl OperatorNewOutOfMemory(size_t size)
+	{
+		char what[64];
+		snprintf(what, sizeof(what), "An operator new of %u bytes", static_cast<unsigned>(size));
+		if (ReleaseNetplayArenaReserve(what))
+			return 1;
+		return g_callNewh(size);
+	}
+
 	bool BytesMatch(uintptr_t address, const BYTE* expected, size_t length)
 	{
 		return memcmp(reinterpret_cast<const void*>(address), expected, length) == 0;
@@ -452,6 +488,14 @@ void InstallNetplayArenaKeeper()
 		// return ordinary heap blocks.
 		LOG(0, "[NetplayArena] VirtualProtect failed (err=%lu); keeper only partly installed.\n", GetLastError());
 	}
+	const uintptr_t callNewhSite = realOperatorNew + kRealOperatorNewCallNewhOffset;
+	g_callNewh = reinterpret_cast<CallNewh_t>(base + kCallNewhRva);
+	const bool callNewhMatches =
+		BytesMatch(callNewhSite - sizeof(kCallNewhSiteBefore), kCallNewhSiteBefore, sizeof(kCallNewhSiteBefore)) &&
+		BytesMatch(callNewhSite + 5, kCallNewhSiteAfter, sizeof(kCallNewhSiteAfter)) &&
+		IsRel32To(callNewhSite, 0xE8, base + kCallNewhRva);
+	if (!callNewhMatches || !RetargetRel32(callNewhSite, reinterpret_cast<void*>(&OperatorNewOutOfMemory)))
+		LOG(0, "[NetplayArena] operator new's out-of-memory call not patched; only the arena and file buffer sites can use the reserve.\n");
 	if (!freeSiteMatches || !RetargetRel32(arenaFreeCall, reinterpret_cast<void*>(&ArenaFree)))
 		LOG(0, "[NetplayArena] Arena free site not patched; the reserve comes back on the 5 s tick only.\n");
 	// Optional too, but all three or none: a rescued buffer freed through an unpatched site
@@ -482,6 +526,10 @@ void InstallNetplayArenaKeeper()
 
 bool ReleaseNetplayArenaReserve(const char* forWhat)
 {
+	char why[128];
+	snprintf(why, sizeof(why), "%s did not fit", forWhat);
+	if (HighMemoryReserve::Release(why))
+		return true;
 
 	// The kept arena goes first, as in RescuingAlloc: the reserve is what the next arena
 	// needs, and a texture or a file fits in either.
@@ -499,6 +547,15 @@ bool ReleaseNetplayArenaReserve(const char* forWhat)
 	LOG(0, "[NetplayArena] %s did not fit; released the address-space reserve at 0x%p for it.\n",
 		forWhat, reserve);
 	return true;
+}
+
+void* ProbeGameOperatorNew(size_t size)
+{
+	if (!g_installed.load())
+		return nullptr;
+	void* block = g_gameOperatorNew(size);
+	g_gameDelete(block);
+	return block;
 }
 
 void TickNetplayArenaKeeper()

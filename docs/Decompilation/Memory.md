@@ -36,13 +36,34 @@ GlyphAtlasGuard) moves the failure to the next big request; fragmentation itself
 Fixes 1-3 apply only when the running exe carries the large-address-aware bit; on a stock exe the
 mod behaves exactly as before.
 
-**Parked 2026-10-10.** The code (LargeAddressAware.cpp, LaaStress.cpp and their hooks) lives on
-branch `experiment/large-address-aware`, not on the release branches. Decision: no player should
-have to touch their exe, and the only way for the mod to set the bit for them is to rewrite
-BBCF.exe on disk itself (the bit is read when Windows creates the process, before the mod loads;
-Steam's verify and every game update undo it). That is only acceptable once it is regression-safe,
-and it is not: bug 4 is open, more may exist, they would surface late in long sessions or as
-online desyncs, and an exe-rewriting DLL invites antivirus flags. Pick it back up from that branch.
+**Parked 2026-10-10, resumed 2026-10-17 with a different safety argument.** The bit stays the
+fix, but the upper 2 GB is no longer handed to the game from boot. `src/Core/HighMemoryReserve.cpp`
+reserves all of it from DllMain (before WinMain, before the D3D device), so the game, the GPU driver
+and everything else lay memory out exactly as on a stock exe. It is released only when the game
+would otherwise run out below 2 GB, which on a stock exe is a crash. Whatever still breaks above
+2 GB (bug 4, or bugs not found yet) can then only break in a session that would have ended anyway.
+Release triggers, all funnelled through `ReleaseNetplayArenaReserve` / `HighMemoryReserve::Release`:
+
+| Trigger | Where | Covers |
+|---|---|---|
+| operator new's `call _callnewh` at 0x0079E091 retargeted | NetplayArenaKeeper.cpp `OperatorNewOutOfMemory` | every `new` in BBCF (554 call sites), on any exe |
+| netplay arena / file-slot sites, malloc-first | `RescuingAlloc` | the 100.6 MB arena and the 62 MB stage file |
+| D3D texture creation returning E_OUTOFMEMORY | ID3D9EXWrapper_Device.cpp, GlyphAtlasGuard.cpp | textures |
+| background watcher, every 2 s, largest truly free block below 2 GB < 32 MB | HighMemoryReserve.cpp | plain malloc callers that would get a null |
+
+Verified 2026-10-17 on the run copy (`BBCF_laa.exe` as BBCF.exe): stock exe unchanged; LAA exe normal
+session holds the half and plays a training match; `BBCF_IM_LAA_STRESS=4` (low half plugged 25 s in,
+watcher off) released it through the stage file (training match then played normally, combos and
+effects) and through the arena (a replay played with the arena at 0x8000F020); a probe `new` released
+it through the _callnewh hook; mode 3 released it through the watcher. Bug 4 did NOT reproduce after
+a release (only under the full from-boot stress). Also found and fixed: the D3DX null-handle guards
+were skipped because the mod's own ID3DXEffectWrapper (hook_D3DXCreateEffect detour) stood in front
+of the D3DX vtable; GuardEffectVtable now unwraps it.
+
+Caveat measured the same day: in an ordinary LAA training match on the dev machine the largest truly
+free block below 2 GB was already 65.5 MB, so on weaker machines the watcher will release in some
+sessions that would not have crashed. Bug 4 therefore still matters. Not done yet: the mod setting
+the bit on players' exes (rename-and-replace, takes effect next launch).
 
 ## 1. How the game allocates
 
