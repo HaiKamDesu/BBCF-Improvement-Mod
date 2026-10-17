@@ -11,6 +11,7 @@
 #include "Network/LobbyTrace.h"
 #include "Game/GlyphAtlasGuard.h"
 #include "Game/NetplayArenaKeeper.h"
+#include "Core/TestProbes.h"
 #include "Game/DesyncDiagnostics.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Game/SpectatorSyncDiagnostics.h"
@@ -9280,6 +9281,7 @@ void __declspec(naked)GetFrameCounter()
 	RankedAutomationHarness::Tick();
 	GetMusicManager().Update();
 	DesyncDiagnostics::Tick();
+	TestProbes::OnGameFrame();
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER
 	{
 		UnlimitedReplayTakeoverManager::Instance().Tick();

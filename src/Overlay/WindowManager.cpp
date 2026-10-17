@@ -1,5 +1,6 @@
 ﻿#include "WindowManager.h"
 #include "Core/LaaStress.h"
+#include "Core/TestProbes.h"
 #include "Input/LocalInputManager.h"
 
 #include "Branding.h"
@@ -1040,6 +1041,7 @@ void WindowManager::HandleButtons()
 	// buffer had to be given it. Cheap: one atomic load on almost every frame.
 	TickNetplayArenaKeeper();
 	LaaStress::Tick();
+	TestProbes::OnRenderFrame();
 
 	// Same reason as above: the lobby avatar only exists on menu screens, where the frame
 	// counter hook never fires.

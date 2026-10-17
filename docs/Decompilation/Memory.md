@@ -30,7 +30,7 @@ GlyphAtlasGuard) moves the failure to the next big request; fragmentation itself
 | 1 | D3DX9 effects created without `D3DXFX_LARGEADDRESSAWARE` | 62 of 63 `D3DXCreateEffect` calls return E_OUTOFMEMORY, null effect, crash at BBCF.exe+0x4972C | `src/Core/LargeAddressAware.cpp` patches BBCF.exe's import of D3DXCreateEffect from DllMain to OR the flag in | fixed, verified under stress |
 | 2 | D3DX in large-address mode decodes a null handle as `~0` | the game calls setters with the 0 that GetParameterBySemantic returns for missing semantics; CEffect::SetMatrix reads address 3 | guards on the 18 handle-taking slots of the CEffect vtable return D3DERR_INVALIDCALL for a null handle, as vanilla D3DX does | fixed, verified under stress |
 | 3 | Particle file pointer fix-up sign-extends the buffer address | every pointer after the first comes out 1 byte short, crash at BBCF.exe+0x5A78D on the main menu | 5-byte patch at 0x45A414: `cdq` becomes a zero-extend | fixed, verified under stress |
-| 4 | Battle logic | in a training match under stress both characters spawn stacked mid-stage and nothing animates; the game loop keeps running, no crash | unknown | **open** |
+| 4 | Battle logic | in a training match under stress both characters spawn stacked mid-stage and nothing animates; the game loop keeps running, no crash | unknown | **not reproducible** (2026-10-17): no repro under full stress on the current build or on the 10-10 build (7062dba) itself; every selectable stage (cursor x=2..43) loaded and took a combo under full stress |
 | 5 | (mod) a `std::map<int, std::string>` swapped while another thread uses it, at startup | AV in `std::_Container_base12::_Swap_proxy_and_iterators_unlocked` writing through 0xFEEEFEEE, only seen under the debugger | unknown | **open**, not LAA-related, a startup race |
 
 Fixes 1-3 apply only when the running exe carries the large-address-aware bit; on a stock exe the
@@ -62,8 +62,20 @@ of the D3DX vtable; GuardEffectVtable now unwraps it.
 
 Caveat measured the same day: in an ordinary LAA training match on the dev machine the largest truly
 free block below 2 GB was already 65.5 MB, so on weaker machines the watcher will release in some
-sessions that would not have crashed. Bug 4 therefore still matters. Not done yet: the mod setting
+sessions that would not have crashed. Not done yet: the mod setting
 the bit on players' exes (rename-and-replace, takes effect next launch).
+
+Step 4 checks, 2026-10-17, all under `BBCF_IM_LAA_STRESS=1` (everything above 2 GB from boot):
+
+- Replay determinism: `BBCF_IM_STATE_TRACE=1` logs `[Probe] hp` on every HP change; the same replay on
+  the stock exe and stressed gave the same 216 lines (HP and both positions).
+- Replay rewind (a snapshot restore) and replay takeover into training both worked.
+- Stage sweep: every selectable stage loaded, a walk-in combo damaged the dummy, and the game returned to
+  character select, each step checked by an expectation (bbcf-agentctl `expectlog`/`expectpixel`/
+  `presspixel`; the stage cursor is logged as `[Probe] stage x= y=`). Stage variants (y != 0) not swept.
+- Static: every BBCF allocation result is null-checked with `je`; no signed test of a fresh pointer
+  (4 scanner hits, all false positives). BBCF imports no VirtualAlloc; all its memory is CRT heap.
+- Not covered: online (needs a second player), arcade/story/Abyss.
 
 ## 1. How the game allocates
 

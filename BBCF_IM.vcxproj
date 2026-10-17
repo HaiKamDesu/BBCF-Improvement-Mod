@@ -117,6 +117,7 @@
     <ClCompile Include="src\Core\GameBuildGuard.cpp" />
     <ClCompile Include="src\Core\HighMemoryReserve.cpp" />
     <ClCompile Include="src\Core\LaaStress.cpp" />
+    <ClCompile Include="src\Core\TestProbes.cpp" />
     <ClCompile Include="src\Core\LargeAddressAware.cpp" />
     <ClCompile Include="src\Updater\UnsupportedBuildFlow.cpp" />
     <ClCompile Include="src\Core\WineCheck.cpp" />
@@ -336,6 +337,7 @@
     <ClInclude Include="src\Core\GameBuildGuard.h" />
     <ClInclude Include="src\Core\HighMemoryReserve.h" />
     <ClInclude Include="src\Core\LaaStress.h" />
+    <ClInclude Include="src\Core\TestProbes.h" />
     <ClInclude Include="src\Core\LargeAddressAware.h" />
     <ClInclude Include="src\Core\SupportedGameBuild.h" />
     <ClInclude Include="src\Updater\UnsupportedBuildFlow.h" />

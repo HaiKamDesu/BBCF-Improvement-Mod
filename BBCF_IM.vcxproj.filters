@@ -103,6 +103,9 @@
     <ClCompile Include="src\Core\LaaStress.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\TestProbes.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\GameBuildGuard.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -385,6 +388,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\LaaStress.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\TestProbes.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\GameBuildGuard.h">
