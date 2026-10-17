@@ -5741,6 +5741,39 @@ struct LocalizationKeysAccessor
 
         // 360 and 720 are shorthand for full circles: 360 is 412369874 and 720 is 41236987412369874, so 360A is a 360 super with A on its last frame.
         inline const char* _360_and_720_are_shorthand_for_full_circles_360_is_412369874_and_720_is_41236987412369874_so_360A_is_a_360_super_with_A_on_its_last_frame() const { return Get("360 and 720 are shorthand for full circles: 360 is 412369874 and 720 is 41236987412369874, so 360A is a 360 super with A on its last frame."); }
+
+        // Run the game in 4 GB mode?
+        inline const char* Run_the_game_in_4_GB_mode() const { return Get("Run the game in 4 GB mode?"); }
+
+        // BBCF is a 32-bit game and only gets 2 GB of memory. In long sessions that memory runs out, and the game closes by itself when a match or a replay loads.
+        inline const char* BBCF_is_a_32_bit_game_and_only_gets_2_GB_of_memory_In_long_sessions_that_memory_runs_out_and_the_game_closes_by_itself_when_a_match_or_a_replay_loads() const { return Get("BBCF is a 32-bit game and only gets 2 GB of memory. In long sessions that memory runs out, and the game closes by itself when a match or a replay loads."); }
+
+        // The mod can run the game with 4 GB instead. If you accept:
+        inline const char* The_mod_can_run_the_game_with_4_GB_instead_If_you_accept() const { return Get("The mod can run the game with 4 GB instead. If you accept:"); }
+
+        // The mod makes a copy of BBCF.exe called BBCF_IM_4GB.exe, with one setting changed so Windows gives it 4 GB. Your BBCF.exe is not modified.
+        inline const char* The_mod_makes_a_copy_of_BBCF_exe_called_BBCF_IM_4GB_exe_with_one_setting_changed_so_Windows_gives_it_4_GB_Your_BBCF_exe_is_not_modified() const { return Get("The mod makes a copy of BBCF.exe called BBCF_IM_4GB.exe, with one setting changed so Windows gives it 4 GB. Your BBCF.exe is not modified."); }
+
+        // From then on, starting the game from Steam starts that copy. Your saves, settings and Steam work as before.
+        inline const char* From_then_on_starting_the_game_from_Steam_starts_that_copy_Your_saves_settings_and_Steam_work_as_before() const { return Get("From then on, starting the game from Steam starts that copy. Your saves, settings and Steam work as before."); }
+
+        // The game closes and starts again by itself, once, right now.
+        inline const char* The_game_closes_and_starts_again_by_itself_once_right_now() const { return Get("The game closes and starts again by itself, once, right now."); }
+
+        // If you ever remove the mod, the game just starts normally again. You can turn this off at any time in the mod's Settings (4 GB mode).
+        inline const char* If_you_ever_remove_the_mod_the_game_just_starts_normally_again_You_can_turn_this_off_at_any_time_in_the_mod_s_Settings_4_GB_mode() const { return Get("If you ever remove the mod, the game just starts normally again. You can turn this off at any time in the mod's Settings (4 GB mode)."); }
+
+        // Could not switch to 4 GB mode:
+        inline const char* Could_not_switch_to_4_GB_mode() const { return Get("Could not switch to 4 GB mode:"); }
+
+        // Restart in 4 GB mode
+        inline const char* Restart_in_4_GB_mode() const { return Get("Restart in 4 GB mode"); }
+
+        // Not now
+        inline const char* Not_now() const { return Get("Not now"); }
+
+        // No, don't ask again
+        inline const char* No_don_t_ask_again() const { return Get("No, don't ask again"); }
 };
 
 

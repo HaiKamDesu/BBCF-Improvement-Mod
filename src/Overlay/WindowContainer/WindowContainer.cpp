@@ -12,6 +12,7 @@
 #include "Overlay/Window/ComboDataWindow.h"
 #include "Overlay/Window/ReplayDBPopupWindow.h" 
 #include "Overlay/Window/PaletteSharePopupWindow.h"
+#include "Overlay/Window/LargeAddressPopupWindow.h"
 #include "Overlay/Window/FrameHistory/FrameHistoryWindow.h"
 #include "Overlay/Window/FrameAdvantage/FrameAdvantageWindow.h"
 #include "Overlay/Window/ReplayExtrasWindow.h"
@@ -94,6 +95,8 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_PaletteSharePopup,
                 new PaletteSharePopupWindow("Palette Share Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
+        AddWindow(WindowType_LargeAddressPopup,
+                new LargeAddressPopupWindow("4 GB Mode Popup", true, *this, ImGuiWindowFlags_NoTitleBar));
 
         AddWindow(WindowType_Jukebox,
         	new JukeboxWindow(L("Jukebox"), true,

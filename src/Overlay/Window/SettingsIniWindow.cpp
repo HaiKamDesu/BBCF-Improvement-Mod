@@ -94,6 +94,7 @@ namespace {
 		{ "PlayerRoomListHideUnmetRequirement", "Hide rooms you cannot join", "Player room list", "Hides rooms that demand a better connection than yours, so everything left in the list is actually joinable." },
 		{ "LoadForeignPalettesToggleDefault", "Show other players' palettes by default", "Palettes", "Whether custom colours made by other players are shown when you start the game. You can still flip this per session from the palette menu." },
 		{ "OnlineInputDelay", "Online input delay (frames)", "Netcode", "How many frames your own inputs are held back in online matches. The game always uses 2. Raising it gives both you and your opponent less rollback and gives you more input lag, which is the trade worth making on a bad connection. It cannot be set below 2, because a lower number does not speed you up - it makes your inputs reach your opponent later and pushes the rollback onto them and onto anyone spectating. Takes effect on your next online match." },
+		{ "LargeAddressSpace", "4 GB mode", "System", "Run the game with 4 GB of memory instead of 2, which stops the game closing when a match or replay loads late in a long session. The mod starts BBCF_IM_4GB.exe, a copy of BBCF.exe with one flag changed; BBCF.exe itself is never modified, so removing the mod runs the normal game again. \"Ask me in-game\" asks once. Takes effect the next time the game starts." },
 		{ "AllowPaletteDownloads", "Let others save your palette", "Palettes", "Whether other players can save the custom colours they see you using. \"Not chosen yet\" means the mod will ask you once in-game." },
 		{ "CustomPalettesInCharSelect", "Show custom colours on character select", "Palettes", "Makes the colour preview on the character select screen use your custom palettes, so it matches what you will actually see in the match. The mod writes a modified copy of one of the game's data files into its own folder to do this - nothing the game shipped is changed. Turn it off if you would rather it did not write that file." },
 		{ "NewControllerSystem", "New controller system", "Controller", "Every keyboard and controller is assigned to Player 1 or Player 2 on the Controllers page, with hot-plug, names and button mapping per device. Turn off to go back to the game's own controller handling and the older options below." },
@@ -345,6 +346,12 @@ namespace {
 		{ 1, "Player 2 controller" },
 	};
 
+	static const SettingEnumOption kAskOffOnOptions[] = {
+		{ -1, "Ask me in-game" },
+		{ 0, "Off" },
+		{ 1, "On" },
+	};
+
 	static const SettingEnumOption kAskNoYesOptions[] = {
 		{ -1, "Ask me in-game" },
 		{ 0, "No" },
@@ -362,6 +369,7 @@ namespace {
 		{ "FrameHistoryTimeDirection", kFrameHistoryDirectionOptions, _countof(kFrameHistoryDirectionOptions) },
 		{ "CrashDumpDetail", kCrashDumpDetailOptions, _countof(kCrashDumpDetailOptions) },
 		{ "AllowPaletteDownloads", kAskNoYesOptions, _countof(kAskNoYesOptions) },
+		{ "LargeAddressSpace", kAskOffOnOptions, _countof(kAskOffOnOptions) },
 		{ "TakeoverInputSlot", kTakeoverSlotOptions, _countof(kTakeoverSlotOptions) },
 		{ "UploadReplayData", kAskNoYesOptions, _countof(kAskNoYesOptions) },
 		{ "PlatinumVoiceChoice", kPlatinumVoiceChoiceOptions, _countof(kPlatinumVoiceChoiceOptions) },
@@ -523,7 +531,7 @@ namespace {
 	{
 		static const char* const kRestartKeys[] = {
 			"RenderingWidth", "RenderingHeight", "Viewport", "AntiAliasing", "V-sync", "MenuSize",
-			"DinputDllWrapper",
+			"DinputDllWrapper", "LargeAddressSpace",
 			"SwapControllerPos", "EnableControllerHooks", "ForceEnableControllerSettingHooks", "NewControllerSystem",
 			"PrimaryKeyboardDeviceId", "IgnoredKeyboardIds", "KeyboardRenameMap", "KeyboardMappings",
 			"SpectatorSyncHooksEnabled",

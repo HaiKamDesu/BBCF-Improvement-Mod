@@ -979,7 +979,7 @@ void MusicManager::Update() {
             m_pendingSoundObj = nullptr;
         } else {
             __try {
-                HMODULE hMod = GetModuleHandleA("BBCF.exe");
+                HMODULE hMod = GetModuleHandleA(nullptr);
                 if (hMod) {
                     uintptr_t modBase = (uintptr_t)hMod;
                     void* audioSingleton = *(void**)(modBase + 0x8929C8);
@@ -1115,7 +1115,7 @@ bool MusicManager::CheckConfirmDialogUp() {
 }
 
 void MusicManager::PollDialogRenderPhase() {
-    HMODULE hMod = GetModuleHandleA("BBCF.exe");
+    HMODULE hMod = GetModuleHandleA(nullptr);
     if (!hMod) { m_dialogSeenInRender = false; return; }
     uintptr_t base = (uintptr_t)hMod;
 
@@ -1313,7 +1313,7 @@ void MusicManager::UpdateMusicState() {
 	// Read the ACTUAL playing BGM ID from the audio engine, not the menu cursor
 	int gameMusicId = -1;
 
-	HMODULE hMod = GetModuleHandleA("BBCF.exe");
+	HMODULE hMod = GetModuleHandleA(nullptr);
 	if (hMod) {
 		__try {
 			gameMusicId = *(int*)((uintptr_t)hMod + AUDIO_MGR_RVA + BGM_ID_OFFSET);
@@ -2384,7 +2384,7 @@ bool MusicManager::PlayTrackPhysically(uintptr_t modBase, int trackId, const cha
 bool MusicManager::PlayTrack(int trackId, bool force, const char* reason) {
 	LogMusic("MusicManager: PlayTrack(%d) reason=%s\n", trackId, reason ? reason : "other");
 
-	HMODULE hMod = GetModuleHandleA("BBCF.exe");
+	HMODULE hMod = GetModuleHandleA(nullptr);
 	if (!hMod) {
 		LogMusic("MusicManager: PlayTrack(%d) - FAIL: BBCF.exe module not found\n", trackId);
 		return false;
@@ -2456,7 +2456,7 @@ bool MusicManager::PlayTrack(int trackId, bool force, const char* reason) {
 static void FormatPlayerSetupBlocks(char* buf, size_t size) {
 	int v[6] = { -99, -99, -99, -99, -99, -99 };
 	__try {
-		const uintptr_t base = (uintptr_t)GetModuleHandleA("BBCF.exe") + AUDIO_MGR_RVA + 0x118;
+		const uintptr_t base = (uintptr_t)GetModuleHandleA(nullptr) + AUDIO_MGR_RVA + 0x118;
 		for (int p = 0; p < 2; p++) {
 			const uintptr_t block = base + (uintptr_t)p * 0x710;
 			v[p * 3 + 0] = *(int*)(block + 0x00);
@@ -2508,7 +2508,7 @@ bool MusicManager::PreviewPac(const std::string& relPathNoExt, const std::string
 		return false;
 	}
 
-	HMODULE hMod = GetModuleHandleA("BBCF.exe");
+	HMODULE hMod = GetModuleHandleA(nullptr);
 	if (!hMod) return false;
 	const uintptr_t modBase = (uintptr_t)hMod;
 
@@ -2652,7 +2652,7 @@ void MusicManager::DetectSceneExitAndUnload() {
 void MusicManager::UnloadCustomBgm() {
     if (!m_customBgmLoaded) return; // nothing we took over; safe no-op
 
-    HMODULE hMod = GetModuleHandleA("BBCF.exe");
+    HMODULE hMod = GetModuleHandleA(nullptr);
     if (hMod) {
         uintptr_t modBase = (uintptr_t)hMod;
         uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;
@@ -2707,7 +2707,7 @@ void MusicManager::UnloadCustomBgm() {
 void MusicManager::RestoreAnchorForSceneExit() {
     if (!m_customBgmLoaded) return; // nothing we took over; safe no-op
 
-    HMODULE hMod = GetModuleHandleA("BBCF.exe");
+    HMODULE hMod = GetModuleHandleA(nullptr);
     if (!hMod) return;
     uintptr_t modBase = (uintptr_t)hMod;
 
@@ -2771,7 +2771,7 @@ void MusicManager::RestoreNativeBgmForMatchEnd() {
     // banks reference their data; freeing it underneath a live bank is what
     // killed the audio clock and black-screened the summary). One buffer is
     // leaked per such scene exit — acceptable; rotations recycle theirs.
-    HMODULE hMod = GetModuleHandleA("BBCF.exe");
+    HMODULE hMod = GetModuleHandleA(nullptr);
     if (!hMod) return;
     uintptr_t soundSlotMgrAddr = (uintptr_t)hMod + SOUND_SLOT_MGR_RVA;
     __try {
@@ -2791,7 +2791,7 @@ void MusicManager::ClearBgmForSceneExit() {
         return;
     }
 
-    HMODULE hMod = GetModuleHandleA("BBCF.exe");
+    HMODULE hMod = GetModuleHandleA(nullptr);
     if (!hMod) return;
     uintptr_t modBase = (uintptr_t)hMod;
     uintptr_t audioMgrAddr = modBase + AUDIO_MGR_RVA;

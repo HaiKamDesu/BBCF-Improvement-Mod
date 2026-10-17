@@ -410,6 +410,14 @@ namespace
 	void Relaunch(const Handoff& h)
 	{
 		if (!h.relaunch) return;
+		// Test only: a copy of the game outside Steam's install (the archived run copy) must
+		// not be relaunched through steam://, which always starts the Steam install.
+		wchar_t direct[4] = {};
+		if (GetEnvironmentVariableW(L"BBCF_IM_RELAUNCH_DIRECT", direct, 4) > 0 && direct[0] == L'1')
+		{
+			ShellExecuteW(nullptr, L"open", h.bbcfExePath.c_str(), nullptr, h.installRoot.c_str(), SW_SHOWNORMAL);
+			return;
+		}
 		HINSTANCE result = ShellExecuteW(nullptr, L"open", L"steam://rungameid/586140", nullptr, nullptr, SW_SHOWNORMAL);
 		if (reinterpret_cast<intptr_t>(result) > 32)
 			return;
@@ -423,13 +431,37 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	int argc = 0;
 	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	std::wstring handoffPath;
+	DWORD relaunchAfter = 0;
+	std::wstring relaunchExe;
 	for (int i = 1; i + 1 < argc; ++i)
 	{
 		if (std::wstring(argv[i]) == L"--handoff")
 			handoffPath = argv[i + 1];
+		else if (std::wstring(argv[i]) == L"--relaunch-after")
+			relaunchAfter = wcstoul(argv[i + 1], nullptr, 10);
+		else if (std::wstring(argv[i]) == L"--exe")
+			relaunchExe = argv[i + 1];
 	}
 	if (argv)
 		LocalFree(argv);
+
+	if (relaunchAfter != 0)
+	{
+		// The mod's 4 GB mode was just accepted (LaaRedirect.cpp): once the game has closed,
+		// start it again the way the player did, through Steam, so the mod's redirect runs.
+		HANDLE game = OpenProcess(SYNCHRONIZE, FALSE, relaunchAfter);
+		if (game)
+		{
+			WaitForSingleObject(game, 60000);
+			CloseHandle(game);
+		}
+		Sleep(1000); // let Steam notice the game stopped before asking it to start again
+		Handoff relaunch;
+		relaunch.bbcfExePath = relaunchExe;
+		relaunch.installRoot = Parent(relaunchExe);
+		Relaunch(relaunch);
+		return 0;
+	}
 
 	Handoff h;
 	if (handoffPath.empty() || !LoadHandoff(handoffPath, h))

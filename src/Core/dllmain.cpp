@@ -13,6 +13,7 @@
 #include "ExitDiagnostics.h"
 #include "GameBuildGuard.h"
 #include "HighMemoryReserve.h"
+#include "LaaRedirect.h"
 #include "LaaStress.h"
 #include "LargeAddressAware.h"
 #include "Localization.h"
@@ -259,6 +260,7 @@ DWORD WINAPI BBCF_IM_Start(HMODULE hModule)
 	LargeAddressAware::LogStatus();
 	LaaStress::LogSummary();
 	HighMemoryReserve::LogSummary();
+	LaaRedirect::LogSummary();
 	ForceLog("[Init] Logging configured (generateDebugLogs=%d, urtReTrace=%d level=%d maxMB=%d backups=%d).\n",
 		Settings::settingsIni.generateDebugLogs,
 		urtReTraceEnabled ? 1 : 0,
@@ -429,6 +431,14 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
                 break;
         }
 
+        // With the player's consent, hand the game to BBCF_IM_4GB.exe (LaaRedirect.h). This
+        // process then only waits for it, so none of the mod's init runs here.
+        if (LaaRedirect::OnProcessAttach())
+        {
+                ForceLog("[Init] Redirected to BBCF_IM_4GB.exe; this process only waits for it");
+                break;
+        }
+
         // On a large-address-aware exe, before the game creates its first D3DX effect.
         LargeAddressAware::InstallD3DXEffectFlag();
 
@@ -467,7 +477,7 @@ BOOL WINAPI DllMain(HMODULE hinstDLL, DWORD ul_reason_for_call, LPVOID lpReserve
 }
 
                 case DLL_PROCESS_DETACH:
-                        if (!GameBuildGuard::IsSupported())
+                        if (!GameBuildGuard::IsSupported() || LaaRedirect::IsRedirectingProcess())
                         {
                                 break;
                         }

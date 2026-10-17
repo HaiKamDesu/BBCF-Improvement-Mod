@@ -1,6 +1,7 @@
 ﻿#include "WindowManager.h"
 #include "Core/LaaStress.h"
 #include "Core/TestProbes.h"
+#include "Core/LaaRedirect.h"
 #include "Input/LocalInputManager.h"
 
 #include "Branding.h"
@@ -645,6 +646,12 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	if (Settings::settingsIni.allowPaletteDownloads == -1)
 	{
 		m_windowContainer->GetWindow(WindowType_PaletteSharePopup)->Open();
+	}
+
+	if (LaaRedirect::ShouldAsk())
+	{
+		m_windowContainer->GetWindow(WindowType_LargeAddressPopup)->Open();
+		LOG(1, "[LAA] Asking whether to run in 4 GB mode.\n");
 	}
 
 

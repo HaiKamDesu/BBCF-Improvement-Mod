@@ -141,7 +141,7 @@ BgmReplacementManager& BgmReplacementManager::GetInstance()
 
 bool BgmReplacementManager::SnapshotTable()
 {
-	HMODULE hMod = GetModuleHandleA("BBCF.exe");
+	HMODULE hMod = GetModuleHandleA(nullptr);
 	if (!hMod)
 	{
 		LogRepl("BBCF.exe module not found - replacements unavailable\n");

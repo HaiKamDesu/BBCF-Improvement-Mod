@@ -59,6 +59,7 @@ public:
 			WindowType_ReplayDBPopup,
 			WindowType_WinePopup,
 			WindowType_PaletteSharePopup,
+			WindowType_LargeAddressPopup,
 			WindowType_UpdateNotifier,
 		};
 

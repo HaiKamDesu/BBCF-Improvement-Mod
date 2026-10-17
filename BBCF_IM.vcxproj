@@ -48,6 +48,7 @@
     <ClCompile Include="src\Overlay\Window\FrameHistory\FrameHistoryWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\ReplayDBPopupWindow.cpp" />
     <ClCompile Include="src\Overlay\Window\PaletteSharePopupWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\LargeAddressPopupWindow.cpp" />
     <ClCompile Include="src\Network\ReplayUploadManager.cpp" />
     <ClCompile Include="src\Game\SnapshotApparatus\SnapshotApparatus.cpp" />
     <ClCompile Include="src\Game\SnapshotApparatus\SnapshotSlotPool.cpp" />
@@ -118,6 +119,7 @@
     <ClCompile Include="src\Core\HighMemoryReserve.cpp" />
     <ClCompile Include="src\Core\LaaStress.cpp" />
     <ClCompile Include="src\Core\TestProbes.cpp" />
+    <ClCompile Include="src\Core\LaaRedirect.cpp" />
     <ClCompile Include="src\Core\LargeAddressAware.cpp" />
     <ClCompile Include="src\Updater\UnsupportedBuildFlow.cpp" />
     <ClCompile Include="src\Core\WineCheck.cpp" />
@@ -255,6 +257,7 @@
     <ClInclude Include="src\Overlay\Window\FrameHistory\FrameHistoryWindow.h" />
     <ClInclude Include="src\Overlay\Window\ReplayDBPopupWindow.h" />
     <ClInclude Include="src\Overlay\Window\PaletteSharePopupWindow.h" />
+    <ClInclude Include="src\Overlay\Window\LargeAddressPopupWindow.h" />
     <ClInclude Include="src\Network\ReplayUploadManager.h" />
     <ClInclude Include="src\Game\GhidraDefs.h" />
     <ClInclude Include="src\Game\SnapshotApparatus\SnapshotApparatus.h" />
@@ -338,6 +341,7 @@
     <ClInclude Include="src\Core\HighMemoryReserve.h" />
     <ClInclude Include="src\Core\LaaStress.h" />
     <ClInclude Include="src\Core\TestProbes.h" />
+    <ClInclude Include="src\Core\LaaRedirect.h" />
     <ClInclude Include="src\Core\LargeAddressAware.h" />
     <ClInclude Include="src\Core\SupportedGameBuild.h" />
     <ClInclude Include="src\Updater\UnsupportedBuildFlow.h" />

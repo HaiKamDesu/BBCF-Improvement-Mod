@@ -288,6 +288,11 @@ SETTING(bool, loadforeignpalettes, "LoadForeignPalettesToggleDefault", "1");
 // Applied to the next session, not the one in progress. See src/Game/OnlineInputDelay.h.
 SETTING(int, onlineInputDelay, "OnlineInputDelay", "2");
 SETTING(int, allowPaletteDownloads, "AllowPaletteDownloads", "-1");
+// Run the game as BBCF_IM_4GB.exe, a copy of BBCF.exe with the large-address-aware flag (4 GB of
+// address space instead of 2), started by the mod in place of the stock exe (src/Core/LaaRedirect.h).
+// enum: -1 = ask in-game, 0 = off, 1 = on. Read straight from settings.ini in DllMain, before the
+// rest of the settings load. The mod sets it to 0 itself if the copy dies while starting.
+SETTING(int, largeAddressSpace, "LargeAddressSpace", "-1");
 SETTING(bool, customPalettesInCharSelect, "CustomPalettesInCharSelect", "1");
 SETTING(int, takeoverInputSlot, "TakeoverInputSlot", "0");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
