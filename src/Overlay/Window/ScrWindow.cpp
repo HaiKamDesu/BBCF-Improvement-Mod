@@ -1001,11 +1001,15 @@ void ScrWindow::TickTrainingResetSwap() {
     // Driven from EndScene (every rendered frame - the battle-frame-counter hook goes
     // idle during the reset limbo). EndScene also fires before the game resolves
     // g_gameVals' pointers (null until then), hence the guards.
-    if (!g_gameVals.pGameMode || !g_gameVals.pFrameCount) {
+    if (!g_gameVals.pGameMode || !g_gameVals.pGameState || !g_gameVals.pFrameCount) {
         return;
     }
 
-    if (*g_gameVals.pGameMode != GameMode_Training) {
+    // In a training match only. gameMode stays Training on its character select, where the
+    // timer below can read 5 with no characters built: the swap then wrote through a player
+    // pointer that did not exist yet (Scumplank 2026-10-16, crash entering training with the
+    // always-swap toggle left on).
+    if (*g_gameVals.pGameMode != GameMode_Training || *g_gameVals.pGameState != GameState_InMatch) {
         return;
     }
 
@@ -1081,6 +1085,9 @@ void ScrWindow::TickTrainingResetSwap() {
 void ScrWindow::swap_character_coordinates() {
     CharData* p1 = g_interfaces.player1.GetData();
     CharData* p2 = g_interfaces.player2.GetData();
+    if (p1 == nullptr || p2 == nullptr) {
+        return;
+    }
     auto posx1 = p1->position_x;
     auto posy1 = p1->position_y;
     p1->facingLeft = !p1->facingLeft;
