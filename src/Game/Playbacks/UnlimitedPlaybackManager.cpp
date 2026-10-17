@@ -662,6 +662,7 @@ void UnlimitedPlaybackManager::Tick() {
 
     ProcessPendingTriggerDelays(frame);
     ProcessPendingActionDelays(frame);
+    ReassertPendingBurst(frame);
 
     // The loop used to be gated on Trigger_OnLoop being *armed* and then returned, so
     // merely having a loop action configured silently disabled all six other triggers -
@@ -2565,6 +2566,11 @@ bool UnlimitedPlaybackManager::ExecuteResolvedAction(TriggerType trigger, Resolv
             // The game reads this and performs the action itself, which is what makes a
             // burst come out of hitstun rather than being cut short by it.
             memcpy(&(p2->set_action_override), &(resolved.animation->name[0]), 20);
+            if (resolved.animation->name.find("Burst") != std::string::npos) {
+                m_burstOverrideStartFrame = currentFrame;
+                m_burstOverrideUntilFrame = currentFrame + 60;
+                m_burstOverrideReasserts = 0;
+            }
         }
         else {
             ForceDummyAnimation(resolved.animation);
@@ -4344,6 +4350,51 @@ bool UnlimitedPlaybackManager::ShouldTriggerOnHit() {
     }
     m_onHitBurstLatched = true;
     return true;
+}
+
+// The action override (+0x2040) is the game's own pending-action request: the game writes
+// its own requests there too (FUN_00582000 copies a name into it), so a single write can be
+// replaced before it is acted on. On a counter hit the burst written on the first hitstun
+// frame never came out (Naoto vs Ragna, 2026-10-16): the hit queues more of its own reaction,
+// and a launch makes the ground burst picked on that first frame the wrong one in the air.
+// So keep asking, with the burst that fits where the dummy is now, until it starts bursting,
+// leaves hitstun, or a second has passed.
+void UnlimitedPlaybackManager::ReassertPendingBurst(int currentFrame) {
+    if (m_burstOverrideUntilFrame < 0) {
+        return;
+    }
+    CharData* const dummy = TrainingSide::Dummy().IsCharDataNullPtr() ? nullptr : TrainingSide::Dummy().GetData();
+    if (dummy == nullptr) {
+        m_burstOverrideUntilFrame = -1;
+        return;
+    }
+    const std::string action = dummy->currentAction;
+    const int waited = currentFrame - m_burstOverrideStartFrame;
+    if (action.find("Burst") != std::string::npos) {
+        if (m_burstOverrideReasserts > 0) {
+            LOG(1, "[UP] Burst came out %d frame(s) after the trigger, after %d re-request(s)\n",
+                waited, m_burstOverrideReasserts);
+        }
+        m_burstOverrideUntilFrame = -1;
+        return;
+    }
+    if (dummy->hitstun <= 0 || currentFrame > m_burstOverrideUntilFrame) {
+        LOG(1, "[UP] Burst never came out: %s %d frame(s) after the trigger (action '%s', hitstun %d, %d re-request(s))\n",
+            dummy->hitstun <= 0 ? "hitstun ended" : "gave up", waited, action.c_str(), dummy->hitstun,
+            m_burstOverrideReasserts);
+        m_burstOverrideUntilFrame = -1;
+        return;
+    }
+    const char* const wanted = dummy->position_y > 0 ? "CmnActAirBurstBegin" : "CmnActBurstBegin";
+    if (strncmp(dummy->set_action_override, wanted, sizeof(dummy->set_action_override)) != 0) {
+        char request[sizeof(dummy->set_action_override)] = {};
+        strncpy_s(request, wanted, _TRUNCATE);
+        memcpy(dummy->set_action_override, request, 20);
+        if (m_burstOverrideReasserts++ == 0) {
+            LOG(1, "[UP] Burst request was replaced (override now '%.20s', action '%s'); asking again for %s\n",
+                dummy->set_action_override, action.c_str(), wanted);
+        }
+    }
 }
 
 bool UnlimitedPlaybackManager::ShouldTriggerOnHitRecovery() {

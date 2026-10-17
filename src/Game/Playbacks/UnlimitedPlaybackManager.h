@@ -387,6 +387,7 @@ private:
     // Starts anything whose delay has run out, and drops a pending fire whose trigger was
     // disarmed or reconfigured while it was counting down.
     void ProcessPendingTriggerDelays(int currentFrame);
+    void ReassertPendingBurst(int currentFrame);
     void ProcessPendingActionDelays(int currentFrame);
     static void MarkActionFired(TriggerConfig& config, int actionIndex);
     // The script jump an animation action performs, on whoever the dummy is now.
@@ -608,6 +609,11 @@ private:
     bool m_loopStartRequested = false;
     // One burst per combo: set when a burst is armed, cleared when hitstun ends.
     bool m_onHitBurstLatched = false;
+    // A burst handed to the game through the action override, re-requested every frame until
+    // it comes out (see ReassertPendingBurst). -1 = none pending.
+    int m_burstOverrideUntilFrame = -1;
+    int m_burstOverrideStartFrame = -1;
+    int m_burstOverrideReasserts = 0;
 
     PlaybackManager m_runtimePlaybackManager;
 };
