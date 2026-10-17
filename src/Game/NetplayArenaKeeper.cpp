@@ -76,6 +76,11 @@ namespace
 	constexpr uintptr_t kCrtMallocRva = 0x003A106D;
 	constexpr uintptr_t kArenaFreeCallRva = 0x00386A3E;     // call delete, in 0x00786A30 (the arena's only free)
 	constexpr uintptr_t kDeleteRva = 0x0039E864;            // jmp 0x0079E0D5
+	// The file-slot table's only frees: the loader dropping a slot's old buffer before it
+	// loads a new one (0x0047C930), free one slot (0x0047C9A0), free slots 0x82 and up
+	// (0x0047C9F0). Each is `mov eax,[table+slot*8]; test; jz; push eax; call delete`.
+	constexpr uintptr_t kFileSlotFreeCallRvas[] = { 0x0007C95A, 0x0007C9C2, 0x0007CA13 };
+	constexpr BYTE kFileSlotFreeIndexModRm[] = { 0xFB, 0xF7, 0xF3 }; // [ebx+edi*8], [edi+esi*8], [ebx+esi*8]
 	constexpr size_t kArenaSize = 0x064A0000;               // the largest taker
 	// NOT just the arena's size. A heap block that big is its own VirtualAlloc of the size
 	// plus the heap's header, rounded to a page, at a 64 KB-aligned base - so a hole of
@@ -110,10 +115,14 @@ namespace
 	std::atomic<void*> g_reserve{ nullptr };
 	std::atomic<bool> g_installed{ false };
 	// While an arena is alive: the free space right after it, up to kReserveSize from its
-	// start. See KeepArenaTail.
+	// start. See KeepTail.
 	std::atomic<void*> g_arenaTail{ nullptr };
 	// A freed arena kept instead of freed. See ArenaFree.
 	std::atomic<void*> g_parkedArena{ nullptr };
+	// A file buffer that only fit by taking the reserve or the kept arena, and the free space
+	// after it, while it is alive. See FileSlotFree.
+	std::atomic<void*> g_rescuedFileBuffer{ nullptr };
+	std::atomic<void*> g_fileBufferTail{ nullptr };
 	DWORD g_lastReReserveAttemptMs = 0;
 
 	void* TryReserve()
@@ -121,10 +130,15 @@ namespace
 		return VirtualAlloc(nullptr, kReserveSize, MEM_RESERVE, PAGE_NOACCESS);
 	}
 
+	void ReleaseTail(std::atomic<void*>& holder)
+	{
+		if (void* tail = holder.exchange(nullptr))
+			VirtualFree(tail, 0, MEM_RELEASE);
+	}
+
 	void ReleaseArenaTail()
 	{
-		if (void* tail = g_arenaTail.exchange(nullptr))
-			VirtualFree(tail, 0, MEM_RELEASE);
+		ReleaseTail(g_arenaTail);
 	}
 
 	// Really frees a parked arena so something else can have its address space.
@@ -139,7 +153,8 @@ namespace
 		return true;
 	}
 
-	void* __cdecl RescuingAlloc(size_t size, const char* what)
+	// *rescued: the block only fit because the kept arena or the reserve was given up for it.
+	void* __cdecl RescuingAlloc(size_t size, const char* what, bool* rescued = nullptr)
 	{
 		if (void* block = g_crtMalloc(size))
 		{
@@ -150,6 +165,8 @@ namespace
 		{
 			void* block = g_gameOperatorNew(size); // throws as vanilla would if even that fails
 			LOG(0, "[NetplayArena] %s placed at 0x%p after freeing the kept arena.\n", what, block);
+			if (rescued != nullptr)
+				*rescued = true;
 			return block;
 		}
 
@@ -168,6 +185,8 @@ namespace
 		       "at 0x%p for it.\n", what, static_cast<unsigned>(size), reserve);
 		void* block = g_gameOperatorNew(size); // throws as vanilla would if even that fails
 		LOG(0, "[NetplayArena] %s placed at 0x%p after the release.\n", what, block);
+		if (rescued != nullptr)
+			*rescued = true;
 		return block;
 	}
 
@@ -181,10 +200,10 @@ namespace
 	// random offset, and in a 32-bit test it fit the previous one's range 3 times in 40.
 	// So hold the tail while the arena lives, and give it back the moment the arena is
 	// freed: the hole is then the full kReserveSize again (200 of 200 in the same test).
-	void KeepArenaTail(void* arena)
+	void KeepTail(void* block, std::atomic<void*>& holder, const char* what)
 	{
 		MEMORY_BASIC_INFORMATION info = {};
-		if (arena == nullptr || VirtualQuery(arena, &info, sizeof(info)) != sizeof(info))
+		if (block == nullptr || VirtualQuery(block, &info, sizeof(info)) != sizeof(info))
 			return;
 		BYTE* const base = static_cast<BYTE*>(info.AllocationBase);
 		BYTE* end = base;
@@ -201,9 +220,9 @@ namespace
 		if (info.RegionSize < size)
 			size = info.RegionSize;
 		void* kept = VirtualAlloc(tail, size, MEM_RESERVE, PAGE_NOACCESS);
-		LOG(1, "[NetplayArena] Arena at 0x%p; holding the %u bytes after it at 0x%p until it is freed (err=%lu).\n",
-			arena, static_cast<unsigned>(size), kept, kept ? 0ul : GetLastError());
-		void* previous = g_arenaTail.exchange(kept);
+		LOG(1, "[NetplayArena] %s at 0x%p; holding the %u bytes after it at 0x%p until it is freed (err=%lu).\n",
+			what, block, static_cast<unsigned>(size), kept, kept ? 0ul : GetLastError());
+		void* previous = holder.exchange(kept);
 		if (previous != nullptr)
 			VirtualFree(previous, 0, MEM_RELEASE);
 	}
@@ -221,13 +240,69 @@ namespace
 			}
 		}
 		void* arena = RescuingAlloc(size, "Netplay arena");
-		KeepArenaTail(arena);
+		KeepTail(arena, g_arenaTail, "Arena");
 		return arena;
 	}
 
 	void* __cdecl FileSlotAlloc(size_t size)
 	{
-		return RescuingAlloc(size, "File buffer");
+		bool rescued = false;
+		void* block = RescuingAlloc(size, "File buffer", &rescued);
+		if (rescued)
+		{
+			g_rescuedFileBuffer.store(block);
+			KeepTail(block, g_fileBufferTail, "File buffer");
+		}
+		return block;
+	}
+
+	// The stage file's hole is only free for a moment too. Dato, 2026-10-17
+	// (Crash_20261017_191407, player lobby, every match): entering lobby character select,
+	// the 62 MB char_select_stage.pac fit nowhere and took the reserve, as designed. Char
+	// select then freed it, the versus screen loaded a 29 MB block and several smaller ones
+	// straight into the hole, no 101 MB hole was left for the 5 s tick, and the arena threw
+	// 18 s after the release with a largest free block of 99.12 MB. So take the hole back
+	// the moment that buffer is freed, exactly as ArenaFree does for the arena. Its tail was
+	// held while it lived, so the hole is a full kReserveSize again.
+	//
+	// Every slot buffer is freed through one of three call sites (kFileSlotFreeCallRvas); all
+	// three come here, and only the rescued buffer is anything but a plain delete.
+	void __cdecl FileSlotFree(void* block)
+	{
+		void* expected = block;
+		if (block == nullptr || !g_rescuedFileBuffer.compare_exchange_strong(expected, nullptr))
+		{
+			g_gameDelete(block);
+			return;
+		}
+
+		MEMORY_BASIC_INFORMATION info = {};
+		void* const hole = VirtualQuery(block, &info, sizeof(info)) == sizeof(info) ? info.AllocationBase : nullptr;
+		g_gameDelete(block);
+		ReleaseTail(g_fileBufferTail);
+		if (g_reserve.load() != nullptr)
+		{
+			LOG(1, "[NetplayArena] Rescued file buffer at 0x%p freed; a reserve is already held.\n", block);
+			return;
+		}
+
+		// The exact range first: it is the one hole we know is whole right now.
+		void* reserve = hole != nullptr ? VirtualAlloc(hole, kReserveSize, MEM_RESERVE, PAGE_NOACCESS) : nullptr;
+		if (reserve == nullptr)
+			reserve = TryReserve();
+		expected = nullptr;
+		if (reserve != nullptr && g_reserve.compare_exchange_strong(expected, reserve))
+		{
+			LOG(1, "[NetplayArena] Rescued file buffer at 0x%p freed; took its address space back as the reserve at 0x%p.\n",
+				block, reserve);
+		}
+		else
+		{
+			if (reserve != nullptr)
+				VirtualFree(reserve, 0, MEM_RELEASE);
+			LOG(1, "[NetplayArena] Rescued file buffer at 0x%p freed but no %u-byte hole was left to reserve (err=%lu).\n",
+				block, static_cast<unsigned>(kReserveSize), GetLastError());
+		}
 	}
 
 	// The arena's hole is only free for a moment: a rematch frees the old arena on the result
@@ -379,6 +454,25 @@ void InstallNetplayArenaKeeper()
 	}
 	if (!freeSiteMatches || !RetargetRel32(arenaFreeCall, reinterpret_cast<void*>(&ArenaFree)))
 		LOG(0, "[NetplayArena] Arena free site not patched; the reserve comes back on the 5 s tick only.\n");
+	// Optional too, but all three or none: a rescued buffer freed through an unpatched site
+	// would leave its tail held (the tick notices, see TickNetplayArenaKeeper).
+	bool fileFreeSitesMatch = true;
+	for (size_t i = 0; i < sizeof(kFileSlotFreeCallRvas) / sizeof(kFileSlotFreeCallRvas[0]); ++i)
+	{
+		const uintptr_t site = base + kFileSlotFreeCallRvas[i];
+		const BYTE before[] = { 0x8B, 0x04, kFileSlotFreeIndexModRm[i], 0x85, 0xC0, 0x74, 0x10, 0x50 };      // mov eax,[..*8]; test eax,eax; jz; push eax
+		const BYTE after[] = { 0x83, 0xC4, 0x04, 0xC7, 0x04, kFileSlotFreeIndexModRm[i], 0, 0, 0, 0 }; // add esp,4; mov [..*8],0
+		fileFreeSitesMatch = fileFreeSitesMatch &&
+			BytesMatch(site - sizeof(before), before, sizeof(before)) &&
+			BytesMatch(site + 5, after, sizeof(after)) &&
+			IsRel32To(site, 0xE8, gameDelete);
+	}
+	bool fileFreeSitesPatched = fileFreeSitesMatch;
+	for (size_t i = 0; fileFreeSitesPatched && i < sizeof(kFileSlotFreeCallRvas) / sizeof(kFileSlotFreeCallRvas[0]); ++i)
+		fileFreeSitesPatched = RetargetRel32(base + kFileSlotFreeCallRvas[i], reinterpret_cast<void*>(&FileSlotFree));
+	if (!fileFreeSitesPatched)
+		LOG(0, "[NetplayArena] File slot free sites %s; a rescued stage buffer's space comes back on the 5 s tick only.\n",
+			fileFreeSitesMatch ? "only partly patched" : "did not match, not patched");
 	g_installed.store(true);
 
 	LOG(1, "[NetplayArena] Keeper installed: %u bytes of address space reserved at 0x%p, released "
@@ -388,6 +482,7 @@ void InstallNetplayArenaKeeper()
 
 bool ReleaseNetplayArenaReserve(const char* forWhat)
 {
+
 	// The kept arena goes first, as in RescuingAlloc: the reserve is what the next arena
 	// needs, and a texture or a file fits in either.
 	if (FreeParkedArena(forWhat))
@@ -408,6 +503,22 @@ bool ReleaseNetplayArenaReserve(const char* forWhat)
 
 void TickNetplayArenaKeeper()
 {
+	// A rescued file buffer freed some way other than the three patched sites: stop holding
+	// the space after it, or no full-size hole can form there again.
+	if (void* buffer = g_rescuedFileBuffer.load())
+	{
+		MEMORY_BASIC_INFORMATION info = {};
+		if (VirtualQuery(buffer, &info, sizeof(info)) == sizeof(info) && info.State == MEM_FREE)
+		{
+			void* expected = buffer;
+			if (g_rescuedFileBuffer.compare_exchange_strong(expected, nullptr))
+			{
+				ReleaseTail(g_fileBufferTail);
+				LOG(0, "[NetplayArena] Rescued file buffer at 0x%p was freed outside the slot table; released the space held after it.\n", buffer);
+			}
+		}
+	}
+
 	// A kept arena already holds a 100 MB range.
 	if (!g_installed.load() || g_reserve.load() != nullptr || g_parkedArena.load() != nullptr)
 	{
