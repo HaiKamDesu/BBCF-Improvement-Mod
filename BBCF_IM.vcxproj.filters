@@ -400,6 +400,9 @@
     <ClInclude Include="src\Core\LaaRedirect.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\FirewallMirror.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="src\Core\GameBuildGuard.h">
       <Filter>include</Filter>
     </ClInclude>

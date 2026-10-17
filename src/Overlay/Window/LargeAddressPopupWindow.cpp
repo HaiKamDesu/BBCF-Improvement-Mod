@@ -45,6 +45,7 @@ void LargeAddressPopupWindow::Draw()
 		for (const char* line : {
 			"The mod makes a copy of BBCF.exe called BBCF_IM_4GB.exe, with one setting changed so Windows gives it 4 GB. Your BBCF.exe is not modified.",
 			"From then on, starting the game from Steam starts that copy. Your saves, settings and Steam work as before.",
+			"Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.",
 			"The game closes and starts again by itself, once, right now." })
 		{
 			ImGui::Bullet();

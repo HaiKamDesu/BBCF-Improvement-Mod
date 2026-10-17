@@ -2103,3 +2103,4 @@ Could not switch to 4 GB mode:,Could not switch to 4 GB mode:,No se pudo pasar a
 Restart in 4 GB mode,Restart in 4 GB mode,Reiniciar en modo 4 GB
 Not now,Not now,Ahora no
 "No, don't ask again","No, don't ask again","No, no preguntar de nuevo"
+"Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.","Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.","La configuración de gráficos y de compatibilidad que le diste a BBCF.exe en Windows pasa a la copia. Si el Firewall de Windows tiene reglas para BBCF.exe, Windows te pide permiso una vez para copiarlas también."

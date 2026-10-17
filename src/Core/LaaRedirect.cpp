@@ -1,11 +1,13 @@
 #include "LaaRedirect.h"
 
+#include "FirewallMirror.h"
 #include "LargeAddressAware.h"
 #include "Settings.h"
 #include "logger.h"
 #include "utils.h"
 
 #include <Windows.h>
+#include <shellapi.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -336,6 +338,121 @@ namespace
 		return true;
 	}
 
+	// ---- per-exe Windows settings ----
+	//
+	// Windows keeps some settings per exe path, so BBCF_IM_4GB.exe would not get the ones the
+	// player gave BBCF.exe. Mirrored here, before every start of the copy, so a later change to
+	// BBCF.exe's settings carries over too, and a removed one is removed:
+	//   - Settings > Display > Graphics: which GPU the game runs on (laptops). The GPU the
+	//     drivers pick by default needs nothing: BBCF.exe exports NvOptimusEnablement and
+	//     AmdPowerXpressRequestHighPerformance, and the copy has the same exports.
+	//   - Properties > Compatibility (compatibility mode, run as administrator, DPI, ...). The
+	//     "for all users" ones live in HKLM, which needs admin to write, so they are copied
+	//     into the current user's key; Windows applies both.
+	struct MirroredKey
+	{
+		const wchar_t* subkey;
+		bool alsoMachine;
+		const char* what;
+	};
+	const MirroredKey kMirroredKeys[] = {
+		{ L"Software\\Microsoft\\DirectX\\UserGpuPreferences", false, "GPU preference" },
+		{ L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers", true, "compatibility settings" },
+	};
+
+	// The REG_SZ value whose name is `path` (compared case-insensitively, the way Windows does).
+	bool FindPathValue(HKEY root, const wchar_t* subkey, const std::wstring& path, std::wstring& data)
+	{
+		HKEY key = nullptr;
+		if (RegOpenKeyExW(root, subkey, 0, KEY_READ | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS)
+			return false;
+		bool found = false;
+		for (DWORD i = 0; !found; ++i)
+		{
+			wchar_t name[MAX_PATH * 2] = {};
+			wchar_t value[1024] = {};
+			DWORD nameLength = MAX_PATH * 2, valueBytes = sizeof(value) - sizeof(wchar_t), type = 0;
+			const LONG result = RegEnumValueW(key, i, name, &nameLength, nullptr, &type, reinterpret_cast<BYTE*>(value), &valueBytes);
+			if (result == ERROR_NO_MORE_ITEMS)
+				break;
+			if (result == ERROR_SUCCESS && type == REG_SZ && _wcsicmp(name, path.c_str()) == 0)
+			{
+				data = value;
+				found = true;
+			}
+		}
+		RegCloseKey(key);
+		return found;
+	}
+
+	void MirrorPerExeSettings()
+	{
+		const std::wstring stock = RunningExePath();
+		const std::wstring copy = GameFile(kCopyName);
+		for (const MirroredKey& entry : kMirroredKeys)
+		{
+			std::wstring wanted;
+			const bool has = FindPathValue(HKEY_CURRENT_USER, entry.subkey, stock, wanted) ||
+				(entry.alsoMachine && FindPathValue(HKEY_LOCAL_MACHINE, entry.subkey, stock, wanted));
+			std::wstring current;
+			const bool copyHas = FindPathValue(HKEY_CURRENT_USER, entry.subkey, copy, current);
+			if (has == copyHas && (!has || wanted == current))
+				continue;
+
+			HKEY key = nullptr;
+			if (RegCreateKeyExW(HKEY_CURRENT_USER, entry.subkey, 0, nullptr, 0, KEY_SET_VALUE | KEY_WOW64_64KEY, nullptr, &key, nullptr) != ERROR_SUCCESS)
+			{
+				RedirectLog("Could not open the %s key to mirror BBCF.exe's %s.", "registry", entry.what);
+				continue;
+			}
+			if (has)
+			{
+				const LONG result = RegSetValueExW(key, copy.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(wanted.c_str()),
+					static_cast<DWORD>((wanted.size() + 1) * sizeof(wchar_t)));
+				RedirectLog("Mirrored BBCF.exe's %s to BBCF_IM_4GB.exe: \"%ls\" (%s).", entry.what, wanted.c_str(),
+					result == ERROR_SUCCESS ? "ok" : "FAILED");
+			}
+			else
+			{
+				RegDeleteValueW(key, copy.c_str());
+				RedirectLog("BBCF.exe no longer has %s; removed them from BBCF_IM_4GB.exe.", entry.what);
+			}
+			RegCloseKey(key);
+		}
+	}
+
+	// ---- firewall ----
+
+	struct FirewallJob
+	{
+		std::wstring from;
+		std::wstring to;
+		int missing = -1;
+		std::wstring report;
+	};
+
+	// On a thread of its own: COM must be initialised the way this needs it, which the game's
+	// threads may already have done differently.
+	DWORD WINAPI CountMissingFirewallRules(LPVOID param)
+	{
+		auto* job = static_cast<FirewallJob*>(param);
+		if (SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)))
+		{
+			job->missing = FirewallMirror::Mirror(job->from, job->to, false, &job->report);
+			CoUninitialize();
+		}
+		return 0;
+	}
+
+	BOOL CALLBACK MinimizeOwnWindow(HWND hwnd, LPARAM)
+	{
+		DWORD pid = 0;
+		GetWindowThreadProcessId(hwnd, &pid);
+		if (pid == GetCurrentProcessId() && IsWindowVisible(hwnd) && GetWindow(hwnd, GW_OWNER) == nullptr)
+			ShowWindow(hwnd, SW_MINIMIZE);
+		return TRUE;
+	}
+
 	std::wstring NewestUpdater()
 	{
 		const std::wstring candidates[] = { GameFile(L"BBCF_IM\\Updater\\BBCFIMUpdater.exe"), GameFile(L"BBCFIMUpdater.exe") };
@@ -393,6 +510,7 @@ namespace LaaRedirect
 			RedirectLog("Wrote BBCF_IM_4GB.exe from this BBCF.exe.");
 		}
 
+		MirrorPerExeSettings();
 		g_child = StartGameProcess(GameFile(kCopyName));
 		if (!g_child)
 			return false; // logged; this process carries on as the stock game
@@ -419,6 +537,15 @@ namespace LaaRedirect
 
 	void LogSummary()
 	{
+		// What a compatibility mode makes this process see (RtlGetVersion, logged elsewhere,
+		// gives the real version). Shows whether settings mirrored onto the copy took effect.
+#pragma warning(suppress: 4996)
+		OSVERSIONINFOW seen = { sizeof(seen) };
+#pragma warning(suppress: 4996)
+		if (GetVersionExW(&seen))
+			ForceLog("[LAA] Windows version as this process sees it: %lu.%lu build %lu.\n",
+				seen.dwMajorVersion, seen.dwMinorVersion, seen.dwBuildNumber);
+
 		if (LargeAddressAware::IsProcessLargeAddressAware())
 		{
 			if (g_parentPid)
@@ -443,9 +570,50 @@ namespace LaaRedirect
 			return false;
 		Settings::changeSetting("LargeAddressSpace", "1");
 		Settings::settingsIni.largeAddressSpace = 1;
-		RedirectLog("Player accepted; wrote BBCF_IM_4GB.exe. Restarting through the updater.");
+		RedirectLog("Player accepted; wrote BBCF_IM_4GB.exe.");
+		MirrorPerExeSettings();
 
 		const std::wstring updater = NewestUpdater();
+
+		// Firewall rules naming BBCF.exe (the player allowed it, or Steam's installer added them)
+		// are copied for the copy now. That needs admin rights, so Windows asks once; declining
+		// only means Windows asks about BBCF_IM_4GB.exe itself the first time it goes online.
+		FirewallJob firewall;
+		firewall.from = RunningExePath();
+		firewall.to = GameFile(kCopyName);
+		if (HANDLE thread = CreateThread(nullptr, 0, &CountMissingFirewallRules, &firewall, 0, nullptr))
+		{
+			WaitForSingleObject(thread, 15000);
+			CloseHandle(thread);
+		}
+		RedirectLog("Firewall rules for BBCF.exe without a BBCF_IM_4GB.exe counterpart: %d.", firewall.missing);
+		if (firewall.missing > 0 && !updater.empty())
+		{
+			const std::wstring logPath = GameFile(L"BBCF_IM\\LargeAddressSpace.log");
+			std::wstring parameters = L"--mirror-firewall \"" + firewall.from + L"\" \"" + firewall.to + L"\" --log \"" + logPath + L"\"";
+			// The game is closing anyway; out of the way so a fullscreen window cannot hide
+			// Windows' permission prompt while this waits for it.
+			EnumWindows(&MinimizeOwnWindow, 0);
+			SHELLEXECUTEINFOW info = {};
+			info.cbSize = sizeof(info);
+			info.fMask = SEE_MASK_NOCLOSEPROCESS;
+			info.lpVerb = L"runas";
+			info.lpFile = updater.c_str();
+			info.lpParameters = parameters.c_str();
+			info.nShow = SW_HIDE;
+			if (ShellExecuteExW(&info) && info.hProcess)
+			{
+				WaitForSingleObject(info.hProcess, 60000);
+				DWORD added = 0;
+				GetExitCodeProcess(info.hProcess, &added);
+				CloseHandle(info.hProcess);
+				RedirectLog("Firewall rules copied to BBCF_IM_4GB.exe: %ld of %d.", static_cast<long>(added), firewall.missing);
+			}
+			else
+			{
+				RedirectLog("Firewall rules not copied (Windows error %lu, 1223 = the player declined the admin prompt).", GetLastError());
+			}
+		}
 		if (updater.empty())
 		{
 			error = "the copy is ready, but BBCFIMUpdater.exe was not found to restart the game. Restart it yourself and it will start in 4 GB mode.";

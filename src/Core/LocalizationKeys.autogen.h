@@ -5774,6 +5774,9 @@ struct LocalizationKeysAccessor
 
         // No, don't ask again
         inline const char* No_don_t_ask_again() const { return Get("No, don't ask again"); }
+
+        // Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.
+        inline const char* Graphics_and_compatibility_settings_you_gave_BBCF_exe_in_Windows_carry_over_to_the_copy_If_Windows_Firewall_has_rules_for_BBCF_exe_Windows_asks_once_for_permission_to_copy_them_too() const { return Get("Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too."); }
 };
 
 

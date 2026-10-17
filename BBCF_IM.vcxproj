@@ -342,6 +342,7 @@
     <ClInclude Include="src\Core\LaaStress.h" />
     <ClInclude Include="src\Core\TestProbes.h" />
     <ClInclude Include="src\Core\LaaRedirect.h" />
+    <ClInclude Include="src\Core\FirewallMirror.h" />
     <ClInclude Include="src\Core\LargeAddressAware.h" />
     <ClInclude Include="src\Core\SupportedGameBuild.h" />
     <ClInclude Include="src\Updater\UnsupportedBuildFlow.h" />

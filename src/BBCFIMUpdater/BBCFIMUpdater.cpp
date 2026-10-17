@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "../Core/FirewallMirror.h"
+
 namespace
 {
 	struct Handoff
@@ -433,6 +435,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	std::wstring handoffPath;
 	DWORD relaunchAfter = 0;
 	std::wstring relaunchExe;
+	std::wstring firewallFrom, firewallTo, firewallLog;
+	bool firewallDryRun = false;
 	for (int i = 1; i + 1 < argc; ++i)
 	{
 		if (std::wstring(argv[i]) == L"--handoff")
@@ -441,9 +445,44 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 			relaunchAfter = wcstoul(argv[i + 1], nullptr, 10);
 		else if (std::wstring(argv[i]) == L"--exe")
 			relaunchExe = argv[i + 1];
+		else if (std::wstring(argv[i]) == L"--mirror-firewall" && i + 2 < argc)
+		{
+			firewallFrom = argv[i + 1];
+			firewallTo = argv[i + 2];
+		}
+		else if (std::wstring(argv[i]) == L"--log")
+			firewallLog = argv[i + 1];
 	}
+	for (int i = 1; i < argc; ++i)
+		if (std::wstring(argv[i]) == L"--dry-run")
+			firewallDryRun = true;
 	if (argv)
 		LocalFree(argv);
+
+	if (!firewallFrom.empty())
+	{
+		// 4 GB mode (the mod's LaaRedirect.cpp) started elevated: give BBCF_IM_4GB.exe the
+		// firewall rules BBCF.exe has. Exit code: rules added, or -1 if the firewall could not
+		// be read. --dry-run only lists what is missing.
+		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		std::wstring report;
+		int added = 0;
+		const int missing = FirewallMirror::Mirror(firewallFrom, firewallTo, !firewallDryRun, &report, &added);
+		CoUninitialize();
+		if (!firewallLog.empty())
+		{
+			FILE* file = nullptr;
+			if (_wfopen_s(&file, firewallLog.c_str(), L"ab") == 0 && file)
+			{
+				const std::string text = "[" + Stamp() + "] mirror-firewall " + (firewallDryRun ? std::string("(dry run) ") : std::string()) +
+					WideToUtf8(firewallFrom) + " -> " + WideToUtf8(firewallTo) + ": missing=" + std::to_string(missing) +
+					" added=" + std::to_string(added) + "\r\n" + WideToUtf8(report);
+				fwrite(text.data(), 1, text.size(), file);
+				fclose(file);
+			}
+		}
+		return missing < 0 ? -1 : (firewallDryRun ? missing : added);
+	}
 
 	if (relaunchAfter != 0)
 	{
