@@ -229,7 +229,10 @@ namespace
 			if (g_job)
 			{
 				JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
-				limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+				// Only the game itself is tied to this process. Without silent breakaway everything
+				// the game starts joins the job too and dies with it: the in-game updater, started
+				// right before the game closes for an update, was killed a second in.
+				limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
 				SetInformationJobObject(g_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
 			}
 		}
