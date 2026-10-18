@@ -32,6 +32,7 @@ mod, one subsystem at a time (the re3/reVC approach). The ledger of what is done
 |---|---|
 | What does FUN_X do, who calls it | `grep -A60 "^//==== 00XXXXXX" /mnt/c/BBCF_Archive/build_11073075/decomp/src/00XX0000.c` (bucket = top 16 bits) |
 | Call graph | `decomp/functions.tsv` (callers and callees counts) or each function's `// callers:` / `// callees:` header |
+| How does A reach B | `python3 tools/decomp_callpath.py A B` (addresses or names; shortest direct-call paths, `--slack N` for longer ones). Indirect calls (vtables, task callbacks) are not edges, so "no path" is not proof |
 | Who uses a string | `decomp/strings.tsv` (string -> referencing functions) |
 | Decompile + asm for a list | headless Ghidra `DecompList.py` (see bbcf-re-workflow / reference-headless-ghidra-from-wsl memory) on the repo project, `-readOnly` |
 | Raw bytes, jump tables | parse `BBCF.exe` sections in Python (see how the profile-sync jump table at 0x4B1128 was read) |
@@ -49,7 +50,9 @@ mod, one subsystem at a time (the re3/reVC approach). The ledger of what is done
 2. **Create `docs/Decompilation/<Subsystem>.md`** with a table
    `| VA | Name | Size | Level | Notes |` (VA as `0x00XXXXXX`; `tools/decomp_progress.py` parses
    exactly that shape). List every function inside the boundary at L0, plus the shared data
-   (globals, struct layouts, vtables) in prose below the table.
+   (globals, struct layouts, vtables) in prose below the table. End the doc with
+   `## Open questions`: each unresolved unknown, what would settle it, and the function it
+   blocks. Read it first when resuming the subsystem; delete an entry once it is answered.
 3. **Raise every function to L1, then L2.** L1 = role + callers/callees. L2 = convention,
    arguments, return, every field touched, every global read/written. Name functions in
    `GhidraDefs.h` (`ADDR_` constants) as they become L2; run `ApplyRepoNames.py` so later
