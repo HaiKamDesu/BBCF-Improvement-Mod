@@ -2,6 +2,7 @@
 
 #include "FirewallMirror.h"
 #include "LargeAddressAware.h"
+#include "NvidiaProfileMirror.h"
 #include "Settings.h"
 #include "logger.h"
 #include "utils.h"
@@ -549,7 +550,11 @@ namespace LaaRedirect
 		if (LargeAddressAware::IsProcessLargeAddressAware())
 		{
 			if (g_parentPid)
+			{
 				ForceLog("[LAA] Running as BBCF_IM_4GB.exe, started by BBCF.exe (pid %lu).\n", g_parentPid);
+				// Again from here, in case a driver reinstall reset the NVIDIA settings since Accept.
+				ForceLog("[LAA] NVIDIA profile: %s.\n", NvidiaProfileMirror::Sync());
+			}
 			else
 				ForceLog("[LAA] Running a large-address-aware exe that the mod did not start.\n");
 			return;
@@ -572,6 +577,7 @@ namespace LaaRedirect
 		Settings::settingsIni.largeAddressSpace = 1;
 		RedirectLog("Player accepted; wrote BBCF_IM_4GB.exe.");
 		MirrorPerExeSettings();
+		RedirectLog("NVIDIA profile: %s.", NvidiaProfileMirror::Sync());
 
 		const std::wstring updater = NewestUpdater();
 

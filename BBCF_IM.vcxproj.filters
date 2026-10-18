@@ -109,6 +109,9 @@
     <ClCompile Include="src\Core\LaaRedirect.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\NvidiaProfileMirror.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\GameBuildGuard.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -398,6 +401,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\LaaRedirect.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\NvidiaProfileMirror.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\FirewallMirror.h">

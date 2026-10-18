@@ -120,6 +120,7 @@
     <ClCompile Include="src\Core\LaaStress.cpp" />
     <ClCompile Include="src\Core\TestProbes.cpp" />
     <ClCompile Include="src\Core\LaaRedirect.cpp" />
+    <ClCompile Include="src\Core\NvidiaProfileMirror.cpp" />
     <ClCompile Include="src\Core\LargeAddressAware.cpp" />
     <ClCompile Include="src\Updater\UnsupportedBuildFlow.cpp" />
     <ClCompile Include="src\Core\WineCheck.cpp" />
@@ -342,6 +343,7 @@
     <ClInclude Include="src\Core\LaaStress.h" />
     <ClInclude Include="src\Core\TestProbes.h" />
     <ClInclude Include="src\Core\LaaRedirect.h" />
+    <ClInclude Include="src\Core\NvidiaProfileMirror.h" />
     <ClInclude Include="src\Core\FirewallMirror.h" />
     <ClInclude Include="src\Core\LargeAddressAware.h" />
     <ClInclude Include="src\Core\SupportedGameBuild.h" />
