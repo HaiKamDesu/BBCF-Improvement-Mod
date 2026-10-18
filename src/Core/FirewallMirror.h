@@ -61,34 +61,56 @@ namespace FirewallMirror
 		return signature;
 	}
 
-	inline INetFwRule* CloneFor(INetFwRule* source, const std::wstring& program)
+	// A new rule like `source` but naming `program`. Setters Windows refuses are listed in
+	// *problems (they explain an Add that then fails).
+	inline INetFwRule* CloneFor(INetFwRule* source, const std::wstring& program, std::wstring* problems = nullptr)
 	{
 		INetFwRule* rule = nullptr;
 		if (FAILED(CoCreateInstance(__uuidof(NetFwRule), nullptr, CLSCTX_INPROC_SERVER, __uuidof(INetFwRule), reinterpret_cast<void**>(&rule))))
 			return nullptr;
-		BSTR value = nullptr;
-		long number = 0;
-		VARIANT_BOOL flag = VARIANT_FALSE;
+		auto note = [problems](const wchar_t* what, HRESULT hr)
+		{
+			if (FAILED(hr) && problems)
+			{
+				wchar_t line[96] = {};
+				swprintf_s(line, L" %ls=0x%08lX", what, static_cast<unsigned long>(hr));
+				*problems += line;
+			}
+		};
+		// Only values that are actually set are copied: an empty string where Windows expects
+		// none is not the same thing. Order matters: ports need the protocol first.
+		auto copyText = [&](HRESULT(STDMETHODCALLTYPE INetFwRule::*get)(BSTR*), HRESULT(STDMETHODCALLTYPE INetFwRule::*put)(BSTR), const wchar_t* what)
+		{
+			BSTR value = nullptr;
+			if (SUCCEEDED((source->*get)(&value)) && value && SysStringLen(value) > 0)
+				note(what, (rule->*put)(value));
+			SysFreeString(value);
+		};
+		// A fresh, zeroed variable for every getter: get_Profiles ORs its bits into the value it is
+		// handed instead of overwriting it, so reusing the protocol's variable turned UDP (17) and
+		// all profiles (7) into an invalid 0x17, and Windows refused the rule (E_INVALIDARG).
+		long protocol = 0, profiles = 0;
+		VARIANT_BOOL edge = VARIANT_FALSE, enabled = VARIANT_FALSE;
 		NET_FW_RULE_DIRECTION direction = NET_FW_RULE_DIR_IN;
 		NET_FW_ACTION action = NET_FW_ACTION_ALLOW;
-		// Order matters: ports can only be set once the protocol says TCP or UDP.
-		if (SUCCEEDED(source->get_Name(&value))) { rule->put_Name(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_Description(&value))) { rule->put_Description(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_Grouping(&value)) && value) { rule->put_Grouping(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_Protocol(&number))) rule->put_Protocol(number);
-		if (SUCCEEDED(source->get_LocalPorts(&value)) && value) { rule->put_LocalPorts(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_RemotePorts(&value)) && value) { rule->put_RemotePorts(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_LocalAddresses(&value)) && value) { rule->put_LocalAddresses(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_RemoteAddresses(&value)) && value) { rule->put_RemoteAddresses(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_Direction(&direction))) rule->put_Direction(direction);
-		if (SUCCEEDED(source->get_Action(&action))) rule->put_Action(action);
-		if (SUCCEEDED(source->get_Profiles(&number))) rule->put_Profiles(number);
-		if (SUCCEEDED(source->get_InterfaceTypes(&value)) && value) { rule->put_InterfaceTypes(value); SysFreeString(value); value = nullptr; }
-		if (SUCCEEDED(source->get_EdgeTraversal(&flag))) rule->put_EdgeTraversal(flag);
-		if (SUCCEEDED(source->get_Enabled(&flag))) rule->put_Enabled(flag);
+		copyText(&INetFwRule::get_Name, &INetFwRule::put_Name, L"Name");
+		copyText(&INetFwRule::get_Description, &INetFwRule::put_Description, L"Description");
+		copyText(&INetFwRule::get_Grouping, &INetFwRule::put_Grouping, L"Grouping");
 		BSTR app = SysAllocString(program.c_str());
-		rule->put_ApplicationName(app);
+		note(L"ApplicationName", rule->put_ApplicationName(app));
 		SysFreeString(app);
+		if (SUCCEEDED(source->get_Protocol(&protocol))) note(L"Protocol", rule->put_Protocol(protocol));
+		copyText(&INetFwRule::get_LocalPorts, &INetFwRule::put_LocalPorts, L"LocalPorts");
+		copyText(&INetFwRule::get_RemotePorts, &INetFwRule::put_RemotePorts, L"RemotePorts");
+		copyText(&INetFwRule::get_LocalAddresses, &INetFwRule::put_LocalAddresses, L"LocalAddresses");
+		copyText(&INetFwRule::get_RemoteAddresses, &INetFwRule::put_RemoteAddresses, L"RemoteAddresses");
+		copyText(&INetFwRule::get_IcmpTypesAndCodes, &INetFwRule::put_IcmpTypesAndCodes, L"IcmpTypesAndCodes");
+		if (SUCCEEDED(source->get_Direction(&direction))) note(L"Direction", rule->put_Direction(direction));
+		if (SUCCEEDED(source->get_Action(&action))) note(L"Action", rule->put_Action(action));
+		if (SUCCEEDED(source->get_Profiles(&profiles))) note(L"Profiles", rule->put_Profiles(profiles));
+		copyText(&INetFwRule::get_InterfaceTypes, &INetFwRule::put_InterfaceTypes, L"InterfaceTypes");
+		if (SUCCEEDED(source->get_EdgeTraversal(&edge))) note(L"EdgeTraversal", rule->put_EdgeTraversal(edge));
+		if (SUCCEEDED(source->get_Enabled(&enabled))) note(L"Enabled", rule->put_Enabled(enabled));
 		return rule;
 	}
 
@@ -149,17 +171,35 @@ namespace FirewallMirror
 			}
 			++missing;
 			bool ok = true;
+			HRESULT hr = S_OK;
+			std::wstring problems;
 			if (apply)
 			{
-				INetFwRule* copy = CloneFor(source, to);
-				ok = copy && SUCCEEDED(rules->Add(copy));
-				if (copy)
-					copy->Release();
+				// Once more on failure, from a fresh clone: a transient refusal must not cost the
+				// player the rule.
+				for (int attempt = 0; attempt < 2; ++attempt)
+				{
+					problems.clear();
+					INetFwRule* copy = CloneFor(source, to, &problems);
+					hr = copy ? rules->Add(copy) : E_FAIL;
+					if (copy)
+						copy->Release();
+					if (SUCCEEDED(hr))
+						break;
+					Sleep(200);
+				}
+				ok = SUCCEEDED(hr);
 				if (ok && added)
 					++*added;
 			}
 			if (report)
-				*report += (apply ? (ok ? L"added: " : L"FAILED to add: ") : L"missing: ") + signature + L"\r\n";
+			{
+				wchar_t code[32] = {};
+				if (!ok)
+					swprintf_s(code, L" (hr=0x%08lX)", static_cast<unsigned long>(hr));
+				*report += (apply ? (ok ? L"added: " : L"FAILED to add: ") : L"missing: ") + signature + code +
+					(problems.empty() ? L"" : L" refused setters:" + problems) + L"\r\n";
+			}
 			existing.insert(signature);
 			source->Release();
 		}
