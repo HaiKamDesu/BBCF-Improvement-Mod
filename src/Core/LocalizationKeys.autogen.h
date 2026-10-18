@@ -5769,6 +5769,9 @@ struct LocalizationKeysAccessor
         // Restart in 4 GB mode
         inline const char* Restart_in_4_GB_mode() const { return Get("Restart in 4 GB mode"); }
 
+        // You are running the game through Wine or Proton. 4 GB mode has not been tested there. If the game does not start afterwards, set LargeAddressSpace=0 in settings.ini.
+        inline const char* You_are_running_the_game_through_Wine_or_Proton_4_GB_mode_has_not_been_tested_there_If_the_game_does_not_start_afterwards_set_LargeAddressSpace_0_in_settings_ini() const { return Get("You are running the game through Wine or Proton. 4 GB mode has not been tested there. If the game does not start afterwards, set LargeAddressSpace=0 in settings.ini."); }
+
         // Not now
         inline const char* Not_now() const { return Get("Not now"); }
 

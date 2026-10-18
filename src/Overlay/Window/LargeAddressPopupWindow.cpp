@@ -2,6 +2,7 @@
 
 #include "Core/LaaRedirect.h"
 #include "Core/Localization.h"
+#include "Core/RuntimePlatform.h"
 #include "Core/Settings.h"
 #include "Overlay/imgui_utils.h"
 
@@ -53,6 +54,14 @@ void LargeAddressPopupWindow::Draw()
 		}
 		ImGui::Spacing();
 		ImGui::TextUnformatted(L("If you ever remove the mod, the game just starts normally again. You can turn this off at any time in the mod's Settings (4 GB mode).").c_str());
+		if (IsWineOrProton())
+		{
+			// The relaunch leans on job objects, AppCompat registry keys and a firewall COM
+			// call, none of which has been run in a prefix. Warn, but let them choose.
+			ImGui::Spacing();
+			ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.30f, 1.0f), "%s",
+				L("You are running the game through Wine or Proton. 4 GB mode has not been tested there. If the game does not start afterwards, set LargeAddressSpace=0 in settings.ini.").c_str());
+		}
 		ImGui::PopTextWrapPos();
 
 		if (!m_error.empty())
