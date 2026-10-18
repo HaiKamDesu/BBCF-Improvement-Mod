@@ -300,6 +300,8 @@ namespace LocalInput
 			HANDLE handle = nullptr;   // raw input device handle, null for the virtual keyboard
 			bool connected = true;
 			ControlSet keys;
+			// When Windows first said a key we hold is up (0 = it agrees). See ReportKeyboards.
+			ULONGLONG upSinceMs[256] = {};
 		};
 
 		typedef BOOLEAN(__stdcall* HidD_GetProductStringFn)(HANDLE, PVOID, ULONG);
@@ -1112,6 +1114,7 @@ namespace LocalInput
 				if (!m_focused && down)
 					return;
 				kb.keys[vk] = down;
+				kb.upSinceMs[vk] = 0;
 				// The generic modifier follows its sided keys, so a binding to either works.
 				if (vk == VK_LSHIFT || vk == VK_RSHIFT)
 					kb.keys[VK_SHIFT] = kb.keys[VK_LSHIFT] || kb.keys[VK_RSHIFT];
@@ -1121,12 +1124,54 @@ namespace LocalInput
 					kb.keys[VK_MENU] = kb.keys[VK_LMENU] || kb.keys[VK_RMENU];
 			}
 
+			// A release that never arrives as WM_INPUT leaves the key held here for good. Steam's
+			// overlay does exactly that: Shift+Tab opens it, it blocks the game's raw input while
+			// it is up, and the releases of Shift and Tab are never delivered (Kakuy 2026-10-16:
+			// Tab+Shift, bound to A+B+C+D, stayed held into an online match, so holding back came
+			// out as barrier). Windows' own key state does see the release, so a key we hold
+			// that Windows has reported up for a while is dropped. Not at once: a tap can be
+			// pressed and released between two polls, with its release still in the queue, and
+			// dropping it then would eat the press. A missed release lasts seconds; a normal one
+			// arrives within a frame. GetAsyncKeyState is global, so a key held on another
+			// keyboard keeps reading down - it can only ever keep a key, never drop a real one.
+			static void DropMissedReleases(Keyboard& kb, ULONGLONG now)
+			{
+				constexpr ULONGLONG kMissedReleaseMs = 200;
+				for (int vk = 1; vk < 256; ++vk)
+				{
+					if (!kb.keys[vk] || vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
+						continue; // generic modifiers follow their sided keys below
+					if (GetAsyncKeyState(vk) & 0x8000)
+					{
+						kb.upSinceMs[vk] = 0;
+						continue;
+					}
+					if (kb.upSinceMs[vk] == 0)
+					{
+						kb.upSinceMs[vk] = now;
+						continue;
+					}
+					if (now - kb.upSinceMs[vk] < kMissedReleaseMs)
+						continue;
+					kb.keys[vk] = false;
+					kb.upSinceMs[vk] = 0;
+					LOG(1, "[LocalInput] %s: key 0x%02X was still held here but Windows says it was released "
+						"(its release never arrived - e.g. the Steam overlay was open); released it\n", kb.id.c_str(), vk);
+				}
+				kb.keys[VK_SHIFT] = kb.keys[VK_LSHIFT] || kb.keys[VK_RSHIFT];
+				kb.keys[VK_CONTROL] = kb.keys[VK_LCONTROL] || kb.keys[VK_RCONTROL];
+				kb.keys[VK_MENU] = kb.keys[VK_LMENU] || kb.keys[VK_RMENU];
+			}
+
 			void ReportKeyboards(std::vector<DeviceSnapshot>& out)
 			{
 				std::lock_guard<std::mutex> lock(m_keyboardMutex);
+				const ULONGLONG now = GetTickCount64();
 				for (auto& entry : m_keyboards)
 				{
 					Keyboard& kb = entry.second;
+					if (m_focused)
+						DropMissedReleases(kb, now);
 					DeviceSnapshot snap;
 					snap.id = kb.id;
 					snap.defaultName = kb.name;
