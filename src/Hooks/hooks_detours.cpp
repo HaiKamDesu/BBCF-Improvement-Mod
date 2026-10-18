@@ -59,8 +59,9 @@ Direct3DCreate9_t orig_Direct3DCreate9;
 // that the first run already overwrote with JMPs. One factory per process.
 LONG g_d3d9ExFactoryWrapped = 0;
 
-// Defined below; the import-table fallback needs its address before that point.
+// Defined below; the import-table fallback needs their addresses before that point.
 HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx);
+HRESULT __stdcall hook_IatDirect3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx);
 D3DXCreateEffect_t orig_D3DXCreateEffect;
 D3DXCreateSprite_t orig_D3DXCreateSprite;
 RequestLobbyList_t orig_RequestLobbyList;
@@ -743,7 +744,7 @@ namespace
 			return false;
 		}
 
-		if (current == reinterpret_cast<void*>(&hook_Direct3DCreate9Ex))
+		if (current == reinterpret_cast<void*>(&hook_IatDirect3DCreate9Ex))
 		{
 			LOG(0, "[HookDiag][IAT] Slot already points at our hook\n");
 			g_iatHookInstalled = true;
@@ -759,7 +760,7 @@ namespace
 		}
 
 		g_iatDisplacedDirect3DCreate9Ex = reinterpret_cast<Direct3DCreate9Ex_t>(current);
-		*slot = reinterpret_cast<void*>(&hook_Direct3DCreate9Ex);
+		*slot = reinterpret_cast<void*>(&hook_IatDirect3DCreate9Ex);
 
 		DWORD ignored = 0;
 		VirtualProtect(slot, sizeof(void*), oldProtect, &ignored);
@@ -1132,6 +1133,10 @@ static bool HookOptionalDetour(PBYTE addr, const char* funcName)
 	return true;
 }
 
+// Set by hook_Direct3DCreate9Ex when it wraps, so the import-table entry knows the export's
+// chain already reached us and must not wrap a second time.
+static thread_local bool t_wrappedInsideIatCall = false;
+
 HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 {
 	LOG(1, "Direct3DCreate9EX pD3DEx: 0x%p\n", pD3DEx);
@@ -1157,6 +1162,45 @@ HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 	{
 		Direct3D9ExWrapper* ret = new Direct3D9ExWrapper(&*pD3DEx);
 		InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
+		t_wrappedInsideIatCall = true;
+	}
+	return retval;
+}
+
+// What the game's import slot points at once the fallback is in. It calls the export as it
+// is NOW, so every hooker on it runs, exactly as without the mod; only then does it make sure
+// the result is ours.
+//
+// It used to point straight at hook_Direct3DCreate9Ex, whose chain is our Detours trampoline:
+// the export's bytes as they were when we patched. When we patch first (the D3D hooks go in
+// before settings.ini since 937afa6), those are d3d9's own bytes, and anything that hooked the
+// export after us was skipped entirely. Steam's overlay is such a hooker: it never saw the
+// device and Shift+Tab stopped opening it (Kakuy, 2026-10-17).
+//
+// The export usually leads back to us (Steam's hook chains into our detour, which wraps); if it
+// does not (a hooker that replaced us outright), the result is wrapped here.
+HRESULT __stdcall hook_IatDirect3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
+{
+	const Direct3DCreate9Ex_t live = g_iatDisplacedDirect3DCreate9Ex;
+	if (live == nullptr)
+	{
+		return hook_Direct3DCreate9Ex(sdkVers, pD3DEx);
+	}
+
+	t_wrappedInsideIatCall = false;
+	const HRESULT retval = live(sdkVers, pD3DEx);
+	const bool wrappedInside = t_wrappedInsideIatCall;
+	t_wrappedInsideIatCall = false;
+
+	if (SUCCEEDED(retval) && pD3DEx && *pD3DEx && !wrappedInside)
+	{
+		LOG(0, "[HookDiag][IAT] The export's current chain did not reach our hook; wrapping at the import\n");
+		Direct3D9ExWrapper* ret = new Direct3D9ExWrapper(&*pD3DEx);
+		InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
+	}
+	else if (SUCCEEDED(retval))
+	{
+		LOG(1, "[HookDiag][IAT] Direct3DCreate9Ex went through the export's current chain and reached our hook\n");
 	}
 	return retval;
 }
