@@ -902,9 +902,59 @@ namespace
 	// nvd3d9wrap.dll is the module that re-patches the d3d9 factory exports shortly after
 	// process start. Either being loaded means the export detour is going to be evicted,
 	// whatever its prologue happens to look like at the moment we hook it.
+	// Test knob, BBCF_IM_SIMULATE_OPTIMUS (unset = off): reproduces Optimus on a machine
+	// without it. 90 ms after our detour lands, the Direct3DCreate9Ex export is re-patched
+	// to a stand-in for nvd3d9wrap that calls d3d9 without going back through our detour,
+	// which is what the real one did on Bishamon's laptop (8.8 log: device created, our
+	// hook never reached). 1 = rely on the eviction watch; 2 = also report the injector as
+	// loaded, so the fallback goes in up front.
+	int SimulatedOptimusMode()
+	{
+		static const int s_mode = []
+		{
+			wchar_t value[8] = {};
+			return GetEnvironmentVariableW(L"BBCF_IM_SIMULATE_OPTIMUS", value, 8) ? _wtoi(value) : 0;
+		}();
+		return s_mode;
+	}
+
 	bool OptimusInjectorLoaded()
 	{
+		if (SimulatedOptimusMode() == 2)
+			return true;
 		return GetModuleHandleA("nvd3d9wrap.dll") != nullptr || GetModuleHandleA("nvinit.dll") != nullptr;
+	}
+
+	HRESULT __stdcall SimulatedOptimusDirect3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
+	{
+		LOG(0, "[HookDiag][SimOptimus] Stand-in nvd3d9wrap Direct3DCreate9Ex called\n");
+		return orig_Direct3DCreate9Ex(sdkVers, pD3DEx);
+	}
+
+	DWORD WINAPI SimulatedOptimusThread(LPVOID target)
+	{
+		Sleep(90);
+		BYTE* const site = static_cast<BYTE*>(target);
+		DWORD oldProtect = 0;
+		if (!VirtualProtect(site, 5, PAGE_EXECUTE_READWRITE, &oldProtect))
+			return 0;
+		const intptr_t rel = reinterpret_cast<intptr_t>(&SimulatedOptimusDirect3DCreate9Ex) - reinterpret_cast<intptr_t>(site + 5);
+		site[0] = 0xE9;
+		memcpy(site + 1, &rel, 4);
+		DWORD ignored = 0;
+		VirtualProtect(site, 5, oldProtect, &ignored);
+		FlushInstructionCache(GetCurrentProcess(), site, 5);
+		LOG(0, "[HookDiag][SimOptimus] Export re-patched past our detour (mode=%d)\n", SimulatedOptimusMode());
+		return 0;
+	}
+
+	void StartSimulatedOptimus(PBYTE pDirect3DCreate9Ex)
+	{
+		if (SimulatedOptimusMode() == 0 || !pDirect3DCreate9Ex || !orig_Direct3DCreate9Ex)
+			return;
+		const HANDLE thread = CreateThread(nullptr, 0, SimulatedOptimusThread, pDirect3DCreate9Ex, 0, nullptr);
+		if (thread != nullptr)
+			CloseHandle(thread);
 	}
 
 	// Captures the failure that has so far left no evidence at all.
@@ -1847,6 +1897,7 @@ bool placeD3D9FactoryHooks_detours()
 	// 0x76860C4A on the dev machine, 90 ms later) now patch it after us, and the fallback
 	// policy below only runs once settings.ini has been read - up to ~400 ms on a cold disk.
 	StartEarlyEvictionWatch();
+	StartSimulatedOptimus(pDirect3DCreate9Ex);
 	return true;
 }
 
