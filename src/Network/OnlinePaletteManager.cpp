@@ -366,6 +366,12 @@ void OnlinePaletteManager::TryApplyReceived(uint16_t matchPlayerIndex)
 			PaletteBlockList::IsUserBlocked(received.senderSteamId) ? "the player" : "the palette");
 		return;
 	}
+	// Only reached once this battle's match init has run for that side (IsPaletteDataReady), so a
+	// palette that arrived while we were still loading waits for it instead of being written with
+	// the previous battle's colour.
+	LOG(1, "[OnlinePalette] Showing palette '%s' from %s on matchPlayerIndex=%u (native colour %d)\n",
+		received.haveInfo ? received.data.palInfo.palName : "?", received.senderName.c_str(), matchPlayerIndex,
+		GetPlayerCharPaletteHandle(matchPlayerIndex).GetOrigPalIndex());
 	ShowReceived(matchPlayerIndex);
 }
 

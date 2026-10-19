@@ -113,12 +113,15 @@ public:
 	// could not be resolved, in which case the caller falls back to clearing the link.
 	bool SyncOwnedCustomPaletteSlots(Player& player);
 
-	// Call it ONCE upon match start
-	void OnMatchInit(Player& playerOne, Player& playerTwo);
+	// Call it ONCE upon match start (GetMatchVariables: once per battle load). applyIni says which
+	// sides get their palettes.ini palette: both offline, only our own side online (the opponent's
+	// palette comes from them), none for a spectator. A side whose storage is not usable yet is
+	// retried every frame from OnUpdate for the rest of the battle.
+	void OnMatchInit(Player& playerOne, Player& playerTwo, bool applyIniP1, bool applyIniP2);
 
 	void OnMatchRematch(Player& playerOne, Player& playerTwo);
-	// Call it when the game enters character select. Undoes UpdatePalette()'s color-index toggle
-	// while the player still cannot have picked a new color -- see the definition before moving.
+	// Call it when the game enters character select. Only undoes the PaletteLegacyIndexToggle
+	// colour flip; a no-op otherwise.
 	void OnCharacterSelect(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo);
 	void OnMatchEnd(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo);
 
@@ -172,6 +175,22 @@ private:
 	// not read our toggle as the player's colour pick. See the definition.
 	void RestoreNativePalIndexOnMatchExit(CharPaletteHandle& P1, CharPaletteHandle& P2);
 	bool m_wasInMatch = false;
+
+	// Per side: OnMatchInit could not initialise the handle yet, retry from OnUpdate.
+	struct PendingMatchInit
+	{
+		bool pending = false;
+		bool applyIni = false;
+		Player* player = nullptr;
+	};
+	PendingMatchInit m_pendingInit[2];
+	bool TryInitPlayer(Player& player, bool applyIni, int side);
+	void RetryPendingMatchInit();
+
+	// FixOnlineMirrorColour: the byte value currently patched into the game's mirror wrap (-1 = not
+	// patched yet this session).
+	int m_mirrorWrapApplied = -1;
+	void ApplyMirrorColourFix();
 
 	void CreatePaletteFolders();
 	void InitCustomPaletteVector();

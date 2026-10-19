@@ -891,29 +891,25 @@ static constexpr uintptr_t ADDR_PaletteContainerLoad    = 0x001B6310; // FUN_005
 // the index change the engine's redraw depends on. Removing that per-frame correction fixed it,
 // confirmed by the reporter across ~22 matches on v8.1. See
 // docs/Research/TaokakaPaletteRefreshInvestigation.md for the full history.
-static constexpr uintptr_t ADDR_PaletteTextureRefresh_Main = 0x001B6940; // FUN_005B6940 (owner+0x830 container)
+static constexpr uintptr_t ADDR_PaletteTextureRefresh_Main = 0x001B6940; // FUN_005B6940: actually CreateGpu (D3DXCreateTexture), see Palettes.md
 static constexpr uintptr_t ADDR_PaletteTextureRefresh_Alt  = 0x001B6980; // FUN_005B6980 (owner+0x82C container)
 
-// Character-select config commit (0x0047D910), established 2026-08-14 from tools/bbcf_disasm.txt.
-// This is the routine the mod's GetPaletteIndexPointers hook already sits inside, at 0x0047D92D.
-// It copies the PENDING (character-select) config over the COMMITTED (in-match) copy:
+// Character-select resume snapshot (0x0047D910). The mod's GetPaletteIndexPointers hook sits
+// inside it at 0x0047D92D. It copies the LIVE slot blocks to a snapshot:
 //
-//   [edx+0x0118] -> [edx+0x16B8]   0x1C4 dwords   P1 character config
-//   [edx+0x1648] -> [edx+0x24D8]   8 dwords       P1 palette/color block   <- hook is here
-//   [edx+0x0828] -> [edx+0x1DC8]   0x1C4 dwords   P2 character config
-//   [edx+0x1668] -> [edx+0x24F8]   8 dwords       P2 palette/color block
+//   [edx+0x0118] -> [edx+0x16B8]   0x1C4 dwords   P1 CSS player state
+//   [edx+0x1648] -> [edx+0x24D8]   8 dwords       P1 slot block        <- hook is here
+//   [edx+0x0828] -> [edx+0x1DC8]   0x1C4 dwords   P2 CSS player state
+//   [edx+0x1668] -> [edx+0x24F8]   8 dwords       P2 slot block
 //
-// The native color index lives at +8 inside each 8-dword block, so what CharPaletteHandle holds
-// as m_pCurPalIndex is edx+0x1650 (P1) / edx+0x1670 (P2) -- i.e. the PENDING copy, the same words
-// character select writes into. This routine runs on the versus screen.
-//
-// Load-bearing consequence: BBCF's versus screen comes AFTER character select, so the ordering
-// across a color change is
-//     match ends -> character select (player picks) -> versus screen (this copy) -> match init
-// and anything the mod writes to the pending block after character select silently destroys the
-// player's pick. UpdatePalette()'s redraw toggle must therefore be undone on entry to character
-// select and nowhere later. See PaletteManager::OnCharacterSelect and
-// docs/Research/TaokakaPaletteRefreshInvestigation.md.
+// Corrected 2026-10-18 (docs/Decompilation/Palettes.md): the 0x1648 blocks are the LIVE match
+// config, and the battle reads the colour at +8 every time an entity resolves its palette
+// (EntityPaletteSource 0x0057C91A). The 0x24D8 copy is a resume snapshot, read back only when
+// returning from a ranked match (0x0047FD20), and never read in battle. This routine runs from
+// the main menu, offline CSS/VS and the ranked menu, never online, so it is NOT a per-match
+// commit. The hook is only useful to learn the two static addresses (0x00C91A00 / 0x00C91A20).
+// Any mod write to the colour dword during a battle changes what the game itself draws, and
+// characters re-read it every round.
 // Character select colour-preview palettes. The preview is indexed "dot art" and it draws
 // with the ORDINARY GAMEPLAY palettes: the bake reads char_<tag>_pal.pac out of resource
 // slot (ADDR_CssPaletteResourceSlot + charIndex). It never touches paldata.pac inside
@@ -1198,6 +1194,29 @@ static constexpr uintptr_t OFFSET_PalObj_DataDup             = 0x81C;
 static constexpr uintptr_t OFFSET_PalObj_Width               = 0x101C;
 static constexpr uintptr_t OFFSET_PalObj_Bpp                 = 0x1020;
 static constexpr uintptr_t ADDR_BattleSceneGet               = 0x0015C540; // FUN_0055C540
+
+// Player palette storage, as the rewrite uses it (2026-10-18, docs/Decompilation/Palettes.md).
+// BattleScene+0x2B8 holds three PlayerResSlot owners of 0x20BDC bytes: 0 = P1, 1 = P2, 2 = shared
+// effects (never a 24-colour character container). At the GetPalBaseAddresses hook site ECX is the
+// owner, so its slot is (ecx - (BattleScene+0x2B8)) / 0x20BDC. owner+0x830 is the palette container
+// (AADX_CDynamicTextureList); the battle destructor zeroes it (FUN_0055C9E0) before freeing it, so
+// reading it live is how a stale container is detected. Sub colour*8+file is an AA_CPalette.
+//
+// Redraw: AADX_CDynamicTextureList::Bind (FUN_0044C880) skips the GPU upload iff
+// container+0x40 == sub && pal+0xC == 0. Writing a palette therefore needs pal+0xC = 1 AND
+// container+0x40 = -1 (the engine writes -1 itself in OnResetDevice, FUN_0044C360); dirty alone is
+// cleared by any PalObjCopy that reads from the player palette before the draw.
+static constexpr uintptr_t OFFSET_BattleScene_PlayerResSlots = 0x2B8;
+static constexpr uintptr_t SIZE_PlayerResSlot                = 0x20BDC;
+static constexpr uintptr_t OFFSET_PlayerRes_PaletteCount     = 0x18;      // lookups clamp to sub 0 at or above this
+static constexpr uintptr_t OFFSET_PlayerRes_PaletteContainer = 0x830;
+static constexpr uintptr_t ADDR_DynamicTextureListVtable     = 0x00498C2C; // VA 0x00898C2C
+static constexpr uintptr_t OFFSET_TexList_LastUploadedSub    = 0x40;
+// Online mirror colour bump: `inc al; ...; cmp al,0Ch; sbb al,al; and al,[..]` wraps colour+1 to 0
+// at 12. These are the immediate bytes of the two `cmp al,0Ch` (3C 0C): Record_ResolveMirror
+// (FUN_0049A2F0, msg 0x13 on the room authority) and Room_AssembleMatchFromMembers (FUN_004989E0).
+static constexpr uintptr_t ADDR_MirrorColourWrapImm_Record   = 0x0009A31A; // VA 0x0049A31A
+static constexpr uintptr_t ADDR_MirrorColourWrapImm_Room     = 0x000995F1; // VA 0x004995F1
 static constexpr uintptr_t ADDR_ResourceRegistryGet          = 0x0000E6B0; // FUN_0040E6B0
 static constexpr uintptr_t ADDR_EntityReserveCustomPalette   = 0x00191BC0; // FUN_00591BC0(this, bool)
 static constexpr uintptr_t ADDR_EntityRefreshCustomPalette   = 0x001787E0; // FUN_005787E0(this)

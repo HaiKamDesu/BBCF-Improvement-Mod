@@ -294,6 +294,16 @@ SETTING(int, allowPaletteDownloads, "AllowPaletteDownloads", "-1");
 // rest of the settings load. The mod sets it to 0 itself if the copy dies while starting.
 SETTING(int, largeAddressSpace, "LargeAddressSpace", "-1");
 SETTING(bool, customPalettesInCharSelect, "CustomPalettesInCharSelect", "1");
+// Fallback to the pre-8.9.1 way of making a palette change show on screen: flip the game's live
+// colour number between N and N+1 and write the palette into both slots. Off = mark the palette
+// dirty and reset the container's upload cache (docs/Decompilation/Palettes.md, "Rewrite design"),
+// which never touches the colour number. Only for a character that turns out not to redraw.
+SETTING(bool, paletteLegacyIndexToggle, "PaletteLegacyIndexToggle", "0");
+// Online mirror matches: the room host gives the second player to confirm colour + 1, and the
+// game wraps that to colour 1 (default) from colour 12 up. On = wrap at 24 instead, so a mirror
+// on colours 12-24 stays off default. Only has an effect when this client is the room host, and
+// every member (spectators too) receives the host's result, so it cannot desync anyone.
+SETTING(bool, fixOnlineMirrorColour, "FixOnlineMirrorColour", "1");
 SETTING(int, takeoverInputSlot, "TakeoverInputSlot", "0");
 SETTING(bool, swapControllerPos, "SwapControllerPos", "0");
 // The local input system (src/Input/LocalInputManager.h): every keyboard and controller is

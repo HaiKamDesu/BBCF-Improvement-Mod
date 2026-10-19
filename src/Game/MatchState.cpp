@@ -68,24 +68,14 @@ namespace
 
 void MatchState::OnMatchInit()
 {
-	if (!WindowManager::GetInstance().IsInitialized())
-	{
-		return;
-	}
-
 	LOG(2, "MatchState::OnMatchInit\n");
 
-	RankedListConnectionFilter::GetInstance().OnMatchStarted();
-
-	GetMusicManager().OnMatchInit();
-
+	// Palettes run before the overlay check below. They do not need the overlay, and returning
+	// early used to skip palettes.ini and the online send for the whole session whenever the
+	// overlay failed to come up (no-GUI boots), which looked like "my palette doesn't load" to
+	// both players. See docs/Decompilation/Palettes.md.
 	const bool paletteManagerReady = ManagerReady(
 		g_interfaces.pPaletteManager, "pPaletteManager", g_loggedMissingPaletteManager);
-	if (paletteManagerReady)
-	{
-		g_interfaces.pPaletteManager->LoadPaletteSettingsFile();
-		g_interfaces.pPaletteManager->OnMatchInit(g_interfaces.player1, g_interfaces.player2);
-	}
 
 	// No room manager means there is no online session to reconcile against, which
 	// is the same answer IsRoomFunctional would give offline.
@@ -93,31 +83,44 @@ void MatchState::OnMatchInit()
 		ManagerReady(g_interfaces.pRoomManager, "pRoomManager", g_loggedMissingRoomManager) &&
 		g_interfaces.pRoomManager->IsRoomFunctional();
 
+	if (paletteManagerReady)
+	{
+		// palettes.ini is ours: offline it applies to both sides, online only to our own side
+		// (the opponent sends theirs) and to nobody when spectating.
+		bool applyIniP1 = true;
+		bool applyIniP2 = true;
+		if (roomFunctional)
+		{
+			const bool spectator = g_interfaces.pRoomManager->IsThisPlayerSpectator();
+			const uint16_t thisPlayerMatchPlayerIndex = g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex();
+			applyIniP1 = !spectator && thisPlayerMatchPlayerIndex == 0;
+			applyIniP2 = !spectator && thisPlayerMatchPlayerIndex == 1;
+		}
+
+		g_interfaces.pPaletteManager->LoadPaletteSettingsFile();
+		g_interfaces.pPaletteManager->OnMatchInit(g_interfaces.player1, g_interfaces.player2, applyIniP1, applyIniP2);
+	}
+
+	// Send our custom palette and show the ones already received. Still checked separately from
+	// the room: this one additionally needs pPaletteManager, so an InitManagers pass that ran
+	// before dllmain finished builds the room manager without it.
+	if (roomFunctional && ManagerReady(g_interfaces.pOnlinePaletteManager, "pOnlinePaletteManager",
+		g_loggedMissingOnlinePaletteManager))
+	{
+		g_interfaces.pOnlinePaletteManager->OnMatchInit();
+	}
+
+	if (!WindowManager::GetInstance().IsInitialized())
+	{
+		return;
+	}
+
+	RankedListConnectionFilter::GetInstance().OnMatchStarted();
+
+	GetMusicManager().OnMatchInit();
+
 	if (roomFunctional)
 	{
-		// Prevent loading palettes.ini custom palette on opponent
-
-		uint16_t thisPlayerMatchPlayerIndex = g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex();
-
-		if (paletteManagerReady && thisPlayerMatchPlayerIndex != 0)
-		{
-			g_interfaces.pPaletteManager->RestoreOrigPal(g_interfaces.player1.GetPalHandle());
-		}
-
-		if (paletteManagerReady && thisPlayerMatchPlayerIndex != 1)
-		{
-			g_interfaces.pPaletteManager->RestoreOrigPal(g_interfaces.player2.GetPalHandle());
-		}
-
-		// Send our custom palette and load opponent's. Still checked separately from
-		// the room: this one additionally needs pPaletteManager, so an InitManagers
-		// pass that ran before dllmain finished builds the room manager without it.
-		if (ManagerReady(g_interfaces.pOnlinePaletteManager, "pOnlinePaletteManager",
-			g_loggedMissingOnlinePaletteManager))
-		{
-			g_interfaces.pOnlinePaletteManager->OnMatchInit();
-		}
-
 		// Activate settled game mode
 		if (ManagerReady(g_interfaces.pOnlineGameModeManager, "pOnlineGameModeManager",
 			g_loggedMissingOnlineGameModeManager))

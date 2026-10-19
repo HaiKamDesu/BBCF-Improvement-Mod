@@ -5,6 +5,7 @@
 #include "PaletteFolderLoader.h"
 
 #include "Core/logger.h"
+#include "Core/Settings.h"
 #include "Core/utils.h"
 #include "Core/interfaces.h"
 #include "Game/characters.h"
@@ -897,41 +898,24 @@ void PaletteManager::SetCurrentPalInfo(CharPaletteHandle& palHandle, IMPL_info_t
 
 void PaletteManager::OnUpdate(CharPaletteHandle & P1, CharPaletteHandle & P2)
 {
-	// Clears the once-per-frame update lock, nothing else. Do NOT correct UpdatePalette()'s
-	// toggle artifact from here -- v8.2 did and it broke the engine's redraw. The artifact is
-	// corrected in CharPaletteHandle::OnMatchInit only. See
-	// docs/Research/TaokakaPaletteRefreshInvestigation.md.
+	// Clears the once-per-frame lock of the PaletteLegacyIndexToggle flip; nothing else uses it.
 	P1.UnlockUpdate();
 	P2.UnlockUpdate();
 
 	RestoreNativePalIndexOnMatchExit(P1, P2);
 
 	// Once-per-frame game-thread tick, which is where a finished background palette load
-	// gets swapped in. Nothing above this reads palette data, so the order does not matter.
+	// gets swapped in. Before the retry below, so a retry sees the newest palette set.
 	PumpAsyncPaletteLoad();
+
+	RetryPendingMatchInit();
+	ApplyMirrorColourFix();
 }
 
-// Undoes UpdatePalette()'s index toggle on the frame the game stops being in a match, whatever
-// took it out of one.
-//
-// OnCharacterSelect covers the ordinary route (match -> character select -> pick -> versus ->
-// match init), but it only covers routes that actually pass through character select. Training's
-// in-game menu can put you back into a new match without one - change the matchup from Kokonoe vs
-// Ragna to Kokonoe vs Jin and the next OnMatchInit reads a colour byte still holding our toggle,
-// so it looks up the palettes.ini slot next to the one the player picked and Kokonoe comes back
-// wearing a different palette. That is Okammunist's original report; the character-select restore
-// never covered this path, which is why it is still reproducible on 8.4.
-//
-// Leaving the match is the earliest moment that is unambiguously after the match and before any
-// new pick, so restoring here is strictly earlier than every existing restore point and cannot
-// overwrite a pick - by the time character select runs the index already equals m_origPalIndex
-// and RestoreNativePalIndex no-ops. It is also NOT a per-frame correction: it fires only on the
-// in-match -> not-in-match edge, so the toggle stays untouched for the whole match and the
-// engine's redraw still sees it. Both of those are the traps described in
-// docs/Research/TaokakaPaletteRefreshInvestigation.md; read it before moving this.
-//
-// A game state we cannot read leaves the edge state alone rather than counting as "left the
-// match" - guessing there would restore mid-match, which is exactly what broke the redraw in v8.2.
+// PaletteLegacyIndexToggle only: undoes the colour flip on the frame the game leaves a match, which
+// covers re-entering a match without character select (training's matchup change). A no-op unless
+// the legacy flip actually ran this battle (CharPaletteHandle::RestoreNativePalIndex), so it cannot
+// overwrite the colour the game itself writes on the way out (training quick change, mirror fix).
 void PaletteManager::RestoreNativePalIndexOnMatchExit(CharPaletteHandle& P1, CharPaletteHandle& P2)
 {
 	if (g_gameVals.pGameState == nullptr)
@@ -1074,7 +1058,7 @@ bool PaletteManager::SyncOwnedCustomPaletteSlots(Player& player)
 	char* srcFiles[TOTAL_PALETTE_FILES] = {};
 	for (int file = 0; file < TOTAL_PALETTE_FILES; ++file)
 	{
-		if (!palHandle.TryGetPalFileAddr(*palHandle.m_pCurPalIndex, file, &srcFiles[file]))
+		if (!palHandle.TryGetPalFileAddr(palHandle.m_origPalIndex, file, &srcFiles[file]))
 			srcFiles[file] = nullptr;
 	}
 
@@ -1141,48 +1125,112 @@ void PaletteManager::UpdatePlatinumItemPalettes(Player& playerOne, Player& playe
 	}
 }
 
-void PaletteManager::OnMatchInit(Player& playerOne, Player& playerTwo)
+bool PaletteManager::TryInitPlayer(Player& player, bool applyIni, int side)
+{
+	if (player.IsCharDataNullPtr())
+		return false;
+
+	if (!player.GetPalHandle().OnMatchInit())
+		return false;
+
+	if (applyIni)
+	{
+		LOG(1, "PaletteManager: applying palettes.ini for P%d\n", side + 1);
+		ApplyDefaultCustomPalette((CharIndex)player.GetData()->charIndex, player.GetPalHandle());
+	}
+	return true;
+}
+
+void PaletteManager::OnMatchInit(Player& playerOne, Player& playerTwo, bool applyIniP1, bool applyIniP2)
 {
 	// The round rebuilds every custom palette slot from scratch, so nothing is synced yet.
 	m_platinumSyncedGeneration[0] = 0;
 	m_platinumSyncedGeneration[1] = 0;
 
-	LOG(1, "PaletteManager::OnMatchInit -- P1 --\n");
-	playerOne.GetPalHandle().OnMatchInit();
+	Player* const players[2] = { &playerOne, &playerTwo };
+	const bool applyIni[2] = { applyIniP1, applyIniP2 };
+	for (int side = 0; side < 2; ++side)
+	{
+		LOG(1, "PaletteManager::OnMatchInit -- P%d --\n", side + 1);
+		const bool done = TryInitPlayer(*players[side], applyIni[side], side);
+		m_pendingInit[side].pending = !done;
+		m_pendingInit[side].applyIni = applyIni[side];
+		m_pendingInit[side].player = players[side];
+		if (!done)
+			LOG(1, "PaletteManager::OnMatchInit P%d not ready, retrying every frame\n", side + 1);
+	}
+}
 
-	LOG(1, "PaletteManager::OnMatchInit -- P2 --\n");
-	playerTwo.GetPalHandle().OnMatchInit();
+void PaletteManager::RetryPendingMatchInit()
+{
+	if (g_gameVals.pGameState == nullptr || *g_gameVals.pGameState != GameState_InMatch)
+	{
+		// Only for the battle that asked for it.
+		m_pendingInit[0].pending = false;
+		m_pendingInit[1].pending = false;
+		return;
+	}
 
-	LOG(1, "PaletteManager::OnMatchInit applying default for P1\n");
-	ApplyDefaultCustomPalette((CharIndex)playerOne.GetData()->charIndex, playerOne.GetPalHandle());
+	for (int side = 0; side < 2; ++side)
+	{
+		PendingMatchInit& pending = m_pendingInit[side];
+		if (!pending.pending || pending.player == nullptr)
+			continue;
 
-	LOG(1, "PaletteManager::OnMatchInit applying default for P2\n");
-	ApplyDefaultCustomPalette((CharIndex)playerTwo.GetData()->charIndex, playerTwo.GetPalHandle());
+		if (TryInitPlayer(*pending.player, pending.applyIni, side))
+		{
+			LOG(1, "PaletteManager: P%d palette storage became ready, match init completed late\n", side + 1);
+			pending.pending = false;
+		}
+	}
+}
+
+// The online mirror bump wraps colour+1 to 0 from colour 12; 0x18 makes it wrap at 24 instead.
+// Only the room authority ever runs that code, and every member receives its result, so the patch
+// changes what everyone sees consistently. Both immediates were byte-checked (3C 0C) before writing.
+void PaletteManager::ApplyMirrorColourFix()
+{
+	const int wanted = Settings::settingsIni.fixOnlineMirrorColour ? 0x18 : 0x0C;
+	if (wanted == m_mirrorWrapApplied)
+		return;
+
+	char* const base = GetBbcfBaseAdress();
+	unsigned char* const sites[2] = {
+		reinterpret_cast<unsigned char*>(base + ADDR_MirrorColourWrapImm_Record),
+		reinterpret_cast<unsigned char*>(base + ADDR_MirrorColourWrapImm_Room),
+	};
+
+	for (unsigned char* site : sites)
+	{
+		if (site[-1] != 0x3C || (site[0] != 0x0C && site[0] != 0x18))
+		{
+			LOG(1, "[MirrorColour] unexpected bytes %02X %02X at %p, not patching\n", site[-1], site[0], (void*)site);
+			m_mirrorWrapApplied = wanted; // do not retry every frame
+			return;
+		}
+	}
+
+	for (unsigned char* site : sites)
+	{
+		DWORD oldProtect = 0;
+		if (VirtualProtect(site, 1, PAGE_EXECUTE_READWRITE, &oldProtect))
+		{
+			*site = static_cast<unsigned char>(wanted);
+			VirtualProtect(site, 1, oldProtect, &oldProtect);
+			FlushInstructionCache(GetCurrentProcess(), site, 1);
+		}
+	}
+
+	LOG(1, "[MirrorColour] online mirror colour wrap set to %d\n", wanted);
+	m_mirrorWrapApplied = wanted;
 }
 
 void PaletteManager::OnMatchRematch(Player& playerOne, Player& playerTwo)
 {
-	playerOne.GetPalHandle().OnMatchRematch();
-	playerTwo.GetPalHandle().OnMatchRematch();
-	
-	playerOne.GetPalHandle().SetPointerBasePal(nullptr);
-	playerTwo.GetPalHandle().SetPointerBasePal(nullptr);
+	playerOne.GetPalHandle().RestoreNativePalIndex("OnMatchRematch");
+	playerTwo.GetPalHandle().RestoreNativePalIndex("OnMatchRematch");
 }
 
-// Entering character select is the one moment that is genuinely after a match and before the
-// player can pick a new color, so it is where UpdatePalette()'s toggle gets undone.
-//
-// The color index the mod holds (`m_pCurPalIndex`) points into the game's *pending* config block
-// at charSelectBlock+8 -- the same block character select writes into. The game copies that block
-// to its committed copy in the routine at BBCF.exe 0x0047D910 (`rep movs` of 8 dwords from
-// [edx+0x1648] to [edx+0x24D8]), which is where the mod's GetPaletteIndexPointers hook sits, and
-// which runs on the versus screen. So the ordering across a color change is:
-//
-//   match ends -> CHARACTER SELECT (restore here) -> player picks -> versus screen (game commits)
-//
-// Restoring any later than character select destroys the player's pick; restoring per frame
-// during the match cancels the redraw the toggle exists to force. See
-// docs/Research/TaokakaPaletteRefreshInvestigation.md.
 void PaletteManager::OnCharacterSelect(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo)
 {
 	playerOne.RestoreNativePalIndex("CharacterSelect");
@@ -1191,12 +1239,10 @@ void PaletteManager::OnCharacterSelect(CharPaletteHandle& playerOne, CharPalette
 
 void PaletteManager::OnMatchEnd(CharPaletteHandle& playerOne, CharPaletteHandle& playerTwo)
 {
-	// Do NOT undo the redraw toggle here. This runs from the GetGameStateVersusScreen hook,
-	// which in BBCF comes AFTER character select, not when a match ends -- restoring the previous
-	// match's color at this point overwrites the color the player just picked, moments before the
-	// game commits it. That is done in OnCharacterSelect instead.
-	playerOne.SetPointerBasePal(nullptr);
-	playerTwo.SetPointerBasePal(nullptr);
+	// Nothing to drop: the handles read the container live from its owner, and the battle
+	// destructor zeroes that before freeing it. Kept as the versus-screen hook's entry point.
+	(void)playerOne;
+	(void)playerTwo;
 }
 
 std::vector<std::vector<IMPL_data_t>>& PaletteManager::GetCustomPalettesVector()

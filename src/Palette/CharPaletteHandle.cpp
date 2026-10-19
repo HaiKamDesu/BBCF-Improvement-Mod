@@ -1,7 +1,11 @@
 #include "CharPaletteHandle.h"
 
 #include "Core/logger.h"
-//#include "impl_templates.cpp"
+#include "Core/Settings.h"
+#include "Core/utils.h"
+#include "Game/GhidraDefs.h"
+
+#include <cstring>
 
 #define BLOOM_PALETTE_INDEX 21
 
@@ -17,51 +21,79 @@ char* palFileNames[TOTAL_PALETTE_FILES] =
 	"Effect07"
 };
 
-char* CharPaletteHandle::GetPalFileAddr(const char* base, int palIndex, int fileID)
+void CharPaletteHandle::SetPointerPalIndex(int* pPalIndex)
 {
-	//dereferencing the multi-level pointer:
-	// [[[baseaddr + 0x4] + palIndex * 0x20] + fileID * 0x4] + 0x1C
-
-	// Leave for debugging:
-	DWORD* deref1 = (DWORD*)base + 1;
-	DWORD* deref2 = (DWORD*)*deref1 + (palIndex * 8);
-	DWORD* deref2Offset = deref2 + + fileID;
-	DWORD* finalAddr = (DWORD*)*deref2Offset + 7;
-
-	DWORD* paletteAddress = (DWORD*)*((DWORD*)*((DWORD*)base + 1) + (palIndex * 8) + fileID) + 7;
-	return (char*)paletteAddress;
+	m_pCurPalIndex = pPalIndex;
 }
 
-bool CharPaletteHandle::TryGetPalFileAddr(int palIndex, int fileID, char** ppPalFileAddr) const
+void CharPaletteHandle::OnContainerLoaded(char* pOwner)
 {
-	if (ppPalFileAddr == nullptr)
+	m_pOwner = pOwner;
+	++m_loadGeneration;
+	// The legacy toggle, if any, was on the previous battle's colour; that battle is gone.
+	m_legacyToggled = false;
+}
+
+// The palette container of the battle that is loaded right now, or null. owner+0x830 is zeroed by
+// the battle destructor (FUN_0055C9E0) before the container is freed, and the vtable check rejects
+// anything else that might have landed there.
+char* CharPaletteHandle::GetLiveContainer() const
+{
+	if (m_pOwner == nullptr)
+		return nullptr;
+
+	__try
+	{
+		char* const container = *reinterpret_cast<char**>(m_pOwner + OFFSET_PlayerRes_PaletteContainer);
+		if (container == nullptr)
+			return nullptr;
+
+		const uintptr_t vtable = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress()) + ADDR_DynamicTextureListVtable;
+		if (*reinterpret_cast<uintptr_t*>(container) != vtable)
+			return nullptr;
+
+		return container;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		return nullptr;
+	}
+}
+
+// Sub colour*8+file of the container, with the same bounds the game's own lookup applies
+// (FUN_005B6AB0 clamps anything at or above owner+0x18 to sub 0).
+bool CharPaletteHandle::TryGetPalObject(int palIndex, int fileID, char** ppPalObj) const
+{
+	if (ppPalObj == nullptr)
 		return false;
 
-	*ppPalFileAddr = nullptr;
-
-	if (m_pPalBaseAddr == nullptr)
-		return false;
+	*ppPalObj = nullptr;
 
 	if (palIndex < 0 || palIndex > MAX_PAL_INDEX || fileID < 0 || fileID >= TOTAL_PALETTE_FILES)
 		return false;
 
+	char* const container = GetLiveContainer();
+	if (container == nullptr)
+		return false;
+
 	__try
 	{
-		const DWORD* deref1 = reinterpret_cast<const DWORD*>(m_pPalBaseAddr) + 1;
-		if (*deref1 == 0)
+		const uint32_t sub = static_cast<uint32_t>(palIndex * TOTAL_PALETTE_FILES + fileID);
+		const uint32_t subCount = *reinterpret_cast<const uint32_t*>(container + OFFSET_Resource_SubObjectCount);
+		const uint32_t ownerCount = *reinterpret_cast<const uint32_t*>(m_pOwner + OFFSET_PlayerRes_PaletteCount);
+		if (sub >= subCount || sub >= ownerCount)
 			return false;
 
-		const DWORD* deref2 = reinterpret_cast<const DWORD*>(*deref1) + (palIndex * 8) + fileID;
-		if (*deref2 == 0)
+		char* const* const subs = *reinterpret_cast<char* const* const*>(container + OFFSET_Resource_SubObjects);
+		if (subs == nullptr || subs[sub] == nullptr)
 			return false;
 
-		char* paletteAddress = reinterpret_cast<char*>(reinterpret_cast<DWORD*>(*deref2) + 7);
+		char* const obj = subs[sub];
+		if (*reinterpret_cast<const int*>(obj + OFFSET_PalObj_Width) != 256 ||
+			*reinterpret_cast<const int*>(obj + OFFSET_PalObj_Bpp) != 32)
+			return false;
 
-		// Probe the first byte so stale game pointers fail here instead of in later memcpy paths.
-		volatile char firstByte = paletteAddress[0];
-		(void)firstByte;
-
-		*ppPalFileAddr = paletteAddress;
+		*ppPalObj = obj;
 		return true;
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
@@ -70,22 +102,29 @@ bool CharPaletteHandle::TryGetPalFileAddr(int palIndex, int fileID, char** ppPal
 	}
 }
 
-void CharPaletteHandle::SetPointerPalIndex(int* pPalIndex)
+bool CharPaletteHandle::TryGetPalFileAddr(int palIndex, int fileID, char** ppPalFileAddr) const
 {
-	m_pCurPalIndex = pPalIndex;
+	char* obj = nullptr;
+	if (!TryGetPalObject(palIndex, fileID, &obj))
+	{
+		if (ppPalFileAddr)
+			*ppPalFileAddr = nullptr;
+		return false;
+	}
+
+	*ppPalFileAddr = obj + OFFSET_PalObj_Data;
+	return true;
 }
 
-void CharPaletteHandle::SetPointerBasePal(char* pPalBaseAddr)
+bool CharPaletteHandle::CanResolveAllFiles(int palIndex) const
 {
-	m_pPalBaseAddr = pPalBaseAddr;
-}
-
-void CharPaletteHandle::SetPaletteIndex(int palIndex)
-{
-	if (palIndex < 0 || palIndex > MAX_PAL_INDEX)
-		return;
-
-	*m_pCurPalIndex = palIndex;
+	char* obj = nullptr;
+	for (int fileID = 0; fileID < TOTAL_PALETTE_FILES; ++fileID)
+	{
+		if (!TryGetPalObject(palIndex, fileID, &obj))
+			return false;
+	}
+	return true;
 }
 
 int CharPaletteHandle::GetOrigPalIndex() const
@@ -93,41 +132,26 @@ int CharPaletteHandle::GetOrigPalIndex() const
 	return m_origPalIndex;
 }
 
-bool CharPaletteHandle::IsNullPointerPalBasePtr() const
-{
-	return m_pPalBaseAddr == nullptr;
-}
-
 bool CharPaletteHandle::IsNullPointerPalIndex() const
 {
 	return m_pCurPalIndex == nullptr;
 }
 
-bool CharPaletteHandle::CanResolvePalFileAddr(int palIndex, int fileID) const
+bool CharPaletteHandle::IsInitializedForCurrentLoad() const
 {
-	char* pPalFileAddr = nullptr;
-	return TryGetPalFileAddr(palIndex, fileID, &pPalFileAddr);
+	return m_initGeneration != 0 && m_initGeneration == m_loadGeneration;
 }
 
 bool CharPaletteHandle::IsPaletteDataReady() const
 {
-	if (m_pCurPalIndex == nullptr)
+	if (m_pCurPalIndex == nullptr || !IsInitializedForCurrentLoad())
 		return false;
 
-	if (m_switchPalIndex1 < 0 || m_switchPalIndex1 > MAX_PAL_INDEX ||
-		m_switchPalIndex2 < 0 || m_switchPalIndex2 > MAX_PAL_INDEX)
-	{
+	if (!CanResolveAllFiles(m_origPalIndex))
 		return false;
-	}
 
-	for (int fileID = 0; fileID < TOTAL_PALETTE_FILES; ++fileID)
-	{
-		if (!CanResolvePalFileAddr(m_switchPalIndex1, fileID) ||
-			!CanResolvePalFileAddr(m_switchPalIndex2, fileID))
-		{
-			return false;
-		}
-	}
+	if (Settings::settingsIni.paletteLegacyIndexToggle && !CanResolveAllFiles(m_legacySwitchIndex))
+		return false;
 
 	return true;
 }
@@ -146,10 +170,11 @@ void CharPaletteHandle::ReplacePalData(IMPL_data_t* newPaletteData)
 	}
 
 	SetCurrentPalInfo(&newPaletteData->palInfo);
-	ReplaceAllPalFiles(newPaletteData, m_switchPalIndex1);
-	ReplaceAllPalFiles(newPaletteData, m_switchPalIndex2);
+	ReplaceAllPalFiles(newPaletteData, m_origPalIndex);
+	if (Settings::settingsIni.paletteLegacyIndexToggle)
+		ReplaceAllPalFiles(newPaletteData, m_legacySwitchIndex);
 
-	UpdatePalette();
+	AfterWrite();
 }
 
 void CharPaletteHandle::ReplaceSinglePalFile(const char* newPalData, PaletteFile palFile)
@@ -161,73 +186,67 @@ void CharPaletteHandle::ReplaceSinglePalFile(const char* newPalData, PaletteFile
 	}
 
 	char* pDst1 = nullptr;
-	char* pDst2 = nullptr;
-	if (!TryGetPalFileAddr(m_switchPalIndex1, (int)palFile, &pDst1) ||
-		!TryGetPalFileAddr(m_switchPalIndex2, (int)palFile, &pDst2))
+	if (!TryGetPalObject(m_origPalIndex, (int)palFile, &pDst1))
 	{
-		LOG(1, "CharPaletteHandle::ReplaceSinglePalFile skipped because palette file pointers became invalid during update (palFile=%d)\n", (int)palFile);
+		LOG(1, "CharPaletteHandle::ReplaceSinglePalFile skipped because the palette became invalid during update (palFile=%d)\n", (int)palFile);
 		return;
 	}
-	
-	ReplacePalArrayInMemory(pDst1, newPalData);
-	ReplacePalArrayInMemory(pDst2, newPalData);
-	
+	WritePalObject(pDst1, newPalData);
 
-	UpdatePalette();
+	char* pDst2 = nullptr;
+	if (Settings::settingsIni.paletteLegacyIndexToggle && TryGetPalObject(m_legacySwitchIndex, (int)palFile, &pDst2))
+		WritePalObject(pDst2, newPalData);
+
+	AfterWrite();
 }
 
-void CharPaletteHandle::OnMatchInit()
+bool CharPaletteHandle::OnMatchInit()
 {
-	// The byte read here is trusted as-is: whatever it says is the color the player picked.
-	// That only holds because RestoreNativePalIndex() puts UpdatePalette()'s toggle back before
-	// the player can reach character select again, so no artifact of ours can still be in it.
-	// Never reintroduce a heuristic that tries to tell a leftover toggle apart from a real pick
-	// -- the two are the same byte value with the same history, and guessing wrong silently
-	// applies the wrong palette. See docs/Research/TaokakaPaletteRefreshInvestigation.md.
-	int rawIndex = *m_pCurPalIndex;
+	if (m_pCurPalIndex == nullptr || GetLiveContainer() == nullptr)
+	{
+		LOG(1, "CharPaletteHandle::OnMatchInit: this battle's palette container is not available yet (pCurPalIndex=%p owner=%p)\n",
+			(void*)m_pCurPalIndex, (void*)m_pOwner);
+		return false;
+	}
+
+	// The game wrote this before the battle loaded (character select offline, the network records
+	// online) and nothing of ours has touched it since: the mod no longer writes it.
+	const int rawIndex = *m_pCurPalIndex;
+	if (rawIndex < 0 || rawIndex > MAX_PAL_INDEX)
+	{
+		LOG(1, "CharPaletteHandle::OnMatchInit: colour %d out of range\n", rawIndex);
+		return false;
+	}
 
 	m_origPalIndex = rawIndex;
+	m_legacySwitchIndex = rawIndex == MAX_PAL_INDEX ? rawIndex - 1 : rawIndex + 1;
+	m_legacyToggled = false;
+	m_initGeneration = m_loadGeneration;
 
-	LOG(1, "CharPaletteHandle::OnMatchInit raw native color slot = %d (pCurPalIndex=%p)\n", m_origPalIndex, (void*)m_pCurPalIndex);
+	if (!IsPaletteDataReady())
+	{
+		LOG(1, "CharPaletteHandle::OnMatchInit: colour %d cannot be resolved in the container yet\n", rawIndex);
+		m_initGeneration = 0;
+		return false;
+	}
+
+	LOG(1, "CharPaletteHandle::OnMatchInit native color slot = %d (load %u)\n", m_origPalIndex, m_loadGeneration);
 
 	BackupOrigPal();
 
 	m_selectedCustomPalIndex = 0;
 
-	m_switchPalIndex1 = rawIndex;
-
-	m_switchPalIndex2 = m_switchPalIndex1 == MAX_PAL_INDEX
-		? m_switchPalIndex1 - 1
-		: m_switchPalIndex1 + 1;
-
-	// Clear palette info
 	IMPL_info_t palInfo = { "Default" };
 	SetCurrentPalInfo(&palInfo);
+	return true;
 }
 
-void CharPaletteHandle::OnMatchRematch()
-{
-	// In case of a rematch we want to start with the original palindex
-	RestoreNativePalIndex("OnMatchRematch");
-}
-
-// Undoes UpdatePalette()'s hot-swap, putting the player's real native color back into game memory.
-//
-// This is the ONLY thing that keeps the native color byte honest, and WHEN it runs is the whole
-// problem. Callers are PaletteManager::OnCharacterSelect and OnMatchRematch, and nothing else:
-//   - Per frame (what v8.2 did) cancels the index change before the engine has observed it, and
-//     the character never redraws with the new palette.
-//   - On the versus screen (where PaletteManager::OnMatchEnd runs) is already too late: in BBCF
-//     that screen comes AFTER character select, so the player's new pick is sitting in the
-//     pending block and this would overwrite it moments before the game commits it.
-//   - At the next OnMatchInit is later still, and worse: a genuine pick that lands on the
-//     previous match's toggle pair is bit-for-bit identical to a leftover artifact, so every
-//     attempt to tell them apart there misfired and applied the wrong palette.
-// Character select is the one point that is after the match and before any new pick.
 void CharPaletteHandle::RestoreNativePalIndex(const char* reason)
 {
-	if (m_pCurPalIndex == nullptr || m_origPalIndex < 0)
+	if (!m_legacyToggled || m_pCurPalIndex == nullptr || m_origPalIndex < 0)
 		return;
+
+	m_legacyToggled = false;
 
 	if (*m_pCurPalIndex == m_origPalIndex)
 		return;
@@ -255,8 +274,11 @@ void CharPaletteHandle::SetSelectedCustomPalIndex(int index)
 
 const char* CharPaletteHandle::GetCurPalFileAddr(PaletteFile palFile)
 {
+	if (!IsInitializedForCurrentLoad())
+		return nullptr;
+
 	char* pPalFileAddr = nullptr;
-	if (!TryGetPalFileAddr(m_switchPalIndex1, (int)palFile, &pPalFileAddr))
+	if (!TryGetPalFileAddr(m_origPalIndex, (int)palFile, &pPalFileAddr))
 		return nullptr;
 
 	return pPalFileAddr;
@@ -291,13 +313,12 @@ const IMPL_data_t& CharPaletteHandle::GetCurrentPalData()
 	{
 		char* pDst = m_currentPalData.file0 + (i * IMPL_PALETTE_DATALEN);
 		char* pSrc = nullptr;
-		if (!TryGetPalFileAddr(m_switchPalIndex1, i, &pSrc))
+		if (!TryGetPalFileAddr(m_origPalIndex, i, &pSrc))
 		{
 			LOG(1, "CharPaletteHandle::GetCurrentPalData returning cached data because palette file %d became invalid during readback\n", i);
 			return m_currentPalData;
 		}
 		memcpy(pDst, pSrc, IMPL_PALETTE_DATALEN);
-		pDst += IMPL_PALETTE_DATALEN;
 	}
 
 	return m_currentPalData;
@@ -311,23 +332,45 @@ bool CharPaletteHandle::IsCurrentPalWithBloom() const
 
 bool CharPaletteHandle::IsCustomPaletteActive() const
 {
-	if (m_pCurPalIndex == nullptr)
+	if (!IsInitializedForCurrentLoad())
 		return false;
 
 	char* pLivePalData = nullptr;
-	if (!TryGetPalFileAddr(*m_pCurPalIndex, PaletteFile_Character, &pLivePalData))
+	if (!TryGetPalFileAddr(m_origPalIndex, PaletteFile_Character, &pLivePalData))
 		return false;
 
 	return memcmp(pLivePalData, m_origPalBackup.file0, IMPL_PALETTE_DATALEN) != 0;
 }
 
-void CharPaletteHandle::ReplacePalArrayInMemory(char* Dst, const void* Src)
+// Both copies: the working copy (+0x81C) is what gets uploaded, and the base copy (+0x1C) is what
+// character commands such as VH_Frame or NT_HairSwitch restore the working copy from. The dirty flag
+// is what AA_CPalette::LockWorking sets when the game edits a palette itself.
+void CharPaletteHandle::WritePalObject(char* pPalObj, const void* Src)
 {
-	// The palette datas are duplicated in the memory at offset 0x800
-	// We have to overwrite both, as some characters use the duplication's address instead
-	memcpy(Dst, Src, IMPL_PALETTE_DATALEN);
-	memcpy(Dst + 0x800, Src, IMPL_PALETTE_DATALEN);
+	memcpy(pPalObj + OFFSET_PalObj_Data, Src, IMPL_PALETTE_DATALEN);
+	memcpy(pPalObj + OFFSET_PalObj_DataDup, Src, IMPL_PALETTE_DATALEN);
+	*reinterpret_cast<int*>(pPalObj + OFFSET_PalObj_Dirty) = 1;
 	++m_writeGeneration;
+}
+
+// Bind re-uploads a sub only when it differs from the last one it uploaded or the palette is dirty,
+// and a PalObjCopy from the player palette (own-slot copies, tint modes) clears dirty before the
+// draw gets there. -1 makes the next Bind of any sub upload, exactly as OnResetDevice does.
+void CharPaletteHandle::InvalidateUpload()
+{
+	char* const container = GetLiveContainer();
+	if (container == nullptr)
+		return;
+
+	*reinterpret_cast<int*>(container + OFFSET_TexList_LastUploadedSub) = -1;
+}
+
+void CharPaletteHandle::AfterWrite()
+{
+	InvalidateUpload();
+
+	if (Settings::settingsIni.paletteLegacyIndexToggle)
+		LegacyToggleIndex();
 }
 
 void CharPaletteHandle::ReplaceAllPalFiles(IMPL_data_t* newPaletteData, int palIndex)
@@ -342,16 +385,18 @@ void CharPaletteHandle::ReplaceAllPalFiles(IMPL_data_t* newPaletteData, int palI
 	{
 		const char* pSrc = newPaletteData->file0 + (i * IMPL_PALETTE_DATALEN);
 
+		// An .impl with an empty effect file keeps this colour's native one. Since only the picked
+		// colour is ever written now, that is the same native file every round.
 		if (!memcmp(NULLBLOCK, pSrc, IMPL_PALETTE_DATALEN))
-			continue;
+			pSrc = m_origPalBackup.file0 + (i * IMPL_PALETTE_DATALEN);
 
 		char* pDst = nullptr;
-		if (!TryGetPalFileAddr(palIndex, i, &pDst))
+		if (!TryGetPalObject(palIndex, i, &pDst))
 		{
-			LOG(1, "CharPaletteHandle::ReplaceAllPalFiles skipped palette file %d because destination pointer is invalid (palIndex=%d)\n", i, palIndex);
+			LOG(1, "CharPaletteHandle::ReplaceAllPalFiles skipped palette file %d because destination is invalid (palIndex=%d)\n", i, palIndex);
 			continue;
 		}
-		ReplacePalArrayInMemory(pDst, pSrc);
+		WritePalObject(pDst, pSrc);
 	}
 }
 
@@ -359,24 +404,16 @@ void CharPaletteHandle::BackupOrigPal()
 {
 	LOG(2, "CharPaletteHandle::BackupOrigPal\n");
 
-	if (!IsPaletteDataReady())
-	{
-		LOG(1, "CharPaletteHandle::BackupOrigPal skipped because palette storage is not ready\n");
-		return;
-	}
-
-	const char* pSrc = 0;
 	char* pDst = m_origPalBackup.file0;
 
 	for (int i = 0; i < TOTAL_PALETTE_FILES; i++)
 	{
-		char* pResolvedSrc = nullptr;
-		if (!TryGetPalFileAddr(*m_pCurPalIndex, i, &pResolvedSrc))
+		char* pSrc = nullptr;
+		if (!TryGetPalFileAddr(m_origPalIndex, i, &pSrc))
 		{
 			LOG(1, "CharPaletteHandle::BackupOrigPal aborted because palette file %d became invalid during backup\n", i);
 			return;
 		}
-		pSrc = pResolvedSrc;
 		memcpy(pDst, pSrc, IMPL_PALETTE_DATALEN);
 		pDst += IMPL_PALETTE_DATALEN;
 	}
@@ -391,20 +428,19 @@ void CharPaletteHandle::RestoreOrigPal()
 	ReplacePalData(&m_origPalBackup);
 }
 
-void CharPaletteHandle::UpdatePalette()
+// PaletteLegacyIndexToggle: the pre-8.9.1 redraw. Flips the live colour between the picked colour
+// and its neighbour (both hold the palette). Kept only as a fallback; it changes the colour the game
+// itself reads, which is why the default path does not do it.
+void CharPaletteHandle::LegacyToggleIndex()
 {
 	// Must not switch more than once per frame, or palette doesn't get updated!
-	if (m_updateLocked)
+	if (m_updateLocked || m_pCurPalIndex == nullptr)
 		return;
 
-	*m_pCurPalIndex = *m_pCurPalIndex == m_switchPalIndex1
-		? m_switchPalIndex2
-		: m_switchPalIndex1;
+	*m_pCurPalIndex = *m_pCurPalIndex == m_origPalIndex
+		? m_legacySwitchIndex
+		: m_origPalIndex;
+	m_legacyToggled = true;
 
-	LockUpdate();
-}
-
-void CharPaletteHandle::LockUpdate()
-{
 	m_updateLocked = true;
 }

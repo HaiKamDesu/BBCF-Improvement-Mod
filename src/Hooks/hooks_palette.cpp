@@ -150,35 +150,45 @@ void __declspec(naked) OnEnterCharSelectFuncEntry()
 	}
 }
 
+// Inside PaletteContainerLoad (FUN_005B6310), at the store of the new container into owner+0x830.
+// SCENE_CBattle::LoadCharResources calls it once per PlayerResSlot owner (0 = P1, 1 = P2, 2 = shared
+// effects) at every battle load, and ECX is that owner here. The slot is computed from it rather
+// than from call order, so a load path with a different number of calls can never hand P1's
+// storage to P2. The container itself is read live from the owner afterwards (it is empty at this
+// point; its palettes are added right after). See docs/Decompilation/Palettes.md.
+static void OnPaletteContainerLoaded(char* owner)
+{
+	const uintptr_t slots = reinterpret_cast<uintptr_t>(GetBbcfBaseAdress()) +
+		ADDR_BattleSceneSingleton + OFFSET_BattleScene_PlayerResSlots;
+	const uintptr_t offset = reinterpret_cast<uintptr_t>(owner) - slots;
+	if (reinterpret_cast<uintptr_t>(owner) < slots || offset % SIZE_PlayerResSlot != 0)
+	{
+		LOG(1, "GetPalBaseAddresses: owner %p is not a battle PlayerResSlot, ignored\n", (void*)owner);
+		return;
+	}
+
+	const uintptr_t slot = offset / SIZE_PlayerResSlot;
+	LOG(2, "GetPalBaseAddresses: palette container loading for owner slot %u\n", (unsigned)slot);
+	if (slot == 0)
+		g_interfaces.player1.GetPalHandle().OnContainerLoaded(owner);
+	else if (slot == 1)
+		g_interfaces.player2.GetPalHandle().OnContainerLoaded(owner);
+}
+
 DWORD GetPalBaseAddressesJmpBackAddr = 0;
 void __declspec(naked) GetPalBaseAddresses()
 {
-	static int counter = 0;
-	static char* palPointer = 0;
+	static char* owner = nullptr;
 
 	LOG_ASM(2, "GetPalBaseAddresses\n");
 
 	__asm
 	{
 		pushad
-
-		mov palPointer, eax
+		mov owner, ecx
 	}
 
-	if (counter == 0)
-	{
-		g_interfaces.player1.GetPalHandle().SetPointerBasePal(palPointer);
-	}
-	else if (counter == 1)
-	{
-		g_interfaces.player2.GetPalHandle().SetPointerBasePal(palPointer);
-	}
-	else
-	{
-		counter = -1;
-	}
-
-	counter++;
+	OnPaletteContainerLoaded(owner);
 
 	__asm
 	{

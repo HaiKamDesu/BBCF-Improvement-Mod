@@ -18,31 +18,48 @@ enum PaletteFile
 	PaletteFile_Effect7
 };
 
+// One player's palette storage in the current battle. How the game stores and draws it is in
+// docs/Decompilation/Palettes.md; read its "Rewrite design" before changing anything here.
+//
+// The handle never writes the game's colour number. It writes the palette objects of the colour the
+// player picked (sub colour*8+file of the container), marks them dirty and resets the container's
+// upload cache, which is what makes the engine re-upload them. The old N <-> N+1 colour toggle only
+// survives behind the PaletteLegacyIndexToggle setting.
+//
+// Lifetime: the GetPalBaseAddresses hook hands over the owner at every battle load, which starts a
+// new load generation. The handle is ready only after OnMatchInit has run for that generation and
+// while the container is still alive (the battle destructor zeroes owner+0x830 before freeing it).
+// So nothing can write a palette with the previous battle's colour, or into a freed container.
 class CharPaletteHandle
 {
 	friend class PaletteManager;
 
-	int* m_pCurPalIndex;
-	// -1 until OnMatchInit has read the player's real color. Teardown must not write a color
-	// back before then: match-end can fire without a preceding match-init (menu transitions),
-	// and an uninitialized value would be written straight into the game's color byte.
+	int* m_pCurPalIndex = nullptr;
+	// The colour the player picked, read at OnMatchInit. -1 until then.
 	int m_origPalIndex = -1;
-	const char* m_pPalBaseAddr;
+	// PlayerResSlot that owns the palette container (BattleScene+0x2B8 + slot*0x20BDC). Static
+	// memory, so the pointer itself never dangles; the container inside it is read live.
+	char* m_pOwner = nullptr;
+	// Starts at 0 and is bumped by every container load, so m_initGeneration == 0 never matches.
+	unsigned m_loadGeneration = 0;
+	unsigned m_initGeneration = 0;
 	IMPL_data_t m_origPalBackup;
 	IMPL_data_t m_currentPalData;
-	int m_switchPalIndex1;
-	int m_switchPalIndex2;
-	int m_selectedCustomPalIndex;
-	bool m_updateLocked;
+	int m_selectedCustomPalIndex = 0;
 	// Bumped on every write into the game's palette storage. PaletteManager compares it against
 	// the value it last propagated to Platinum's item palettes, so those are re-copied exactly
 	// once per change instead of every frame.
 	unsigned m_writeGeneration = 0;
 
+	// PaletteLegacyIndexToggle only.
+	int m_legacySwitchIndex = -1;
+	bool m_legacyToggled = false;
+	bool m_updateLocked = false;
+
 public:
 	void SetPointerPalIndex(int* pPalIdx);
-	void SetPointerBasePal(char* pPalBaseAddr);
-	bool IsNullPointerPalBasePtr() const;
+	// From the GetPalBaseAddresses hook: a new battle loaded this player's container.
+	void OnContainerLoaded(char* pOwner);
 	bool IsNullPointerPalIndex() const;
 	bool IsPaletteDataReady() const;
 	int& GetPalIndexRef();
@@ -59,15 +76,14 @@ public:
 	unsigned GetWriteGeneration() const { return m_writeGeneration; }
 
 private:
-	void SetPaletteIndex(int palIndex);
 	void ReplacePalData(IMPL_data_t* newPaletteData);
-	void OnMatchInit();
-	void OnMatchRematch();
-	// Puts the player's real native color back after UpdatePalette()'s redraw toggle. Character
-	// select is the only valid moment for this -- read the comment on the definition before
-	// moving it or adding a caller.
+	// Reads the player's colour and backs up their native palette. False when this battle's
+	// container is not usable yet; the caller retries.
+	bool OnMatchInit();
+	bool IsInitializedForCurrentLoad() const;
+	// PaletteLegacyIndexToggle only: puts the real colour back after the legacy toggle. A no-op
+	// unless that toggle actually ran, so it can never overwrite a colour the game wrote.
 	void RestoreNativePalIndex(const char* reason);
-	void LockUpdate();
 	void UnlockUpdate();
 	int GetSelectedCustomPalIndex();
 	void SetSelectedCustomPalIndex(int index);
@@ -76,13 +92,16 @@ private:
 	const IMPL_info_t& GetCurrentPalInfo() const;
 	void SetCurrentPalInfo(IMPL_info_t* pPalInfo);
 	const IMPL_data_t& GetCurrentPalData();
-	char* GetPalFileAddr(const char* base, int palIdx, int fileIdx);
+	char* GetLiveContainer() const;
+	bool TryGetPalObject(int palIdx, int fileIdx, char** ppPalObj) const;
 	bool TryGetPalFileAddr(int palIdx, int fileIdx, char** ppPalFileAddr) const;
-	bool CanResolvePalFileAddr(int palIdx, int fileIdx) const;
-	void ReplacePalArrayInMemory(char* Dst, const void* Src);
+	bool CanResolveAllFiles(int palIdx) const;
+	void WritePalObject(char* pPalObj, const void* Src);
+	void InvalidateUpload();
 	void ReplaceSinglePalFile(const char* newPalData, PaletteFile palFile);
 	void ReplaceAllPalFiles(IMPL_data_t* newPaletteData, int palIdx);
+	void AfterWrite();
 	void BackupOrigPal();
 	void RestoreOrigPal();
-	void UpdatePalette();
+	void LegacyToggleIndex();
 };
