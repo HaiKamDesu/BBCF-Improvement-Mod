@@ -900,6 +900,24 @@ void WindowManager::Render()
 		SetDisplaySizeOverride(0.0f, 0.0f);
 	}
 
+	// Keys whose release the Steam overlay swallowed (its Shift+Tab) stay "held" in ImGui forever,
+	// and a held Shift+Tab makes ImGui cycle focus through every widget at key-repeat rate. The game
+	// side of the same problem is handled in the local input system (c5f6337); this is the overlay's.
+	int releasedVks[8] = {};
+	const int releasedKeys = ImGui_ImplWin32_ReleaseKeysNotHeld(releasedVks, 8);
+	if (releasedKeys > 0)
+	{
+		char list[64] = {};
+		for (int i = 0; i < releasedKeys && i < 8; ++i)
+		{
+			char one[8];
+			sprintf_s(one, "%s0x%02X", i ? "," : "", releasedVks[i]);
+			strcat_s(list, one);
+		}
+		LOG(1, "[OverlayInput] released %d key(s) [%s] the overlay still held but Windows has reported "
+			"up for 200 ms (their release never arrived, e.g. eaten by the Steam overlay)\n", releasedKeys, list);
+	}
+
 	ImGui_ImplWin32_NewFrame();
 	ImGui_ImplDX9_NewFrame();
 	ApplyViewportOverride();

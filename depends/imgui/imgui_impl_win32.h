@@ -36,6 +36,10 @@ IMGUI_IMPL_API void     ImGui_ImplWin32_NewFrame();
 // Scales every mouse position this backend reports, so a fixed ImGui coordinate space
 // (the mod's "Viewport" setting) hit-tests in the same space it renders in. 1,1 disables.
 IMGUI_IMPL_API void     ImGui_ImplWin32_SetMousePosScale(float scale_x, float scale_y);
+// BBCF Improvement Mod local modification: releases keys ImGui holds whose release never arrived
+// (e.g. eaten by the Steam overlay) after 200 ms. Call once per frame before NewFrame. Returns the
+// number released and stores up to maxReleasedVks of their VK codes.
+IMGUI_IMPL_API int      ImGui_ImplWin32_ReleaseKeysNotHeld(int* releasedVks = nullptr, int maxReleasedVks = 0);
 
 // Win32 message handler your application needs to call.
 // - Intentionally commented out in a '#if 0' block to avoid dragging dependencies on <windows.h> from this helper.

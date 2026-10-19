@@ -322,6 +322,70 @@ static void ImGui_ImplWin32_ProcessKeyEventsWorkarounds(ImGuiIO& io)
         ImGui_ImplWin32_AddKeyEvent(io, ImGuiKey_RightSuper, false, VK_RWIN);
 }
 
+ImGuiKey ImGui_ImplWin32_KeyEventToImGuiKey(WPARAM wParam, LPARAM lParam);
+
+// BBCF Improvement Mod local modification - see imgui_impl_win32.h. Releases every key ImGui still
+// holds down whose release never reached this window. The Steam overlay's Shift+Tab is the known
+// cause: it swallows the WM_KEYUPs, so ImGui kept Shift+Tab "held" and its key repeat cycled focus
+// through the widgets forever (sliders flipping into text boxes, Kakuy 2026-10-18). Uses
+// GetAsyncKeyState, the physical state: GetKeyState (IsVkDown) is the thread's message state, which
+// can keep the swallowed key down, which is also why the Shift workaround above did not catch it.
+// It only ever releases, never presses. Returns how many keys it released.
+int ImGui_ImplWin32_ReleaseKeysNotHeld(int* releasedVks, int maxReleasedVks)
+{
+    if (ImGui::GetCurrentContext() == nullptr)
+        return 0;
+
+    // A key has to read as up for this long before it is released, the same grace the game-side fix
+    // uses. Injected input (remote play, remappers, SendInput) can show a held key as up for a moment,
+    // and releasing it then would cut a held key short.
+    const DWORD graceMs = 200;
+    static DWORD s_upSince[256] = {};
+    const DWORD now = ::GetTickCount();
+
+    ImGuiIO& io = ImGui::GetIO();
+    int released = 0;
+    for (int vk = 1; vk < 255; vk++)
+    {
+        // Mouse buttons are tracked by the mouse path, and VK_SHIFT/VK_CONTROL/VK_MENU are covered by
+        // the modifiers below and by their left/right VK codes.
+        if (vk <= VK_XBUTTON2 || vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU)
+            continue;
+
+        const ImGuiKey key = ImGui_ImplWin32_KeyEventToImGuiKey((WPARAM)vk, 0);
+        if (key == ImGuiKey_None || !ImGui::IsKeyDown(key) || (::GetAsyncKeyState(vk) & 0x8000) != 0)
+        {
+            s_upSince[vk] = 0;
+            continue;
+        }
+
+        if (s_upSince[vk] == 0)
+        {
+            s_upSince[vk] = now ? now : 1;
+            continue;
+        }
+        if (now - s_upSince[vk] < graceMs)
+            continue;
+
+        ImGui_ImplWin32_AddKeyEvent(io, key, false, vk);
+        s_upSince[vk] = 0;
+        if (releasedVks != nullptr && released < maxReleasedVks)
+            releasedVks[released] = vk;
+        released++;
+    }
+
+    // Only together with the keys themselves: a modifier is held exactly when one of its keys is.
+    const struct { ImGuiKey mod; int vk; } mods[] = {
+        { ImGuiMod_Ctrl, VK_CONTROL }, { ImGuiMod_Shift, VK_SHIFT }, { ImGuiMod_Alt, VK_MENU },
+    };
+    for (const auto& m : mods)
+    {
+        if (ImGui::IsKeyDown(m.mod) && (::GetAsyncKeyState(m.vk) & 0x8000) == 0 && released > 0)
+            io.AddKeyEvent(m.mod, false);
+    }
+    return released;
+}
+
 static void ImGui_ImplWin32_UpdateKeyModifiers(ImGuiIO& io)
 {
     io.AddKeyEvent(ImGuiMod_Ctrl, IsVkDown(VK_CONTROL));
