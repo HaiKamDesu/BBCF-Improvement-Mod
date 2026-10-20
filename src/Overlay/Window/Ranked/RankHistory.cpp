@@ -29,6 +29,8 @@ namespace RankHistory
 		// How long to wait after the upload for the game's ranked row to show the match before
 		// recording from the LP change alone.
 		const ULONGLONG kRowSettleTimeoutMs = 8000;
+		// How often a pending match re-reads the character's ranked row.
+		const ULONGLONG kRowPollIntervalMs = 250;
 
 		std::vector<Entry> g_entries;
 		bool g_loaded = false;
@@ -310,7 +312,8 @@ namespace RankHistory
 
 	void OnRankedUploadCompleted(uint32_t characterId)
 	{
-		if (!g_pending.active || characterId != g_pending.context.characterId)
+		// Only starts the LP-only fallback clock; OnUpdate records the match from the ranked row.
+		if (!g_pending.active || characterId != g_pending.context.characterId || g_pending.finalizeRequested)
 		{
 			return;
 		}
@@ -320,10 +323,22 @@ namespace RankHistory
 
 	void OnUpdate()
 	{
-		if (!g_pending.active || !g_pending.finalizeRequested)
+		if (!g_pending.active)
 		{
 			return;
 		}
+
+		// The ranked row is what decides, not the upload callback: on 2026-10-19 neither game of a
+		// two-game set got the completion callback, so the first was only saved when the second
+		// started and the second (followed by leaving ranked) was never saved. Polling the row
+		// catches the match the moment the game counts it, however the upload goes.
+		static ULONGLONG s_lastPollTickMs = 0;
+		const ULONGLONG now = GetTickCount64();
+		if (now - s_lastPollTickMs < kRowPollIntervalMs)
+		{
+			return;
+		}
+		s_lastPollTickMs = now;
 
 		RankedCharacterRecord after;
 		if (!ReadRankedCharacterRecord(g_pending.context.characterId, &after))
@@ -335,7 +350,7 @@ namespace RankHistory
 		{
 			Finalize(after, true);
 		}
-		else if (GetTickCount64() - g_pending.finalizeRequestTickMs > kRowSettleTimeoutMs)
+		else if (g_pending.finalizeRequested && now - g_pending.finalizeRequestTickMs > kRowSettleTimeoutMs)
 		{
 			Finalize(after, false);
 		}

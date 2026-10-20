@@ -8,8 +8,8 @@
 // append-only, so a crash can lose at most the match in progress).
 //
 // How a match is recorded: at match init the local character, the opponent and the character's
-// ranked row (rank, LP, wins, matches) are captured. When the game's ranked upload for that match
-// completes, the row is read again and the difference is the entry: wins going up = a win, matches
+// ranked row (rank, LP, wins, matches) are captured. The row is then re-read every 250 ms, and the
+// moment its match count goes up the difference is the entry: wins going up = a win, matches
 // going up without wins = a loss, LP and rank before/after straight from the row. Player rooms never
 // produce an entry, because only ranked matches change the ranked row and upload a ranked score.
 namespace RankHistory

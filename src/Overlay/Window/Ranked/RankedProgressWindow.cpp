@@ -4843,6 +4843,12 @@ void NoteRankedUploadAttempt(int32_t characterId, int32_t score, const char* lea
 			resolvedByPackedRow ? 1 : 0);
 	}
 	BeginObservedRankedUploadWindow(g_rankedUploadOverlayState.characterId, score);
+
+	// The completion callback does not always arrive (2026-10-19), the attempt always does.
+	if (g_rankedUploadOverlayState.characterId != kInvalidRankedCharacterId)
+	{
+		RankHistory::OnRankedUploadCompleted(g_rankedUploadOverlayState.characterId);
+	}
 }
 
 bool TryResolveCharacterIdFromPackedUploadScore(int32_t score, uint32_t* outCharacterId)
