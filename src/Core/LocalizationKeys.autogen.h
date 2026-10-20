@@ -5835,6 +5835,24 @@ struct LocalizationKeysAccessor
         // Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.
         inline const char* Every_ranked_match_you_have_played_with_the_mod_day_by_day_who_you_played_whether_you_won_how_much_LP_it_was_worth_and_when_you_ranked_up_or_down() const { return Get("Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down."); }
 
+        // %s to %s
+        inline const char* s_to_s() const { return Get("%s to %s"); }
+
+        // Into this rank
+        inline const char* Into_this_rank() const { return Get("Into this rank"); }
+
+        // Left to %s
+        inline const char* Left_to_s() const { return Get("Left to %s"); }
+
+        // Total LP
+        inline const char* Total_LP() const { return Get("Total LP"); }
+
+        // Promotion
+        inline const char* Promotion() const { return Get("Promotion"); }
+
+        // Demotion
+        inline const char* Demotion() const { return Get("Demotion"); }
+
         // Clear history...
         inline const char* Clear_history() const { return Get("Clear history..."); }
 

@@ -5616,6 +5616,223 @@ void ResetRankedProgressRuntimeState()
 	g_lastRankedOverlayCharacterId = kInvalidRankedCharacterId;
 }
 
+namespace
+{
+	std::string FormatLpThousands(uint32_t value)
+	{
+		std::string digits = std::to_string(value);
+		std::string out;
+		int count = 0;
+		for (auto it = digits.rbegin(); it != digits.rend(); ++it)
+		{
+			if (count != 0 && count % 3 == 0)
+			{
+				out.insert(out.begin(), ',');
+			}
+			out.insert(out.begin(), *it);
+			++count;
+		}
+		return out;
+	}
+
+	// The last level of each colour range (LV19, LV29, LV35) fades its fill into the next range's
+	// colour across the bar, so the bar visibly "becomes" the next colour as you approach it.
+	bool TryGetRankColorRangeEdgeTarget(uint32_t visibleRank, bool isUnranked, ImVec4* outNextColor)
+	{
+		if (isUnranked || outNextColor == nullptr)
+		{
+			return false;
+		}
+		if (visibleRank == 19u || visibleRank == 29u || visibleRank == 35u)
+		{
+			*outNextColor = GetVisibleRankColor(visibleRank + 1u, false);
+			return true;
+		}
+		return false;
+	}
+
+	ImVec4 LerpColor(const ImVec4& a, const ImVec4& b, float t)
+	{
+		return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t);
+	}
+
+	// Rewrites the alpha of the vertices just added, top to bottom: a soft highlight that fades out.
+	void ShadeVertsAlphaVertical(ImDrawList* drawList, int vtxStart, int vtxEnd, float y0, float y1, float alphaTop, float alphaBottom, ImU32 rgb)
+	{
+		const float height = (y1 - y0) > 1.0f ? (y1 - y0) : 1.0f;
+		for (int i = vtxStart; i < vtxEnd; ++i)
+		{
+			ImDrawVert& vert = drawList->VtxBuffer[i];
+			float t = (vert.pos.y - y0) / height;
+			t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+			const float alpha = alphaTop + (alphaBottom - alphaTop) * t;
+			vert.col = (rgb & ~IM_COL32_A_MASK) | (static_cast<ImU32>(alpha * 255.0f + 0.5f) << IM_COL32_A_SHIFT);
+		}
+	}
+
+	// Text inside the bar, in two colours split exactly at the fill's edge: dark over the bright
+	// rank colour, light over the dark track. One colour cannot read well on both.
+	void DrawBarText(ImDrawList* drawList, const ImVec2& pos, const char* text, const ImVec2& barPos, const ImVec2& barEnd,
+		float fillEndX, ImU32 onFillColor, ImU32 onTrackColor)
+	{
+		if (fillEndX > barPos.x)
+		{
+			drawList->PushClipRect(barPos, ImVec2(fillEndX, barEnd.y), true);
+			drawList->AddText(pos, onFillColor, text);
+			drawList->PopClipRect();
+		}
+		if (fillEndX < barEnd.x)
+		{
+			drawList->PushClipRect(ImVec2(fillEndX, barPos.y), barEnd, true);
+			drawList->AddText(pos, onTrackColor, text);
+			drawList->PopClipRect();
+		}
+	}
+
+	void DrawRankedProgressBar(ImDrawList* drawList, const ImVec2& barPos, const ImVec2& barSize,
+		const RankedProgressDisplayState& display, const ImVec4& rankColor, float windowAlpha)
+	{
+		const float rounding = 5.0f;
+		const ImVec2 barEnd(barPos.x + barSize.x, barPos.y + barSize.y);
+
+		// Track: a slightly darker inset so the fill reads as sitting inside it.
+		drawList->AddRectFilled(barPos, barEnd, ImGui::ColorConvertFloat4ToU32(ImVec4(0.12f, 0.13f, 0.15f, 0.96f * windowAlpha)), rounding);
+		{
+			const int vtxStart = drawList->VtxBuffer.Size;
+			drawList->AddRectFilled(barPos, ImVec2(barEnd.x, barPos.y + barSize.y * 0.45f), IM_COL32_BLACK, rounding, ImDrawFlags_RoundCornersTop);
+			ShadeVertsAlphaVertical(drawList, vtxStart, drawList->VtxBuffer.Size, barPos.y, barPos.y + barSize.y * 0.45f, 0.30f * windowAlpha, 0.0f, IM_COL32_BLACK);
+		}
+
+		float progress = display.progress;
+		progress = progress < 0.0f ? 0.0f : (progress > 1.0f ? 1.0f : progress);
+		const float fillWidth = barSize.x * progress;
+		if (fillWidth > 1.0f)
+		{
+			const ImVec2 fillEnd(barPos.x + fillWidth, barEnd.y);
+			const ImDrawFlags corners = progress >= 0.999f ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft;
+			const float fillRounding = fillWidth < rounding * 2.0f ? fillWidth * 0.5f : rounding;
+			const ImVec4 baseColor(rankColor.x, rankColor.y, rankColor.z, rankColor.w * windowAlpha);
+
+			// Fill, with the colour-range gradient on edge levels. The gradient spans the whole bar,
+			// so how far the fill has reached is how far into the next colour it has turned.
+			const int fillVtxStart = drawList->VtxBuffer.Size;
+			drawList->AddRectFilled(barPos, fillEnd, ImGui::ColorConvertFloat4ToU32(baseColor), fillRounding, corners);
+			ImVec4 nextColor;
+			if (TryGetRankColorRangeEdgeTarget(display.visibleRank, display.isUnranked, &nextColor))
+			{
+				const ImVec4 endColor(nextColor.x, nextColor.y, nextColor.z, baseColor.w);
+				ImGui::ShadeVertsLinearColorGradientKeepAlpha(drawList, fillVtxStart, drawList->VtxBuffer.Size,
+					barPos, ImVec2(barEnd.x, barPos.y),
+					ImGui::ColorConvertFloat4ToU32(baseColor), ImGui::ColorConvertFloat4ToU32(endColor));
+			}
+
+			// A bright leading edge where the fill ends.
+			if (progress < 0.999f && fillWidth > 3.0f)
+			{
+				drawList->AddLine(ImVec2(fillEnd.x - 1.0f, barPos.y + 2.0f), ImVec2(fillEnd.x - 1.0f, barEnd.y - 2.0f),
+					IM_COL32(255, 255, 255, static_cast<int>(150.0f * windowAlpha)), 1.5f);
+			}
+		}
+
+		drawList->AddRect(barPos, barEnd, ImGui::ColorConvertFloat4ToU32(ImVec4(0.36f, 0.37f, 0.41f, windowAlpha)), rounding, ImDrawFlags_RoundCornersAll, 1.0f);
+
+		// LP into the rank on the filled side, LP still to go on the empty side.
+		if (display.isUnranked || display.nextThreshold <= display.lowerThreshold)
+		{
+			return;
+		}
+		const uint32_t into = display.currentLp > display.lowerThreshold ? display.currentLp - display.lowerThreshold : 0u;
+		const uint32_t remaining = display.nextThreshold > display.currentLp ? display.nextThreshold - display.currentLp : 0u;
+		const std::string intoText = FormatLpThousands(into) + " LP";
+		const std::string nextLabel = FormatVisibleRankLabel(display.visibleRank + 1u, false);
+		char remainingText[96];
+		std::snprintf(remainingText, sizeof(remainingText), L("%s to %s").c_str(), FormatLpThousands(remaining).c_str(), nextLabel.c_str());
+
+		const float padding = 7.0f;
+		const float textY = barPos.y + (barSize.y - ImGui::GetTextLineHeight()) * 0.5f;
+		const float intoWidth = ImGui::CalcTextSize(intoText.c_str()).x;
+		const float remainingWidth = ImGui::CalcTextSize(remainingText).x;
+		float fillProgress = display.progress;
+		fillProgress = fillProgress < 0.0f ? 0.0f : (fillProgress > 1.0f ? 1.0f : fillProgress);
+		const float fillEndX = barPos.x + barSize.x * fillProgress;
+		const ImU32 onFill = IM_COL32(14, 15, 18, static_cast<int>(255.0f * windowAlpha));
+		const ImU32 onTrack = IM_COL32(222, 225, 230, static_cast<int>(255.0f * windowAlpha));
+		DrawBarText(drawList, ImVec2(barPos.x + padding, textY), intoText.c_str(), barPos, barEnd, fillEndX, onFill, onTrack);
+		if (padding + intoWidth + 24.0f + remainingWidth + padding <= barSize.x)
+		{
+			DrawBarText(drawList, ImVec2(barEnd.x - padding - remainingWidth, textY), remainingText, barPos, barEnd, fillEndX, onFill, onTrack);
+		}
+	}
+
+	void DrawRankedProgressBarTooltip(const RankedProgressDisplayState& display)
+	{
+		ImGui::BeginTooltip();
+		const std::string rankLabel = FormatVisibleRankLabel(display.visibleRank, display.isUnranked);
+		const ImVec4 rankColor = GetVisibleRankColor(display.visibleRank, display.isUnranked);
+		if (display.isUnranked || display.nextThreshold <= display.lowerThreshold)
+		{
+			ImGui::TextColored(rankColor, "%s", rankLabel.c_str());
+			ImGui::TextUnformatted((L("Total LP") + ": " + FormatLpThousands(display.currentLp)).c_str());
+			ImGui::EndTooltip();
+			return;
+		}
+
+		const std::string nextLabel = FormatVisibleRankLabel(display.visibleRank + 1u, false);
+		const ImVec4 nextColor = GetVisibleRankColor(display.visibleRank + 1u, false);
+		const uint32_t span = display.nextThreshold - display.lowerThreshold;
+		const uint32_t into = display.currentLp > display.lowerThreshold ? display.currentLp - display.lowerThreshold : 0u;
+		const uint32_t remaining = display.nextThreshold > display.currentLp ? display.nextThreshold - display.currentLp : 0u;
+
+		ImGui::PushFont(NULL, ImGui::GetStyle().FontSizeBase * 1.15f);
+		ImGui::TextColored(rankColor, "%s", rankLabel.c_str());
+		ImGui::SameLine();
+		ImGui::TextDisabled("\xE2\x86\x92");
+		ImGui::SameLine();
+		ImGui::TextColored(nextColor, "%s", nextLabel.c_str());
+		ImGui::PopFont();
+		ImGui::Separator();
+
+		if (ImGui::BeginTable("##ranked_bar_tooltip", 2, ImGuiTableFlags_SizingFixedFit))
+		{
+			auto row = [](const std::string& label, const std::string& value, const ImVec4* color)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::TextDisabled("%s", label.c_str());
+				ImGui::TableSetColumnIndex(1);
+				if (color)
+					ImGui::TextColored(*color, "%s", value.c_str());
+				else
+					ImGui::TextUnformatted(value.c_str());
+			};
+
+			char intoValue[96];
+			std::snprintf(intoValue, sizeof(intoValue), "%s / %s LP  (%d%%)", FormatLpThousands(into).c_str(),
+				FormatLpThousands(span).c_str(), static_cast<int>(into * 100.0 / (span > 0 ? span : 1) + 0.0001));
+			row(L("Into this rank"), intoValue, nullptr);
+			char leftLabel[96];
+			std::snprintf(leftLabel, sizeof(leftLabel), L("Left to %s").c_str(), nextLabel.c_str());
+			row(leftLabel, FormatLpThousands(remaining) + " LP", &nextColor);
+			row(L("Total LP"), FormatLpThousands(display.currentLp), nullptr);
+			// The game puts a placeholder of 8192 here for ranks that do not promote by counter.
+			if (display.promotionCounterLimit > 0u && display.promotionCounterLimit < 1000u)
+			{
+				char value[32];
+				std::snprintf(value, sizeof(value), "%u / %u", display.promotionCounter, display.promotionCounterLimit);
+				row(L("Promotion"), value, nullptr);
+			}
+			if (display.demotionCounterLimit > 0u)
+			{
+				char value[32];
+				std::snprintf(value, sizeof(value), "%u / %u", display.demotionCounter, display.demotionCounterLimit);
+				row(L("Demotion"), value, nullptr);
+			}
+			ImGui::EndTable();
+		}
+		ImGui::EndTooltip();
+	}
+}
+
 void DrawRankedProgressOverlayStandalone()
 {
 	LoadRankedProgressTopRowOptions();
@@ -6039,27 +6256,30 @@ void DrawRankedProgressOverlayStandalone()
 	const float availableBarWidth = ImGui::GetContentRegionAvail().x;
 	const float barWidth = availableBarWidth > 320.0f ? availableBarWidth : 320.0f;
 	const ImVec2 barPos = ImGui::GetCursorScreenPos();
-	const ImVec2 barSize(barWidth, g_rankedOverlayTuning.barHeight);
-	const ImU32 bgColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.16f, 0.17f, 0.19f, 0.96f * windowAlpha));
-	const ImU32 borderColor = ImGui::ColorConvertFloat4ToU32(ImVec4(0.36f, 0.37f, 0.41f, 1.0f * windowAlpha));
-	drawList->AddRectFilled(barPos, ImVec2(barPos.x + barSize.x, barPos.y + barSize.y), bgColor, 5.0f);
-	const float fillWidth = barSize.x * renderedDisplay.progress;
-	if (fillWidth > 0.0f)
+	// Tall enough for the LP text that sits inside it.
+	const float barHeight = (std::max)(g_rankedOverlayTuning.barHeight, ImGui::GetTextLineHeight() + 6.0f);
+	const ImVec2 barSize(barWidth, barHeight);
+	DrawRankedProgressBar(drawList, barPos, barSize, renderedDisplay, rankColor, windowAlpha);
+	ImGui::InvisibleButton("##ranked_progress_bar", barSize);
+	if (ImGui::IsItemHovered())
 	{
-		drawList->AddRectFilled(barPos, ImVec2(barPos.x + fillWidth, barPos.y + barSize.y), rankColorU32, 5.0f);
+		DrawRankedProgressBarTooltip(renderedDisplay);
 	}
-	// Explicit flags: a bare 0 here meant "round no corners" before ImGui 1.82 and means
-	// "round all corners" now, so spell out the intent that matches the rounded fill above.
-	drawList->AddRect(barPos, ImVec2(barPos.x + barSize.x, barPos.y + barSize.y), borderColor, 5.0f, ImDrawFlags_RoundCornersAll, 1.0f);
-	ImGui::Dummy(ImVec2(barSize.x, barSize.y + 6.0f));
+	// The game hides the cursor and no mod window may be asking for one on the ranked screens, so
+	// show it while the mouse is over this window: the tooltip and the right-click menu need it.
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+	{
+		ImGui::GetIO().MouseDrawCursor = true;
+	}
+	ImGui::Dummy(ImVec2(1.0f, 6.0f));
 
 	const float availableRowWidth = ImGui::GetContentRegionAvail().x;
 	const float fullWidth = availableRowWidth > 1.0f ? availableRowWidth : 1.0f;
 	const float thirdWidth = fullWidth / 3.0f;
 	char leftBuffer[64] = {};
 	char rightBuffer[64] = {};
-	std::snprintf(leftBuffer, sizeof(leftBuffer), "%u LP", static_cast<unsigned int>(renderedDisplay.currentLp));
-	std::snprintf(rightBuffer, sizeof(rightBuffer), "%u LP", static_cast<unsigned int>(renderedDisplay.nextThreshold));
+	std::snprintf(leftBuffer, sizeof(leftBuffer), "%s LP", FormatLpThousands(renderedDisplay.currentLp).c_str());
+	std::snprintf(rightBuffer, sizeof(rightBuffer), "%s LP", FormatLpThousands(renderedDisplay.nextThreshold).c_str());
 	ImGui::TextUnformatted(leftBuffer);
 	if (std::abs(renderedDelta) > 0 && deltaAlpha > 0.0f)
 	{

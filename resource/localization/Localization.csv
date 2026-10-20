@@ -2123,6 +2123,12 @@ Rank History,Rank History,Historial de rango
 Rank history,Rank history,Historial de rango
 Ranked leaderboard,Ranked leaderboard,Tabla de clasificación ranked
 "Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.","Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.","Cada partida ranked que jugaste con el mod, día por día: contra quién, si ganaste, cuánto LP valió y cuándo subiste o bajaste de rango."
+%s to %s,%s to %s,%s para %s
+Into this rank,Into this rank,Dentro de este rango
+Left to %s,Left to %s,Falta para %s
+Total LP,Total LP,LP total
+Promotion,Promotion,Ascenso
+Demotion,Demotion,Descenso
 Clear history...,Clear history...,Borrar historial...
 Clear rank history?###ClearRankHistory,Clear rank history?###ClearRankHistory,¿Borrar el historial de rango?###ClearRankHistory
 This deletes all %zu ranked matches recorded for this Steam account.,This deletes all %zu ranked matches recorded for this Steam account.,Esto borra las %zu partidas ranked registradas para esta cuenta de Steam.
