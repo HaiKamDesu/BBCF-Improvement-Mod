@@ -23,6 +23,7 @@
 #include "Overlay/Window/NetworkSquareColorWindow.h"
 #include "Overlay/Window/Ranked/RankedListFilterWindow.h"
 #include "Overlay/Window/Ranked/RankedLeaderboardWindow.h"
+#include "Overlay/Window/Ranked/RankHistoryWindow.h"
 #include "Overlay/Window/ReleaseCheckerWindow.h"
 #include "Overlay/Window/TasWindow.h"
 #include "Overlay/Window/TasInputListWindow.h"
@@ -140,6 +141,10 @@ WindowContainer::WindowContainer()
 
         AddWindow(WindowType_RankedLeaderboard,
                 new RankedLeaderboardWindow((L("Ranked Leaderboard") + "###RankedLeaderboard").c_str(), true,
+                        ImGuiWindowFlags_NoCollapse));
+
+        AddWindow(WindowType_RankHistory,
+                new RankHistoryWindow((L("Rank History") + "###RankHistory").c_str(), true,
                         ImGuiWindowFlags_NoCollapse));
 }
 

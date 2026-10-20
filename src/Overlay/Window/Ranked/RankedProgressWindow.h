@@ -78,3 +78,18 @@ ImVec4 GetVisibleRankColor(uint32_t visibleRank, bool isUnranked);
 // Returns false (and leaves *outTotalLp untouched) if internalRank has no
 // known LP bounds (e.g. out of table range).
 bool ComputeTotalLpFromPackedScore(uint32_t internalRank, uint32_t packedSubscore, uint32_t* outTotalLp);
+
+// One character's ranked standing as the game holds it right now (its row in the ranked table):
+// the same numbers the progress overlay shows. Used by the rank history to diff a match.
+struct RankedCharacterRecord
+{
+	bool valid = false;
+	bool isUnranked = true;
+	uint32_t visibleRank = 0;  // 1..35 = LV, 36+ = special ranks (FormatVisibleRankLabel)
+	uint32_t totalLp = 0;      // cumulative LP, as shown on the overlay
+	uint32_t rankStartLp = 0;  // total LP at which the current rank starts
+	uint32_t nextRankLp = 0;   // total LP at which the next rank starts (0 = unknown)
+	uint32_t wins = 0;
+	uint32_t matches = 0;
+};
+bool ReadRankedCharacterRecord(uint32_t characterId, RankedCharacterRecord* outRecord);

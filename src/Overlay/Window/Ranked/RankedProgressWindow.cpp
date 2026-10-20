@@ -4,6 +4,7 @@
 
 #include "RankedMainMenuSection.h"
 #include "RankedModalWindow.h"
+#include "RankHistory.h"
 #include "RankLeaderboardCodes.h"
 
 #include "Core/Settings.h"
@@ -4775,6 +4776,31 @@ bool ComputeTotalLpFromPackedScore(uint32_t internalRank, uint32_t packedSubscor
 	return true;
 }
 
+bool ReadRankedCharacterRecord(uint32_t characterId, RankedCharacterRecord* outRecord)
+{
+	if (!outRecord || characterId >= 0x40u)
+	{
+		return false;
+	}
+
+	RankedProgressOverlaySnapshot snapshot;
+	if (!FillRankedProgressSnapshotForRow(characterId, characterId, characterId, -1, -1, &snapshot))
+	{
+		return false;
+	}
+
+	*outRecord = {};
+	outRecord->valid = true;
+	outRecord->isUnranked = snapshot.isUnranked;
+	outRecord->visibleRank = snapshot.currentRank;
+	outRecord->totalLp = snapshot.currentLp;
+	outRecord->rankStartLp = snapshot.lowerThreshold;
+	outRecord->nextRankLp = snapshot.nextThreshold;
+	outRecord->wins = snapshot.earnedPoints;
+	outRecord->matches = snapshot.totalPoints;
+	return true;
+}
+
 void NoteRankedUploadAttempt(int32_t characterId, int32_t score, const char* leaderboardName)
 {
 	uint32_t resolvedCharacterId = (characterId >= 0 && characterId < 64)
@@ -4864,6 +4890,12 @@ void NoteRankedUploadCompletion(const char* origin, bool success, bool scoreChan
 
 		g_lastSuccessfulRankScoreByCharacter[characterId] = score;
 		g_hasLastSuccessfulRankScoreByCharacter[characterId] = 1;
+	}
+
+	// The match this upload belongs to is over: let the rank history diff the ranked row.
+	if (characterId != kInvalidRankedCharacterId)
+	{
+		RankHistory::OnRankedUploadCompleted(characterId);
 	}
 
 	if (IsRankedOverlayDiagnosticsEnabled())
@@ -5547,6 +5579,10 @@ void DrawRankedMatchesMainMenuSection()
 	{
 		WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_RankedLeaderboard)->Open();
 	}
+	if ((actions & RankedUi::RankedMainMenuAction_OpenRankHistory) != 0u)
+	{
+		WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_RankHistory)->Open();
+	}
 }
 
 bool IsRankedOverlayRuntimeReady()
@@ -5811,6 +5847,14 @@ void DrawRankedProgressOverlayStandalone()
 	ImGui::SetWindowSize(ImVec2(g_rankedOverlayTuning.overlayWidth, 118.0f), ImGuiCond_FirstUseEver);
 	if (ImGui::BeginPopupContextWindow("ranked_progress_context", ImGuiPopupFlags_MouseButtonRight))
 	{
+		if (ImGui::MenuItem(L("Ranked leaderboard").c_str()))
+		{
+			WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_RankedLeaderboard)->Open();
+		}
+		if (ImGui::MenuItem(L("Rank history").c_str()))
+		{
+			WindowManager::GetInstance().GetWindowContainer()->GetWindow(WindowType_RankHistory)->Open();
+		}
 		if (ImGui::MenuItem(L("Ranked ladder").c_str()))
 		{
 			g_showRankedLadderWindow = true;

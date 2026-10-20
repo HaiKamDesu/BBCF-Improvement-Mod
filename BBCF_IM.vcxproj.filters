@@ -261,6 +261,8 @@
     <ClCompile Include="src\Overlay\Widget\MarkdownRenderer.cpp" />
     <ClCompile Include="src\Overlay\Widget\UpdateProgressWidget.cpp" />
     <ClCompile Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.cpp" />
+    <ClCompile Include="src\Overlay\Window\Ranked\RankHistory.cpp" />
+    <ClCompile Include="src\Overlay\Window\Ranked\RankHistoryWindow.cpp" />
     <ClCompile Include="src\Game\Scr\ScrStateReader.cpp" />
     <ClCompile Include="src\Game\Scr\ScrStateNames.cpp" />
     <ClCompile Include="src\Overlay\Window\ScrWindow.cpp" />
@@ -563,6 +565,8 @@
     <ClInclude Include="src\Overlay\Widget\MarkdownRenderer.h" />
     <ClInclude Include="src\Overlay\Widget\UpdateProgressWidget.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankedLeaderboardWindow.h" />
+    <ClInclude Include="src\Overlay\Window\Ranked\RankHistory.h" />
+    <ClInclude Include="src\Overlay\Window\Ranked\RankHistoryWindow.h" />
     <ClInclude Include="src\Overlay\Window\Ranked\RankLeaderboardCodes.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackSlot.h" />
     <ClInclude Include="src\Game\Playbacks\PlaybackManager.h" />

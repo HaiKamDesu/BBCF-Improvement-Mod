@@ -31,4 +31,5 @@ enum WindowType_
         WindowType_BgmReplacement,
         WindowType_PlayerRoomListFilter,
         WindowType_LargeAddressPopup,
+        WindowType_RankHistory,
 };

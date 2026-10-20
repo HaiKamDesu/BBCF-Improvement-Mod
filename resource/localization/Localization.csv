@@ -2105,3 +2105,25 @@ Restart in 4 GB mode,Restart in 4 GB mode,Reiniciar en modo 4 GB
 Not now,Not now,Ahora no
 "No, don't ask again","No, don't ask again","No, no preguntar de nuevo"
 "Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.","Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.","La configuración de gráficos y de compatibilidad que le diste a BBCF.exe en Windows pasa a la copia. Si el Firewall de Windows tiene reglas para BBCF.exe, Windows te pide permiso una vez para copiarlas también."
+Today,Today,Hoy
+Yesterday,Yesterday,Ayer
+Last 7 days,Last 7 days,Últimos 7 días
+All time,All time,Total
+match,match,partida
+matches,matches,partidas
+No matches,No matches,Sin partidas
+Time,Time,Hora
+Result,Result,Resultado
+WIN,WIN,VICTORIA
+LOSE,LOSE,DERROTA
+All characters,All characters,Todos los personajes
+No ranked matches recorded yet.,No ranked matches recorded yet.,Todavía no hay partidas ranked registradas.
+"Every ranked match you play from now on shows up here, with how it moved your LP.","Every ranked match you play from now on shows up here, with how it moved your LP.","Cada partida ranked que juegues a partir de ahora aparece acá, con cuánto LP te movió."
+Rank History,Rank History,Historial de rango
+Rank history,Rank history,Historial de rango
+Ranked leaderboard,Ranked leaderboard,Tabla de clasificación ranked
+"Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.","Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.","Cada partida ranked que jugaste con el mod, día por día: contra quién, si ganaste, cuánto LP valió y cuándo subiste o bajaste de rango."
+Clear history...,Clear history...,Borrar historial...
+Clear rank history?###ClearRankHistory,Clear rank history?###ClearRankHistory,¿Borrar el historial de rango?###ClearRankHistory
+This deletes all %zu ranked matches recorded for this Steam account.,This deletes all %zu ranked matches recorded for this Steam account.,Esto borra las %zu partidas ranked registradas para esta cuenta de Steam.
+Your rank and LP are not affected. This cannot be undone.,Your rank and LP are not affected. This cannot be undone.,Tu rango y tu LP no cambian. No se puede deshacer.

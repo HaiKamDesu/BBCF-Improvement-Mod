@@ -72,6 +72,14 @@ namespace RankedUi
 		ImGui::ShowHelpMarker(L("Opens a detailed, paged leaderboard browser (all players or per character) with exact scores, rank + LP, last-used character, Steam level, online status, and a profile shortcut.").c_str());
 
 		ImGui::HorizontalSpacing();
+		if (ImGui::Button(L("Rank history").c_str()))
+		{
+			actions |= RankedMainMenuAction_OpenRankHistory;
+		}
+		ImGui::SameLine();
+		ImGui::ShowHelpMarker(L("Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.").c_str());
+
+		ImGui::HorizontalSpacing();
 		if (ImGui::Button(L("How does ranked work?").c_str()))
 		{
 			actions |= RankedMainMenuAction_OpenRulesSelector;

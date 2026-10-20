@@ -9,6 +9,7 @@
 #include "Game/ReplayFiles/ReplayFileManager.h"
 #include "Network/RankedListConnectionFilter.h"
 #include "Overlay/Window/PaletteEditorWindow.h"
+#include "Overlay/Window/Ranked/RankHistory.h"
 #include "Overlay/Window/Ranked/RankedListFilterWindow.h"
 #include "Overlay/Window/ReplayExtrasWindow.h"
 #include "Overlay/WindowContainer/WindowType.h"
@@ -109,6 +110,9 @@ void MatchState::OnMatchInit()
 	{
 		g_interfaces.pOnlinePaletteManager->OnMatchInit();
 	}
+
+	// Recording does not need the overlay either; only viewing the history does.
+	RankHistory::OnMatchInit();
 
 	if (!WindowManager::GetInstance().IsInitialized())
 	{
@@ -265,6 +269,7 @@ void MatchState::OnUpdate()
 	{
 		g_interfaces.pReplayRewindManager->OnUpdate();
 	}
+	RankHistory::OnUpdate();
 	g_rep_manager.check_and_load_replay_steam();
 }
 

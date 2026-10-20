@@ -5780,6 +5780,72 @@ struct LocalizationKeysAccessor
 
         // Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too.
         inline const char* Graphics_and_compatibility_settings_you_gave_BBCF_exe_in_Windows_carry_over_to_the_copy_If_Windows_Firewall_has_rules_for_BBCF_exe_Windows_asks_once_for_permission_to_copy_them_too() const { return Get("Graphics and compatibility settings you gave BBCF.exe in Windows carry over to the copy. If Windows Firewall has rules for BBCF.exe, Windows asks once for permission to copy them too."); }
+
+        // Today
+        inline const char* Today() const { return Get("Today"); }
+
+        // Yesterday
+        inline const char* Yesterday() const { return Get("Yesterday"); }
+
+        // Last 7 days
+        inline const char* Last_7_days() const { return Get("Last 7 days"); }
+
+        // All time
+        inline const char* All_time() const { return Get("All time"); }
+
+        // match
+        inline const char* match_2() const { return Get("match"); }
+
+        // matches
+        inline const char* matches_2() const { return Get("matches"); }
+
+        // No matches
+        inline const char* No_matches() const { return Get("No matches"); }
+
+        // Time
+        inline const char* Time_2() const { return Get("Time"); }
+
+        // Result
+        inline const char* Result() const { return Get("Result"); }
+
+        // WIN
+        inline const char* WIN_2() const { return Get("WIN"); }
+
+        // LOSE
+        inline const char* LOSE() const { return Get("LOSE"); }
+
+        // All characters
+        inline const char* All_characters() const { return Get("All characters"); }
+
+        // No ranked matches recorded yet.
+        inline const char* No_ranked_matches_recorded_yet() const { return Get("No ranked matches recorded yet."); }
+
+        // Every ranked match you play from now on shows up here, with how it moved your LP.
+        inline const char* Every_ranked_match_you_play_from_now_on_shows_up_here_with_how_it_moved_your_LP() const { return Get("Every ranked match you play from now on shows up here, with how it moved your LP."); }
+
+        // Rank History
+        inline const char* Rank_History() const { return Get("Rank History"); }
+
+        // Rank history
+        inline const char* Rank_history_2() const { return Get("Rank history"); }
+
+        // Ranked leaderboard
+        inline const char* Ranked_leaderboard() const { return Get("Ranked leaderboard"); }
+
+        // Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down.
+        inline const char* Every_ranked_match_you_have_played_with_the_mod_day_by_day_who_you_played_whether_you_won_how_much_LP_it_was_worth_and_when_you_ranked_up_or_down() const { return Get("Every ranked match you have played with the mod, day by day: who you played, whether you won, how much LP it was worth, and when you ranked up or down."); }
+
+        // Clear history...
+        inline const char* Clear_history() const { return Get("Clear history..."); }
+
+        // Clear rank history?###ClearRankHistory
+        inline const char* Clear_rank_history_ClearRankHistory() const { return Get("Clear rank history?###ClearRankHistory"); }
+
+        // This deletes all %zu ranked matches recorded for this Steam account.
+        inline const char* This_deletes_all_zu_ranked_matches_recorded_for_this_Steam_account() const { return Get("This deletes all %zu ranked matches recorded for this Steam account."); }
+
+        // Your rank and LP are not affected. This cannot be undone.
+        inline const char* Your_rank_and_LP_are_not_affected_This_cannot_be_undone() const { return Get("Your rank and LP are not affected. This cannot be undone."); }
 };
 
 
