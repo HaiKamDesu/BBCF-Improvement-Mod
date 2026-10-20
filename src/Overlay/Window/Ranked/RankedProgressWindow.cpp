@@ -5670,25 +5670,6 @@ namespace
 		}
 	}
 
-	// Text inside the bar, in two colours split exactly at the fill's edge: dark over the bright
-	// rank colour, light over the dark track. One colour cannot read well on both.
-	void DrawBarText(ImDrawList* drawList, const ImVec2& pos, const char* text, const ImVec2& barPos, const ImVec2& barEnd,
-		float fillEndX, ImU32 onFillColor, ImU32 onTrackColor)
-	{
-		if (fillEndX > barPos.x)
-		{
-			drawList->PushClipRect(barPos, ImVec2(fillEndX, barEnd.y), true);
-			drawList->AddText(pos, onFillColor, text);
-			drawList->PopClipRect();
-		}
-		if (fillEndX < barEnd.x)
-		{
-			drawList->PushClipRect(ImVec2(fillEndX, barPos.y), barEnd, true);
-			drawList->AddText(pos, onTrackColor, text);
-			drawList->PopClipRect();
-		}
-	}
-
 	void DrawRankedProgressBar(ImDrawList* drawList, const ImVec2& barPos, const ImVec2& barSize,
 		const RankedProgressDisplayState& display, const ImVec4& rankColor, float windowAlpha)
 	{
@@ -5755,12 +5736,32 @@ namespace
 		float fillProgress = display.progress;
 		fillProgress = fillProgress < 0.0f ? 0.0f : (fillProgress > 1.0f ? 1.0f : fillProgress);
 		const float fillEndX = barPos.x + barSize.x * fillProgress;
-		const ImU32 onFill = IM_COL32(14, 15, 18, static_cast<int>(255.0f * windowAlpha));
-		const ImU32 onTrack = IM_COL32(222, 225, 230, static_cast<int>(255.0f * windowAlpha));
-		DrawBarText(drawList, ImVec2(barPos.x + padding, textY), intoText.c_str(), barPos, barEnd, fillEndX, onFill, onTrack);
-		if (padding + intoWidth + 24.0f + remainingWidth + padding <= barSize.x)
+
+		// Each number lives in its own part of the bar and only shows when it fits there: LP into
+		// the rank inside the fill, LP left in the empty part. As the fill grows or shrinks past the
+		// point where one fits, it fades over kFadeMargin instead of popping, and it is clipped to
+		// its part so it never spills onto the other colour. The tooltip has both regardless.
+		const float kFadeMargin = 24.0f;
+		auto fitAlpha = [&](float space, float textWidth)
 		{
-			DrawBarText(drawList, ImVec2(barEnd.x - padding - remainingWidth, textY), remainingText, barPos, barEnd, fillEndX, onFill, onTrack);
+			const float spare = space - (padding + textWidth + padding);
+			return spare <= 0.0f ? 0.0f : (spare >= kFadeMargin ? 1.0f : spare / kFadeMargin);
+		};
+
+		const float intoAlpha = fitAlpha(fillEndX - barPos.x, intoWidth) * windowAlpha;
+		if (intoAlpha > 0.0f)
+		{
+			drawList->PushClipRect(barPos, ImVec2(fillEndX, barEnd.y), true);
+			drawList->AddText(ImVec2(barPos.x + padding, textY), IM_COL32(14, 15, 18, static_cast<int>(255.0f * intoAlpha)), intoText.c_str());
+			drawList->PopClipRect();
+		}
+
+		const float remainingAlpha = fitAlpha(barEnd.x - fillEndX, remainingWidth) * windowAlpha;
+		if (remainingAlpha > 0.0f)
+		{
+			drawList->PushClipRect(ImVec2(fillEndX, barPos.y), barEnd, true);
+			drawList->AddText(ImVec2(barEnd.x - padding - remainingWidth, textY), IM_COL32(222, 225, 230, static_cast<int>(255.0f * remainingAlpha)), remainingText);
+			drawList->PopClipRect();
 		}
 	}
 
