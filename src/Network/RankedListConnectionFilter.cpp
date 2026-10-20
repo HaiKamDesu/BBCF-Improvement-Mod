@@ -680,6 +680,29 @@ void RankedListConnectionFilter::OnLobbyListResultDelivered(void* pvParam, bool 
 		candidate.ownerSteamId = g_interfaces.pSteamMatchmakingWrapper->ResolveLobbyOwnerSteamId(lobby);
 		const char* const ownerName = raw->GetLobbyData(lobby, "ownerName");
 		candidate.ownerName = (ownerName != nullptr) ? ownerName : "";
+		// Orphaned lobby: Steam moves ownership to the remaining member when the host leaves, but the
+		// lobby data keeps advertising the old host. The game's row shows that old host, while its
+		// join goes to whoever Steam says owns the lobby, so clicking "marioara" sent the join to the
+		// player marioara had just played (2026-10-19, refused, and the error named him). Only judged
+		// when Steam actually resolves the owner; an unresolved owner is normal for search results.
+		{
+			const char* const advertised = raw->GetLobbyData(lobby, "ownerID");
+			if (advertised != nullptr && advertised[0] != '\0')
+			{
+				candidate.advertisedOwnerSteamId = std::strtoull(advertised, nullptr, 10);
+			}
+			const CSteamID steamOwner = raw->GetLobbyOwner(lobby);
+			candidate.orphaned = steamOwner.IsValid() && candidate.advertisedOwnerSteamId != 0 &&
+				steamOwner.ConvertToUint64() != candidate.advertisedOwnerSteamId;
+			if (candidate.orphaned)
+			{
+				LOG(1, "[RankedListFilter] orphaned lobby=%llu: advertises host %llu (%s) but Steam's owner is %llu - the host left; not listed\n",
+					static_cast<unsigned long long>(candidate.lobbyId),
+					static_cast<unsigned long long>(candidate.advertisedOwnerSteamId),
+					candidate.ownerName.empty() ? "?" : candidate.ownerName.c_str(),
+					static_cast<unsigned long long>(steamOwner.ConvertToUint64()));
+			}
+		}
 		const char* const hostLevel = raw->GetLobbyData(lobby, "RANK_HOST_LEVEL");
 		if (hostLevel != nullptr && hostLevel[0] != '\0')
 		{
@@ -2705,6 +2728,13 @@ void RankedListConnectionFilter::BuildCompactedListAndDeliver(const char* reason
 	// without a refresh.
 	for (const LobbyCandidate& candidate : m_candidates)
 	{
+		// An orphaned ranked lobby can never be joined (its host is gone) and shows up as a
+		// duplicate of that host's new lobby, so it is left out of the list the game gets. Not a
+		// reversible live-pass hide like the rest: nothing about it can come back.
+		if (candidate.orphaned && m_listKind == RoomListKind::Ranked)
+		{
+			continue;
+		}
 		shownCandidates.push_back(&candidate);
 		if (candidate.ownerSteamId != 0 && !candidate.ownerName.empty())
 		{

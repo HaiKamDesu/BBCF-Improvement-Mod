@@ -293,6 +293,11 @@ private:
 		uint64_t lobbyId = 0;
 		uint64_t ownerSteamId = 0;
 		std::string ownerName;     // from "ownerName" lobby metadata, for user-facing notifications
+		// The host the lobby advertises ("ownerID" lobby metadata), which is what the game's row shows.
+		// Differs from ownerSteamId (Steam's real owner) only when the advertising host has left and
+		// Steam handed the lobby to the member left inside: an orphan nobody is hosting.
+		uint64_t advertisedOwnerSteamId = 0;
+		bool orphaned = false;
 		int internalRankLevel = -1; // from "RANK_HOST_LEVEL" lobby metadata (visible level - 1); -1 = unknown
 		// Player rooms (refreshed from the game's node every live pass):
 		int members = -1;          // node+0x6D, GetNumLobbyMembers at delivery
