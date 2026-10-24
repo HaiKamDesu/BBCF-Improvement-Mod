@@ -16,6 +16,13 @@ game decides that at runtime, but from data that is all on disk:
     (AA_CCollision_JON vtable+0x54 -> chunk dword +0x48): non-zero means file = value-1
     for that one image. That is how player sprites carry effect images.
 
+  * Some objects draw nothing indexed at all - 3D models (createEff3d), particles - and are
+    tinted instead with single colours the script reads out of the object's palette file:
+    4047 setParticleColorFromPalette, 21004, 21009 and 23122 all resolve entries through
+    0x0057E0F0, which reads entry n of the object's current colour and file. Mai's file 2,
+    for one, is never on a sprite; its entry 1 is the glow of her charged spear and 2C.
+    Those entries are recorded per file, so the editor knows the file is used.
+
 So: walk every state of the character's scripts, track the palette file an object holds
 when it shows each sprite, open that sprite's .jonbin, and record the file for each
 image it draws. setPalette inside if/ifNot/else/upon blocks adds an alternative rather
@@ -44,7 +51,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_palette_thumbnails import CHAR_TAGS, unwrap, fpac_entries  # noqa: E402
 
 MAGIC = b"BBEM"
-VERSION = 2  # 1 had no render state
+VERSION = 3  # 1 had no render state, 2 no colours read from the palette
 PACK_IMG = 0
 PACK_VRI = 1
 
@@ -84,6 +91,19 @@ CMD_RECIPE_PARAM_LAST = 3048
 PREVIEW_ONLY = {
     ("mi", 6): r"mi600_\d+y$",
 }
+# Commands that take single colours out of the object's palette file (BBCF.exe 0x0057E0F0,
+# entry = low byte of the argument): command id -> which i32 arguments are entries.
+#   4047  setParticleColorFromPalette(a, b, c) -> vtable+0x588 (0x00591980), +0x12B8..+0x12C0
+#   21004 (n)                                  -> vtable+0xD78 (0x0059A850), into vtable+0x460
+#   21009 (on, a, b, c, d, e)                  -> vtable+0xD8C (0x00595FE0), only when on != 0
+#   23122 (n)                                  -> vtable+0xFC8 (0x0059AD80), into vtable+0xFB8
+PALETTE_READS = {
+    4047: (0, 1, 2),
+    21004: (0,),
+    21009: (1, 2, 3, 4, 5),
+    23122: (0,),
+}
+CMD_READS_SWITCH = 21009
 OPENERS = {CMD_IF, CMD_IF_NOT, CMD_ELSE, CMD_UPON}
 CLOSERS = {CMD_END_IF, CMD_END_IF_NOT, CMD_END_ELSE, CMD_END_UPON}
 
@@ -158,14 +178,15 @@ def new_render_state():
     return {"blend": 0, "recipe": 0, "params": [0] * 8}
 
 
-def walk(commands, subs, files, render, depth=0):
+def walk(commands, subs, files, render, reads, depth=0):
     """Yield (sprite name, set of palette files, render state) through a state's commands.
 
     `files` is the set the object may hold, updated in place. An unconditional setPalette
     replaces it; a conditional one (inside if/ifNot/else, or upon other than IMMEDIATE,
     which runs on state entry) adds to it. `render` is how the object is drawn; for it the
-    last write wins, conditional or not - a preview can only show one way. Subroutines
-    are followed."""
+    last write wins, conditional or not - a preview can only show one way. Colours read
+    out of the palette (PALETTE_READS) go into `reads`, file -> entries, for every file the
+    object may hold at that point. Subroutines are followed."""
     stack = []
     for cid, args in commands:
         if cid in OPENERS:
@@ -183,6 +204,11 @@ def walk(commands, subs, files, render, depth=0):
             if all(stack):
                 files.clear()
             files.add(value)
+        elif cid in PALETTE_READS:
+            values = struct.unpack_from("<%di" % (len(args) // 4), args)
+            if cid != CMD_READS_SWITCH or values[0]:
+                for f in files:
+                    reads[f].update(values[i] & 0xFF for i in PALETTE_READS[cid])
         elif CMD_BLEND_FIRST <= cid <= CMD_BLEND_LAST:
             render["blend"] = cid - CMD_BLEND_FIRST
         elif cid == CMD_RECIPE:
@@ -192,10 +218,10 @@ def walk(commands, subs, files, render, depth=0):
         elif cid == CMD_CALL_SUBROUTINE and depth < 8:
             body = subs.get(c_string(args[:32]), [])
             if all(stack):
-                yield from walk(body, subs, files, render, depth + 1)
+                yield from walk(body, subs, files, render, reads, depth + 1)
             else:
                 branch = set(files)
-                for item in walk(body, subs, branch, render, depth + 1):
+                for item in walk(body, subs, branch, render, reads, depth + 1):
                     yield item
                 files |= branch
         elif cid == CMD_SPRITE:
@@ -220,6 +246,7 @@ def map_character(char_dir, tag, sizes):
 
     usage = defaultdict(set)
     render_of = {}
+    reads = defaultdict(set)
     for commands in scripts:
         body = None
         states = []
@@ -232,7 +259,7 @@ def map_character(char_dir, tag, sizes):
             elif body is not None:
                 body.append((cid, args))
         for body in states:
-            for sprite, files, render in walk(body, subs, {0}, new_render_state()):
+            for sprite, files, render in walk(body, subs, {0}, new_render_state(), reads):
                 jonbin = jonbins.get(sprite)
                 if jonbin is None:
                     continue
@@ -260,7 +287,9 @@ def map_character(char_dir, tag, sizes):
                     mask |= 1 << f
         if mask:
             entries.append((packs[image], mask, image, render_of.get(image, new_render_state())))
-    return entries
+    # File 0 is the character's own colours, always edited on the reference sheet.
+    colours = {f: sorted(reads[f]) for f in range(1, 8) if reads[f]}
+    return entries, colours
 
 
 def main():
@@ -276,18 +305,22 @@ def main():
 
     tables = []
     for char_index, tag in enumerate(CHAR_TAGS):
-        entries = map_character(char_dir, tag, sizes)
+        entries, colours = map_character(char_dir, tag, sizes)
         per_file = [sum(1 for e in entries if e[1] & (1 << f)) for f in range(1, 8)]
         print("  %02d %-3s %4d effect images  per file 1-7: %s" % (char_index, tag, len(entries), per_file))
-        tables.append(entries)
+        for f, read in sorted(colours.items()):
+            print("         file %d colours read: %s%s" % (f, read, "" if per_file[f - 1] else "  (on no sprite)"))
+        tables.append((entries, colours))
 
     # "BBEM", u32 version, u32 count, count * { u32 offset, u32 entries },
     # then per entry: u8 pack (0 img, 1 vri), u8 file mask (bit n = file n), u8 name length, name,
-    # u8 blend mode, u8 palette recipe, and when the recipe is not 0: 8 * i32 for 3041-3048
+    # u8 blend mode, u8 palette recipe, and when the recipe is not 0: 8 * i32 for 3041-3048;
+    # after a character's entries: u8 files, files * { u8 file, u16 count, count * u8 entry }
+    # for the colours its scripts read out of each file
     header_size = 12 + len(tables) * 8
     body = bytearray()
     table = bytearray()
-    for entries in tables:
+    for entries, colours in tables:
         table += struct.pack("<II", header_size + len(body), len(entries))
         for pack, mask, name, render in entries:
             encoded = name.encode("ascii")
@@ -296,6 +329,9 @@ def main():
             body += struct.pack("<BB", render["blend"], recipe)
             if recipe:
                 body += struct.pack("<8i", *render["params"])
+        body += struct.pack("<B", len(colours))
+        for f, read in sorted(colours.items()):
+            body += struct.pack("<BH", f, len(read)) + bytes(read)
     blob = MAGIC + struct.pack("<II", VERSION, len(tables)) + table + body
 
     with open(args.output, "wb") as handle:

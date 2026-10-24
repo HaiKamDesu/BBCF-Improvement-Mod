@@ -413,7 +413,7 @@ bool PaletteEditorModal::ResolveBase(const BaseChoice& choice, IMPL_data_t& out,
 
 void PaletteEditorModal::LoadBase(const IMPL_data_t& palette)
 {
-	if (m_file != 0 && EffectSheets::ImageCount(m_charIndex, m_file) == 0)
+	if (m_file != 0 && !EffectSheets::FileIsUsed(m_charIndex, m_file))
 		m_file = 0;
 	CopyColourFiles(m_palette, palette);
 	CopyColourFiles(m_base, palette);
@@ -1245,9 +1245,9 @@ void PaletteEditorModal::DrawToolbar()
 	{
 		for (int f = 0; f < IMPL_PALETTE_FILES_COUNT; f++)
 		{
-			// A file the game never draws anything with has nothing to edit it on, and
-			// nothing it changes: offered, but not selectable.
-			const bool unused = f > 0 && EffectSheets::ImageCount(m_charIndex, f) == 0;
+			// A file the game never uses, on a sprite or as a colour, has nothing to edit it
+			// on and nothing it changes: offered, but not selectable.
+			const bool unused = f > 0 && !EffectSheets::FileIsUsed(m_charIndex, f);
 			const std::string label = unused ? fileLabel(f) + "  " + L("(unused)") : fileLabel(f);
 			if (ImGui::Selectable(label.c_str(), f == m_file, unused ? ImGuiSelectableFlags_Disabled : 0))
 			{
@@ -1730,6 +1730,17 @@ bool PaletteEditorModal::DrawEntryGrid(const char* id, float cell, float gap)
 			outline(i, ImGui::GetColorU32(ImGuiCol_CheckMark), 1.5f);
 	if (underMouse >= 0)
 		outline(underMouse, IM_COL32(200, 200, 200, 255), 1.5f);
+	// Entries the scripts read as single colours (3D models, particles) are on no sprite,
+	// so the grid is the only place to find them: a dot in the corner.
+	const std::vector<unsigned char>& coloursRead = EffectSheets::ColoursRead(m_charIndex, m_file);
+	for (unsigned char i : coloursRead)
+	{
+		const ImVec2 corner(gridOrigin.x + (i % 16 + 1) * cell - gap, gridOrigin.y + (i / 16) * cell);
+		const float radius = (std::max)(2.0f, cell * 0.14f);
+		const ImVec2 centre(corner.x - radius - 1.0f, corner.y + radius + 1.0f);
+		draw->AddCircleFilled(centre, radius + 1.0f, IM_COL32(0, 0, 0, 220));
+		draw->AddCircleFilled(centre, radius, IM_COL32(255, 255, 255, 255));
+	}
 	if (m_selected >= 0)
 	{
 		for (int i = 0; i < 256; i++)
@@ -1742,7 +1753,10 @@ bool PaletteEditorModal::DrawEntryGrid(const char* id, float cell, float gap)
 	{
 		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 		const unsigned char* e = shown + underMouse * 4;
-		ImGui::SetTooltip("#%03d  %02X%02X%02X\n%s", underMouse + 1, e[2], e[1], e[0], L("Click to edit this color").c_str());
+		const bool read = std::find(coloursRead.begin(), coloursRead.end(), (unsigned char)underMouse) != coloursRead.end();
+		ImGui::SetTooltip("#%03d  %02X%02X%02X\n%s%s%s", underMouse + 1, e[2], e[1], e[0],
+			read ? L("Tints 3D effects and particles, which are on no sprite").c_str() : "", read ? "\n" : "",
+			L("Click to edit this color").c_str());
 	}
 	return hovered;
 }
@@ -2218,7 +2232,17 @@ void PaletteEditorModal::DrawEffectGrid()
 
 	const ImVec2 gridOrigin(origin.x + (size.x - pickerRoom - cell * 16.0f) * 0.5f, origin.y + top);
 	std::string note;
-	if (EffectSheets::ImageCount(m_charIndex, m_file) == 0)
+	const std::vector<unsigned char>& coloursRead = EffectSheets::ColoursRead(m_charIndex, m_file);
+	if (EffectSheets::ImageCount(m_charIndex, m_file) == 0 && !coloursRead.empty())
+	{
+		// No sprite, but single colours taken from it: name them, and the grid marks them.
+		std::string entries;
+		for (unsigned char entry : coloursRead)
+			entries += (entries.empty() ? "" : ", ") + FormatText("#%03d", entry + 1);
+		note = FormatText(L("%s draws no sprite with this file, but tints 3D effects and particles with %s from it (marked).").c_str(),
+			getCharacterNameByIndexA(m_charIndex).c_str(), entries.c_str());
+	}
+	else if (EffectSheets::ImageCount(m_charIndex, m_file) == 0)
 		note = FormatText(L("%s never draws anything with this file. Its colors are still saved with the palette.").c_str(),
 			getCharacterNameByIndexA(m_charIndex).c_str());
 	else if (!m_effectNote.empty())

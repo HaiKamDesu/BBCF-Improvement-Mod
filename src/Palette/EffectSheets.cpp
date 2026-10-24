@@ -26,9 +26,10 @@ namespace
 	// Blob layout, written by tools/build_effect_palette_map.py:
 	//   "BBEM", u32 version, u32 count, count * { u32 offset, u32 entries },
 	//   per entry: u8 pack (0 img, 1 vri), u8 file mask (bit n = file n), u8 length, name,
-	//   u8 blend mode, u8 palette recipe, and when the recipe is not 0: 8 * i32 for 3041-3048
+	//   u8 blend mode, u8 palette recipe, and when the recipe is not 0: 8 * i32 for 3041-3048;
+	//   after a character's entries: u8 files, files * { u8 file, u16 count, count * u8 entry }
 	const wchar_t* const kMapResource = L"effect_palette_map";
-	const unsigned int kMapVersion = 2;
+	const unsigned int kMapVersion = 3;
 
 	// Every sprite is shrunk to fit this box on the sheet (never enlarged); if a file has
 	// so many that the sheet would outgrow a texture, the box shrinks until it fits.
@@ -70,6 +71,11 @@ namespace
 		RenderInfo render;
 	};
 
+	// Per character and file (charIndex * 8 + file): the entries its scripts take single
+	// colours from - 3D models and particles tinted with one palette colour, drawn on no
+	// sprite (setParticleColorFromPalette and friends). Filled by Map().
+	std::vector<std::vector<unsigned char>> g_coloursRead;
+
 	const std::vector<std::vector<MapEntry>>& Map()
 	{
 		static std::vector<std::vector<MapEntry>> map;
@@ -89,11 +95,13 @@ namespace
 		if (blob.size() < 12 + (size_t)count * 8)
 			return map;
 		map.resize(count);
+		g_coloursRead.resize((size_t)count * 8);
 		for (unsigned int c = 0; c < count; c++)
 		{
 			size_t pos = ReadU32(base + 12 + c * 8);
 			const unsigned int entries = ReadU32(base + 12 + c * 8 + 4);
-			for (unsigned int e = 0; e < entries && pos + 3 <= blob.size(); e++)
+			unsigned int e = 0;
+			for (; e < entries && pos + 3 <= blob.size(); e++)
 			{
 				MapEntry entry;
 				entry.pack = base[pos];
@@ -118,6 +126,20 @@ namespace
 					pos += 32;
 				}
 				map[c].push_back(entry);
+			}
+			if (e < entries || pos >= blob.size())
+				continue; // truncated: no colour list to read
+			const unsigned int files = base[pos++];
+			for (unsigned int f = 0; f < files && pos + 3 <= blob.size(); f++)
+			{
+				const unsigned int file = base[pos];
+				const size_t length = base[pos + 1] | (base[pos + 2] << 8);
+				pos += 3;
+				if (pos + length > blob.size())
+					break;
+				if (file >= 1 && file <= 7)
+					g_coloursRead[(size_t)c * 8 + file].assign(base + pos, base + pos + length);
+				pos += length;
 			}
 		}
 		return map;
@@ -735,6 +757,20 @@ namespace EffectSheets
 			if (entry.mask & (1 << file))
 				count++;
 		return count;
+	}
+
+	const std::vector<unsigned char>& ColoursRead(int charIndex, int file)
+	{
+		static const std::vector<unsigned char> none;
+		Map();
+		if (charIndex < 0 || file < 1 || file > 7 || (size_t)charIndex * 8 + file >= g_coloursRead.size())
+			return none;
+		return g_coloursRead[(size_t)charIndex * 8 + file];
+	}
+
+	bool FileIsUsed(int charIndex, int file)
+	{
+		return ImageCount(charIndex, file) > 0 || !ColoursRead(charIndex, file).empty();
 	}
 
 	Status Request(int charIndex, std::string* error)

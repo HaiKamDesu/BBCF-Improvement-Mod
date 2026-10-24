@@ -4497,6 +4497,12 @@ struct LocalizationKeysAccessor
         // (unused)
         inline const char* unused() const { return Get("(unused)"); }
 
+        // %s draws no sprite with this file, but tints 3D effects and particles with %s from it (marked).
+        inline const char* s_draws_no_sprite_with_this_file_but_tints_3D_effects_and_particles_with_s_from_it_marked() const { return Get("%s draws no sprite with this file, but tints 3D effects and particles with %s from it (marked)."); }
+
+        // Tints 3D effects and particles, which are on no sprite
+        inline const char* Tints_3D_effects_and_particles_which_are_on_no_sprite() const { return Get("Tints 3D effects and particles, which are on no sprite"); }
+
         // All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.
         inline const char* All_256_colors_of_this_file_as_a_grid_next_to_the_picture_Some_colors_are_on_no_sprite_and_can_only_be_reached_from_here() const { return Get("All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here."); }
 

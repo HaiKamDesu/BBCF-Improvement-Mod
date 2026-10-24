@@ -3,6 +3,7 @@
 #include "PaletteThumbnails.h"
 
 #include <string>
+#include <vector>
 
 // Pictures to edit a palette's effect files on.
 //
@@ -31,6 +32,16 @@ namespace EffectSheets
 	// How many images the map lists for this character and file (1-7), without loading
 	// anything. 0 means the game never draws anything with that file for this character.
 	int ImageCount(int charIndex, int file);
+
+	// The entries of file `file` (1-7) the character's scripts read single colours from,
+	// ascending: 3D models and particles are tinted with one palette colour instead of
+	// being drawn from it (setParticleColorFromPalette and the like). Mai's file 2 is only
+	// that - entry 1 is the glow of her charged spear - so a file can matter with no image.
+	const std::vector<unsigned char>& ColoursRead(int charIndex, int file);
+
+	// Whether the game uses file `file` (1-7) of this character at all: drawn on a sprite,
+	// or read as a colour.
+	bool FileIsUsed(int charIndex, int file);
 
 	// Starts loading the character's effect sprites if that has not happened yet, and
 	// reports how it is going. Asking for a different character drops the previous one.

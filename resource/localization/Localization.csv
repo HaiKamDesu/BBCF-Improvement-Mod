@@ -1677,6 +1677,8 @@ Swap,Swap,Intercambiar
 To,To,Hasta
 %s never draws anything with this file. Its colors are still saved with the palette.,%s never draws anything with this file. Its colors are still saved with the palette.,%s nunca dibuja nada con este archivo. Sus colores igual se guardan con la paleta.
 (unused),(unused),(sin uso)
+"%s draws no sprite with this file, but tints 3D effects and particles with %s from it (marked).","%s draws no sprite with this file, but tints 3D effects and particles with %s from it (marked).","%s no dibuja ningún sprite con este archivo, pero tiñe efectos 3D y partículas con %s de él (marcados)."
+"Tints 3D effects and particles, which are on no sprite","Tints 3D effects and particles, which are on no sprite","Tiñe efectos 3D y partículas, que no están en ningún sprite"
 "All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.","All 256 colors of this file as a grid, next to the picture. Some colors are on no sprite and can only be reached from here.","Los 256 colores de este archivo como grilla, junto a la imagen. Algunos colores no están en ningún sprite y solo se alcanzan desde aquí."
 Hide color grid,Hide color grid,Ocultar grilla de colores
 Show color grid,Show color grid,Mostrar grilla de colores
