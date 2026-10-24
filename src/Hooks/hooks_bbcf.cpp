@@ -9701,6 +9701,91 @@ void __declspec(naked)SkipReplayListConfirm()
 	}
 }
 
+// The per-match audio loader (FUN_00555A20) loads the battle BGM into file slot 0x3F from
+// "data/sound/BGM/" + filenameTable[selectStruct+0x1690], and skips the slot when that file
+// is not there. The sound setup then registers slot 0x3F anyway (FUN_0056B850 ->
+// FUN_004C0A70(4, ...)) and reads [null+0xC]: BBCF+0x57AC2, a crash in vanilla too.
+//
+// Replays reach it on their own. FUN_0047FF60 adds 1 to a replay's BGM index when the
+// replay's catalog version is below 4 and the index is above 0x22, and every replay recorded
+// online today has catalog version 0 (266 of 266 on the dev machine). Jase, 2026-10-20: a
+// replay recorded with 141 (982_btl_douchara_old) was shifted to 142 (bgm_end_rg, which only
+// ships in sound/bgm_End) and crashed on load, with and without the mod.
+//
+// So, only when the file the game is about to ask for is missing: in a replay take the
+// index back by one, otherwise (or if that is missing too) use track 0. If neither exists
+// either, the path is what is wrong, not the index, and nothing is touched.
+namespace
+{
+	constexpr uintptr_t kBgmLoadIndexReadRva = 0x001566BD; // mov esi,[edi+1690h] in FUN_00555A20
+	const BYTE kBgmLoadIndexReadBytes[] = { 0x8B, 0xB7, 0x90, 0x16, 0x00, 0x00 };
+	constexpr uintptr_t kBgmFilenameTableRva = 0x005DC650;
+	constexpr int kBgmTableEntries = 160; // 160..174 are voice-bank format strings
+	constexpr DWORD kSelectStructBgmOffset = 0x1690;
+
+	bool BgmIndexLoadable(int index)
+	{
+		if (index < 0 || index >= kBgmTableEntries)
+			return false;
+		const char* const* table = reinterpret_cast<const char* const*>(GetBbcfBaseAdress() + kBgmFilenameTableRva);
+		const char* name = table[index];
+		if (name == nullptr || name[0] == '\0')
+			return false;
+		const DWORD attrs = GetFileAttributesA(GamePath(std::string("data/sound/BGM/") + name).c_str());
+		return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	}
+
+	void ValidateMatchBgmIndex(DWORD selectStruct)
+	{
+		if (selectStruct == 0)
+			return;
+		int* bgmIndex = reinterpret_cast<int*>(selectStruct + kSelectStructBgmOffset);
+		const int requested = *bgmIndex;
+		if (BgmIndexLoadable(requested))
+			return;
+
+		const bool replay = g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_ReplayTheater;
+		int fallback = -1;
+		if (replay && BgmIndexLoadable(requested - 1))
+			fallback = requested - 1;
+		else if (BgmIndexLoadable(0))
+			fallback = 0;
+
+		if (fallback < 0)
+		{
+			LOG(0, "[BgmGuard] Match BGM index %d has no file in data/sound/BGM, and neither does any "
+			       "fallback; left as is (replay=%d)\n", requested, (int)replay);
+			return;
+		}
+
+		LOG(0, "[BgmGuard] Match BGM index %d has no file in data/sound/BGM; using %d instead so "
+		       "the match does not crash on an empty BGM slot (replay=%d)\n", requested, fallback, (int)replay);
+		*bgmIndex = fallback;
+	}
+}
+
+DWORD BgmLoadIndexReadJmpBackAddr = 0;
+void __declspec(naked) BgmLoadIndexRead()
+{
+	static DWORD sSelectStruct;
+	__asm
+	{
+		mov sSelectStruct, edi
+		pushfd
+		pushad
+	}
+
+	ValidateMatchBgmIndex(sSelectStruct);
+
+	__asm
+	{
+		popad
+		popfd
+		mov esi, [edi + 1690h]
+		jmp[BgmLoadIndexReadJmpBackAddr]
+	}
+}
+
 bool placeHooks_bbcf()
 {
 	LOG(2, "placeHooks_bbcf\n");
@@ -9951,6 +10036,16 @@ bool placeHooks_bbcf()
 	BeforeWriteReplayListDatJmpBackAddr = HookManager::SetHook("BeforeWriteReplayListDat", (DWORD)(GetBbcfBaseAdress() + 0x2C2AF8), 5, BeforeWriteReplayListDat);
 
 		HookManager::SetHook("SkipReplayListConfirm", (DWORD)(GetBbcfBaseAdress() + 0x002c3038), 5, SkipReplayListConfirm);
+
+		// By address, so check it is the instruction we replay. Nothing branches into its six
+		// bytes (checked across the whole image).
+		{
+			const BYTE* site = reinterpret_cast<const BYTE*>(GetBbcfBaseAdress() + kBgmLoadIndexReadRva);
+			if (std::memcmp(site, kBgmLoadIndexReadBytes, sizeof(kBgmLoadIndexReadBytes)) == 0)
+				BgmLoadIndexReadJmpBackAddr = HookManager::SetHook("BgmLoadIndexRead", (DWORD)site, 6, BgmLoadIndexRead);
+			else
+				LOG(0, "[BgmGuard] BGM index read not found at +0x%X; guard not placed\n", (unsigned)kBgmLoadIndexReadRva);
+		}
 
 		// The ranked RE hook pack is intentionally off for normal debug builds.
 		// Rankings/leaderboard capture needs stable menu entry first; these invasive
