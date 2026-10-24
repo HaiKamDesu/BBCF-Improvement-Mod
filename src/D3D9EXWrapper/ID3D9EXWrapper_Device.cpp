@@ -6,6 +6,7 @@
 #include "Core/logger.h"
 #include "Game/FrameStallDiagnostics.h"
 #include "Game/MatchState.h"
+#include "Game/PerformanceMonitor.h"
 #include "Hooks/hooks_bbcf.h"
 #include "Hooks/HookManager.h"
 #include "Hooks/hooks_customGameModes.h"
@@ -182,6 +183,7 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::Present(CONST RECT* pSourceRect, CONS
 	// frame in FrameStallIncidents.log - see FrameStallDiagnostics.h.
 	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
 	const HRESULT hr = m_Direct3DDevice9Ex->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+	PerformanceMonitor::OnPresentDone();
 	ExitDiagnostics::OnPresentResult("Present", hr);
 	return hr;
 }
@@ -393,6 +395,7 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		LOG(1, "[EndSceneProbe] before MatchState::OnUpdate budget=%d\n", s_endSceneProbeBudget);
 	}
 	FrameStallDiagnostics::OnFrameBegin();
+	PerformanceMonitor::OnEndSceneBegin();
 	{
 		FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_MatchState);
 		MatchState::OnUpdate();
@@ -406,6 +409,9 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		// of drawing the old States window. Their controls now live on mod-menu pages, so
 		// they are pumped here instead of dying whenever the menu is closed.
 		ScrWindow::Tick();
+		// PC performance panel: folds its frame/rollback timings into a report twice a
+		// second and exchanges it with the opponent. One compare on the other frames.
+		PerformanceMonitor::Tick();
 	}
 	if (s_endSceneProbeBudget > 0)
 	{
@@ -422,7 +428,11 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::EndScene()
 		--s_endSceneProbeBudget;
 	}
 
-	return m_Direct3DDevice9Ex->EndScene();
+	const HRESULT hr = m_Direct3DDevice9Ex->EndScene();
+	// The end of the frame's CPU work (the game's limiter and Present come next). See
+	// src/Game/PerformanceMonitor.h for why this is the right edge.
+	PerformanceMonitor::OnEndSceneDone();
+	return hr;
 }
 
 HRESULT APIENTRY Direct3DDevice9ExWrapper::Clear(DWORD Count, CONST D3DRECT* pRects, DWORD Flags, D3DCOLOR Color, float Z, DWORD Stencil)
@@ -927,6 +937,7 @@ HRESULT APIENTRY Direct3DDevice9ExWrapper::PresentEx(CONST RECT* pSourceRect, CO
 	// Same accounting as Present() above; BBCF uses the Ex path in practice.
 	FrameStallDiagnostics::ScopedSection section(FrameStallDiagnostics::Section_Present);
 	const HRESULT hr = m_Direct3DDevice9Ex->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	PerformanceMonitor::OnPresentDone();
 	ExitDiagnostics::OnPresentResult("PresentEx", hr);
 	return hr;
 }

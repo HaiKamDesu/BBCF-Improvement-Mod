@@ -10,6 +10,7 @@
 #include "Overlay/imgui_utils.h"
 #include "Overlay/WindowContainer/WindowContainer.h"
 #include "Overlay/Window/Ranked/RankedProgressWindow.h"
+#include "Overlay/Window/PerfStatsWindow.h"
 #include "Overlay/Window/ScrWindow.h"
 #include "Network/LobbyAvatarManager.h"
 #include "Network/ProfileBlobSeal.h"
@@ -218,5 +219,14 @@ namespace MainMenu
 
 		ImGui::VerticalSpacing(8);
 		DrawOnlineInputDelay();
+
+		ImGui::VerticalSpacing(8);
+		Anchor(Online_Performance);
+		if (ImGui::Button(L("Show PC & connection stats").c_str()))
+		{
+			if (PerfStatsWindow* stats = ctx.container->GetWindow<PerfStatsWindow>(WindowType_PerfStats))
+				stats->OpenFocused();
+		}
+		ImGui::ShowHelpMarkerSameLine(L("Opens the PC & connection stats window (also Ctrl+F2): how fast each PC runs the game, the ping, and who is causing any lag - for players and spectators. The other side's numbers need them to run this mod too.").c_str());
 	}
 }

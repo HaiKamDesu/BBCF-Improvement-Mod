@@ -32,4 +32,5 @@ enum WindowType_
         WindowType_PlayerRoomListFilter,
         WindowType_LargeAddressPopup,
         WindowType_RankHistory,
+        WindowType_PerfStats,
 };

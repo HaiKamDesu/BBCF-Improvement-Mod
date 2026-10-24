@@ -1227,3 +1227,36 @@ static constexpr uintptr_t ADDR_PalObjCopy                   = 0x00052C60; // FU
 static constexpr uintptr_t ADDR_PalObjSetEntry               = 0x00052DE0; // FUN_00452DE0(index, color)
 static constexpr uintptr_t ADDR_RenderPaletteChooser         = 0x001A6C80; // FUN_005A6C80
 static constexpr uintptr_t ADDR_PlatLightCmdCompare          = 0x001B2B7F; // "PT_Light" - reads +0x358, writes no colors
+
+// GGPO rollback re-simulation (PC performance panel, src/Game/PerformanceMonitor.h).
+// Sync::AdjustSimulation(this=Sync, seek_to): LoadFrame(seek_to), then advance_frame (0x783EB0)
+// once per frame back up to [Sync+0xF4] (_framecount). Depth <= 8. Exactly two callers; the
+// mod redirects the rel32 of both calls to a timer, it does not hook the function itself.
+static constexpr uintptr_t ADDR_GgpoSyncAdjustSimulation      = 0x003821C0; // FUN_007821C0, __thiscall, ret 4
+static constexpr uintptr_t ADDR_GgpoAdjustSimCall_CheckSim    = 0x00382379; // E8 in Sync::CheckSimulation (FUN_00782360)
+static constexpr uintptr_t ADDR_GgpoAdjustSimCall_Disconnect  = 0x0037D233; // E8 in the disconnect adjust (FUN_0077D1B0)
+
+// GGPO network stats (read-only, PC performance / connection section of the online window).
+// [base+ADDR_RollbackSessionManagerPtr] points at the netplay wrapper (static object, VA
+// 0xA5BD08): +0 GGPOSession* = the GGPO backend, +4 the game's state-save interface, +8 the
+// desync checker, +0xC GGPOSessionCallbacks (seen in four crash dumps). For a
+// player the backend is a Peer2PeerBackend (vtable below; a spectator's backend is a different class).
+// Peer2PeerBackend::GetNetworkStats is FUN_0077D580 (vtable +0x20): endpoint for handle h is
+// [backend+0xA58] + (h-1)*0x5780, then SteamUdpProtocol::GetNetworkStats (FUN_0077FC90) copies
+// the fields below into GGPONetworkStats {send_queue_len, recv_queue_len, ping, kbps_sent,
+// (BBCF) frames since last confirmed, local_frames_behind, remote_frames_behind}.
+static constexpr uintptr_t ADDR_RollbackSessionManagerPtr     = 0x0142A920; // DAT_0182A920
+static constexpr uintptr_t ADDR_GgpoPeer2PeerBackendVtable    = 0x00585B7C; // VA 0x00985B7C
+static constexpr uintptr_t OFF_GgpoMgrBackend                 = 0x0;        // NOT +4 (that is the state interface)
+static constexpr uintptr_t OFF_GgpoBackendSyncLastConfirmed   = 0x62C;      // Sync(+0x53C)+0xF0
+static constexpr uintptr_t OFF_GgpoBackendSyncFrameCount      = 0x630;      // Sync(+0x53C)+0xF4
+static constexpr uintptr_t OFF_GgpoBackendEndpoints           = 0xA58;      // SteamUdpProtocol[]
+static constexpr uintptr_t OFF_GgpoBackendNumEndpoints        = 0x2176C;
+static constexpr uintptr_t SIZE_GgpoEndpoint                  = 0x5780;
+static constexpr uintptr_t OFF_GgpoEpUdp                      = 0x4;        // non-null = live peer
+static constexpr uintptr_t OFF_GgpoEpRoundTripMs              = 0x1850;     // set by OnQualityReply FUN_00780560
+static constexpr uintptr_t OFF_GgpoEpState                    = 0x1878;     // 2 = Running
+static constexpr uintptr_t OFF_GgpoEpLocalFrameAdvantage      = 0x1888;     // FUN_00781200: rtt*60/1000 + remote frame - local
+static constexpr uintptr_t OFF_GgpoEpRemoteFrameAdvantage     = 0x188C;     // from their quality report, FUN_00780580
+static constexpr uintptr_t OFF_GgpoEpPendingOutput            = 0x3498;     // unacked local inputs (send_queue_len)
+static constexpr uintptr_t OFF_GgpoEpLastRecvTimeMs           = 0x34F4;     // timeGetTime of the last valid msg, FUN_007804B0

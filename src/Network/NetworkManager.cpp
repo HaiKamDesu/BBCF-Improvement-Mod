@@ -6,6 +6,7 @@
 #include "Core/logger.h"
 #include "Core/utils.h"
 #include "Game/gamestates.h"
+#include "Game/PerformanceMonitor.h"
 #include "Overlay/Logger/ImGuiLogger.h"
 
 NetworkManager::NetworkManager(SteamNetworkingWrapper* SteamNetworking, CSteamID steamID)
@@ -51,6 +52,13 @@ bool NetworkManager::SendPacket(CSteamID* steamID, Packet* packet)
 	EP2PSend sendType = k_EP2PSendReliable;
 
 	return m_pSteamNetworking->SendP2PPacket(*steamID, packet, packet->packetSize, sendType, 0);
+}
+
+bool NetworkManager::SendPacketQuiet(CSteamID* steamID, Packet* packet, bool reliable)
+{
+	packet->steamID = m_steamID.ConvertToUint64();
+	return m_pSteamNetworking->SendP2PPacket(*steamID, packet, packet->packetSize,
+		reliable ? k_EP2PSendReliable : k_EP2PSendUnreliable, 0);
 }
 
 void NetworkManager::RecvPacket(Packet* packet)
@@ -124,6 +132,18 @@ void NetworkManager::RecvPacket(Packet* packet)
 		{
 			g_interfaces.pReplayUploadManager->RecvReplayUploadEnabledBroadcastPacket(packet);
 		}
+		break;
+
+	case PacketType_PerformanceReport:
+		// Checks the sender is a player of this match itself, and needs a room entry for
+		// this client before it asks (IsPacketFromSameMatch dereferences it).
+		PerformanceMonitor::OnReportPacket(packet);
+		break;
+
+	case PacketType_PingLocation:
+		// Accepted only from the opponent player of this match; parsed and dropped, never
+		// logged or stored as text.
+		PerformanceMonitor::OnPingLocationPacket(packet);
 		break;
 
 	default:

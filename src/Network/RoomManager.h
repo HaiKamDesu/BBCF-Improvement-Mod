@@ -15,6 +15,11 @@ struct IMPlayer
 	CSteamID steamID;
 	std::string steamName;
 	int matchPlayerIndex;
+	// From the ModVersionInfo in their acknowledge (8.9.2+). Empty/0 for an older build,
+	// which sends an empty acknowledge.
+	std::string modVersion;
+	uint16_t modCaps = 0;
+	bool versionKnown = false;
 
 	IMPlayer() : roomMemberIndex(-1), matchPlayerIndex(-1)
 	{
@@ -28,7 +33,8 @@ struct IMPlayer
 
 	IMPlayer(IMPlayer other, int matchPlayerIndex)
 		: roomMemberIndex(other.roomMemberIndex), steamID(other.steamID),
-		steamName(other.steamName), matchPlayerIndex(matchPlayerIndex)
+		steamName(other.steamName), matchPlayerIndex(matchPlayerIndex),
+		modVersion(other.modVersion), modCaps(other.modCaps), versionKnown(other.versionKnown)
 	{
 	}
 };
@@ -58,6 +64,9 @@ public:
 	bool TryGetRoomType(RoomType* outType) const;
 	std::vector<IMPlayer> GetIMPlayersInCurrentMatch() const;
 	std::vector<IMPlayer> GetIMPlayersInCurrentRoom() const;
+	// The mod-user record for this Steam ID in the current room, or false (no mod, or not
+	// acknowledged yet). Copies into *out so callers never hold a pointer into m_imPlayers.
+	bool FindIMPlayer(uint64_t steamId, IMPlayer* out) const;
 	std::vector<const RoomMemberEntry*> GetOtherRoomMemberEntriesInCurrentMatch() const;
 	// Public since 2026-09-26: the ranked stale-room check reads slots directly.
 	const RoomMemberEntry* GetThisPlayerRoomMemberEntry() const;
@@ -69,6 +78,8 @@ public:
 
 private:
 	void SendAnnounce();
+	void SendAcknowledgeTo(const CSteamID& to, bool replyWanted);
+	static void ApplyModVersionInfo(const Packet* packet, IMPlayer* player);
 	void AddIMPlayerToRoom(const IMPlayer& player);
 	void RemoveIMPlayerFromRoom(uint16_t index);
 	bool IsPacketFromSameMatch(Packet* packet) const;

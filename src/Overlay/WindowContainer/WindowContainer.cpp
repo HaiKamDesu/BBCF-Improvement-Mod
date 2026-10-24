@@ -6,6 +6,7 @@
 #include "Overlay/Window/MainWindow.h"
 #include "Overlay/Window/PaletteEditorWindow.h"
 #include "Overlay/Window/RoomWindow.h"
+#include "Overlay/Window/PerfStatsWindow.h"
 #include "Overlay/Window/UpdateNotifierWindow.h"
 #include "Overlay/Window/ScrWindow.h"
 #include "Overlay/Window/InputBufferWindow.h"
@@ -62,7 +63,7 @@ WindowContainer::WindowContainer()
 		new HitboxOverlay("##HitboxOverlay", false, ImGuiWindowFlags_NoCollapse));
 
         AddWindow(WindowType_Room,
-                new RoomWindow(std::string(Messages.Online()) + "###Room", true, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse));
+                new RoomWindow(std::string(Messages.Online()) + "###Room", true, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar));
 
 	AddWindow(WindowType_Scr,
 		new ScrWindow("States", true, *this));
@@ -142,6 +143,11 @@ WindowContainer::WindowContainer()
         AddWindow(WindowType_RankedLeaderboard,
                 new RankedLeaderboardWindow((L("Ranked Leaderboard") + "###RankedLeaderboard").c_str(), true,
                         ImGuiWindowFlags_NoCollapse));
+
+        // Fits its content (fixed width, see PerfStatsWindow::BeforeDraw); position saved in menus.ini.
+        AddWindow(WindowType_PerfStats,
+                new PerfStatsWindow((L("PC & connection stats") + "###PerfStats").c_str(), true,
+                        ImGuiWindowFlags_AlwaysAutoResize));
 
         AddWindow(WindowType_RankHistory,
                 new RankHistoryWindow((L("Rank History") + "###RankHistory").c_str(), true,

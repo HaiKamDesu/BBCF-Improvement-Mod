@@ -68,6 +68,7 @@ namespace MainMenu
 		Online_Avatar,
 		Online_ForeignPalettes,
 		Online_InputDelay,
+		Online_Performance,
 
 		Replays_Rewind,
 		Replays_Files,

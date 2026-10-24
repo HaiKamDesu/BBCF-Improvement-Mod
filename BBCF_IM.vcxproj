@@ -96,6 +96,9 @@
     <ClCompile Include="src\Game\FrameStallDiagnostics.cpp" />
     <ClCompile Include="src\Game\EntityDiagnostics.cpp" />
     <ClCompile Include="src\Game\OnlineInputDelay.cpp" />
+    <ClCompile Include="src\Game\PerformanceMonitor.cpp" />
+    <ClCompile Include="src\Game\NetLinkType.cpp" />
+    <ClCompile Include="src\Overlay\Window\PerfStatsWindow.cpp" />
     <ClCompile Include="src\Game\ReplayPauseHud.cpp" />
     <ClCompile Include="src\Game\FrameStallWatchdog.cpp" />
     <ClCompile Include="src\Game\NetplayArenaKeeper.cpp" />
@@ -318,6 +321,9 @@
     <ClInclude Include="src\Game\FrameStallDiagnostics.h" />
     <ClInclude Include="src\Game\EntityDiagnostics.h" />
     <ClInclude Include="src\Game\OnlineInputDelay.h" />
+    <ClInclude Include="src\Game\PerformanceMonitor.h" />
+    <ClInclude Include="src\Game\NetLinkType.h" />
+    <ClInclude Include="src\Overlay\Window\PerfStatsWindow.h" />
     <ClInclude Include="src\Game\ReplayPauseHud.h" />
     <ClInclude Include="src\Game\FrameStallWatchdog.h" />
     <ClInclude Include="src\Game\NetplayArenaKeeper.h" />

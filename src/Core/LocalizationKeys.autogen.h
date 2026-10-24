@@ -5870,6 +5870,471 @@ struct LocalizationKeysAccessor
 
         // Your rank and LP are not affected. This cannot be undone.
         inline const char* Your_rank_and_LP_are_not_affected_This_cannot_be_undone() const { return Get("Your rank and LP are not affected. This cannot be undone."); }
+
+        // Match settings
+        inline const char* Match_settings() const { return Get("Match settings"); }
+
+        // Close PC & connection stats
+        inline const char* Close_PC_connection_stats() const { return Get("Close PC & connection stats"); }
+
+        // Open PC & connection stats
+        inline const char* Open_PC_connection_stats() const { return Get("Open PC & connection stats"); }
+
+        // A separate window with how fast each PC runs the game, the connection between the players, and who is causing any lag. Also Ctrl+F2.
+        inline const char* A_separate_window_with_how_fast_each_PC_runs_the_game_the_connection_between_the_players_and_who_is_causing_any_lag_Also_Ctrl_F2() const { return Get("A separate window with how fast each PC runs the game, the connection between the players, and who is causing any lag. Also Ctrl+F2."); }
+
+        // Role
+        inline const char* Role() const { return Get("Role"); }
+
+        // In room
+        inline const char* In_room() const { return Get("In room"); }
+
+        // Another match
+        inline const char* Another_match() const { return Get("Another match"); }
+
+        // Playing
+        inline const char* Playing() const { return Get("Playing"); }
+
+        // Older mod
+        inline const char* Older_mod() const { return Get("Older mod"); }
+
+        // Runs a version of the mod older than 8.9.2, which does not say which version it is.
+        inline const char* Runs_a_version_of_the_mod_older_than_8_9_2_which_does_not_say_which_version_it_is() const { return Get("Runs a version of the mod older than 8.9.2, which does not say which version it is."); }
+
+        // No mod
+        inline const char* No_mod() const { return Get("No mod"); }
+
+        // No reply to the mod's room handshake: this player runs the plain game. Someone who has only just joined can show this for a moment.
+        inline const char* No_reply_to_the_mod_s_room_handshake_this_player_runs_the_plain_game_Someone_who_has_only_just_joined_can_show_this_for_a_moment() const { return Get("No reply to the mod's room handshake: this player runs the plain game. Someone who has only just joined can show this for a moment."); }
+
+        // Measuring...
+        inline const char* Measuring() const { return Get("Measuring..."); }
+
+        // Too slow for 60 FPS
+        inline const char* Too_slow_for_60_FPS() const { return Get("Too slow for 60 FPS"); }
+
+        // Dropping frames
+        inline const char* Dropping_frames() const { return Get("Dropping frames"); }
+
+        // OK, little headroom
+        inline const char* OK_little_headroom() const { return Get("OK, little headroom"); }
+
+        // Good
+        inline const char* Good() const { return Get("Good"); }
+
+        // Rollback: OK
+        inline const char* Rollback_OK() const { return Get("Rollback: OK"); }
+
+        // Rollback: may lag
+        inline const char* Rollback_may_lag() const { return Get("Rollback: may lag"); }
+
+        // Rollback: too few to judge
+        inline const char* Rollback_too_few_to_judge() const { return Get("Rollback: too few to judge"); }
+
+        // %u, deepest %u f
+        inline const char* u_deepest_u_f() const { return Get("%u, deepest %u f"); }
+
+        // longest
+        inline const char* longest() const { return Get("longest"); }
+
+        // %.2f ms + %.2f ms/frame
+        inline const char* _2f_ms_2f_ms_frame() const { return Get("%.2f ms + %.2f ms/frame"); }
+
+        // 99+ (needs %d)
+        inline const char* _99_needs_d() const { return Get("99+ (needs %d)"); }
+
+        // %d (needs %d)
+        inline const char* d_needs_d() const { return Get("%d (needs %d)"); }
+
+        // %u (%u frames)
+        inline const char* u_u_frames() const { return Get("%u (%u frames)"); }
+
+        // Steam relay
+        inline const char* Steam_relay() const { return Get("Steam relay"); }
+
+        // Direct
+        inline const char* Direct() const { return Get("Direct"); }
+
+        // Checking... give it a few seconds of play.
+        inline const char* Checking_give_it_a_few_seconds_of_play() const { return Get("Checking... give it a few seconds of play."); }
+
+        // Nobody's - it is running smoothly.
+        inline const char* Nobody_s_it_is_running_smoothly() const { return Get("Nobody's - it is running smoothly."); }
+
+        // The connection is unsteady, but it is not clear whose side it is.
+        inline const char* The_connection_is_unsteady_but_it_is_not_clear_whose_side_it_is() const { return Get("The connection is unsteady, but it is not clear whose side it is."); }
+
+        // The route: Steam can't connect you directly and detours through its servers.
+        inline const char* The_route_Steam_can_t_connect_you_directly_and_detours_through_its_servers() const { return Get("The route: Steam can't connect you directly and detours through its servers."); }
+
+        // Nobody's fault - you are just far apart.
+        inline const char* Nobody_s_fault_you_are_just_far_apart() const { return Get("Nobody's fault - you are just far apart."); }
+
+        // The route: the connection takes a detour - it should be faster.
+        inline const char* The_route_the_connection_takes_a_detour_it_should_be_faster() const { return Get("The route: the connection takes a detour - it should be faster."); }
+
+        // Struggling (can't hold 60 FPS)
+        inline const char* Struggling_can_t_hold_60_FPS() const { return Get("Struggling (can't hold 60 FPS)"); }
+
+        // Checking...
+        inline const char* Checking() const { return Get("Checking..."); }
+
+        // Unstable
+        inline const char* Unstable() const { return Get("Unstable"); }
+
+        // Slow line
+        inline const char* Slow_line() const { return Get("Slow line"); }
+
+        // You
+        inline const char* You() const { return Get("You"); }
+
+        // Recommendation: no VPN needed - the ping is what your locations allow.
+        inline const char* Recommendation_no_VPN_needed_the_ping_is_what_your_locations_allow() const { return Get("Recommendation: no VPN needed - the ping is what your locations allow."); }
+
+        // Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - the path between your two providers is the slow part.
+        inline const char* Recommendation_either_of_you_could_try_a_VPN_e_g_Cloudflare_WARP_the_path_between_your_two_providers_is_the_slow_part() const { return Get("Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - the path between your two providers is the slow part."); }
+
+        // Route check off: the connection goes through Steam's servers (no direct connection), so routes can't be compared.
+        inline const char* Route_check_off_the_connection_goes_through_Steam_s_servers_no_direct_connection_so_routes_can_t_be_compared() const { return Get("Route check off: the connection goes through Steam's servers (no direct connection), so routes can't be compared."); }
+
+        // Route check: waiting for both sides' numbers.
+        inline const char* Route_check_waiting_for_both_sides_numbers() const { return Get("Route check: waiting for both sides' numbers."); }
+
+        // Route check: needs both players on this mod version.
+        inline const char* Route_check_needs_both_players_on_this_mod_version() const { return Get("Route check: needs both players on this mod version."); }
+
+        // Wi-Fi
+        inline const char* Wi_Fi() const { return Get("Wi-Fi"); }
+
+        // Wired
+        inline const char* Wired() const { return Get("Wired"); }
+
+        // Status
+        inline const char* Status() const { return Get("Status"); }
+
+        // on Wi-Fi
+        inline const char* on_Wi_Fi() const { return Get("on Wi-Fi"); }
+
+        // Copy stats
+        inline const char* Copy_stats() const { return Get("Copy stats"); }
+
+        // Copies what this window says, with each player's mod version and all the numbers, as text ready to paste into Discord.
+        inline const char* Copies_what_this_window_says_with_each_player_s_mod_version_and_all_the_numbers_as_text_ready_to_paste_into_Discord() const { return Get("Copies what this window says, with each player's mod version and all the numbers, as text ready to paste into Discord."); }
+
+        // Shows during an online match, for both players and for spectators: whether each PC keeps up, how good each connection is, and whose side any lag is on.
+        inline const char* Shows_during_an_online_match_for_both_players_and_for_spectators_whether_each_PC_keeps_up_how_good_each_connection_is_and_whose_side_any_lag_is_on() const { return Get("Shows during an online match, for both players and for spectators: whether each PC keeps up, how good each connection is, and whose side any lag is on."); }
+
+        // If it lags, whose side is it on?
+        inline const char* If_it_lags_whose_side_is_it_on() const { return Get("If it lags, whose side is it on?"); }
+
+        // That side is on Wi-Fi: a cable will most likely fix it.
+        inline const char* That_side_is_on_Wi_Fi_a_cable_will_most_likely_fix_it() const { return Get("That side is on Wi-Fi: a cable will most likely fix it."); }
+
+        // That side is already wired, so it is the line itself or something else using it (downloads, streams, other devices).
+        inline const char* That_side_is_already_wired_so_it_is_the_line_itself_or_something_else_using_it_downloads_streams_other_devices() const { return Get("That side is already wired, so it is the line itself or something else using it (downloads, streams, other devices)."); }
+
+        // Offline test: your side only
+        inline const char* Offline_test_your_side_only() const { return Get("Offline test: your side only"); }
+
+        // PC
+        inline const char* PC() const { return Get("PC"); }
+
+        // Whether this PC runs the game at a full 60 frames per second. If one PC can't, the game slows down for both players.
+        inline const char* Whether_this_PC_runs_the_game_at_a_full_60_frames_per_second_If_one_PC_can_t_the_game_slows_down_for_both_players() const { return Get("Whether this PC runs the game at a full 60 frames per second. If one PC can't, the game slows down for both players."); }
+
+        // Connection
+        inline const char* Connection() const { return Get("Connection"); }
+
+        // Good: this player's messages arrive steadily and their line is quick. Unstable: their messages arrive with long pauses (often Wi-Fi or a busy line). Slow line: their internet is slow to reach even Valve's nearest server (measured by Steam), so it adds delay to every match.
+        inline const char* Good_this_player_s_messages_arrive_steadily_and_their_line_is_quick_Unstable_their_messages_arrive_with_long_pauses_often_Wi_Fi_or_a_busy_line_Slow_line_their_internet_is_slow_to_reach_even_Valve_s_nearest_server_measured_by_Steam_so_it_adds_delay_to_every_match() const { return Get("Good: this player's messages arrive steadily and their line is quick. Unstable: their messages arrive with long pauses (often Wi-Fi or a busy line). Slow line: their internet is slow to reach even Valve's nearest server (measured by Steam), so it adds delay to every match."); }
+
+        // Ping between you: %u ms (%s) - your locations allow about %d ms
+        inline const char* Ping_between_you_u_ms_s_your_locations_allow_about_d_ms() const { return Get("Ping between you: %u ms (%s) - your locations allow about %d ms"); }
+
+        // Ping between you: %u ms (%s)
+        inline const char* Ping_between_you_u_ms_s() const { return Get("Ping between you: %u ms (%s)"); }
+
+        // How long a message takes to go to the other player and back. Under about 60 ms feels local; over about 100 ms the game has to correct more often. The ping is shared by both players - the Connection row says whose line adds to it.
+        inline const char* How_long_a_message_takes_to_go_to_the_other_player_and_back_Under_about_60_ms_feels_local_over_about_100_ms_the_game_has_to_correct_more_often_The_ping_is_shared_by_both_players_the_Connection_row_says_whose_line_adds_to_it() const { return Get("How long a message takes to go to the other player and back. Under about 60 ms feels local; over about 100 ms the game has to correct more often. The ping is shared by both players - the Connection row says whose line adds to it."); }
+
+        // Route: through Steam's servers (no direct connection)
+        inline const char* Route_through_Steam_s_servers_no_direct_connection() const { return Get("Route: through Steam's servers (no direct connection)"); }
+
+        // Route: direct
+        inline const char* Route_direct() const { return Get("Route: direct"); }
+
+        // Ping between you: not measured yet
+        inline const char* Ping_between_you_not_measured_yet() const { return Get("Ping between you: not measured yet"); }
+
+        // Details
+        inline const char* Details() const { return Get("Details"); }
+
+        // Whether each PC keeps up with 60 FPS (first line) and can absorb the rollbacks this connection produces without slowing down (second line).
+        inline const char* Whether_each_PC_keeps_up_with_60_FPS_first_line_and_can_absorb_the_rollbacks_this_connection_produces_without_slowing_down_second_line() const { return Get("Whether each PC keeps up with 60 FPS (first line) and can absorb the rollbacks this connection produces without slowing down (second line)."); }
+
+        // %s's numbers: %.0f s ago
+        inline const char* s_s_numbers_0f_s_ago() const { return Get("%s's numbers: %.0f s ago"); }
+
+        // Test: spectator view with fake players
+        inline const char* Test_spectator_view_with_fake_players() const { return Get("Test: spectator view with fake players"); }
+
+        // In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds.
+        inline const char* In_development_check_offline_only_shows_the_spectator_layout_fed_by_made_up_player_reports_pushed_through_the_same_receive_code_as_real_ones_It_cycles_through_three_situations_every_6_seconds() const { return Get("In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds."); }
+
+        // Game+Draw
+        inline const char* Game_Draw() const { return Get("Game+Draw"); }
+
+        // How fast this PC runs one full game frame - the game update and the drawing - compared with what 60 FPS needs. 100% is exactly enough; below 100% the game cannot hold 60 FPS and both players feel it. Measured without the frame limiter or vsync wait, as the typical (90th percentile) frame of the last 2 seconds.
+        inline const char* How_fast_this_PC_runs_one_full_game_frame_the_game_update_and_the_drawing_compared_with_what_60_FPS_needs_100_is_exactly_enough_below_100_the_game_cannot_hold_60_FPS_and_both_players_feel_it_Measured_without_the_frame_limiter_or_vsync_wait_as_the_typical_90th_percentile_frame_of_the_last_2_seconds() const { return Get("How fast this PC runs one full game frame - the game update and the drawing - compared with what 60 FPS needs. 100% is exactly enough; below 100% the game cannot hold 60 FPS and both players feel it. Measured without the frame limiter or vsync wait, as the typical (90th percentile) frame of the last 2 seconds."); }
+
+        // Resim
+        inline const char* Resim() const { return Get("Resim"); }
+
+        // How fast this PC re-simulates frames during a rollback, compared with a 60 FPS frame. A rollback redoes several frames inside a single frame, so this needs to be well above 100%. The bar shows how many rollback frames fit in one frame; the tick is 8, the most the game ever does.
+        inline const char* How_fast_this_PC_re_simulates_frames_during_a_rollback_compared_with_a_60_FPS_frame_A_rollback_redoes_several_frames_inside_a_single_frame_so_this_needs_to_be_well_above_100_The_bar_shows_how_many_rollback_frames_fit_in_one_frame_the_tick_is_8_the_most_the_game_ever_does() const { return Get("How fast this PC re-simulates frames during a rollback, compared with a 60 FPS frame. A rollback redoes several frames inside a single frame, so this needs to be well above 100%. The bar shows how many rollback frames fit in one frame; the tick is 8, the most the game ever does."); }
+
+        // Ping
+        inline const char* Ping() const { return Get("Ping"); }
+
+        // Round trip time between the two of you, as the game's netcode measures it once a second. Higher ping means deeper rollbacks; that is distance, not a fault.
+        inline const char* Round_trip_time_between_the_two_of_you_as_the_game_s_netcode_measures_it_once_a_second_Higher_ping_means_deeper_rollbacks_that_is_distance_not_a_fault() const { return Get("Round trip time between the two of you, as the game's netcode measures it once a second. Higher ping means deeper rollbacks; that is distance, not a fault."); }
+
+        // Rollbacks (2 s)
+        inline const char* Rollbacks_2_s() const { return Get("Rollbacks (2 s)"); }
+
+        // How many times the game rolled back in the last 2 seconds, and the deepest one in frames. A few shallow rollbacks are normal online.
+        inline const char* How_many_times_the_game_rolled_back_in_the_last_2_seconds_and_the_deepest_one_in_frames_A_few_shallow_rollbacks_are_normal_online() const { return Get("How many times the game rolled back in the last 2 seconds, and the deepest one in frames. A few shallow rollbacks are normal online."); }
+
+        // Frame cost
+        inline const char* Frame_cost() const { return Get("Frame cost"); }
+
+        // Game+Draw time in milliseconds: average / typical (90th percentile) / worst, over the last 2 seconds. A 60 FPS frame is 16.7 ms.
+        inline const char* Game_Draw_time_in_milliseconds_average_typical_90th_percentile_worst_over_the_last_2_seconds_A_60_FPS_frame_is_16_7_ms() const { return Get("Game+Draw time in milliseconds: average / typical (90th percentile) / worst, over the last 2 seconds. A 60 FPS frame is 16.7 ms."); }
+
+        // Mod overlay
+        inline const char* Mod_overlay() const { return Get("Mod overlay"); }
+
+        // The part of the average frame cost that is this mod's own work: its overlay windows and per-frame managers. Included in Game+Draw, since the PC has to do it too.
+        inline const char* The_part_of_the_average_frame_cost_that_is_this_mod_s_own_work_its_overlay_windows_and_per_frame_managers_Included_in_Game_Draw_since_the_PC_has_to_do_it_too() const { return Get("The part of the average frame cost that is this mod's own work: its overlay windows and per-frame managers. Included in Game+Draw, since the PC has to do it too."); }
+
+        // Real FPS
+        inline const char* Real_FPS() const { return Get("Real FPS"); }
+
+        // Frames actually shown per second, and the longest gap between two frames, over the last 2 seconds. This also catches a slow graphics card, which Game+Draw cannot see.
+        inline const char* Frames_actually_shown_per_second_and_the_longest_gap_between_two_frames_over_the_last_2_seconds_This_also_catches_a_slow_graphics_card_which_Game_Draw_cannot_see() const { return Get("Frames actually shown per second, and the longest gap between two frames, over the last 2 seconds. This also catches a slow graphics card, which Game+Draw cannot see."); }
+
+        // Resim cost
+        inline const char* Resim_cost() const { return Get("Resim cost"); }
+
+        // What one rollback costs: a fixed part (loading the saved moment) plus a part per re-simulated frame, worked out from the last 64 rollbacks.
+        inline const char* What_one_rollback_costs_a_fixed_part_loading_the_saved_moment_plus_a_part_per_re_simulated_frame_worked_out_from_the_last_64_rollbacks() const { return Get("What one rollback costs: a fixed part (loading the saved moment) plus a part per re-simulated frame, worked out from the last 64 rollbacks."); }
+
+        // Rollback headroom
+        inline const char* Rollback_headroom() const { return Get("Rollback headroom"); }
+
+        // How many rollback frames fit in one 60 FPS frame on top of a normal frame, and how many this connection realistically needs (from the ping, plus a margin). Below that, deep rollbacks could slow the game down. Judged only after 8 rollbacks.
+        inline const char* How_many_rollback_frames_fit_in_one_60_FPS_frame_on_top_of_a_normal_frame_and_how_many_this_connection_realistically_needs_from_the_ping_plus_a_margin_Below_that_deep_rollbacks_could_slow_the_game_down_Judged_only_after_8_rollbacks() const { return Get("How many rollback frames fit in one 60 FPS frame on top of a normal frame, and how many this connection realistically needs (from the ping, plus a margin). Below that, deep rollbacks could slow the game down. Judged only after 8 rollbacks."); }
+
+        // Rollbacks (match)
+        inline const char* Rollbacks_match() const { return Get("Rollbacks (match)"); }
+
+        // Rollbacks this match, and how many frames they re-simulated in total.
+        inline const char* Rollbacks_this_match_and_how_many_frames_they_re_simulated_in_total() const { return Get("Rollbacks this match, and how many frames they re-simulated in total."); }
+
+        // Jitter
+        inline const char* Jitter() const { return Get("Jitter"); }
+
+        // How much the ping changes from one second to the next. A steady connection stays under about 10 ms; big swings mean an unstable connection (Wi-Fi, a busy line).
+        inline const char* How_much_the_ping_changes_from_one_second_to_the_next_A_steady_connection_stays_under_about_10_ms_big_swings_mean_an_unstable_connection_Wi_Fi_a_busy_line() const { return Get("How much the ping changes from one second to the next. A steady connection stays under about 10 ms; big swings mean an unstable connection (Wi-Fi, a busy line)."); }
+
+        // Longest silence
+        inline const char* Longest_silence() const { return Get("Longest silence"); }
+
+        // The longest stretch in the last 2 seconds with no packet from the other player. The game sends every frame, so anything past about 120 ms is a hiccup: packets lost or held up on the way. In your column it is their packets reaching you; in theirs, yours reaching them.
+        inline const char* The_longest_stretch_in_the_last_2_seconds_with_no_packet_from_the_other_player_The_game_sends_every_frame_so_anything_past_about_120_ms_is_a_hiccup_packets_lost_or_held_up_on_the_way_In_your_column_it_is_their_packets_reaching_you_in_theirs_yours_reaching_them() const { return Get("The longest stretch in the last 2 seconds with no packet from the other player. The game sends every frame, so anything past about 120 ms is a hiccup: packets lost or held up on the way. In your column it is their packets reaching you; in theirs, yours reaching them."); }
+
+        // Unconfirmed frames
+        inline const char* Unconfirmed_frames() const { return Get("Unconfirmed frames"); }
+
+        // The most frames the game had to guess the other player's input for, in the last 2 seconds. This is how deep a rollback could get right now.
+        inline const char* The_most_frames_the_game_had_to_guess_the_other_player_s_input_for_in_the_last_2_seconds_This_is_how_deep_a_rollback_could_get_right_now() const { return Get("The most frames the game had to guess the other player's input for, in the last 2 seconds. This is how deep a rollback could get right now."); }
+
+        // Unacked inputs
+        inline const char* Unacked_inputs() const { return Get("Unacked inputs"); }
+
+        // Inputs this side has sent that the other side has not confirmed yet. It climbs when packets are lost or the connection stalls.
+        inline const char* Inputs_this_side_has_sent_that_the_other_side_has_not_confirmed_yet_It_climbs_when_packets_are_lost_or_the_connection_stalls() const { return Get("Inputs this side has sent that the other side has not confirmed yet. It climbs when packets are lost or the connection stalls."); }
+
+        // The netcode's estimate of how far ahead each side's game runs (this side / the other side). The side ahead waits for the other now and then; a large steady number usually means one PC is slow.
+        inline const char* The_netcode_s_estimate_of_how_far_ahead_each_side_s_game_runs_this_side_the_other_side_The_side_ahead_waits_for_the_other_now_and_then_a_large_steady_number_usually_means_one_PC_is_slow() const { return Get("The netcode's estimate of how far ahead each side's game runs (this side / the other side). The side ahead waits for the other now and then; a large steady number usually means one PC is slow."); }
+
+        // Route
+        inline const char* Route() const { return Get("Route"); }
+
+        // Whether Steam sends your traffic directly to the other player or through Valve's relay servers. A relay adds some ping but is not itself a problem.
+        inline const char* Whether_Steam_sends_your_traffic_directly_to_the_other_player_or_through_Valve_s_relay_servers_A_relay_adds_some_ping_but_is_not_itself_a_problem() const { return Get("Whether Steam sends your traffic directly to the other player or through Valve's relay servers. A relay adds some ping but is not itself a problem."); }
+
+        // Ping to nearest Valve server
+        inline const char* Ping_to_nearest_Valve_server() const { return Get("Ping to nearest Valve server"); }
+
+        // This player's own line: the ping from their PC to the closest of Valve's servers, measured by Steam. It does not depend on the opponent, so it shows whose line adds delay. Above about 60 ms the line itself is slow (Wi-Fi, a long distance to the nearest server, or a slow connection).
+        inline const char* This_player_s_own_line_the_ping_from_their_PC_to_the_closest_of_Valve_s_servers_measured_by_Steam_It_does_not_depend_on_the_opponent_so_it_shows_whose_line_adds_delay_Above_about_60_ms_the_line_itself_is_slow_Wi_Fi_a_long_distance_to_the_nearest_server_or_a_slow_connection() const { return Get("This player's own line: the ping from their PC to the closest of Valve's servers, measured by Steam. It does not depend on the opponent, so it shows whose line adds delay. Above about 60 ms the line itself is slow (Wi-Fi, a long distance to the nearest server, or a slow connection)."); }
+
+        // No opponent
+        inline const char* No_opponent() const { return Get("No opponent"); }
+
+        // Waiting...
+        inline const char* Waiting() const { return Get("Waiting..."); }
+
+        // No reply
+        inline const char* No_reply() const { return Get("No reply"); }
+
+        // No update
+        inline const char* No_update() const { return Get("No update"); }
+
+        // n/a
+        inline const char* n_a() const { return Get("n/a"); }
+
+        // This player has not been found in the room yet.
+        inline const char* This_player_has_not_been_found_in_the_room_yet() const { return Get("This player has not been found in the room yet."); }
+
+        // This player is not running the Improvement Mod, so there are no numbers from their side. The ping and your own side still work.
+        inline const char* This_player_is_not_running_the_Improvement_Mod_so_there_are_no_numbers_from_their_side_The_ping_and_your_own_side_still_work() const { return Get("This player is not running the Improvement Mod, so there are no numbers from their side. The ping and your own side still work."); }
+
+        // This player runs a version of the mod older than 8.9.2, which cannot share these numbers. They need to update.
+        inline const char* This_player_runs_a_version_of_the_mod_older_than_8_9_2_which_cannot_share_these_numbers_They_need_to_update() const { return Get("This player runs a version of the mod older than 8.9.2, which cannot share these numbers. They need to update."); }
+
+        // Asking this player's mod for its numbers. They arrive about a second after this window opens.
+        inline const char* Asking_this_player_s_mod_for_its_numbers_They_arrive_about_a_second_after_this_window_opens() const { return Get("Asking this player's mod for its numbers. They arrive about a second after this window opens."); }
+
+        // This player's mod did not answer. It is probably an early test version.
+        inline const char* This_player_s_mod_did_not_answer_It_is_probably_an_early_test_version() const { return Get("This player's mod did not answer. It is probably an early test version."); }
+
+        // This player's numbers stopped arriving.
+        inline const char* This_player_s_numbers_stopped_arriving() const { return Get("This player's numbers stopped arriving."); }
+
+        // Both PCs keep up and the connection is steady. A few small rollbacks are normal online.
+        inline const char* Both_PCs_keep_up_and_the_connection_is_steady_A_few_small_rollbacks_are_normal_online() const { return Get("Both PCs keep up and the connection is steady. A few small rollbacks are normal online."); }
+
+        // The game has to wait for the slower PC, so both players feel it. Closing other programs or lowering the graphics settings can help.
+        inline const char* The_game_has_to_wait_for_the_slower_PC_so_both_players_feel_it_Closing_other_programs_or_lowering_the_graphics_settings_can_help() const { return Get("The game has to wait for the slower PC, so both players feel it. Closing other programs or lowering the graphics settings can help."); }
+
+        // Messages from that side arrive with long pauses - usually Wi-Fi or someone else using the connection. A cable instead of Wi-Fi usually fixes it.
+        inline const char* Messages_from_that_side_arrive_with_long_pauses_usually_Wi_Fi_or_someone_else_using_the_connection_A_cable_instead_of_Wi_Fi_usually_fixes_it() const { return Get("Messages from that side arrive with long pauses - usually Wi-Fi or someone else using the connection. A cable instead of Wi-Fi usually fixes it."); }
+
+        // Messages arrive unevenly. Wi-Fi or a busy connection on either side can do this; a cable instead of Wi-Fi is the first thing to try.
+        inline const char* Messages_arrive_unevenly_Wi_Fi_or_a_busy_connection_on_either_side_can_do_this_a_cable_instead_of_Wi_Fi_is_the_first_thing_to_try() const { return Get("Messages arrive unevenly. Wi-Fi or a busy connection on either side can do this; a cable instead of Wi-Fi is the first thing to try."); }
+
+        // That side's internet is slow to reach even Valve's nearest server. A cable helps; if it is already wired, a gaming VPN may find a faster route.
+        inline const char* That_side_s_internet_is_slow_to_reach_even_Valve_s_nearest_server_A_cable_helps_if_it_is_already_wired_a_gaming_VPN_may_find_a_faster_route() const { return Get("That side's internet is slow to reach even Valve's nearest server. A cable helps; if it is already wired, a gaming VPN may find a faster route."); }
+
+        // Opening the game's ports on the router, or a VPN, can let Steam connect you directly, which usually lowers the ping.
+        inline const char* Opening_the_game_s_ports_on_the_router_or_a_VPN_can_let_Steam_connect_you_directly_which_usually_lowers_the_ping() const { return Get("Opening the game's ports on the router, or a VPN, can let Steam connect you directly, which usually lowers the ping."); }
+
+        // Both internet lines look fine; the delay is the distance between you. A VPN rarely helps here.
+        inline const char* Both_internet_lines_look_fine_the_delay_is_the_distance_between_you_A_VPN_rarely_helps_here() const { return Get("Both internet lines look fine; the delay is the distance between you. A VPN rarely helps here."); }
+
+        // Steam's map of where you both are says the ping could be clearly lower. See the recommendation below.
+        inline const char* Steam_s_map_of_where_you_both_are_says_the_ping_could_be_clearly_lower_See_the_recommendation_below() const { return Get("Steam's map of where you both are says the ping could be clearly lower. See the recommendation below."); }
+
+        // How this is decided: a PC that can't hold 60 FPS comes first. Then the connection: long pauses between messages from one side point at that side; a high ping (over 100 ms) is blamed on whichever player's own line to Valve's nearest server is slow, on Steam's detour servers if it is using them, or else on distance. Limits: it cannot see a bad route between two good internet lines, and the other side's numbers need them to run this mod.
+        inline const char* How_this_is_decided_a_PC_that_can_t_hold_60_FPS_comes_first_Then_the_connection_long_pauses_between_messages_from_one_side_point_at_that_side_a_high_ping_over_100_ms_is_blamed_on_whichever_player_s_own_line_to_Valve_s_nearest_server_is_slow_on_Steam_s_detour_servers_if_it_is_using_them_or_else_on_distance_Limits_it_cannot_see_a_bad_route_between_two_good_internet_lines_and_the_other_side_s_numbers_need_them_to_run_this_mod() const { return Get("How this is decided: a PC that can't hold 60 FPS comes first. Then the connection: long pauses between messages from one side point at that side; a high ping (over 100 ms) is blamed on whichever player's own line to Valve's nearest server is slow, on Steam's detour servers if it is using them, or else on distance. Limits: it cannot see a bad route between two good internet lines, and the other side's numbers need them to run this mod."); }
+
+        // Your side: your PC can't keep up with 60 FPS.
+        inline const char* Your_side_your_PC_can_t_keep_up_with_60_FPS() const { return Get("Your side: your PC can't keep up with 60 FPS."); }
+
+        // Your opponent's side: their PC can't keep up with 60 FPS.
+        inline const char* Your_opponent_s_side_their_PC_can_t_keep_up_with_60_FPS() const { return Get("Your opponent's side: their PC can't keep up with 60 FPS."); }
+
+        // %s's side: their PC can't keep up with 60 FPS.
+        inline const char* s_s_side_their_PC_can_t_keep_up_with_60_FPS() const { return Get("%s's side: their PC can't keep up with 60 FPS."); }
+
+        // close
+        inline const char* close_2() const { return Get("close"); }
+
+        // medium distance
+        inline const char* medium_distance() const { return Get("medium distance"); }
+
+        // far apart
+        inline const char* far_apart() const { return Get("far apart"); }
+
+        // Network
+        inline const char* Network() const { return Get("Network"); }
+
+        // Whether this player's PC reaches the internet over Wi-Fi or a cable, as Windows reports it for the adapter that carries the match. Wi-Fi is the most common cause of an unstable connection.
+        inline const char* Whether_this_player_s_PC_reaches_the_internet_over_Wi_Fi_or_a_cable_as_Windows_reports_it_for_the_adapter_that_carries_the_match_Wi_Fi_is_the_most_common_cause_of_an_unstable_connection() const { return Get("Whether this player's PC reaches the internet over Wi-Fi or a cable, as Windows reports it for the adapter that carries the match. Wi-Fi is the most common cause of an unstable connection."); }
+
+        // Steam's expected ping
+        inline const char* Steam_s_expected_ping() const { return Get("Steam's expected ping"); }
+
+        // What Steam's map of both players' locations says the ping between them should be. Only available when the game connects them directly.
+        inline const char* What_Steam_s_map_of_both_players_locations_says_the_ping_between_them_should_be_Only_available_when_the_game_connects_them_directly() const { return Get("What Steam's map of both players' locations says the ping between them should be. Only available when the game connects them directly."); }
+
+        // Route excess
+        inline const char* Route_excess() const { return Get("Route excess"); }
+
+        // How much this player's internet provider adds on the way to the other player's region, beyond its own line to the nearest Valve server. A clearly higher number on one side is the sign that a VPN on that side should help.
+        inline const char* How_much_this_player_s_internet_provider_adds_on_the_way_to_the_other_player_s_region_beyond_its_own_line_to_the_nearest_Valve_server_A_clearly_higher_number_on_one_side_is_the_sign_that_a_VPN_on_that_side_should_help() const { return Get("How much this player's internet provider adds on the way to the other player's region, beyond its own line to the nearest Valve server. A clearly higher number on one side is the sign that a VPN on that side should help."); }
+
+        // How this works: when the game connects you directly, each mod sends the other a rough location from Steam (never shown or saved) and the code of its nearest Valve server. From those it works out what ping your two locations should allow, how fast each line reaches the nearest server, and how much each side's internet provider adds to reach the other side's region. If the real ping is much higher than that, the side whose provider adds more should turn on a VPN such as Cloudflare WARP, which carries that side's traffic into a faster network. Limits: it needs both players on this mod version and a direct connection - if a VPN makes Steam route the connection through its own servers, the check switches off. It is an estimate, not a guarantee.
+        inline const char* How_this_works_when_the_game_connects_you_directly_each_mod_sends_the_other_a_rough_location_from_Steam_never_shown_or_saved_and_the_code_of_its_nearest_Valve_server_From_those_it_works_out_what_ping_your_two_locations_should_allow_how_fast_each_line_reaches_the_nearest_server_and_how_much_each_side_s_internet_provider_adds_to_reach_the_other_side_s_region_If_the_real_ping_is_much_higher_than_that_the_side_whose_provider_adds_more_should_turn_on_a_VPN_such_as_Cloudflare_WARP_which_carries_that_side_s_traffic_into_a_faster_network_Limits_it_needs_both_players_on_this_mod_version_and_a_direct_connection_if_a_VPN_makes_Steam_route_the_connection_through_its_own_servers_the_check_switches_off_It_is_an_estimate_not_a_guarantee() const { return Get("How this works: when the game connects you directly, each mod sends the other a rough location from Steam (never shown or saved) and the code of its nearest Valve server. From those it works out what ping your two locations should allow, how fast each line reaches the nearest server, and how much each side's internet provider adds to reach the other side's region. If the real ping is much higher than that, the side whose provider adds more should turn on a VPN such as Cloudflare WARP, which carries that side's traffic into a faster network. Limits: it needs both players on this mod version and a direct connection - if a VPN makes Steam route the connection through its own servers, the check switches off. It is an estimate, not a guarantee."); }
+
+        // wired
+        inline const char* wired_2() const { return Get("wired"); }
+
+        // Your side: your connection drops out now and then.
+        inline const char* Your_side_your_connection_drops_out_now_and_then() const { return Get("Your side: your connection drops out now and then."); }
+
+        // Your opponent's side: their connection drops out now and then.
+        inline const char* Your_opponent_s_side_their_connection_drops_out_now_and_then() const { return Get("Your opponent's side: their connection drops out now and then."); }
+
+        // %s's side: their connection drops out now and then.
+        inline const char* s_s_side_their_connection_drops_out_now_and_then() const { return Get("%s's side: their connection drops out now and then."); }
+
+        // Your side: your internet line adds most of the delay.
+        inline const char* Your_side_your_internet_line_adds_most_of_the_delay() const { return Get("Your side: your internet line adds most of the delay."); }
+
+        // Your opponent's side: their internet line adds most of the delay.
+        inline const char* Your_opponent_s_side_their_internet_line_adds_most_of_the_delay() const { return Get("Your opponent's side: their internet line adds most of the delay."); }
+
+        // %s's side: their internet line adds most of the delay.
+        inline const char* s_s_side_their_internet_line_adds_most_of_the_delay() const { return Get("%s's side: their internet line adds most of the delay."); }
+
+        // Recommendation: you should turn on your VPN (e.g. Cloudflare WARP) - your internet provider takes a long way to reach your opponent.
+        inline const char* Recommendation_you_should_turn_on_your_VPN_e_g_Cloudflare_WARP_your_internet_provider_takes_a_long_way_to_reach_your_opponent() const { return Get("Recommendation: you should turn on your VPN (e.g. Cloudflare WARP) - your internet provider takes a long way to reach your opponent."); }
+
+        // Recommendation: your opponent should turn on their VPN (e.g. Cloudflare WARP) - their internet provider takes a long way to reach you.
+        inline const char* Recommendation_your_opponent_should_turn_on_their_VPN_e_g_Cloudflare_WARP_their_internet_provider_takes_a_long_way_to_reach_you() const { return Get("Recommendation: your opponent should turn on their VPN (e.g. Cloudflare WARP) - their internet provider takes a long way to reach you."); }
+
+        // Recommendation: %s should turn on their VPN (e.g. Cloudflare WARP) - their internet provider takes a long way to reach the other player.
+        inline const char* Recommendation_s_should_turn_on_their_VPN_e_g_Cloudflare_WARP_their_internet_provider_takes_a_long_way_to_reach_the_other_player() const { return Get("Recommendation: %s should turn on their VPN (e.g. Cloudflare WARP) - their internet provider takes a long way to reach the other player."); }
+
+        // Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - start with you, and if it doesn't help, your opponent.
+        inline const char* Recommendation_either_of_you_could_try_a_VPN_e_g_Cloudflare_WARP_start_with_you_and_if_it_doesn_t_help_your_opponent() const { return Get("Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - start with you, and if it doesn't help, your opponent."); }
+
+        // Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - start with your opponent, and if it doesn't help, you.
+        inline const char* Recommendation_either_of_you_could_try_a_VPN_e_g_Cloudflare_WARP_start_with_your_opponent_and_if_it_doesn_t_help_you() const { return Get("Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - start with your opponent, and if it doesn't help, you."); }
+
+        // Recommendation: either player could try a VPN (e.g. Cloudflare WARP) - start with %s.
+        inline const char* Recommendation_either_player_could_try_a_VPN_e_g_Cloudflare_WARP_start_with_s() const { return Get("Recommendation: either player could try a VPN (e.g. Cloudflare WARP) - start with %s."); }
+
+        // Recommendation: your own line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN.
+        inline const char* Recommendation_your_own_line_is_slow_even_to_Valve_s_nearest_server_a_cable_or_a_better_connection_will_help_more_than_a_VPN() const { return Get("Recommendation: your own line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN."); }
+
+        // Recommendation: your opponent's line is slow even to Valve's nearest server - a cable or a better connection will help them more than a VPN.
+        inline const char* Recommendation_your_opponent_s_line_is_slow_even_to_Valve_s_nearest_server_a_cable_or_a_better_connection_will_help_them_more_than_a_VPN() const { return Get("Recommendation: your opponent's line is slow even to Valve's nearest server - a cable or a better connection will help them more than a VPN."); }
+
+        // Recommendation: %s's line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN.
+        inline const char* Recommendation_s_s_line_is_slow_even_to_Valve_s_nearest_server_a_cable_or_a_better_connection_will_help_more_than_a_VPN() const { return Get("Recommendation: %s's line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN."); }
+
+        // Show PC & connection stats
+        inline const char* Show_PC_connection_stats() const { return Get("Show PC & connection stats"); }
+
+        // Opens the PC & connection stats window (also Ctrl+F2): how fast each PC runs the game, the ping, and who is causing any lag - for players and spectators. The other side's numbers need them to run this mod too.
+        inline const char* Opens_the_PC_connection_stats_window_also_Ctrl_F2_how_fast_each_PC_runs_the_game_the_ping_and_who_is_causing_any_lag_for_players_and_spectators_The_other_side_s_numbers_need_them_to_run_this_mod_too() const { return Get("Opens the PC & connection stats window (also Ctrl+F2): how fast each PC runs the game, the ping, and who is causing any lag - for players and spectators. The other side's numbers need them to run this mod too."); }
+
+        // PC & connection stats
+        inline const char* PC_connection_stats() const { return Get("PC & connection stats"); }
 };
 
 

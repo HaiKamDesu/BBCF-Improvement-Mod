@@ -1,5 +1,6 @@
 #include "RoomManager.h"
 
+#include "Core/info.h"
 #include "Core/logger.h"
 
 #include <cstddef>
@@ -33,6 +34,34 @@ void RoomManager::SendAnnounce()
 	}
 }
 
+void RoomManager::SendAcknowledgeTo(const CSteamID& to, bool replyWanted)
+{
+	ModVersionInfo info = {};
+	info.magic = kModInfoMagic;
+	info.infoVersion = 1;
+	info.flags = replyWanted ? kModInfo_ReplyWanted : 0;
+	info.caps = kModCap_PerformanceReport;
+	strncpy_s(info.version, sizeof(info.version), MOD_VERSION, _TRUNCATE);
+
+	Packet ackPacket = Packet(&info, (uint16_t)sizeof(info), PacketType_IMID_Acknowledge, GetThisPlayerRoomMemberIndex());
+	CSteamID dest = to;
+	m_pNetworkManager->SendPacket(&dest, &ackPacket);
+}
+
+void RoomManager::ApplyModVersionInfo(const Packet* packet, IMPlayer* player)
+{
+	if (packet->dataSize < sizeof(ModVersionInfo) || packet->dataSize > MAX_DATA_SIZE)
+		return;
+	ModVersionInfo info;
+	memcpy(&info, packet->data, sizeof(info));
+	if (info.magic != kModInfoMagic || info.infoVersion < 1)
+		return;
+	info.version[sizeof(info.version) - 1] = '\0';
+	player->modVersion = info.version;
+	player->modCaps = info.caps;
+	player->versionKnown = true;
+}
+
 void RoomManager::SendAcknowledge(Packet* packet)
 {
 	LOG(2, "RoomManager::SendAcknowledge\n");
@@ -40,8 +69,8 @@ void RoomManager::SendAcknowledge(Packet* packet)
 	IMPlayer otherPlayer = IMPlayer(packet->roomMemberIndex, packet->steamID, GetPlayerSteamName(packet->steamID));
 	AddIMPlayerToRoom(otherPlayer);
 
-	Packet ackPacket = Packet(NULL, NULL, PacketType_IMID_Acknowledge, GetThisPlayerRoomMemberIndex());
-	m_pNetworkManager->SendPacket(&otherPlayer.steamID, &ackPacket);
+	// The announce carries no version (it also goes to vanilla clients), so ask for one back.
+	SendAcknowledgeTo(otherPlayer.steamID, true);
 }
 
 void RoomManager::AcceptAcknowledge(Packet* packet)
@@ -49,7 +78,23 @@ void RoomManager::AcceptAcknowledge(Packet* packet)
 	LOG(2, "RoomManager::AcceptAcknowledge\n");
 
 	IMPlayer otherPlayer = IMPlayer(packet->roomMemberIndex, packet->steamID, GetPlayerSteamName(packet->steamID));
+	ApplyModVersionInfo(packet, &otherPlayer);
 	AddIMPlayerToRoom(otherPlayer);
+
+	if (otherPlayer.versionKnown)
+	{
+		LOG(1, "[ModVersion] %s runs %s (caps 0x%04X)\n", otherPlayer.steamName.c_str(),
+			otherPlayer.modVersion.c_str(), (unsigned)otherPlayer.modCaps);
+
+		// Only a current build sets ReplyWanted, and the reply does not, so this is one
+		// extra packet per pair of mod users per room join and cannot loop.
+		ModVersionInfo info;
+		memcpy(&info, packet->data, sizeof(info));
+		if (info.flags & kModInfo_ReplyWanted)
+		{
+			SendAcknowledgeTo(otherPlayer.steamID, false);
+		}
+	}
 }
 
 void RoomManager::JoinRoom(Room* pRoom)
@@ -62,6 +107,9 @@ void RoomManager::JoinRoom(Room* pRoom)
 	m_imPlayers.resize(8);
 
 	IMPlayer thisPlayer = IMPlayer(GetThisPlayerRoomMemberIndex(), m_thisPlayerSteamID.ConvertToUint64(), GetPlayerSteamName(m_thisPlayerSteamID.ConvertToUint64()));
+	thisPlayer.modVersion = MOD_VERSION;
+	thisPlayer.modCaps = kModCap_PerformanceReport;
+	thisPlayer.versionKnown = true;
 	AddIMPlayerToRoom(thisPlayer);
 
 	SendAnnounce();
@@ -307,7 +355,36 @@ std::vector<IMPlayer> RoomManager::GetIMPlayersInCurrentMatchNonSpec() const
 
 void RoomManager::AddIMPlayerToRoom(const IMPlayer& imPlayer)
 {
-	m_imPlayers[imPlayer.roomMemberIndex] = imPlayer;
+	if (imPlayer.roomMemberIndex < 0 || imPlayer.roomMemberIndex >= (int)m_imPlayers.size())
+		return;
+
+	IMPlayer& slot = m_imPlayers[imPlayer.roomMemberIndex];
+	// An announce re-adds a player with no version; keep what their acknowledge told us.
+	const bool keepVersion = !imPlayer.versionKnown && slot.versionKnown &&
+		slot.steamID == imPlayer.steamID;
+	IMPlayer merged = imPlayer;
+	if (keepVersion)
+	{
+		merged.modVersion = slot.modVersion;
+		merged.modCaps = slot.modCaps;
+		merged.versionKnown = true;
+	}
+	slot = merged;
+}
+
+bool RoomManager::FindIMPlayer(uint64_t steamId, IMPlayer* out) const
+{
+	for (const IMPlayer& imPlayer : m_imPlayers)
+	{
+		if (imPlayer.roomMemberIndex == -1 || imPlayer.steamID.ConvertToUint64() != steamId)
+			continue;
+		if (!GetRoomMemberEntryByIndex((uint16_t)imPlayer.roomMemberIndex))
+			continue;
+		if (out)
+			*out = imPlayer;
+		return true;
+	}
+	return false;
 }
 
 void RoomManager::RemoveIMPlayerFromRoom(uint16_t index)

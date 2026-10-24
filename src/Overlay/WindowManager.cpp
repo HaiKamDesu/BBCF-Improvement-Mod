@@ -19,6 +19,8 @@
 #include "Window/NetworkSquareColorWindow.h"
 #include "Window/ScrWindow.h"
 #include "Window/Ranked/RankedProgressWindow.h"
+#include "Window/RoomWindow.h"
+#include "Window/PerfStatsWindow.h"
 #include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
 
@@ -492,6 +494,8 @@ bool WindowManager::Initialize(void* hwnd, IDirect3DDevice9* device)
 	PaletteEditorWindow::RegisterLayoutSettings();
 	MainMenu::RegisterLayoutSettings();
 	ReplayExtras::RegisterLayoutSettings();
+	RoomWindow::RegisterLayoutSettings();
+	PerfStatsWindow::RegisterLayoutSettings();
 
 	m_initialized = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
 	if (!m_initialized)
@@ -1021,6 +1025,13 @@ void WindowManager::HandleButtons()
 	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleOnlineWindow))
 	{
 		m_windowContainer->GetWindow(WindowType_Room)->ToggleOpen();
+	}
+
+	// Ctrl+F2 by default. Modifiers match exactly, so this and plain F2 never both fire.
+	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleOnlinePerformance))
+	{
+		if (PerfStatsWindow* stats = m_windowContainer->GetWindow<PerfStatsWindow>(WindowType_PerfStats))
+			stats->ToggleFromHotkey();
 	}
 
 	if (HotkeyManager::WasPressed(HotkeyManager::Hotkey_ToggleHud) && g_gameVals.pIsHUDHidden)

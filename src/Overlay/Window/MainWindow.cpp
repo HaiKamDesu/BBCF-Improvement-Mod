@@ -295,6 +295,7 @@ void MainWindow::DrawNavHotkeyHints() const
 	static const Hint kHints[] = {
 		{ HotkeyManager::Hotkey_ToggleMainWindow,   "this menu" },
 		{ HotkeyManager::Hotkey_ToggleOnlineWindow, "online info" },
+		{ HotkeyManager::Hotkey_ToggleOnlinePerformance, "PC & connection stats" },
 		{ HotkeyManager::Hotkey_ToggleHud,          "hide the HUD" },
 	};
 

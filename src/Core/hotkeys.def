@@ -22,6 +22,10 @@ HOTKEY(ToggleOnlineWindow, toggleOnlineButton, "ToggleOnlineButton", "F2",
 	"Open/close the online window",
 	"Shows or hides the online info window, which lists who is in the room with you and their connection details.")
 
+HOTKEY(ToggleOnlinePerformance, toggleOnlinePerformanceButton, "ToggleOnlinePerformanceButton", "Ctrl+F2",
+	"Show PC & connection stats",
+	"Opens the PC & connection stats window: how fast your PC and your opponent's run the game, the ping, and who is causing any lag. Press it again to close it.")
+
 HOTKEY(ToggleHud, toggleHUDbutton, "ToggleHUDButton", "F3",
 	"Hide/show the game HUD",
 	"Hides or restores the game's own health bars, timer and meter. Handy for clean screenshots and video recording.")
