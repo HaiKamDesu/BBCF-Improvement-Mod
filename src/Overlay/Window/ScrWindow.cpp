@@ -1040,14 +1040,24 @@ void ScrWindow::TickTrainingResetSwap() {
 
     int current_frame_count = *g_gameVals.pFrameCount;
 
+    // EndScene can run more than once per game tick (seen in a 4 GB mode session, two calls
+    // ~12 ms apart on the same tick), so nothing here may assume one call per tick. The press
+    // edge stays set for the whole tick, and the old code re-armed on every call: the first
+    // call consumed the hook's verdict, the second found none and overwrote armed_swap with
+    // false, so Up+reset never toggled.
     if (PollTrainingResetPressed()) {
         armed_at_ms = GetTickCount64();
-        // The direction was read by the TrainingResetDirection hook inside the game's own
-        // reset step this frame, with the game's own controller read; this is its verdict.
-        // Without the hook (controller gate off) there is no trustworthy direction, so no
-        // swap - the game then does exactly what it always did.
-        ResetLabDecision decision;
-        armed_swap = ConsumeLastResetPressDecision(&decision) && decision.swapSides;
+    }
+    // The direction was read by the TrainingResetDirection hook inside the game's own reset
+    // step, with the game's own controller read; this is its verdict. It is taken whenever
+    // the hook left one, which only happens on a reset press the game accepted, so it does
+    // not depend on this call landing on the press edge. Without the hook (controller gate
+    // off) there is no trustworthy direction, so no swap - the game then does exactly what
+    // it always did.
+    ResetLabDecision decision;
+    if (ConsumeLastResetPressDecision(&decision)) {
+        armed_at_ms = GetTickCount64();
+        armed_swap = decision.swapSides;
     }
 
     if (last_frame_count != -1 && current_frame_count < last_frame_count) {
@@ -1073,10 +1083,15 @@ void ScrWindow::TickTrainingResetSwap() {
         }
     }
 
+    const int previous_frame_count = last_frame_count;
     last_frame_count = current_frame_count;
     last_phase = phase;
 
-    if (s_swapCoordsToggle && current_frame_count == 5 && !last_drop_was_timestop) {
+    // Once per reset: when the timer reaches 5, not on every call that sees it there. Two
+    // calls on the tick where it read 5 swapped twice, which put both characters back.
+    const bool reached_swap_frame = current_frame_count >= 5
+        && previous_frame_count >= 0 && previous_frame_count < 5;
+    if (s_swapCoordsToggle && reached_swap_frame && !last_drop_was_timestop) {
         LOG(1, "[ResetSwap] swapping sides after reset\n");
         ScrWindow::swap_character_coordinates();
     }
