@@ -1183,9 +1183,12 @@ static bool HookOptionalDetour(PBYTE addr, const char* funcName)
 	return true;
 }
 
-// Set by hook_Direct3DCreate9Ex when it wraps, so the import-table entry knows the export's
-// chain already reached us and must not wrap a second time.
-static thread_local bool t_wrappedInsideIatCall = false;
+// While the import-table entry runs the export's chain, the export detour must not wrap: the
+// import entry wraps the chain's final result itself, so our wrapper is always the OUTERMOST
+// object and every hooker on the export (Steam's overlay above all) gets the real d3d9 factory,
+// exactly as without the mod. t_reachedInsideIatCall only records that the chain came through us.
+static thread_local bool t_passThroughInsideIatCall = false;
+static thread_local bool t_reachedInsideIatCall = false;
 
 HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 {
@@ -1206,13 +1209,20 @@ HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 		LOG(0, "Direct3DCreate9Ex hook called without original function\n");
 		return E_FAIL;
 	}
+	if (t_passThroughInsideIatCall)
+	{
+		// Inside the import entry's call: hand the chain's object back untouched (see above).
+		t_passThroughInsideIatCall = false; // a nested call further down is not the game's
+		t_reachedInsideIatCall = true;
+		return chain(sdkVers, pD3DEx);
+	}
+
 	HRESULT retval = chain(sdkVers, pD3DEx); // real one
 
 	if (SUCCEEDED(retval) && pD3DEx && *pD3DEx)
 	{
 		Direct3D9ExWrapper* ret = new Direct3D9ExWrapper(&*pD3DEx);
 		InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
-		t_wrappedInsideIatCall = true;
 	}
 	return retval;
 }
@@ -1227,8 +1237,13 @@ HRESULT __stdcall hook_Direct3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 // export after us was skipped entirely. Steam's overlay is such a hooker: it never saw the
 // device and Shift+Tab stopped opening it (Kakuy, 2026-10-17).
 //
-// The export usually leads back to us (Steam's hook chains into our detour, which wraps); if it
-// does not (a hooker that replaced us outright), the result is wrapped here.
+// The export usually leads back to us (Steam's hook chains into our detour), but the wrap is
+// always done HERE, on the chain's final result. If the export detour wrapped instead, the
+// hookers above it (Steam) would receive our wrapper and hook OUR device's Present: Steam's
+// IWrapIDirect3D9Ex::CreateDeviceEx inline-patches the vtable functions of whatever device its
+// inner factory returns. Its overlay is then drawn before d3d9's Present, where OBS/Streamlabs
+// game capture grabs the frame, so "Capture third-party overlays" off could not leave it out
+// (Athena, 4 GB mode: there Steam always hooks the export after us, at SteamAPI_Init).
 HRESULT __stdcall hook_IatDirect3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 {
 	const Direct3DCreate9Ex_t live = g_iatDisplacedDirect3DCreate9Ex;
@@ -1237,20 +1252,26 @@ HRESULT __stdcall hook_IatDirect3DCreate9Ex(UINT sdkVers, IDirect3D9Ex** pD3DEx)
 		return hook_Direct3DCreate9Ex(sdkVers, pD3DEx);
 	}
 
-	t_wrappedInsideIatCall = false;
+	t_passThroughInsideIatCall = true;
+	t_reachedInsideIatCall = false;
 	const HRESULT retval = live(sdkVers, pD3DEx);
-	const bool wrappedInside = t_wrappedInsideIatCall;
-	t_wrappedInsideIatCall = false;
+	const bool reachedInside = t_reachedInsideIatCall;
+	t_passThroughInsideIatCall = false;
+	t_reachedInsideIatCall = false;
 
-	if (SUCCEEDED(retval) && pD3DEx && *pD3DEx && !wrappedInside)
+	if (SUCCEEDED(retval) && pD3DEx && *pD3DEx)
 	{
-		LOG(0, "[HookDiag][IAT] The export's current chain did not reach our hook; wrapping at the import\n");
 		Direct3D9ExWrapper* ret = new Direct3D9ExWrapper(&*pD3DEx);
 		InterlockedExchange(&g_d3d9ExFactoryWrapped, 1);
-	}
-	else if (SUCCEEDED(retval))
-	{
-		LOG(1, "[HookDiag][IAT] Direct3DCreate9Ex went through the export's current chain and reached our hook\n");
+		if (reachedInside)
+		{
+			LOG(1, "[HookDiag][IAT] Direct3DCreate9Ex went through the export's current chain and reached our hook;"
+			       " wrapped at the import, outside every other hooker\n");
+		}
+		else
+		{
+			LOG(0, "[HookDiag][IAT] The export's current chain did not reach our hook; wrapping at the import\n");
+		}
 	}
 	return retval;
 }
