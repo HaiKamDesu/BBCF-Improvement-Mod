@@ -69,6 +69,9 @@ namespace
 	uint64_t g_locationSentTo = 0;
 	long long g_locationSentMatchStart = -1;
 	uint32_t g_locationSentHash = 0;
+	long long g_locationResendAt = 0;
+	bool g_loggedLocationResendThisMatch = false;
+	bool g_loggedLocationRejectThisMatch = false;
 
 	// Raw buffers only: __try cannot unwind C++ objects.
 	bool LocalLocationString(ISteamNetworkingUtils004Head* utils, char* buf, int cch)
@@ -268,12 +271,14 @@ namespace
 		}
 	}
 
-	// From the 500 ms refresh while the stats window is open. Steam measures the relay pings
-	// itself (a few seconds after the first request); this only reads the smallest one.
-	void PollRelayBaseline()
+	// Gets the SteamNetworkingUtils interface and asks Steam to start measuring its relay
+	// pings (InitRelayNetworkAccess). Called as soon as the player is in online mode (lobby,
+	// room, ranked menus), so the numbers are ready by the first match: this only makes Steam
+	// ping Valve's relays - Valve's infrastructure, not ASW's - and sends nothing to any player.
+	bool EnsureRelayAccess()
 	{
 		if (g_relayDisabled)
-			return;
+			return false;
 		if (!g_relayInitTried)
 		{
 			g_relayInitTried = true;
@@ -281,10 +286,21 @@ namespace
 			if (!g_netUtils || !StartRelayPings(g_netUtils))
 			{
 				g_relayDisabled = true;
+				g_netUtils = nullptr;
 				LOG(1, "[PerfMonitor] relay baseline unavailable: SteamNetworkingUtils004 not provided by this Steam client\n");
-				return;
+				return false;
 			}
+			LOG(1, "[PerfMonitor] relay access started (online mode)\n");
 		}
+		return g_netUtils != nullptr;
+	}
+
+	// Every 2 s in online mode or while the stats window is open. Steam measures the relay
+	// pings itself (a few seconds after the first request); this only reads the smallest one.
+	void PollRelayBaseline()
+	{
+		if (!EnsureRelayAccess())
+			return;
 		int popCount = 0;
 		uint32_t bestPop = 0;
 		const int ping = ReadNearestRelayPing(g_netUtils, &popCount, &bestPop);
@@ -598,12 +614,24 @@ namespace
 	NetSample g_lastNet = {};
 	bool g_netSeenThisMatch = false;
 	bool g_loggedNetReadThisMatch = false;
+	bool g_rttSeenThisMatch = false;
 	double SecondsSinceMatchStart();
 
 	constexpr int kRttRing = 8;
 	int g_rtt[kRttRing] = {};
 	int g_rttCount = 0;
 	int g_rttNext = 0;
+
+	int StablePingMs()
+	{
+		if (g_rttCount < 3)
+			return g_lastNet.rttMs;
+		int sorted[kRttRing];
+		for (int i = 0; i < g_rttCount; ++i)
+			sorted[i] = g_rtt[(g_rttNext - g_rttCount + i + kRttRing) % kRttRing];
+		std::sort(sorted, sorted + g_rttCount);
+		return sorted[g_rttCount / 2];
+	}
 
 	char* g_base = nullptr;
 
@@ -626,7 +654,8 @@ namespace
 		{
 			// Once per match, so a wrong walk never again shows "-" silently. The early frames of
 			// a match can legitimately have no session yet; log only after 3 s of failing.
-			if (!g_loggedNetReadThisMatch && SecondsSinceMatchStart() > 3.0)
+			// After a session that worked, a missing session means the match ended normally.
+			if (!g_loggedNetReadThisMatch && !g_netSeenThisMatch && SecondsSinceMatchStart() > 3.0)
 			{
 				g_loggedNetReadThisMatch = true;
 				LOG(1, "[PerfMonitor] network stats unavailable: %s (step %d)\n", NetReadStepName(step), step);
@@ -640,6 +669,9 @@ namespace
 		}
 		g_lastNet = s;
 		g_netSeenThisMatch = true;
+		// GGPO's RTT reads 0 until the first quality reply (about a second in): unknown, not 0.
+		if (s.rttMs > 0)
+			g_rttSeenThisMatch = true;
 		NetBucket& b = g_buckets[g_bucket];
 		const DWORD now = timeGetTime();
 		if (s.lastRecvMs != 0 && now >= s.lastRecvMs)
@@ -792,6 +824,9 @@ namespace
 		g_rttNext = 0;
 		g_netSeenThisMatch = false;
 		g_loggedNetReadThisMatch = false;
+		g_rttSeenThisMatch = false;
+		g_loggedLocationRejectThisMatch = false;
+		g_loggedLocationResendThisMatch = false;
 		g_loggedFirstReportThisMatch = false;
 		if (g_sentThisMatch > 0)
 			LOG(1, "[PerfMonitor] previous match: %u packets sent\n", g_sentThisMatch);
@@ -863,7 +898,10 @@ namespace
 			{
 				const double slope = (sumNT - sumN * sumT / n) / varN;
 				const double intercept = (sumT - slope * sumN) / n;
-				if (slope > 0.0 && intercept >= 0.0)
+				// A few noisy rollbacks can fit a near-flat line: 26 us/frame ("resim 64103%")
+				// from 10 rollbacks on 10-24. A frame can't resimulate in a quarter of the
+				// average, so keep the average until the fit is plausible.
+				if (slope >= perFrame / 4.0 && intercept >= 0.0)
 				{
 					perFrame = slope;
 					load = intercept;
@@ -883,6 +921,7 @@ namespace
 		// Route-check numbers: only for the current opponent, and only numbers (see header).
 		if (g_peerLocationValid && g_opponentPeer >= 0 && g_peers[g_opponentPeer].steamId == g_peerLocationSteamId)
 		{
+			r.flags |= Flag_HaveYourLocation;
 			r.expectedPingMs = (uint16_t)(std::min)(g_expectedPingMs, 65535);
 			r.crossPingMs = (uint16_t)(std::min)(g_crossPingMs, 65535);
 		}
@@ -905,10 +944,12 @@ namespace
 		r.totalRollbacks = g_totalRollbacks;
 		r.totalResimFrames = g_totalResimFrames;
 
-		if (g_netSeenThisMatch)
+		if (g_netSeenThisMatch && g_rttSeenThisMatch)
 		{
 			r.flags |= Flag_HasNet;
-			r.pingMs = (uint16_t)(std::max)(0, (std::min)(g_lastNet.rttMs, 65535));
+			// The median of the last 8 one-second samples once there are 3: the verdicts and the route
+			// check read this, and a single spike must not flip them to "use a VPN".
+			r.pingMs = (uint16_t)(std::max)(0, (std::min)(StablePingMs(), 65535));
 			r.maxRecvGapMs = (uint16_t)(std::min)(maxGap, 65535u);
 			r.sendQueue = (uint16_t)(std::max)(0, (std::min)(g_lastNet.sendQueue, 65535));
 			r.localFramesBehind = (int8_t)(std::max)(-127, (std::min)(g_lastNet.localAdvantage, 127));
@@ -1087,7 +1128,9 @@ namespace
 	// DIRECT-ONLY RULE (see PerformanceMonitor.h "ROUTE CHECK"): this is the one place the
 	// ping location and nearest-relay code leave this PC, and only to the opponent, only while
 	// the game's P2P session with them is direct, only while one of the two has the stats
-	// window open, once per match and again only if the text changed.
+	// window open. Sent once per match, again if the text changes, and re-sent every 8 s until
+	// the opponent's report carries Flag_HaveYourLocation (the first build sent it once, and it
+	// was lost when it reached a peer whose Steam relay access had not started yet).
 	void MaybeSendPingLocation(long long now, bool localWants)
 	{
 		if (g_opponentPeer < 0 || !g_netUtils || g_relayBestPop == 0)
@@ -1110,9 +1153,13 @@ namespace
 			return;
 		const size_t length = strnlen(text, kMaxLocationChars + 1);
 		const uint32_t hash = Fnv1a(text, g_relayBestPop);
-		const bool alreadySent = g_locationSentTo == opp.steamId && g_locationSentMatchStart == g_matchStartAt &&
+		const bool sameAsSent = g_locationSentTo == opp.steamId && g_locationSentMatchStart == g_matchStartAt &&
 			g_locationSentHash == hash;
-		if (!alreadySent && length > 0 && length <= (size_t)kMaxLocationChars)
+		const RemoteState* const remote = FindRemote(opp.steamId);
+		const bool peerHasIt = remote && remote->received > 0 && (remote->report.flags & Flag_HaveYourLocation) != 0 &&
+			SecondsSince(remote->receivedAt, now) < 5.0;
+		const bool resendDue = sameAsSent && !peerHasIt && now >= g_locationResendAt;
+		if ((!sameAsSent || resendDue) && length > 0 && length <= (size_t)kMaxLocationChars)
 		{
 			PingLocationHeader header = { 1, 0, (uint16_t)length, g_relayBestPop };
 			memcpy(buffer, &header, sizeof(header));
@@ -1128,8 +1175,17 @@ namespace
 				g_locationSentTo = opp.steamId;
 				g_locationSentMatchStart = g_matchStartAt;
 				g_locationSentHash = hash;
+				g_locationResendAt = now + 8 * g_qpcFreq;
 				++g_sentThisMatch;
-				LOG(1, "[PerfMonitor] route check: sent our location to the opponent (direct session)\n");
+				if (!resendDue)
+				{
+					LOG(1, "[PerfMonitor] route check: sent our location to the opponent (direct session)\n");
+				}
+				else if (!g_loggedLocationResendThisMatch)
+				{
+					g_loggedLocationResendThisMatch = true;
+					LOG(1, "[PerfMonitor] route check: opponent has not confirmed our location yet; re-sending every 8 s\n");
+				}
 			}
 		}
 		SecureZeroMemory(buffer, sizeof(buffer));
@@ -1222,10 +1278,33 @@ namespace
 	// Cycles every 6 s through made-up situations so each wording can be checked:
 	// 0 smooth (P1 wired, P2 Wi-Fi), 1 high ping with P2's line slow, 2 P2 unstable on Wi-Fi,
 	// 3 route long - P2 should use a VPN, 4 route long - either, start with P2,
-	// 5 Steam relays the session (route check cannot run).
+	// 5 Steam relays the session (route check cannot run),
+	// 6 no rollbacks yet + only P2 has Steam's expected ping (shown in both columns),
+	// 7 a location received before this PC's relay data is ready: this PC's own location is
+	//   pushed through IngestPingLocation (the real receive/parse path) with the relay number
+	//   hidden, and P1's expected/region ping come from the real Steam calls on it.
 	long long g_spectatorTestStart = 0;
 	int g_spectatorTestScenario = 0;
-	constexpr int kSpectatorTestScenarios = 6;
+	int g_spectatorTestLastScenario = -1;
+	constexpr int kSpectatorTestScenarios = 8;
+
+	void IngestPingLocation(uint64_t steamId, const char* src, uint32_t length, uint32_t pop); // below
+
+	void SpectatorTestFeedOwnLocation()
+	{
+		if (!g_netUtils || g_relayBestPop == 0)
+			return;
+		char text[kMaxLocationChars + 1];
+		if (!LocalLocationString(g_netUtils, text, sizeof(text)))
+			return;
+		const int savedRelay = g_relayPingMs;
+		g_relayPingMs = 0; // "not ready yet": the location must be kept anyway
+		ForgetPeerLocation();
+		IngestPingLocation(g_peers[g_playerPeer[1]].steamId, text, (uint32_t)strnlen(text, sizeof(text)), g_relayBestPop);
+		SecureZeroMemory(text, sizeof(text));
+		g_relayPingMs = savedRelay;
+		RecomputeRouteNumbers(); // what the next 2 s poll would do once the relay data is in
+	}
 
 	void SpectatorTestInject()
 	{
@@ -1233,6 +1312,8 @@ namespace
 		if (g_spectatorTestStart == 0)
 			g_spectatorTestStart = now;
 		g_spectatorTestScenario = (int)(SecondsSince(g_spectatorTestStart, now) / 6.0) % kSpectatorTestScenarios;
+		const bool scenarioChanged = g_spectatorTestScenario != g_spectatorTestLastScenario;
+		g_spectatorTestLastScenario = g_spectatorTestScenario;
 
 		Report p1 = g_local;
 		p1.flags |= Flag_HasNet | Flag_HasResim;
@@ -1273,6 +1354,22 @@ namespace
 			p1.flags |= Flag_UsingRelay; p2.flags |= Flag_UsingRelay;
 			p1.pingMs = p2.pingMs = 120;
 			p1.expectedPingMs = p2.expectedPingMs = 0; p1.crossPingMs = p2.crossPingMs = 0;
+			break;
+		case 6:
+			p1.flags &= ~Flag_HasResim; p2.flags &= ~Flag_HasResim;
+			p1.rollbackSamples = p2.rollbackSamples = 0;
+			p1.totalRollbacks = p2.totalRollbacks = 0; p1.rollbacksRecent = p2.rollbacksRecent = 0;
+			p1.maxDepthRecent = p2.maxDepthRecent = 0;
+			p1.resimLoadUs = p2.resimLoadUs = p1.resimFrameAvgUs = p2.resimFrameAvgUs = 0;
+			p1.expectedPingMs = 0; // only P2 has it: the window shares it
+			break;
+		case 7:
+			if (scenarioChanged)
+				SpectatorTestFeedOwnLocation();
+			p1.expectedPingMs = (uint16_t)(g_peerLocationValid ? g_expectedPingMs : 0);
+			p1.crossPingMs = (uint16_t)(g_peerLocationValid ? g_crossPingMs : 0);
+			p1.relayPingMs = (uint16_t)g_relayPingMs;
+			p2.expectedPingMs = 0;
 			break;
 		default:
 			break;
@@ -1491,6 +1588,64 @@ PerformanceMonitor::RouteCheck PerformanceMonitor::CheckRoute(const Report& a, c
 	return rc;
 }
 
+namespace
+{
+	void RejectLocation(const char* why)
+	{
+		if (!g_loggedLocationRejectThisMatch)
+		{
+			g_loggedLocationRejectThisMatch = true;
+			LOG(1, "[PerfMonitor] route check: opponent's location not used: %s\n", why);
+		}
+	}
+
+	// The one place a received location becomes a parsed location; the network path (after the
+	// room checks) and the dev-only offline test both come through here. text need not be
+	// terminated; it is copied, validated, parsed, and zeroed.
+	void IngestPingLocation(uint64_t steamId, const char* src, uint32_t length, uint32_t pop)
+	{
+		if (length == 0 || length > (uint32_t)kMaxLocationChars) { RejectLocation("bad length"); return; }
+		if (!IsPlausiblePopId(pop)) { RejectLocation("bad relay code"); return; }
+		// Parsing needs only the interface, not this side's ping data: start Steam's relay access
+		// now if it has not been (this is what dropped the first location in the 10-24 set).
+		if (!EnsureRelayAccess()) { RejectLocation("SteamNetworkingUtils unavailable on this PC"); return; }
+
+		char text[kMaxLocationChars + 1];
+		for (uint32_t i = 0; i < length; ++i)
+		{
+			const char c = src[i];
+			if (c < 0x20 || c > 0x7E)
+			{
+				SecureZeroMemory(text, sizeof(text));
+				RejectLocation("not printable text");
+				return;
+			}
+			text[i] = c;
+		}
+		text[length] = '\0';
+
+		PingLocationBlob parsed = {};
+		const bool ok = ParseLocation(g_netUtils, text, &parsed);
+		SecureZeroMemory(text, sizeof(text));
+		if (!ok)
+		{
+			RejectLocation("Steam could not parse it");
+			return;
+		}
+
+		g_peerLocation = parsed;
+		SecureZeroMemory(&parsed, sizeof(parsed));
+		g_peerLocationValid = true;
+		g_peerLocationSteamId = steamId;
+		g_peerPop = pop;
+		// Kept even when this side's relay data is not ready: the numbers fill in on a later
+		// poll (RecomputeRouteNumbers runs every 2 s in online mode).
+		RecomputeRouteNumbers();
+		LOG(1, "[PerfMonitor] route check: opponent's location received; Steam estimate %d ms, our ping to their region %d ms%s\n",
+			g_expectedPingMs, g_crossPingMs, g_relayPingMs > 0 ? "" : " (our relay data not ready yet; will fill in)");
+	}
+}
+
 void PerformanceMonitor::OnPingLocationPacket(Packet* packet)
 {
 	// Only from the opponent player of this match, to a player (spectators never get it).
@@ -1507,46 +1662,21 @@ void PerformanceMonitor::OnPingLocationPacket(Packet* packet)
 	const bool ffa = room->TryGetRoomType(&roomType) && roomType == RoomType_FFA;
 	if (!ffa && (self->matchPlayerIndex > 1 || sender->matchPlayerIndex > 1))
 		return;
-	if (!g_netUtils)
-		return; // no SteamNetworkingUtils here: nothing to compare against
 
 	if (packet->dataSize < sizeof(PingLocationHeader) + 1 || packet->dataSize > MAX_DATA_SIZE)
+	{
+		RejectLocation("bad packet size");
 		return;
+	}
 	PingLocationHeader header;
 	memcpy(&header, packet->data, sizeof(header));
-	if (header.version < 1 || header.length == 0 || header.length > kMaxLocationChars ||
-		sizeof(header) + header.length > packet->dataSize || !IsPlausiblePopId(header.nearestPop))
-		return;
-
-	char text[kMaxLocationChars + 1];
-	const char* const src = (const char*)(packet->data + sizeof(header));
-	for (uint16_t i = 0; i < header.length; ++i)
+	if (header.version < 1 || sizeof(header) + header.length > packet->dataSize)
 	{
-		const char c = src[i];
-		if (c < 0x20 || c > 0x7E)
-		{
-			SecureZeroMemory(text, sizeof(text));
-			return; // printable ASCII only
-		}
-		text[i] = c;
-	}
-	text[header.length] = '\0';
-
-	PingLocationBlob parsed = {};
-	const bool ok = ParseLocation(g_netUtils, text, &parsed);
-	SecureZeroMemory(text, sizeof(text));
-	SecureZeroMemory(packet->data, packet->dataSize);
-	if (!ok)
+		RejectLocation("bad header");
 		return;
-
-	g_peerLocation = parsed;
-	SecureZeroMemory(&parsed, sizeof(parsed));
-	g_peerLocationValid = true;
-	g_peerLocationSteamId = packet->steamID;
-	g_peerPop = header.nearestPop;
-	RecomputeRouteNumbers();
-	LOG(1, "[PerfMonitor] route check: opponent's location received; Steam estimate %d ms, our ping to their region %d ms\n",
-		g_expectedPingMs, g_crossPingMs);
+	}
+	IngestPingLocation(packet->steamID, (const char*)(packet->data + sizeof(header)), header.length, header.nearestPop);
+	SecureZeroMemory(packet->data, packet->dataSize);
 }
 
 void PerformanceMonitor::OnEndSceneBegin()
@@ -1621,7 +1751,8 @@ void PerformanceMonitor::Tick()
 		// The relay baseline takes a few seconds to measure; start it as soon as the window
 		// is opened, in a lobby too, so the number is there when the match begins.
 		const long long nowIdle = Now();
-		if (LocalWantsReports(nowIdle) && nowIdle >= g_nextRefresh)
+		const bool onlineMode = g_gameVals.pGameMode && *g_gameVals.pGameMode == GameMode_Online;
+		if ((LocalWantsReports(nowIdle) || onlineMode) && nowIdle >= g_nextRefresh)
 		{
 			g_nextRefresh = nowIdle + 2 * g_qpcFreq;
 			PollRelayBaseline();
@@ -1665,7 +1796,7 @@ void PerformanceMonitor::Tick()
 		SpectatorTestInject();
 	if (everySecond)
 		TalkToPeers(now);
-	if (LocalWantsReports(now) && (g_refreshCounter % 4) == 0)
+	if ((LocalWantsReports(now) || online) && (g_refreshCounter % 4) == 0)
 		PollRelayBaseline(); // every 2 s while the window is open
 
 	// Advance the 2 s window.

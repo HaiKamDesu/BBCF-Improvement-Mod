@@ -65,7 +65,10 @@ struct Packet;
 	The ping between the two players is one shared number. To say whose side adds the delay,
 	each side also measures its own ping to the nearest Valve relay (ISteamNetworkingUtils,
 	"SteamNetworkingUtils004", through SteamClient017::GetISteamGenericInterface): Steam pings
-	Valve's relay points of presence itself; we read the smallest direct ping. Only that one
+	Valve's relay points of presence itself, starting as soon as the player is in online mode
+	(lobby, rooms, ranked menus) so the numbers are ready by the first match - that is Steam
+	talking to Valve's relays, nothing is sent to any player or to ASW. We read the smallest
+	direct ping. Only that one
 	number is sent (relayPingMs) - never the ping location string, never the list of relays,
 	which together would locate the player. Limits: it measures the player's line up to
 	Valve's nearest relay, not the route between the two players, so it can point at a slow
@@ -84,7 +87,8 @@ struct Packet;
 	    coarse location adds no exposure. When Steam relays the session, vanilla hides the IP,
 	    so nothing is sent and the check says it cannot run.
 	  - Opponent only, never spectators (they get the computed numbers in the 1 Hz report).
-	  - Only while the stats window is open on either side; once per match and on change.
+	  - Only while the stats window is open on either side; once per match, on change, and
+	    re-sent every 8 s until the opponent's report says it has it (Flag_HaveYourLocation).
 	  - Never logged, displayed or saved. The receiver validates it (printable ASCII, max
 	    length), parses it with ParsePingLocationString, keeps only the parsed binary form in
 	    memory for the match, and zeroes the text.
@@ -173,7 +177,8 @@ namespace PerformanceMonitor
 		Flag_HasResim = 1 << 1,
 		Flag_HasNet = 1 << 2,
 		Flag_UsingRelay = 1 << 3,
-		Flag_WantsReports = 1 << 4, // sender has the performance section on screen
+		Flag_WantsReports = 1 << 4, // sender has the stats window open
+		Flag_HaveYourLocation = 1 << 5, // sender holds the receiver's ping location (stop re-sending it)
 	};
 
 	enum OpponentState

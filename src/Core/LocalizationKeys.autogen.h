@@ -5928,6 +5928,9 @@ struct LocalizationKeysAccessor
         // Rollback: may lag
         inline const char* Rollback_may_lag() const { return Get("Rollback: may lag"); }
 
+        // Rollback: none yet
+        inline const char* Rollback_none_yet() const { return Get("Rollback: none yet"); }
+
         // Rollback: too few to judge
         inline const char* Rollback_too_few_to_judge() const { return Get("Rollback: too few to judge"); }
 
@@ -5990,6 +5993,15 @@ struct LocalizationKeysAccessor
 
         // Recommendation: no VPN needed - the ping is what your locations allow.
         inline const char* Recommendation_no_VPN_needed_the_ping_is_what_your_locations_allow() const { return Get("Recommendation: no VPN needed - the ping is what your locations allow."); }
+
+        // Recommendation: no VPN needed - the route is as short as it can be. Your own line is slow to reach the internet; only a better connection lowers that.
+        inline const char* Recommendation_no_VPN_needed_the_route_is_as_short_as_it_can_be_Your_own_line_is_slow_to_reach_the_internet_only_a_better_connection_lowers_that() const { return Get("Recommendation: no VPN needed - the route is as short as it can be. Your own line is slow to reach the internet; only a better connection lowers that."); }
+
+        // Recommendation: no VPN needed - the route is as short as it can be. Your opponent's line is slow to reach the internet; only a better connection lowers that.
+        inline const char* Recommendation_no_VPN_needed_the_route_is_as_short_as_it_can_be_Your_opponent_s_line_is_slow_to_reach_the_internet_only_a_better_connection_lowers_that() const { return Get("Recommendation: no VPN needed - the route is as short as it can be. Your opponent's line is slow to reach the internet; only a better connection lowers that."); }
+
+        // Recommendation: no VPN needed - the route is as short as it can be. %s's line is slow to reach the internet; only a better connection lowers that.
+        inline const char* Recommendation_no_VPN_needed_the_route_is_as_short_as_it_can_be_s_s_line_is_slow_to_reach_the_internet_only_a_better_connection_lowers_that() const { return Get("Recommendation: no VPN needed - the route is as short as it can be. %s's line is slow to reach the internet; only a better connection lowers that."); }
 
         // Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - the path between your two providers is the slow part.
         inline const char* Recommendation_either_of_you_could_try_a_VPN_e_g_Cloudflare_WARP_the_path_between_your_two_providers_is_the_slow_part() const { return Get("Recommendation: either of you could try a VPN (e.g. Cloudflare WARP) - the path between your two providers is the slow part."); }
@@ -6225,8 +6237,8 @@ struct LocalizationKeysAccessor
         // Messages arrive unevenly. Wi-Fi or a busy connection on either side can do this; a cable instead of Wi-Fi is the first thing to try.
         inline const char* Messages_arrive_unevenly_Wi_Fi_or_a_busy_connection_on_either_side_can_do_this_a_cable_instead_of_Wi_Fi_is_the_first_thing_to_try() const { return Get("Messages arrive unevenly. Wi-Fi or a busy connection on either side can do this; a cable instead of Wi-Fi is the first thing to try."); }
 
-        // That side's internet is slow to reach even Valve's nearest server. A cable helps; if it is already wired, a gaming VPN may find a faster route.
-        inline const char* That_side_s_internet_is_slow_to_reach_even_Valve_s_nearest_server_A_cable_helps_if_it_is_already_wired_a_gaming_VPN_may_find_a_faster_route() const { return Get("That side's internet is slow to reach even Valve's nearest server. A cable helps; if it is already wired, a gaming VPN may find a faster route."); }
+        // That side's internet is slow to reach even Valve's nearest server. A cable helps if it is on Wi-Fi; otherwise it is the internet provider, or a long way to the nearest server.
+        inline const char* That_side_s_internet_is_slow_to_reach_even_Valve_s_nearest_server_A_cable_helps_if_it_is_on_Wi_Fi_otherwise_it_is_the_internet_provider_or_a_long_way_to_the_nearest_server() const { return Get("That side's internet is slow to reach even Valve's nearest server. A cable helps if it is on Wi-Fi; otherwise it is the internet provider, or a long way to the nearest server."); }
 
         // Opening the game's ports on the router, or a VPN, can let Steam connect you directly, which usually lowers the ping.
         inline const char* Opening_the_game_s_ports_on_the_router_or_a_VPN_can_let_Steam_connect_you_directly_which_usually_lowers_the_ping() const { return Get("Opening the game's ports on the router, or a VPN, can let Steam connect you directly, which usually lowers the ping."); }
@@ -6326,6 +6338,39 @@ struct LocalizationKeysAccessor
 
         // Recommendation: %s's line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN.
         inline const char* Recommendation_s_s_line_is_slow_even_to_Valve_s_nearest_server_a_cable_or_a_better_connection_will_help_more_than_a_VPN() const { return Get("Recommendation: %s's line is slow even to Valve's nearest server - a cable or a better connection will help more than a VPN."); }
+
+        // measuring...
+        inline const char* measuring_2() const { return Get("measuring..."); }
+
+        // Collecting the first numbers; this takes a few seconds.
+        inline const char* Collecting_the_first_numbers_this_takes_a_few_seconds() const { return Get("Collecting the first numbers; this takes a few seconds."); }
+
+        // no rollbacks yet
+        inline const char* no_rollbacks_yet() const { return Get("no rollbacks yet"); }
+
+        // No rollbacks have happened this match - that is good news: inputs are arriving in time. This fills in after the first rollback.
+        inline const char* No_rollbacks_have_happened_this_match_that_is_good_news_inputs_are_arriving_in_time_This_fills_in_after_the_first_rollback() const { return Get("No rollbacks have happened this match - that is good news: inputs are arriving in time. This fills in after the first rollback."); }
+
+        // The game measures the connection about once a second; the first numbers arrive shortly after the match starts.
+        inline const char* The_game_measures_the_connection_about_once_a_second_the_first_numbers_arrive_shortly_after_the_match_starts() const { return Get("The game measures the connection about once a second; the first numbers arrive shortly after the match starts."); }
+
+        // Steam is still measuring the ping to its servers; it starts when you enter online mode and takes a few seconds.
+        inline const char* Steam_is_still_measuring_the_ping_to_its_servers_it_starts_when_you_enter_online_mode_and_takes_a_few_seconds() const { return Get("Steam is still measuring the ping to its servers; it starts when you enter online mode and takes a few seconds."); }
+
+        // n/a (relayed)
+        inline const char* n_a_relayed() const { return Get("n/a (relayed)"); }
+
+        // Steam routes this connection through its own servers, so the two locations are not exchanged and this cannot be worked out.
+        inline const char* Steam_routes_this_connection_through_its_own_servers_so_the_two_locations_are_not_exchanged_and_this_cannot_be_worked_out() const { return Get("Steam routes this connection through its own servers, so the two locations are not exchanged and this cannot be worked out."); }
+
+        // waiting for opponent
+        inline const char* waiting_for_opponent_2() const { return Get("waiting for opponent"); }
+
+        // Needs the other player's rough location from Steam; it is exchanged while either of you has this window open and the connection is direct.
+        inline const char* Needs_the_other_player_s_rough_location_from_Steam_it_is_exchanged_while_either_of_you_has_this_window_open_and_the_connection_is_direct() const { return Get("Needs the other player's rough location from Steam; it is exchanged while either of you has this window open and the connection is direct."); }
+
+        // Needs the code of the other player's nearest Valve server; it is exchanged while either of you has this window open and the connection is direct.
+        inline const char* Needs_the_code_of_the_other_player_s_nearest_Valve_server_it_is_exchanged_while_either_of_you_has_this_window_open_and_the_connection_is_direct() const { return Get("Needs the code of the other player's nearest Valve server; it is exchanged while either of you has this window open and the connection is direct."); }
 
         // Show PC & connection stats
         inline const char* Show_PC_connection_stats() const { return Get("Show PC & connection stats"); }

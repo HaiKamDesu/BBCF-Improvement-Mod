@@ -110,7 +110,35 @@ namespace
 	bool HasResim(const Report& r) { return (r.flags & Flag_HasResim) != 0 && r.resimFrameAvgUs > 0; }
 	bool HasNet(const Report& r) { return (r.flags & Flag_HasNet) != 0; }
 
-	void Dash() { ImGui::TextColored(kDim, "-"); }
+	// A value that is not there yet for a normal reason, in plain grey words, with the reason
+	// in the tooltip. A bare "-" is kept for real failures only.
+	void Pending(const char* word, const char* why)
+	{
+		ImGui::TextColored(kDim, "%s", L(word).c_str());
+		if (why && *why && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_NoSharedDelay))
+			ImGui::SetTooltipWrapped(L(why).c_str());
+	}
+
+	void Measuring() { Pending("measuring...", "Collecting the first numbers; this takes a few seconds."); }
+	void NoRollbacksYet()
+	{
+		Pending("no rollbacks yet", "No rollbacks have happened this match - that is good news: inputs are arriving in time. This fills in after the first rollback.");
+	}
+	void NetMeasuring()
+	{
+		Pending("measuring...", "The game measures the connection about once a second; the first numbers arrive shortly after the match starts.");
+	}
+
+	// Resim-type values: either there were no rollbacks yet (good) or the frames are not in.
+	void NoResim(const Report& r)
+	{
+		if ((r.flags & Flag_HasFrames) != 0 && r.totalRollbacks == 0 && r.rollbackSamples == 0)
+			NoRollbacksYet();
+		else
+			Measuring();
+	}
+
+	void Dash() { Measuring(); }
 
 	// Every cell draws the same number of lines whatever the data, so the table does not
 	// jump when a value appears or a status changes.
@@ -141,6 +169,8 @@ namespace
 			ImGui::TextColored(kGood, "%s", L("Rollback: OK").c_str());
 		else if (capacity < 0)
 			ImGui::TextColored(kWarn, "%s", L("Rollback: may lag").c_str());
+		else if (r.totalRollbacks == 0 && r.rollbackSamples == 0)
+			ImGui::TextColored(kGood, "%s", L("Rollback: none yet").c_str());
 		else
 			ImGui::TextColored(kDim, "%s", L("Rollback: too few to judge").c_str());
 	}
@@ -156,7 +186,7 @@ namespace
 
 	void ResimCell(const Report& r)
 	{
-		if (!HasResim(r)) { Dash(); ImGui::Dummy(ImVec2(BarWidth(), 6.0f)); return; }
+		if (!HasResim(r)) { NoResim(r); ImGui::Dummy(ImVec2(BarWidth(), 6.0f)); return; }
 		const double percent = CapacityPercent(r.resimFrameAvgUs);
 		const int headroom = RollbackHeadroomFrames(r);
 		const int capacity = RollbackCapacityOk(r);
@@ -167,7 +197,7 @@ namespace
 
 	void PingCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::TextColored(PingColor(r.pingMs), "%u ms", (unsigned)r.pingMs);
 	}
 
@@ -201,14 +231,14 @@ namespace
 
 	void ResimCostCell(const Report& r)
 	{
-		if (!HasResim(r)) { Dash(); return; }
+		if (!HasResim(r)) { NoResim(r); return; }
 		ImGui::Text(L("%.2f ms + %.2f ms/frame").c_str(), r.resimLoadUs / 1000.0, r.resimFrameAvgUs / 1000.0);
 	}
 
 	void HeadroomCell(const Report& r)
 	{
 		const int headroom = RollbackHeadroomFrames(r);
-		if (headroom < 0) { Dash(); return; }
+		if (headroom < 0) { NoResim(r); return; }
 		const int capacity = RollbackCapacityOk(r);
 		const ImVec4 color = capacity < 0 ? kWarn : (capacity > 0 ? kGood : ImGui::GetStyleColorVec4(ImGuiCol_Text));
 		if (headroom >= 99)
@@ -225,43 +255,43 @@ namespace
 
 	void JitterCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::TextColored(r.jitterMs >= 20 ? kWarn : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%u ms", (unsigned)r.jitterMs);
 	}
 
 	void SilenceCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::TextColored(GapColor(r.maxRecvGapMs), "%u ms", (unsigned)r.maxRecvGapMs);
 	}
 
 	void PredictionCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::Text("%u f", (unsigned)r.maxPrediction);
 	}
 
 	void SendQueueCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::Text("%u", (unsigned)r.sendQueue);
 	}
 
 	void AdvantageCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::Text("%+d / %+d", (int)r.localFramesBehind, (int)r.remoteFramesBehind);
 	}
 
 	void RelayPingCell(const Report& r)
 	{
-		if (r.relayPingMs == 0) { Dash(); return; }
+		if (r.relayPingMs == 0) { Pending("measuring...", "Steam is still measuring the ping to its servers; it starts when you enter online mode and takes a few seconds."); return; }
 		ImGui::TextColored(r.relayPingMs >= kSlowLineRelayMs ? kWarn : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%u ms", (unsigned)r.relayPingMs);
 	}
 
 	void RouteCell(const Report& r)
 	{
-		if (!HasNet(r)) { Dash(); return; }
+		if (!HasNet(r)) { NetMeasuring(); return; }
 		ImGui::TextUnformatted((r.flags & Flag_UsingRelay) ? L("Steam relay").c_str() : L("Direct").c_str());
 	}
 
@@ -393,7 +423,7 @@ namespace
 		case Lag_Pc:              return "The game has to wait for the slower PC, so both players feel it. Closing other programs or lowering the graphics settings can help.";
 		case Lag_Unstable:        return "Messages from that side arrive with long pauses - usually Wi-Fi or someone else using the connection. A cable instead of Wi-Fi usually fixes it.";
 		case Lag_UnstableUnknown: return "Messages arrive unevenly. Wi-Fi or a busy connection on either side can do this; a cable instead of Wi-Fi is the first thing to try.";
-		case Lag_SlowLine:        return "That side's internet is slow to reach even Valve's nearest server. A cable helps; if it is already wired, a gaming VPN may find a faster route.";
+		case Lag_SlowLine:        return "That side's internet is slow to reach even Valve's nearest server. A cable helps if it is on Wi-Fi; otherwise it is the internet provider, or a long way to the nearest server.";
 		case Lag_Relayed:         return "Opening the game's ports on the router, or a VPN, can let Steam connect you directly, which usually lowers the ping.";
 		case Lag_Distance:        return "Both internet lines look fine; the delay is the distance between you. A VPN rarely helps here.";
 		case Lag_LongRoute:       return "Steam's map of where you both are says the ping could be clearly lower. See the recommendation below.";
@@ -467,6 +497,8 @@ namespace
 		std::string headerTip;
 		bool isLocal = false;
 		OpponentView view; // for a remote column
+		Report display = {}; // what the cells draw: the report, with pair-wide values shared
+		bool hasDisplay = false;
 	};
 
 	bool HasData(const PerfColumn& c) { return c.isLocal || c.view.state == Opp_Live || c.view.state == Opp_Stale; }
@@ -584,7 +616,32 @@ namespace
 
 	const Report* ReportOf(const PerfColumn& c)
 	{
+		if (c.hasDisplay)
+			return &c.display;
 		return c.isLocal ? &LocalReport() : (HasData(c) ? &c.view.report : nullptr);
+	}
+
+	// Steam's expected ping is one number for the pair: once either side has it, show it in
+	// both columns.
+	void ShareSymmetricValues(std::vector<PerfColumn>& columns)
+	{
+		for (PerfColumn& c : columns)
+		{
+			c.hasDisplay = false;
+			const Report* r = ReportOf(c);
+			if (r)
+			{
+				c.display = *r;
+				c.hasDisplay = true;
+			}
+		}
+		if (columns.size() == 2 && columns[0].hasDisplay && columns[1].hasDisplay)
+		{
+			Report& a = columns[0].display;
+			Report& b = columns[1].display;
+			if (!a.expectedPingMs) a.expectedPingMs = b.expectedPingMs;
+			if (!b.expectedPingMs) b.expectedPingMs = a.expectedPingMs;
+		}
 	}
 
 	const char* RouteCheckExplained()
@@ -605,8 +662,21 @@ namespace
 		switch (r.state)
 		{
 		case Route_Fine:
+		{
+			// The route is as short as the locations allow, but one side's own line can still be
+			// slow; a VPN does not shorten that, so say so instead of a bare "no VPN needed".
+			const bool slow0 = r.lastMile[0] >= kSlowLineRelayMs, slow1 = r.lastMile[1] >= kSlowLineRelayMs;
+			if (slow0 != slow1)
+			{
+				*color = kWarn;
+				return who(slow0 ? 0 : 1,
+					"Recommendation: no VPN needed - the route is as short as it can be. Your own line is slow to reach the internet; only a better connection lowers that.",
+					"Recommendation: no VPN needed - the route is as short as it can be. Your opponent's line is slow to reach the internet; only a better connection lowers that.",
+					"Recommendation: no VPN needed - the route is as short as it can be. %s's line is slow to reach the internet; only a better connection lowers that.");
+			}
 			*color = kGood;
 			return L("Recommendation: no VPN needed - the ping is what your locations allow.");
+		}
 		case Route_VpnSide:
 			*color = kBad;
 			return who(r.side,
@@ -644,13 +714,34 @@ namespace
 
 	void ExpectedPingCell(const Report& r)
 	{
-		if (!r.expectedPingMs) { ImGui::TextColored(kDim, "-"); return; }
+		if (!r.expectedPingMs)
+		{
+			if (r.flags & Flag_UsingRelay)
+				Pending("n/a (relayed)", "Steam routes this connection through its own servers, so the two locations are not exchanged and this cannot be worked out.");
+			else
+				Pending("waiting for opponent", "Needs the other player's rough location from Steam; it is exchanged while either of you has this window open and the connection is direct.");
+			return;
+		}
 		ImGui::Text("%u ms", (unsigned)r.expectedPingMs);
 	}
 
 	void RouteExcessCell(const Report& r)
 	{
-		if (!r.crossPingMs || !r.relayPingMs) { ImGui::TextColored(kDim, "-"); return; }
+		if (r.flags & Flag_UsingRelay)
+		{
+			Pending("n/a (relayed)", "Steam routes this connection through its own servers, so the two locations are not exchanged and this cannot be worked out.");
+			return;
+		}
+		if (!r.relayPingMs)
+		{
+			Pending("measuring...", "Steam is still measuring the ping to its servers; it starts when you enter online mode and takes a few seconds.");
+			return;
+		}
+		if (!r.crossPingMs)
+		{
+			Pending("waiting for opponent", "Needs the code of the other player's nearest Valve server; it is exchanged while either of you has this window open and the connection is direct.");
+			return;
+		}
 		const int excess = (std::max)(0, (int)r.crossPingMs - (int)r.relayPingMs);
 		ImGui::Text("%d ms", excess);
 	}
@@ -756,7 +847,8 @@ void PerfStatsWindow::Draw()
 
 void PerfStatsWindow::DrawStats()
 {
-	const Model m = BuildModel();
+	Model m = BuildModel();
+	ShareSymmetricValues(m.columns);
 	const Widths w = ComputeWidths();
 	ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w.table);
 
@@ -945,7 +1037,7 @@ void PerfStatsWindow::DrawStats()
 						if (HasData(m.columns[i]))
 							row.fn(*ReportOf(m.columns[i]));
 						else
-							Dash();
+							ImGui::TextColored(kDim, "%s", L(OpponentStateLabel(m.columns[i].view.state)).c_str());
 					}
 				}
 			}
@@ -1004,7 +1096,8 @@ std::string PerfStatsWindow::BuildStatsText() const
 		out += "\n";
 	}
 
-	const Model m = BuildModel();
+	Model m = BuildModel();
+	ShareSymmetricValues(m.columns);
 	if (m.hasVerdict)
 	{
 		out += L("If it lags, whose side is it on?") + " " + SideHeadline(m.verdict, m.who) + "\n";
