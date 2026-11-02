@@ -4,6 +4,7 @@
 #include "Core/interfaces.h"
 #include "Core/logger.h"
 #include "Core/utils.h"
+#include "Game/GhidraDefs.h"
 #include "Network/RoomManager.h"
 
 #include <Windows.h>
@@ -44,7 +45,34 @@ namespace
 		int musicChanges = 0;
 	};
 
+	// The GGPO backend the wrapper points at (+0). StartSession (0x783750) builds a
+	// Peer2PeerBackend and stores the local player's handle (1 = P1, 2 = P2) at wrapper+0x28;
+	// StartSpectating (0x783940) builds a SpectatorBackend whose one endpoint is the host (P1).
+	constexpr uintptr_t SPECTATOR_BACKEND_VTABLE_RVA = 0x00586098; // VA 0x00986098
+	constexpr uintptr_t MGR_LOCAL_HANDLE = 0x28;
+	constexpr uintptr_t SPECTATOR_HOST_ENDPOINT = 0x548;
+	constexpr uintptr_t EP_PEER_STEAM_ID = 0x08;
+
+	enum GameSeatKind { GameSeat_None, GameSeat_Player, GameSeat_Spectator, GameSeat_Unknown };
+
+	struct GameSeatView
+	{
+		uintptr_t backend;
+		int kind;
+		int handle;      // players: 1 or 2
+		uint64_t peer;   // players: the remote player; spectators: the host
+	};
+
+	struct MatchInitRole
+	{
+		bool valid = false;
+		bool spectator = false;
+		int index = -1;
+	};
+
 	Session g_session;
+	MatchInitRole g_matchInitRole;
+	uintptr_t g_seatCheckedBackend = 0;
 	std::string g_lastMusicChange;
 	int g_lastMusicChangeFrame = -1;
 
@@ -82,6 +110,128 @@ namespace
 		{
 			return false;
 		}
+	}
+
+	// No C++ objects in here: __try cannot unwind them.
+	bool ReadGameSeat(GameSeatView* out)
+	{
+		out->backend = 0;
+		out->kind = GameSeat_None;
+		out->handle = 0;
+		out->peer = 0;
+		__try
+		{
+			const uintptr_t base = (uintptr_t)GetBbcfBaseAdress();
+			const uintptr_t mgr = *(uintptr_t*)(base + ROLLBACK_MGR_PTR_RVA);
+			if (!mgr)
+				return false;
+			const uintptr_t backend = *(uintptr_t*)(mgr + OFF_GgpoMgrBackend);
+			if (!backend)
+				return false;
+
+			out->backend = backend;
+			const uintptr_t vtable = *(uintptr_t*)backend;
+			if (vtable == base + ADDR_GgpoPeer2PeerBackendVtable)
+			{
+				out->kind = GameSeat_Player;
+				out->handle = *(int*)(mgr + MGR_LOCAL_HANDLE);
+				const int count = *(int*)(backend + OFF_GgpoBackendNumEndpoints);
+				const uintptr_t endpoints = *(uintptr_t*)(backend + OFF_GgpoBackendEndpoints);
+				if (endpoints && count > 0 && count <= 8)
+				{
+					// The local player's endpoint is never initialised (no udp).
+					for (int i = 0; i < count; i++)
+					{
+						const uintptr_t ep = endpoints + (uintptr_t)i * SIZE_GgpoEndpoint;
+						if (*(uintptr_t*)(ep + OFF_GgpoEpUdp) != 0)
+						{
+							out->peer = *(uint64_t*)(ep + EP_PEER_STEAM_ID);
+							break;
+						}
+					}
+				}
+			}
+			else if (vtable == base + SPECTATOR_BACKEND_VTABLE_RVA)
+			{
+				out->kind = GameSeat_Spectator;
+				out->peer = *(uint64_t*)(backend + SPECTATOR_HOST_ENDPOINT + EP_PEER_STEAM_ID);
+			}
+			else
+			{
+				out->kind = GameSeat_Unknown;
+			}
+			return true;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			return false;
+		}
+	}
+
+	const char* RoleName(bool spectator, int index)
+	{
+		if (spectator)
+			return "spectator";
+		return index == 0 ? "P1" : (index == 1 ? "P2" : "P?");
+	}
+
+	// The seated member of our match on the given side, or 0.
+	uint64_t FindSeatedMember(RoomManager* room, int side)
+	{
+		const RoomMemberEntry* self = room->GetThisPlayerRoomMemberEntry();
+		if (!self)
+			return 0;
+		for (uint16_t i = 0; i < MAX_PLAYERS_IN_ROOM; i++)
+		{
+			const RoomMemberEntry* entry = room->GetRoomMemberEntryByIndex(i);
+			if (!entry || entry->steamId == 0 || entry->matchId != self->matchId)
+				continue;
+			if (RoomManager::IsSeatedEntry(entry) && (int)(entry->seatFlags & 1) == side)
+				return entry->steamId;
+		}
+		return 0;
+	}
+
+	void CheckSeat(const GameSeatView& game)
+	{
+		RoomManager* room = g_interfaces.pRoomManager;
+		if (!room || !room->IsRoomFunctional())
+			return;
+
+		const RoomMemberEntry* self = room->GetThisPlayerRoomMemberEntry();
+		RoomType roomType = (RoomType)0;
+		room->TryGetRoomType(&roomType);
+		const bool nowSpectator = room->IsThisPlayerSpectator();
+		const int nowIndex = nowSpectator ? -1 : (int)room->GetThisPlayerMatchPlayerIndex();
+
+		if (game.kind == GameSeat_Unknown)
+		{
+			LOG(0, "[SeatCheck] unknown GGPO backend class, cannot compare (room type 0x%02X)\n", (unsigned)roomType);
+			return;
+		}
+
+		const bool gameSpectator = game.kind == GameSeat_Spectator;
+		const int gameIndex = gameSpectator ? -1 : game.handle - 1;
+
+		// Players: the remote peer must be the seated member on the other side.
+		// Spectators: the host endpoint must be the seated P1 (only P1 adds spectators).
+		const uint64_t expectedPeer = gameSpectator ? FindSeatedMember(room, 0)
+			: (nowSpectator ? 0 : FindSeatedMember(room, nowIndex == 0 ? 1 : 0));
+
+		bool agree = nowSpectator == gameSpectator && nowIndex == gameIndex && expectedPeer == game.peer;
+		if (g_matchInitRole.valid)
+			agree = agree && g_matchInitRole.spectator == gameSpectator &&
+				(gameSpectator || g_matchInitRole.index == gameIndex);
+
+		const int level = agree ? 1 : 0;
+		LOG(level, "[SeatCheck] %s: game=%s peer=%llu | ours at match init=%s | ours now=%s expected peer=%llu"
+			" | room type 0x%02X seat %d flags 0x%X matchPlayerIndex %d\n",
+			agree ? "AGREE" : "MISMATCH",
+			RoleName(gameSpectator, gameIndex), (unsigned long long)game.peer,
+			g_matchInitRole.valid ? RoleName(g_matchInitRole.spectator, g_matchInitRole.index) : "not recorded",
+			RoleName(nowSpectator, nowIndex), (unsigned long long)expectedPeer,
+			(unsigned)roomType, self ? (int)self->memberIndex : -1, self ? self->seatFlags : 0u,
+			self ? (int)self->matchPlayerIndex : -1);
 	}
 
 	std::string DescribePeers()
@@ -128,8 +278,28 @@ namespace
 
 namespace DesyncDiagnostics
 {
+	void NoteMatchInitRole(bool spectator, int matchPlayerIndex)
+	{
+		g_matchInitRole.valid = true;
+		g_matchInitRole.spectator = spectator;
+		g_matchInitRole.index = matchPlayerIndex;
+	}
+
 	void Tick()
 	{
+		// Once per GGPO session, independent of the checker (a spectator may have none).
+		GameSeatView seat;
+		if (!ReadGameSeat(&seat))
+		{
+			g_seatCheckedBackend = 0;
+		}
+		else if (seat.backend != g_seatCheckedBackend)
+		{
+			g_seatCheckedBackend = seat.backend;
+			CheckSeat(seat);
+			g_matchInitRole = MatchInitRole();
+		}
+
 		CheckerView view;
 		if (!ReadChecker(&view))
 		{

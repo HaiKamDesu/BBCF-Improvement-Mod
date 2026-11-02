@@ -22,4 +22,10 @@ namespace DesyncDiagnostics
 	// A one-line description of a music change, kept so the next mismatch can name the last
 	// change before it. Also counted for the end-of-session summary.
 	void NoteMusicChange(const char* description);
+
+	// What MatchState::OnMatchInit decided about us (palettes.ini side, palette sends). When the
+	// game then builds its GGPO session, Tick logs a [SeatCheck] line comparing the two: player
+	// or spectator, P1 or P2, and who the remote peer is. The session is built from the game's
+	// own seat logic (0x4E5740), so a MISMATCH means our room reading is wrong.
+	void NoteMatchInitRole(bool spectator, int matchPlayerIndex);
 }

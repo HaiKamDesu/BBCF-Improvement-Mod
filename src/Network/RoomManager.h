@@ -71,6 +71,10 @@ public:
 	// Public since 2026-09-26: the ranked stale-room check reads slots directly.
 	const RoomMemberEntry* GetThisPlayerRoomMemberEntry() const;
 	const RoomMemberEntry* GetRoomMemberEntryByIndex(uint16_t index) const;
+	// Seated = playing (seatFlags bit1); side = bit0. The game's own rule, see RoomMemberEntry.
+	static bool IsSeatedEntry(const RoomMemberEntry* entry);
+	// 0 = P1, 1 = P2, above 1 = spectator.
+	uint16_t GetEntryMatchPlayerIndex(const RoomMemberEntry* entry) const;
 
 	std::vector<IMPlayer> GetIMPlayersInCurrentMatchNonSpec() const;
 	static RoomSettingsStatic* GetRoomSettingsStaticBaseAdress();
@@ -87,7 +91,7 @@ private:
 	uint16_t GetThisPlayerRoomMemberIndex() const;
 	bool IsPlayerInRoom(const IMPlayer& player) const;
 	bool IsThisPlayer(const uint64_t otherSteamID) const;
-	
+
 	const char* GetPlayerSteamName(uint64_t steamID) const;
 
 	std::vector<IMPlayer> m_imPlayers;

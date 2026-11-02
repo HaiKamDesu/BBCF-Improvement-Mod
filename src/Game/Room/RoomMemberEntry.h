@@ -11,7 +11,11 @@ public:
 	uint8_t N00009342; //0x0002
 	uint8_t N00009340; //0x0003
 	uint64_t steamId; //0x0004
-	char pad_000C[36]; //0x000C
+	char pad_000C[32]; //0x000C
+	// bit1 = seated as a player, bit0 = side (0 P1, 1 P2) when seated; unseated = spectator.
+	// The game's own rule (0x49A340, used by the battle session start 0x4E5740), in every room
+	// type. 0x1000 = in a match.
+	uint32_t seatFlags; //0x002C
 	uint32_t matchId; //0x0030
 	uint8_t matchPlayerIndex; //0x0034
 	uint8_t N00009349; //0x0035

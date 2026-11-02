@@ -190,7 +190,24 @@ bool RoomManager::IsThisPlayerSpectator() const
 {
 	LOG(7, "RoomManager::IsThisPlayerSpectator\n");
 
-	return GetThisPlayerRoomMemberEntry()->matchPlayerIndex > 1;
+	// Not matchPlayerIndex > 1: in a lobby (FFA) room that is the lobby seat (0-7), so a player
+	// at any cabinet but the first read as a spectator and skipped their palettes.
+	const RoomMemberEntry* entry = GetThisPlayerRoomMemberEntry();
+	return entry == nullptr || !IsSeatedEntry(entry);
+}
+
+bool RoomManager::IsSeatedEntry(const RoomMemberEntry* entry)
+{
+	return (entry->seatFlags & 2) != 0;
+}
+
+uint16_t RoomManager::GetEntryMatchPlayerIndex(const RoomMemberEntry* entry) const
+{
+	if (IsSeatedEntry(entry))
+		return (uint16_t)(entry->seatFlags & 1);
+
+	// Spectator: anything above 1. In a lobby room the seat is no answer, so use 2.
+	return (m_pRoom->roomType == RoomType_FFA) ? 2 : entry->matchPlayerIndex;
 }
 
 bool RoomManager::IsThisPlayerInMatch() const
@@ -214,26 +231,22 @@ uint16_t RoomManager::GetThisPlayerMatchPlayerIndex() const
 {
 	LOG(7, "RoomManager::GetThisPlayerMatchPlayerIndex\n");
 
-	if (m_pRoom->roomType == RoomType_FFA)
+	const RoomMemberEntry* entry = GetThisPlayerRoomMemberEntry();
+	if (entry && IsSeatedEntry(entry))
+		return GetEntryMatchPlayerIndex(entry);
+
+	if (m_pRoom->roomType == RoomType_FFA && m_pFFAThisPlayerIndex)
 		return *m_pFFAThisPlayerIndex;
 
-	return GetThisPlayerRoomMemberEntry()->matchPlayerIndex;
+	return entry ? entry->matchPlayerIndex : 2;
 }
 
 uint16_t RoomManager::GetPlayerMatchPlayerIndexByRoomMemberIndex(uint16_t index) const
 {
 	LOG(7, "RoomManager::GetPlayerMatchPlayerIndexByRoomMemberIndex\n");
 
-	// Resolve playerindex via m_pFFAThisPlayerIndex if room type is FFA
-	if (m_pRoom->roomType == RoomType_FFA)
-	{
-		if (index == GetThisPlayerRoomMemberIndex())
-			return *m_pFFAThisPlayerIndex;
-
-		return !*m_pFFAThisPlayerIndex;;
-	}
-
-	return GetRoomMemberEntryByIndex(index)->matchPlayerIndex;
+	const RoomMemberEntry* entry = GetRoomMemberEntryByIndex(index);
+	return entry ? GetEntryMatchPlayerIndex(entry) : 2;
 }
 
 const char* RoomManager::GetPlayerSteamName(uint64_t steamID) const
@@ -405,10 +418,8 @@ bool RoomManager::IsPacketFromSameMatch(Packet* packet) const
 // IsPacketFromSameMatch should be called beforehand
 bool RoomManager::IsPacketFromSpectator(Packet* packet) const
 {
-	if (m_pRoom->roomType == RoomType_FFA)
-		return false;
-
-	return GetRoomMemberEntryByIndex(packet->roomMemberIndex)->matchPlayerIndex > 1;
+	const RoomMemberEntry* entry = GetRoomMemberEntryByIndex(packet->roomMemberIndex);
+	return entry == nullptr || !IsSeatedEntry(entry);
 }
 
 uint16_t RoomManager::GetThisPlayerRoomMemberIndex() const

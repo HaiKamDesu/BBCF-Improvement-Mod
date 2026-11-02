@@ -3,6 +3,7 @@
 #include "Audio/MusicManager.h"
 #include "Core/interfaces.h"
 #include "Core/logger.h"
+#include "Game/DesyncDiagnostics.h"
 #include "Game/gamestates.h"
 #include "Game/NetworkStallDiagnostics.h"
 #include "Game/Playbacks/UnlimitedPlaybackManager.h"
@@ -96,6 +97,7 @@ void MatchState::OnMatchInit()
 			const uint16_t thisPlayerMatchPlayerIndex = g_interfaces.pRoomManager->GetThisPlayerMatchPlayerIndex();
 			applyIniP1 = !spectator && thisPlayerMatchPlayerIndex == 0;
 			applyIniP2 = !spectator && thisPlayerMatchPlayerIndex == 1;
+			DesyncDiagnostics::NoteMatchInitRole(spectator, spectator ? -1 : (int)thisPlayerMatchPlayerIndex);
 		}
 
 		g_interfaces.pPaletteManager->LoadPaletteSettingsFile();
