@@ -49,8 +49,8 @@ struct Packet;
 	acknowledge) advertised kModCap_PerformanceReport - so never to a vanilla client and never
 	to an older mod build. Always on (there is no opt-out setting since 2026-10-24; the payload
 	is audited to carry only frame-time/connection numbers, see the field list below):
-	  - player -> opponent: the 72-byte report, 1 Hz, while either of the two has the
-	    PC & connection stats window open;
+	  - player -> opponent: the 80-byte report, 1 Hz, while either of the two has the
+	    PC & connection stats window open or shows the connection icons;
 	  - spectator -> each player: an 8-byte request (Flag_WantsReports, no numbers), 1 Hz,
 	    while the spectator has the stats window open;
 	  - player -> spectator: the 72-byte report, 1 Hz, only while that spectator's requests
@@ -177,8 +177,9 @@ namespace PerformanceMonitor
 		Flag_HasResim = 1 << 1,
 		Flag_HasNet = 1 << 2,
 		Flag_UsingRelay = 1 << 3,
-		Flag_WantsReports = 1 << 4, // sender has the stats window open
+		Flag_WantsReports = 1 << 4, // sender has the stats window open, or shows the connection icons
 		Flag_HaveYourLocation = 1 << 5, // sender holds the receiver's ping location (stop re-sending it)
+		Flag_WantsRoute = 1 << 6,   // sender has the stats window open (kModCap_RouteRequestFlag peers only)
 	};
 
 	enum OpponentState
@@ -246,6 +247,10 @@ namespace PerformanceMonitor
 	// the exchange on (for the opponent, and for a spectator asking the players) and off again
 	// ~1.5 s after it closes.
 	void NoteStatsWindowOpen();
+	// The on-screen connection icons call this every frame they are drawn. Like the window it
+	// turns the report exchange on, but not the ping-location exchange (the route check),
+	// which stays tied to the window being open on either side.
+	void NoteWidgetsVisible();
 
 	const Report& LocalReport();
 	OpponentView GetOpponentView();     // players

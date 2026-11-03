@@ -21,6 +21,7 @@
 #include "Window/Ranked/RankedProgressWindow.h"
 #include "Window/RoomWindow.h"
 #include "Window/PerfStatsWindow.h"
+#include "Window/ConnectionIcons.h"
 #include "Window/UnlimitedPlaybackWindow.h"
 #include "Window/WinePopupWindow.h"
 
@@ -964,6 +965,7 @@ void WindowManager::Render()
 	UnlimitedPlaybackManager::Instance().RunDeferredSetup();
 	DrawRankedProgressOverlayStandalone();
 	DrawNetworkSquareColorProgressStandalone();
+	DrawConnectionIconsStandalone(m_windowContainer->GetWindow(WindowType_Main)->IsOpen());
 	DrawUnlimitedPlaybackLoopSetupIndicatorStandalone();
 	DrawSaveStateSetupDelayStandalone();
 #if BBCF_ENABLE_UNLIMITED_REPLAY_TAKEOVER

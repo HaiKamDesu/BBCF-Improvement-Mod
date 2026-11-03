@@ -40,7 +40,7 @@ void RoomManager::SendAcknowledgeTo(const CSteamID& to, bool replyWanted)
 	info.magic = kModInfoMagic;
 	info.infoVersion = 1;
 	info.flags = replyWanted ? kModInfo_ReplyWanted : 0;
-	info.caps = kModCap_PerformanceReport;
+	info.caps = kModCap_PerformanceReport | kModCap_RouteRequestFlag;
 	strncpy_s(info.version, sizeof(info.version), MOD_VERSION, _TRUNCATE);
 
 	Packet ackPacket = Packet(&info, (uint16_t)sizeof(info), PacketType_IMID_Acknowledge, GetThisPlayerRoomMemberIndex());
@@ -108,7 +108,7 @@ void RoomManager::JoinRoom(Room* pRoom)
 
 	IMPlayer thisPlayer = IMPlayer(GetThisPlayerRoomMemberIndex(), m_thisPlayerSteamID.ConvertToUint64(), GetPlayerSteamName(m_thisPlayerSteamID.ConvertToUint64()));
 	thisPlayer.modVersion = MOD_VERSION;
-	thisPlayer.modCaps = kModCap_PerformanceReport;
+	thisPlayer.modCaps = kModCap_PerformanceReport | kModCap_RouteRequestFlag;
 	thisPlayer.versionKnown = true;
 	AddIMPlayerToRoom(thisPlayer);
 

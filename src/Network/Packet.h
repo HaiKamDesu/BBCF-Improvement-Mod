@@ -41,6 +41,10 @@ enum PacketType : uint16_t
 constexpr uint32_t kModInfoMagic = 0x49564D49; // "IMVI"
 constexpr uint8_t kModInfo_ReplyWanted = 1 << 0;
 constexpr uint16_t kModCap_PerformanceReport = 1 << 0;
+// Sets PerformanceMonitor's Flag_WantsRoute while its stats window is open, so Flag_WantsReports
+// alone (the on-screen connection icons) does not start the ping-location exchange. A peer
+// without this bit sets Flag_WantsReports only from the window, and is read that way.
+constexpr uint16_t kModCap_RouteRequestFlag = 1 << 1;
 
 #pragma pack(push, 1)
 struct ModVersionInfo

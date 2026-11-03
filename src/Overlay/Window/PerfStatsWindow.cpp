@@ -1,5 +1,7 @@
 #include "PerfStatsWindow.h"
 
+#include "Overlay/Window/ConnectionIcons.h"
+
 #include "Core/info.h"
 #include "Core/Localization.h"
 #include "Core/Settings.h"
@@ -841,6 +843,7 @@ void PerfStatsWindow::Draw()
 	WrappedTip(L("Copies what this window says, with each player's mod version and all the numbers, as text ready to paste into Discord.").c_str());
 	ImGui::SameLine();
 	ImGui::TextDisabled("%s", MOD_VERSION);
+	DrawConnectionIconsControls();
 
 	DrawStats();
 }
@@ -1061,7 +1064,7 @@ void PerfStatsWindow::DrawStats()
 		bool test = IsSpectatorTestMode();
 		if (ImGui::Checkbox((L("Test: spectator view with fake players") + "##perf_spectest").c_str(), &test))
 			SetSpectatorTestMode(test);
-		WrappedTip(L("In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds.").c_str());
+		WrappedTip(L("In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through ten situations every 6 seconds (the connection icons follow it too).").c_str());
 	}
 	ImGui::PopTextWrapPos();
 }

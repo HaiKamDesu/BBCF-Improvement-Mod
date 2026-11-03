@@ -68,6 +68,13 @@ SETTING(int, crashDumpDetail, "CrashDumpDetail", "1");
 // every bundle forever, which is the behaviour that let the folder grow unbounded.
 SETTING(int, crashReportsToKeep, "CrashReportsToKeep", "5");
 SETTING(bool, showRankedProgress, "ShowRankedProgress", "0");
+// Connection icons: a PC icon and a Wi-Fi/wired icon per player, green to red, drawn during online
+// matches (players and spectators) from the PC & connection stats numbers. Turning them on also
+// turns on the 1 Hz report exchange with the other side (not the route check). Each icon is its
+// own window; positions are kept in menus.ini. Size is the icon height in pixels.
+SETTING(bool, connectionIcons, "ConnectionIcons", "0");
+SETTING(int, connectionIconsSize, "ConnectionIconsSize", "22");
+SETTING(bool, connectionIconsLocked, "ConnectionIconsLocked", "0");
 SETTING(bool, showSquareColorProgress, "ShowSquareColorProgress", "0");
 SETTING(bool, showRankedPrediction, "ShowRankedPrediction", "1");
 SETTING(bool, rankedProgressShowMatches, "RankedProgressShowMatches", "1");

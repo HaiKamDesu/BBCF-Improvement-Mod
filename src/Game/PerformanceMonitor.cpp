@@ -695,8 +695,14 @@ namespace
 	bool g_onlinePlayer = false;
 	bool g_spectating = false;
 	bool g_spectatorTest = false; // dev-only offline injection, see SetSpectatorTestMode
+	long long g_spectatorTestStart = 0;
+	int g_spectatorTestScenario = 0;
+	int g_spectatorTestLastScenario = -1;
+	constexpr int kSpectatorTestScenarios = 10;
+	constexpr int kSpectatorTestNoModScenario = 9; // P2 shows as a player without the mod
 
 	long long g_sectionVisibleAt = 0; // last frame the stats window was open
+	long long g_widgetsVisibleAt = 0; // last frame the connection icons were drawn
 	bool g_sessionDirect = false;     // the game's Steam P2P session with the opponent is direct
 	long long g_linkCheckedMatchStart = -1;
 	long long g_wantingSince = 0;     // when we started asking, for "not sharing"
@@ -711,6 +717,7 @@ namespace
 		uint8_t side;       // 0 = P1, 1 = P2, 2 = spectator
 		bool hasMod;
 		bool capable;       // advertised kModCap_PerformanceReport in its acknowledge
+		bool routeFlagAware; // advertised kModCap_RouteRequestFlag: Flag_WantsRoute is meaningful
 	};
 	constexpr int kMaxPeers = MAX_PLAYERS_IN_ROOM;
 	Peer g_peers[kMaxPeers] = {};
@@ -726,6 +733,7 @@ namespace
 		long long receivedAt; // last full report
 		uint32_t received;
 		long long wantsAt;    // last packet from it with Flag_WantsReports
+		long long wantsRouteAt; // last packet from it asking for the route check (its window is open)
 	};
 	RemoteState g_remotes[kMaxPeers] = {};
 	bool g_loggedFirstReportThisMatch = false;
@@ -766,9 +774,33 @@ namespace
 		return oldest;
 	}
 
-	bool LocalWantsReports(long long now)
+	// The route check (ping-location exchange) needs the window itself; reports also flow for
+	// the connection icons.
+	bool LocalWantsRoute(long long now)
 	{
 		return g_sectionVisibleAt != 0 && SecondsSince(g_sectionVisibleAt, now) < 1.5;
+	}
+
+	bool LocalWantsReports(long long now)
+	{
+		return LocalWantsRoute(now) ||
+			(g_widgetsVisibleAt != 0 && SecondsSince(g_widgetsVisibleAt, now) < 1.5);
+	}
+
+	bool PeerWantsRoute(uint64_t steamId, long long now)
+	{
+		const RemoteState* r = FindRemote(steamId);
+		return r && r->wantsRouteAt != 0 && SecondsSince(r->wantsRouteAt, now) < 2.5;
+	}
+
+	// Whether this peer's build sets Flag_WantsRoute; an older one sets Flag_WantsReports only
+	// from its stats window, so that flag alone already means "window open".
+	bool PeerKnowsRouteFlag(uint64_t steamId)
+	{
+		for (int i = 0; i < g_peerCount; ++i)
+			if (g_peers[i].steamId == steamId)
+				return g_peers[i].routeFlagAware;
+		return false;
 	}
 
 	// A peer that wants our reports re-asks every second while its section is open, so 2.5 s
@@ -794,6 +826,9 @@ namespace
 		const long long now = Now();
 		if (report.flags & Flag_WantsReports)
 			r->wantsAt = now;
+		if ((report.flags & Flag_WantsRoute) ||
+			((report.flags & Flag_WantsReports) && !PeerKnowsRouteFlag(steamId)))
+			r->wantsRouteAt = now;
 		// A request-only packet (a spectator asking, or a truncated header) carries no numbers.
 		if (!fullReportAllowed || (report.flags & Flag_HasFrames) == 0)
 			return;
@@ -973,6 +1008,8 @@ namespace
 		}
 		if (LocalWantsReports(now))
 			r.flags |= Flag_WantsReports;
+		if (LocalWantsRoute(now))
+			r.flags |= Flag_WantsRoute;
 
 		g_local = r;
 	}
@@ -997,8 +1034,9 @@ namespace
 				p.steamId = 0x0110000100000001ULL + (uint64_t)side;
 				p.memberIndex = (uint16_t)side;
 				p.side = (uint8_t)side;
-				p.hasMod = true;
-				p.capable = true;
+				p.hasMod = !(side == 1 && g_spectatorTestScenario == kSpectatorTestNoModScenario);
+				p.capable = p.hasMod;
+				p.routeFlagAware = p.hasMod;
 				g_playerPeer[side] = g_peerCount++;
 			}
 			return;
@@ -1016,9 +1054,9 @@ namespace
 		if (!self || self->matchId == 0)
 			return;
 
-		RoomType roomType = RoomType_Lobby;
-		const bool ffa = room->TryGetRoomType(&roomType) && roomType == RoomType_FFA;
-		const bool selfSpectating = !ffa && self->matchPlayerIndex > 1;
+		// Seated or watching, and which side: the game's own seat flags (RoomMemberEntry), which
+		// also hold in lobby (FFA) rooms, where matchPlayerIndex is just the lobby seat.
+		const bool selfSpectating = !RoomManager::IsSeatedEntry(self);
 		g_spectating = selfSpectating;
 		g_onlinePlayer = !selfSpectating;
 
@@ -1029,20 +1067,19 @@ namespace
 				continue;
 			if (entry->matchId != self->matchId)
 				continue;
-			const bool entryIsPlayer = ffa || entry->matchPlayerIndex <= 1;
-			// A spectator only exchanges with the two players; FFA has no spectators here.
+			const bool entryIsPlayer = RoomManager::IsSeatedEntry(entry);
+			// A spectator only exchanges with the two players.
 			if (selfSpectating && !entryIsPlayer)
-				continue;
-			if (!selfSpectating && !entryIsPlayer && ffa)
 				continue;
 
 			Peer& p = g_peers[g_peerCount];
 			p.steamId = entry->steamId;
 			p.memberIndex = entry->memberIndex;
-			p.side = entryIsPlayer ? (uint8_t)(ffa ? (g_opponentPeer < 0 ? 1 : 0) : entry->matchPlayerIndex) : 2;
+			p.side = entryIsPlayer ? (uint8_t)(entry->seatFlags & 1) : 2;
 			IMPlayer imPlayer;
 			p.hasMod = room->FindIMPlayer(entry->steamId, &imPlayer);
 			p.capable = p.hasMod && imPlayer.versionKnown && (imPlayer.modCaps & kModCap_PerformanceReport) != 0;
+			p.routeFlagAware = p.capable && (imPlayer.modCaps & kModCap_RouteRequestFlag) != 0;
 
 			if (!selfSpectating && entryIsPlayer && g_opponentPeer < 0)
 				g_opponentPeer = g_peerCount;
@@ -1138,7 +1175,7 @@ namespace
 		const Peer& opp = g_peers[g_opponentPeer];
 		if (!opp.capable)
 			return;
-		if (!localWants && !PeerWantsReports(opp.steamId, now))
+		if (!localWants && !PeerWantsRoute(opp.steamId, now))
 			return;
 		// Re-check right before sending rather than trusting the 500 ms cache.
 		P2PSessionState_t state = {};
@@ -1219,7 +1256,7 @@ namespace
 
 		if (!g_onlinePlayer || (g_local.flags & Flag_HasFrames) == 0)
 			return;
-		MaybeSendPingLocation(now, localWants);
+		MaybeSendPingLocation(now, LocalWantsRoute(now));
 		for (int i = 0; i < g_peerCount; ++i)
 		{
 			const Peer& peer = g_peers[i];
@@ -1282,11 +1319,9 @@ namespace
 	// 6 no rollbacks yet + only P2 has Steam's expected ping (shown in both columns),
 	// 7 a location received before this PC's relay data is ready: this PC's own location is
 	//   pushed through IngestPingLocation (the real receive/parse path) with the relay number
-	//   hidden, and P1's expected/region ping come from the real Steam calls on it.
-	long long g_spectatorTestStart = 0;
-	int g_spectatorTestScenario = 0;
-	int g_spectatorTestLastScenario = -1;
-	constexpr int kSpectatorTestScenarios = 8;
+	//   hidden, and P1's expected/region ping come from the real Steam calls on it,
+	// 8 P2's PC cannot hold 60 FPS, 9 P2 does not run the mod (its peer entry says so; see
+	//   RefreshOnlineContext), for the connection icons' grey question mark.
 
 	void IngestPingLocation(uint64_t steamId, const char* src, uint32_t length, uint32_t pop); // below
 
@@ -1370,6 +1405,10 @@ namespace
 			p1.crossPingMs = (uint16_t)(g_peerLocationValid ? g_crossPingMs : 0);
 			p1.relayPingMs = (uint16_t)g_relayPingMs;
 			p2.expectedPingMs = 0;
+			break;
+		case 8:
+			p2.gameDrawP90Us = 21000; p2.gameDrawAvgUs = 19000; p2.gameDrawMaxUs = 30000;
+			p2.intervalAvgUs = 20000; // ~50 FPS
 			break;
 		default:
 			break;
@@ -1658,9 +1697,7 @@ void PerformanceMonitor::OnPingLocationPacket(Packet* packet)
 	const RoomMemberEntry* const sender = room->GetRoomMemberEntryByIndex(packet->roomMemberIndex);
 	if (!sender || sender == self || sender->steamId != packet->steamID || sender->matchId != self->matchId)
 		return;
-	RoomType roomType = RoomType_Lobby;
-	const bool ffa = room->TryGetRoomType(&roomType) && roomType == RoomType_FFA;
-	if (!ffa && (self->matchPlayerIndex > 1 || sender->matchPlayerIndex > 1))
+	if (!RoomManager::IsSeatedEntry(self) || !RoomManager::IsSeatedEntry(sender))
 		return;
 
 	if (packet->dataSize < sizeof(PingLocationHeader) + 1 || packet->dataSize > MAX_DATA_SIZE)
@@ -1823,10 +1860,8 @@ void PerformanceMonitor::OnReportPacket(Packet* packet)
 	if (!sender || sender == self || sender->steamId != packet->steamID || sender->matchId != self->matchId)
 		return;
 
-	RoomType roomType = RoomType_Lobby;
-	const bool ffa = room->TryGetRoomType(&roomType) && roomType == RoomType_FFA;
-	const bool selfPlays = ffa || self->matchPlayerIndex <= 1;
-	const bool senderPlays = ffa || sender->matchPlayerIndex <= 1;
+	const bool selfPlays = RoomManager::IsSeatedEntry(self);
+	const bool senderPlays = RoomManager::IsSeatedEntry(sender);
 	if (!selfPlays && !senderPlays)
 		return;
 
@@ -1837,6 +1872,12 @@ void PerformanceMonitor::NoteStatsWindowOpen()
 {
 	if (g_qpcFreq != 0)
 		g_sectionVisibleAt = Now();
+}
+
+void PerformanceMonitor::NoteWidgetsVisible()
+{
+	if (g_qpcFreq != 0)
+		g_widgetsVisibleAt = Now();
 }
 
 const PerformanceMonitor::Report& PerformanceMonitor::LocalReport()

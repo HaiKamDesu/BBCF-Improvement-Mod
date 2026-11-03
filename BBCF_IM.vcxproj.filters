@@ -239,6 +239,7 @@
     <ClCompile Include="src\Network\ProfileBlobSeal.cpp" />
     <ClCompile Include="src\Network\ProfileSync.cpp" />
     <ClCompile Include="src\Core\SaveDataSafety.cpp" />
+    <ClCompile Include="src\Overlay\Window\ConnectionIcons.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
     <ClCompile Include="src\Palette\CharPaletteHandle.cpp" />
@@ -544,6 +545,7 @@
     <ClInclude Include="src\Network\ProfileBlobSeal.h" />
     <ClInclude Include="src\Network\ProfileSync.h" />
     <ClInclude Include="src\Core\SaveDataSafety.h" />
+    <ClInclude Include="src\Overlay\Window\ConnectionIcons.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />
     <ClInclude Include="src\Game\Room\RoomMemberEntry.h" />

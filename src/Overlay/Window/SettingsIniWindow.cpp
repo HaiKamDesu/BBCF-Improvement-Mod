@@ -58,6 +58,9 @@ namespace {
 		{ "ProfileBackup", "Back up your network profile", "Ranked", "Keeps an encrypted copy of your network profile, refreshed every time the server confirms it. It is only used if the server ever says it has no profile for you at all. Leave it on." },
 		{ "ProfileSyncTestFailures", "Fail profile downloads (testing)", "Debug", "TESTING ONLY. Makes the next N network profile downloads fail, to check the retries and the retry dialog. Leave at 0." },
 		{ "ShowRankedProgress", "Show ranked progress", "Ranked", "Shows a small overlay with your ranked stats while you are in ranked." },
+		{ "ConnectionIcons", "Show connection icons", "Connection icons", "During online matches, shows a small PC icon and a connection icon (Wi-Fi or wired) for each player, green when fine, orange when borderline, red when it is the cause of lag, grey when unknown. Hover one for the numbers. The other player's icons need them to run this mod too." },
+		{ "ConnectionIconsSize", "Connection icon size", "Connection icons", "Height of each connection icon in pixels (12 to 256). Easier: drag the corner of any icon, all four follow." },
+		{ "ConnectionIconsLocked", "Lock connection icon positions", "Connection icons", "Stops the icons from being moved or resized by accident. Also in the PC & connection stats window (Ctrl+F2)." },
 		{ "ShowSquareColorProgress", "Show net colour progress", "Ranked", "Shows how close you are to the next net colour (the coloured square next to your name)." },
 		{ "ShowRankedPrediction", "Show ranked prediction", "Ranked", "Before a ranked match, shows how much rank you stand to gain or lose." },
 		{ "RankedProgressShowMatches", "Show match count", "Ranked", "Include your total number of matches in the ranked overlay." },
@@ -265,6 +268,7 @@ namespace {
 		{ "Playback loop",         SPage_Training },
 
 		{ "Netcode",               SPage_Online },
+		{ "Connection icons",      SPage_Online },
 		{ "Lobby",                 SPage_Online },
 		{ "Ranked",                SPage_Online },
 		{ "Ranked list",           SPage_Online },

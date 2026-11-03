@@ -50,7 +50,7 @@ namespace MainMenu
 			{ Page_Online, Item_Group,   "Lobby avatar",                        "avatar icon color accessory lobby" },
 			{ Page_Online, Item_Loose,   "Load other players' custom palettes", "foreign palettes crash ranked stability stopgap" },
 			{ Page_Online, Item_Loose,   "Online input delay",                  "delay frames netcode rollback ggpo lag ping input" },
-			{ Page_Online, Item_Loose,   "Show PC & connection stats",          "pc performance fps resim rollback lag ping jitter connection slow computer opponent tournament game draw version" },
+			{ Page_Online, Item_Loose,   "Show PC & connection stats",          "pc performance fps resim rollback lag ping jitter connection slow computer opponent tournament game draw version icons wifi cable hud" },
 
 			{ Page_Replays, Item_Section, "Rewind",           "rewind replay theater scrub back extras window" },
 			{ Page_Replays, Item_Section, "Replay files",     "local replays load archive replay theater database download" },
