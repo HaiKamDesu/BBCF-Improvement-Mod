@@ -1266,8 +1266,19 @@ namespace
 			// The opponent gets it while either of us looks; a spectator only while it does.
 			const bool send = isOpponent ? (localWants || PeerWantsReports(peer.steamId, now))
 				: PeerWantsReports(peer.steamId, now);
-			if (send)
+			if (!send)
+				continue;
+			// A build without kModCap_RouteRequestFlag reads Flag_WantsReports as "stats window
+			// open" and starts the route check on it, so only the window may set it for that
+			// peer, never the connection icons alone.
+			if (peer.routeFlagAware || (g_local.flags & Flag_WantsRoute))
 				SendTo(peer, &g_local, (uint16_t)sizeof(g_local));
+			else
+			{
+				Report legacy = g_local;
+				legacy.flags = (uint8_t)(legacy.flags & ~Flag_WantsReports);
+				SendTo(peer, &legacy, (uint16_t)sizeof(legacy));
+			}
 		}
 	}
 
