@@ -209,4 +209,85 @@ namespace FirewallMirror
 		policy->Release();
 		return missing;
 	}
+
+	// The rules naming `program` (the copies Mirror made), for uninstall. With apply, removes
+	// them (needs admin rights). Returns how many were found, or -1 if the firewall could not be
+	// read. The caller initialises COM.
+	//
+	// INetFwRules::Remove takes a name, and the copies carry the names of BBCF.exe's own rules,
+	// so each copy is first renamed to something unique and removed by that name: removing by
+	// the shared name could take BBCF.exe's rule instead.
+	inline int RemoveFor(const std::wstring& program, bool apply, std::wstring* report, int* removed = nullptr)
+	{
+		if (removed)
+			*removed = 0;
+		INetFwPolicy2* policy = nullptr;
+		if (FAILED(CoCreateInstance(__uuidof(NetFwPolicy2), nullptr, CLSCTX_INPROC_SERVER, __uuidof(INetFwPolicy2), reinterpret_cast<void**>(&policy))))
+			return -1;
+		INetFwRules* rules = nullptr;
+		IUnknown* enumUnknown = nullptr;
+		IEnumVARIANT* enumerator = nullptr;
+		if (FAILED(policy->get_Rules(&rules)) || FAILED(rules->get__NewEnum(&enumUnknown)) ||
+			FAILED(enumUnknown->QueryInterface(__uuidof(IEnumVARIANT), reinterpret_cast<void**>(&enumerator))))
+		{
+			if (enumUnknown) enumUnknown->Release();
+			if (rules) rules->Release();
+			policy->Release();
+			return -1;
+		}
+
+		std::vector<INetFwRule*> matches;
+		VARIANT item;
+		VariantInit(&item);
+		ULONG fetched = 0;
+		while (enumerator->Next(1, &item, &fetched) == S_OK && fetched == 1)
+		{
+			INetFwRule* rule = nullptr;
+			if (item.vt == VT_DISPATCH && item.pdispVal &&
+				SUCCEEDED(item.pdispVal->QueryInterface(__uuidof(INetFwRule), reinterpret_cast<void**>(&rule))))
+			{
+				BSTR app = nullptr;
+				rule->get_ApplicationName(&app);
+				if (SamePath(app, program))
+					matches.push_back(rule), rule = nullptr;
+				SysFreeString(app);
+				if (rule)
+					rule->Release();
+			}
+			VariantClear(&item);
+		}
+		enumerator->Release();
+		enumUnknown->Release();
+
+		const int found = static_cast<int>(matches.size());
+		for (size_t i = 0; i < matches.size(); ++i)
+		{
+			INetFwRule* rule = matches[i];
+			const std::wstring signature = Signature(rule);
+			HRESULT hr = S_OK;
+			if (apply)
+			{
+				wchar_t unique[96] = {};
+				swprintf_s(unique, L"BBCF_IM uninstall %lu-%zu", GetTickCount(), i);
+				BSTR name = SysAllocString(unique);
+				hr = rule->put_Name(name);
+				if (SUCCEEDED(hr))
+					hr = rules->Remove(name);
+				SysFreeString(name);
+				if (SUCCEEDED(hr) && removed)
+					++*removed;
+			}
+			if (report)
+			{
+				wchar_t code[32] = {};
+				if (FAILED(hr))
+					swprintf_s(code, L" (hr=0x%08lX)", static_cast<unsigned long>(hr));
+				*report += (apply ? (SUCCEEDED(hr) ? L"removed: " : L"FAILED to remove: ") : L"found: ") + signature + code + L"\r\n";
+			}
+			rule->Release();
+		}
+		rules->Release();
+		policy->Release();
+		return found;
+	}
 }

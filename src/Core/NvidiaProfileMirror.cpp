@@ -14,6 +14,7 @@ namespace
 	constexpr unsigned kCreateApplication = 0x4347A9DE;
 	constexpr unsigned kSaveSettings = 0xFCBC7E14;
 	constexpr unsigned kDestroySession = 0xDAD9CFF8;
+	constexpr unsigned kDeleteApplication = 0x2C694BC6;
 	constexpr int kExecutableNotFound = -166; // NVAPI_EXECUTABLE_NOT_FOUND
 
 #pragma pack(push, 8)
@@ -31,6 +32,8 @@ namespace
 #pragma pack(pop)
 
 	using QueryInterface_t = void*(__cdecl*)(unsigned);
+
+	const wchar_t* const kCopyFriendlyName = L"BlazBlue Centralfiction (4 GB mode)";
 
 	std::unique_ptr<DrsApplication> NewApplication()
 	{
@@ -88,7 +91,7 @@ namespace NvidiaProfileMirror
 			{
 				auto entry = NewApplication();
 				wcscpy_s(entry->appName, L"bbcf_im_4gb.exe");
-				wcscpy_s(entry->userFriendlyName, L"BlazBlue Centralfiction (4 GB mode)");
+				wcscpy_s(entry->userFriendlyName, kCopyFriendlyName);
 				if (createApplication(session, gameProfile, entry.get()) != 0)
 					result = "could not add BBCF_IM_4GB.exe to BBCF's NVIDIA profile";
 				else if (saveSettings(session) != 0)
@@ -97,6 +100,50 @@ namespace NvidiaProfileMirror
 					result = "added BBCF_IM_4GB.exe to BBCF's NVIDIA profile";
 			}
 		}
+		destroySession(session);
+		return result;
+	}
+
+	const char* Remove()
+	{
+		HMODULE nvapi = LoadLibraryW(L"nvapi.dll");
+		if (!nvapi)
+			return "no NVIDIA driver; nothing to remove";
+		auto query = reinterpret_cast<QueryInterface_t>(GetProcAddress(nvapi, "nvapi_QueryInterface"));
+		if (!query)
+			return "nvapi.dll has no nvapi_QueryInterface; left alone";
+
+		auto initialize = reinterpret_cast<int(__cdecl*)()>(query(kInitialize));
+		auto createSession = reinterpret_cast<int(__cdecl*)(void**)>(query(kCreateSession));
+		auto loadSettings = reinterpret_cast<int(__cdecl*)(void*)>(query(kLoadSettings));
+		auto findApplication = reinterpret_cast<int(__cdecl*)(void*, const wchar_t*, void**, DrsApplication*)>(query(kFindApplicationByName));
+		auto deleteApplication = reinterpret_cast<int(__cdecl*)(void*, void*, const wchar_t*)>(query(kDeleteApplication));
+		auto saveSettings = reinterpret_cast<int(__cdecl*)(void*)>(query(kSaveSettings));
+		auto destroySession = reinterpret_cast<int(__cdecl*)(void*)>(query(kDestroySession));
+		if (!initialize || !createSession || !loadSettings || !findApplication ||
+			!deleteApplication || !saveSettings || !destroySession)
+			return "NVAPI driver settings calls unavailable; left alone";
+		if (initialize() != 0)
+			return "NVAPI did not initialise; left alone";
+
+		void* session = nullptr;
+		if (createSession(&session) != 0 || !session)
+			return "could not open the NVIDIA settings; left alone";
+		const char* result = nullptr;
+		void* profile = nullptr;
+		auto app = NewApplication();
+		if (loadSettings(session) != 0)
+			result = "could not load the NVIDIA settings; left alone";
+		else if (findApplication(session, L"bbcf_im_4gb.exe", &profile, app.get()) != 0 || !profile)
+			result = "BBCF_IM_4GB.exe is in no NVIDIA profile; nothing to remove";
+		else if (wcscmp(app->userFriendlyName, kCopyFriendlyName) != 0)
+			result = "BBCF_IM_4GB.exe's NVIDIA entry was not made by the mod; left alone";
+		else if (deleteApplication(session, profile, L"bbcf_im_4gb.exe") != 0)
+			result = "could not remove BBCF_IM_4GB.exe from the NVIDIA settings";
+		else if (saveSettings(session) != 0)
+			result = "removed BBCF_IM_4GB.exe from the NVIDIA settings but could not save it";
+		else
+			result = "removed BBCF_IM_4GB.exe from BBCF's NVIDIA profile";
 		destroySession(session);
 		return result;
 	}

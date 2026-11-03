@@ -25,3 +25,7 @@
 // Which palette file each effect sprite is drawn with, per character; the sprites
 // themselves are read from the game files. See tools/build_effect_palette_map.py.
 "effect_palette_map" RCDATA "effect_palette_map.bin"
+
+// The updater, for Settings > Uninstall: extracted to %TEMP% and run with --uninstall, so the
+// uninstaller always matches this DLL. Copied into build\embedded by the EmbedUpdater target.
+"BBCFIMUpdater.exe" RCDATA "..\\build\\embedded\\BBCFIMUpdater.exe"

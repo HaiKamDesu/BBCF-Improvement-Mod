@@ -138,6 +138,9 @@
     <ClCompile Include="src\Network\ProfileBlobSeal.cpp" />
     <ClCompile Include="src\Network\ProfileSync.cpp" />
     <ClCompile Include="src\Core\SaveDataSafety.cpp" />
+    <ClCompile Include="src\Core\ModCleanup.cpp" />
+    <ClCompile Include="src\Core\ModUninstall.cpp" />
+    <ClCompile Include="src\Overlay\Window\MaintenanceDialogs.cpp" />
     <ClCompile Include="src\Overlay\Window\ConnectionIcons.cpp" />
     <ClCompile Include="src\Overlay\Window\ProfileRestorePanel.cpp" />
     <ClCompile Include="src\Input\WindowsInputBackend.cpp" />
@@ -370,6 +373,9 @@
     <ClInclude Include="src\Network\ProfileBlobSeal.h" />
     <ClInclude Include="src\Network\ProfileSync.h" />
     <ClInclude Include="src\Core\SaveDataSafety.h" />
+    <ClInclude Include="src\Core\ModCleanup.h" />
+    <ClInclude Include="src\Core\ModUninstall.h" />
+    <ClInclude Include="src\Overlay\Window\MaintenanceDialogs.h" />
     <ClInclude Include="src\Overlay\Window\ConnectionIcons.h" />
     <ClInclude Include="src\Overlay\Window\ProfileRestorePanel.h" />
     <ClInclude Include="src\Input\DeviceModels.h" />
@@ -750,6 +756,20 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <!-- Settings > Uninstall runs the updater from %TEMP% (BBCFIMUpdater, uninstall mode), extracted from
+       the DLL so it always matches this mod version, whatever updater copy the install has.
+       The updater project is a ProjectReference, so it is normally built before this runs. But a
+       Debug/Release build's package_release.ps1 deletes the loose exe from bin\, and Visual Studio's
+       fast up-to-date check can then skip the updater project (its objects are current), leaving no
+       exe to copy; build it here in that case. -->
+  <Target Name="EmbedUpdater" BeforeTargets="ResourceCompile">
+    <PropertyGroup>
+      <UpdaterConfiguration Condition="'$(UpdaterBinaryDir)'=='bin\Debug\'">Debug</UpdaterConfiguration>
+      <UpdaterConfiguration Condition="'$(UpdaterBinaryDir)'!='bin\Debug\'">Release</UpdaterConfiguration>
+    </PropertyGroup>
+    <MSBuild Projects="$(ProjectDir)BBCFIMUpdater.vcxproj" Targets="Build" Properties="Configuration=$(UpdaterConfiguration);Platform=$(Platform);PlatformToolset=$(PlatformToolset);SolutionDir=$(SolutionDir)" Condition="!Exists('$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe')" />
+    <Copy SourceFiles="$(ProjectDir)$(UpdaterBinaryDir)BBCFIMUpdater.exe" DestinationFolder="$(ProjectDir)build\embedded" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="AfterBuild">
     <Delete Files="$(ProjectDir)$(OutDir)$(TargetName).exp;$(ProjectDir)$(OutDir)$(TargetName).lib" />
     <!-- Packaged configs keep the .pdb until package_release.ps1 has archived it into

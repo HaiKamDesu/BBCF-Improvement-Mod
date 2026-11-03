@@ -16,4 +16,7 @@ namespace NvidiaProfileMirror
 {
 	// Not from DllMain (loads nvapi.dll). Returns a one-line description of what it did, for the log.
 	const char* Sync();
+	// Uninstall: takes BBCF_IM_4GB.exe back out of the profile, if Sync put it there (an entry
+	// with another name is the player's own and stays). Same description, for the log.
+	const char* Remove();
 }

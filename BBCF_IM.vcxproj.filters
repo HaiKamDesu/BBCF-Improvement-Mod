@@ -239,6 +239,9 @@
     <ClCompile Include="src\Network\ProfileBlobSeal.cpp" />
     <ClCompile Include="src\Network\ProfileSync.cpp" />
     <ClCompile Include="src\Core\SaveDataSafety.cpp" />
+    <ClCompile Include="src\Core\ModCleanup.cpp" />
+    <ClCompile Include="src\Core\ModUninstall.cpp" />
+    <ClCompile Include="src\Overlay\Window\MaintenanceDialogs.cpp" />
     <ClCompile Include="src\Overlay\Window\ConnectionIcons.cpp" />
     <ClCompile Include="src\Network\LobbyLinkManager.cpp" />
     <ClCompile Include="src\Network\RankedListConnectionFilter.cpp" />
@@ -545,6 +548,9 @@
     <ClInclude Include="src\Network\ProfileBlobSeal.h" />
     <ClInclude Include="src\Network\ProfileSync.h" />
     <ClInclude Include="src\Core\SaveDataSafety.h" />
+    <ClInclude Include="src\Core\ModCleanup.h" />
+    <ClInclude Include="src\Core\ModUninstall.h" />
+    <ClInclude Include="src\Overlay\Window\MaintenanceDialogs.h" />
     <ClInclude Include="src\Overlay\Window\ConnectionIcons.h" />
     <ClInclude Include="src\Network\LobbyLinkManager.h" />
     <ClInclude Include="src\Network\RankedListConnectionFilter.h" />

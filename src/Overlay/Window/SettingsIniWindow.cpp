@@ -916,10 +916,14 @@ void SettingsIniWindow::DrawModal()
 		ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
 			"Some changes require a restart to take effect.");
 
+	// Bottom left: the folder maintenance buttons. Bottom right: Cancel / Save / Restart.
+	m_maintenance.DrawButtons();
+	ImGui::SameLine();
+
 	const float saveButtonWidth = m_needsRestart ? 150.0f : 120.0f;
 	const float footerWidth = 120.0f + saveButtonWidth + 120.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
-	ImGui::SetCursorPosX((std::max)(ImGui::GetStyle().WindowPadding.x,
-		(ImGui::GetWindowWidth() - footerWidth) * 0.5f));
+	ImGui::SetCursorPosX((std::max)(ImGui::GetCursorPosX(),
+		ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - footerWidth));
 
 	if (ImGui::Button("Cancel", ImVec2(120, 0)))
 		ImGui::CloseCurrentPopup();
@@ -967,6 +971,8 @@ void SettingsIniWindow::DrawModal()
 
 	if (ImGui::Button("Restart Game", ImVec2(120, 0)))
 		RestartGame();
+
+	m_maintenance.DrawModals();
 
 	ImGui::EndPopup();
 }

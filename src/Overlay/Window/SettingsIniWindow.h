@@ -2,6 +2,7 @@
 
 #include "Core/HotkeyManager.h"
 #include "Core/Settings.h"
+#include "Overlay/Window/MaintenanceDialogs.h"
 
 #include "imgui.h"
 
@@ -54,4 +55,5 @@ private:
 	std::vector<SettingRow> m_settingRows;
 	// Survives closing the popup, so reopening it lands where you left off.
 	int m_currentPage = 0;
+	MaintenanceDialogs m_maintenance;
 };

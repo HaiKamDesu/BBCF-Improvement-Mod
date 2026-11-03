@@ -426,6 +426,270 @@ namespace
 
 		ShellExecuteW(nullptr, L"open", h.bbcfExePath.c_str(), nullptr, h.installRoot.c_str(), SW_SHOWNORMAL);
 	}
+
+	// ---- Uninstall (--uninstall, started by the mod's Settings > Uninstall) ----
+	//
+	// Runs from a copy in %TEMP% (the mod extracts it from the DLL), so the version always
+	// matches the mod and nothing it deletes is in use by itself. Waits for the game, then
+	// removes the mod's files, the registry values 4 GB mode mirrored, and (elevated, once) the
+	// firewall rules it copied for BBCF_IM_4GB.exe. BBCF.exe, data\ and Save\ are never
+	// touched, apart from the files the mod itself put there.
+
+	struct UninstallStats
+	{
+		int deleted = 0;
+		unsigned long long bytes = 0;
+		std::vector<std::wstring> failed;
+	};
+
+	bool IsUnder(const std::wstring& root, const std::wstring& path)
+	{
+		std::wstring prefix = root;
+		if (!prefix.empty() && prefix.back() != L'\\')
+			prefix += L'\\';
+		return path.size() > prefix.size() && _wcsnicmp(path.c_str(), prefix.c_str(), prefix.size()) == 0 &&
+			path.find(L"\\..") == std::wstring::npos;
+	}
+
+	void DeleteOne(const Handoff& h, const std::wstring& path, UninstallStats& stats)
+	{
+		WIN32_FILE_ATTRIBUTE_DATA info = {};
+		if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info))
+			return;
+		if (!IsUnder(h.installRoot, path))
+			return;
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+			SetFileAttributesW(path.c_str(), info.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY);
+		if (DeleteFileW(path.c_str()))
+		{
+			++stats.deleted;
+			stats.bytes += (static_cast<unsigned long long>(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+			return;
+		}
+		Log(h, "Could not delete %s (Windows error %lu)", WideToUtf8(path).c_str(), GetLastError());
+		stats.failed.push_back(path);
+	}
+
+	// A folder and everything in it. Links are removed, never followed.
+	void DeleteTree(const Handoff& h, const std::wstring& folder, UninstallStats& stats)
+	{
+		if (!IsUnder(h.installRoot, folder) || !Exists(folder, true))
+			return;
+		WIN32_FIND_DATAW data;
+		HANDLE find = FindFirstFileW(Combine(folder, L"*").c_str(), &data);
+		if (find != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				const std::wstring name = data.cFileName;
+				if (name == L"." || name == L"..")
+					continue;
+				const std::wstring path = Combine(folder, name);
+				const bool isDir = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+				if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+				{
+					if (isDir)
+						RemoveDirectoryW(path.c_str());
+					else
+						DeleteOne(h, path, stats);
+				}
+				else if (isDir)
+					DeleteTree(h, path, stats);
+				else
+					DeleteOne(h, path, stats);
+			} while (FindNextFileW(find, &data));
+			FindClose(find);
+		}
+		RemoveDirectoryW(folder.c_str());
+	}
+
+	void DeleteMatching(const Handoff& h, const std::wstring& folder, const wchar_t* pattern, UninstallStats& stats,
+		bool (*accept)(const std::wstring& name) = nullptr)
+	{
+		WIN32_FIND_DATAW data;
+		HANDLE find = FindFirstFileW(Combine(folder, pattern).c_str(), &data);
+		if (find == INVALID_HANDLE_VALUE)
+			return;
+		do
+		{
+			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				continue;
+			if (accept && !accept(data.cFileName))
+				continue;
+			DeleteOne(h, Combine(folder, data.cFileName), stats);
+		} while (FindNextFileW(find, &data));
+		FindClose(find);
+	}
+
+	// Converted custom songs: "c" + five digits + "_" + name + ".pac" (CustomMusicConverter).
+	// The stock tracks are "000_btl_rg.pac" and the like, so this never matches one.
+	bool IsCustomSongPac(const std::wstring& name)
+	{
+		if (name.size() < 12 || (name[0] != L'c' && name[0] != L'C') || name[6] != L'_')
+			return false;
+		for (int i = 1; i <= 5; ++i)
+			if (name[i] < L'0' || name[i] > L'9')
+				return false;
+		return _wcsicmp(name.c_str() + name.size() - 4, L".pac") == 0;
+	}
+
+	void DeleteRegistryValue(const Handoff& h, const wchar_t* key, const std::wstring& value, REGSAM extra)
+	{
+		HKEY handle = nullptr;
+		if (RegOpenKeyExW(HKEY_CURRENT_USER, key, 0, KEY_SET_VALUE | extra, &handle) != ERROR_SUCCESS)
+			return;
+		const LSTATUS status = RegDeleteValueW(handle, value.c_str());
+		if (status == ERROR_SUCCESS)
+			Log(h, "Removed registry value HKCU\\%s\\%s", WideToUtf8(key).c_str(), WideToUtf8(value).c_str());
+		RegCloseKey(handle);
+	}
+
+	// Returns how many of the copy's firewall rules are left (0 = none, or all removed).
+	int RemoveFirewallCopies(const Handoff& h, const std::wstring& copyPath)
+	{
+		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		std::wstring report;
+		const int found = FirewallMirror::RemoveFor(copyPath, false, &report);
+		CoUninitialize();
+		if (found <= 0)
+			return 0;
+		Log(h, "%d firewall rule(s) name %s; asking for admin rights to remove them.", found, WideToUtf8(copyPath).c_str());
+
+		wchar_t self[MAX_PATH * 2] = {};
+		GetModuleFileNameW(nullptr, self, MAX_PATH * 2);
+		const std::wstring parameters = L"--remove-firewall \"" + copyPath + L"\" --log \"" + h.logPath + L"\"";
+		SHELLEXECUTEINFOW info = { sizeof(info) };
+		info.fMask = SEE_MASK_NOCLOSEPROCESS;
+		info.lpVerb = L"runas";
+		info.lpFile = self;
+		info.lpParameters = parameters.c_str();
+		info.nShow = SW_HIDE;
+		if (!ShellExecuteExW(&info) || !info.hProcess)
+		{
+			Log(h, "Firewall cleanup was not allowed (Windows error %lu).", GetLastError());
+			return found;
+		}
+		WaitForSingleObject(info.hProcess, 60000);
+		DWORD code = 0;
+		GetExitCodeProcess(info.hProcess, &code);
+		CloseHandle(info.hProcess);
+		const int removed = static_cast<int>(code);
+		return removed < 0 ? found : (std::max)(0, found - removed);
+	}
+
+	int RunUninstall(const std::wstring& installRoot, const std::vector<DWORD>& waitPids, bool wipe)
+	{
+		wchar_t temp[MAX_PATH] = {};
+		GetTempPathW(MAX_PATH, temp);
+
+		Handoff h;
+		h.installRoot = installRoot;
+		h.logPath = Combine(temp, L"BBCF_IM_uninstall.log");
+		Log(h, "Uninstall started for %s (%s).", WideToUtf8(installRoot).c_str(), wipe ? "everything" : "keeping the player's files");
+
+		for (DWORD pid : waitPids)
+		{
+			HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, pid);
+			if (process)
+			{
+				WaitForSingleObject(process, 60000);
+				CloseHandle(process);
+			}
+		}
+		if (!WaitForGame(h))
+		{
+			Log(h, "dinput8.dll is still in use; giving up.");
+			MessageBoxW(nullptr, L"BBCF Improvement Mod could not be uninstalled because the game is still running.\n\n"
+				L"Close BlazBlue Centralfiction and use Uninstall again.", L"BBCF IM Uninstall", MB_ICONERROR);
+			return 1;
+		}
+
+		const std::wstring copyPath = Combine(installRoot, L"BBCF_IM_4GB.exe");
+		const int firewallLeft = RemoveFirewallCopies(h, copyPath);
+
+		// 4 GB mode's mirrors of BBCF.exe's GPU preference and compatibility settings, and the
+		// profile backup markers. The values are named after the copy's path, so BBCF.exe's own
+		// settings are untouched.
+		DeleteRegistryValue(h, L"Software\\Microsoft\\DirectX\\UserGpuPreferences", copyPath, KEY_WOW64_64KEY);
+		DeleteRegistryValue(h, L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers", copyPath, KEY_WOW64_64KEY);
+		if (RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\BBCF_IM") == ERROR_SUCCESS)
+		{
+			RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\BBCF_IM");
+			Log(h, "Removed HKCU\\Software\\BBCF_IM");
+		}
+
+		UninstallStats stats;
+		const std::wstring mod = Combine(installRoot, L"BBCF_IM");
+		for (const wchar_t* name : { L"dinput8.dll", L"BBCFIMUpdater.exe", L"USER_README.txt", L"BBCF_IM_4GB.exe",
+			L"BBCF_IM_4GB.exe.tmp", L"dinput8.pdb" })
+			DeleteOne(h, Combine(installRoot, name), stats);
+		DeleteMatching(h, installRoot, L"*.bak-before-*", stats);
+		// The mod's temporary copies of the visible replays (ReplayFileManager); the replays
+		// themselves, and the archive of older ones, stay.
+		DeleteTree(h, Combine(installRoot, L"Save\\Replay\\tmp"), stats);
+
+		if (wipe)
+		{
+			for (const wchar_t* name : { L"settings.ini", L"palettes.ini", L"menus.ini" })
+				DeleteOne(h, Combine(installRoot, name), stats);
+			DeleteTree(h, Combine(installRoot, L"slots"), stats);
+			DeleteTree(h, mod, stats);
+			DeleteTree(h, Combine(installRoot, L"data\\Sound\\BGM\\custom"), stats);
+			DeleteTree(h, Combine(installRoot, L"data\\Sound\\BGM\\BBCFIM_Music"), stats);
+			DeleteTree(h, Combine(installRoot, L"data\\sound\\bgm_End\\BBCFIM_Music"), stats);
+			DeleteMatching(h, Combine(installRoot, L"data\\Sound\\BGM"), L"c*_*.pac", stats, IsCustomSongPac);
+		}
+		else
+		{
+			// Everything that is not the player's: the updater, logs, crash dumps, caches,
+			// test dumps. Palettes, music, recordings, settings and save backups stay, so
+			// installing the mod again picks up where it left off.
+			for (const wchar_t* folder : { L"Updater", L"DebugHistory", L"CrashReports", L"URT_RE_BLOBS", L"URT_RE_HANG" })
+				DeleteTree(h, Combine(mod, folder), stats);
+			for (const wchar_t* pattern : { L"DEBUG*.txt", L"*.log", L"DCodeBlobFail_*.bin", L"*.tmp", L"*.bak-before-*",
+				L"bbsave_backup_before_rollback_*.dat", L"HookAddrCache.bin", L"PaletteCache.bin" })
+				DeleteMatching(h, mod, pattern, stats);
+		}
+
+		Log(h, "Uninstall finished: %d file(s), %llu bytes removed, %zu could not be removed, %d firewall rule(s) left.",
+			stats.deleted, stats.bytes, stats.failed.size(), firewallLeft);
+
+		wchar_t size[64] = {};
+		swprintf_s(size, L"%.1f MB", stats.bytes / (1024.0 * 1024.0));
+		std::wstring message = L"BBCF Improvement Mod has been uninstalled (" + std::to_wstring(stats.deleted) +
+			L" files, " + size + L").\n\nThe game will start without the mod from now on.";
+		if (!wipe)
+			message += L"\n\nYour settings, palettes, music and recordings were kept in the game folder (settings.ini, palettes.ini, BBCF_IM), so reinstalling picks them up again.";
+		if (!stats.failed.empty())
+			message += L"\n\n" + std::to_wstring(stats.failed.size()) + L" file(s) could not be removed, starting with:\n" + stats.failed[0];
+		if (firewallLeft > 0)
+			message += L"\n\n" + std::to_wstring(firewallLeft) + L" Windows Firewall rule(s) for BBCF_IM_4GB.exe are still there (administrator permission was not given). They are harmless, and can be removed in Windows Defender Firewall > Advanced settings.";
+		message += L"\n\nDetails: " + h.logPath;
+		MessageBoxW(nullptr, message.c_str(), L"BBCF IM Uninstall", stats.failed.empty() ? MB_ICONINFORMATION : MB_ICONWARNING);
+		return stats.failed.empty() ? 0 : 1;
+	}
+
+	// The mod runs this updater from its own %TEMP% folder; remove that folder once this
+	// process has exited.
+	void DeleteOwnTempFolder()
+	{
+		wchar_t self[MAX_PATH * 2] = {};
+		GetModuleFileNameW(nullptr, self, MAX_PATH * 2);
+		const std::wstring folder = Parent(self);
+		wchar_t temp[MAX_PATH] = {};
+		GetTempPathW(MAX_PATH, temp);
+		std::wstring tempRoot = temp;
+		if (!IsUnder(tempRoot, folder) || folder.find(L"BBCF_IM_Uninstall") == std::wstring::npos)
+			return;
+		std::wstring command = L"cmd.exe /c ping -n 3 127.0.0.1 >nul & rmdir /s /q \"" + folder + L"\"";
+		STARTUPINFOW si = { sizeof(si) };
+		PROCESS_INFORMATION pi = {};
+		if (CreateProcessW(nullptr, &command[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, tempRoot.c_str(), &si, &pi))
+		{
+			CloseHandle(pi.hThread);
+			CloseHandle(pi.hProcess);
+		}
+	}
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
@@ -453,11 +717,55 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		else if (std::wstring(argv[i]) == L"--log")
 			firewallLog = argv[i + 1];
 	}
+	std::wstring uninstallRoot, removeFirewallFor;
+	std::vector<DWORD> waitPids;
+	bool wipe = false;
 	for (int i = 1; i < argc; ++i)
-		if (std::wstring(argv[i]) == L"--dry-run")
+	{
+		const std::wstring arg = argv[i];
+		if (arg == L"--dry-run")
 			firewallDryRun = true;
+		else if (arg == L"--wipe")
+			wipe = true;
+		else if (arg == L"--uninstall" && i + 1 < argc)
+			uninstallRoot = argv[i + 1];
+		else if (arg == L"--wait-pid" && i + 1 < argc)
+			waitPids.push_back(wcstoul(argv[i + 1], nullptr, 10));
+		else if (arg == L"--remove-firewall" && i + 1 < argc)
+			removeFirewallFor = argv[i + 1];
+	}
 	if (argv)
 		LocalFree(argv);
+
+	if (!removeFirewallFor.empty())
+	{
+		// Uninstall, started elevated: remove the rules 4 GB mode copied for BBCF_IM_4GB.exe.
+		// Exit code: rules removed, or -1 if the firewall could not be read.
+		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		std::wstring report;
+		int removed = 0;
+		const int found = FirewallMirror::RemoveFor(removeFirewallFor, true, &report, &removed);
+		CoUninitialize();
+		if (!firewallLog.empty())
+		{
+			FILE* file = nullptr;
+			if (_wfopen_s(&file, firewallLog.c_str(), L"ab") == 0 && file)
+			{
+				const std::string text = "[" + Stamp() + "] remove-firewall " + WideToUtf8(removeFirewallFor) + ": found=" +
+					std::to_string(found) + " removed=" + std::to_string(removed) + "\r\n" + WideToUtf8(report);
+				fwrite(text.data(), 1, text.size(), file);
+				fclose(file);
+			}
+		}
+		return found < 0 ? -1 : removed;
+	}
+
+	if (!uninstallRoot.empty())
+	{
+		const int result = RunUninstall(uninstallRoot, waitPids, wipe);
+		DeleteOwnTempFolder();
+		return result;
+	}
 
 	if (!firewallFrom.empty())
 	{
