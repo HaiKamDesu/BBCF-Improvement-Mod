@@ -372,7 +372,7 @@ namespace
 
 	enum IconKind { Icon_Pc, Icon_Net };
 
-	// One draggable icon window. The label says whose it is ("P1", or "P1 You" for your side).
+	// One draggable icon window. The label says whose it is ("P1" or "P2"; the tooltip says which is you).
 	void DrawIconWindow(int side, IconKind kind, const SideData& data, const SideData& other, bool inMatch, bool locked)
 	{
 		ImGuiIO& io = ImGui::GetIO();
@@ -415,7 +415,7 @@ namespace
 		const ImU32 color = ToU32(rating.color, alpha);
 		const ImU32 shadow = IM_COL32(0, 0, 0, (int)(170 * alpha));
 
-		const std::string label = std::string(side == 0 ? "P1" : "P2") + (data.isLocal ? " " + L("You") : "");
+		const std::string label = side == 0 ? "P1" : "P2";
 		ImFont* font = ImGui::GetFont();
 		const float labelSize = (std::max)(9.0f, s * 0.5f);
 		const ImVec2 labelExtent = font->CalcTextSizeA(labelSize, FLT_MAX, 0.0f, label.c_str());
