@@ -6534,8 +6534,8 @@ struct LocalizationKeysAccessor
         // Uninstall BBCF Improvement Mod
         inline const char* Uninstall_BBCF_Improvement_Mod() const { return Get("Uninstall BBCF Improvement Mod"); }
 
-        // Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched.
-        inline const char* Removes_the_mod_from_this_game_folder_and_closes_the_game_The_next_time_you_start_BlazBlue_Centralfiction_it_runs_without_the_mod_The_game_itself_your_save_data_and_your_replays_are_not_touched() const { return Get("Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched."); }
+        // Removes the mod from this game folder and restarts the game without it. The game itself, your save data and your replays are not touched.
+        inline const char* Removes_the_mod_from_this_game_folder_and_restarts_the_game_without_it_The_game_itself_your_save_data_and_your_replays_are_not_touched() const { return Get("Removes the mod from this game folder and restarts the game without it. The game itself, your save data and your replays are not touched."); }
 
         // Keep my settings, palettes, music and recordings
         inline const char* Keep_my_settings_palettes_music_and_recordings() const { return Get("Keep my settings, palettes, music and recordings"); }
@@ -6561,8 +6561,8 @@ struct LocalizationKeysAccessor
         // Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.
         inline const char* Windows_may_ask_for_administrator_permission_once_to_remove_the_firewall_rules_4_GB_mode_added() const { return Get("Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added."); }
 
-        // Uninstall and close the game
-        inline const char* Uninstall_and_close_the_game() const { return Get("Uninstall and close the game"); }
+        // Uninstall and restart the game
+        inline const char* Uninstall_and_restart_the_game() const { return Get("Uninstall and restart the game"); }
 
         // The uninstaller is missing from this build of the mod.
         inline const char* The_uninstaller_is_missing_from_this_build_of_the_mod() const { return Get("The uninstaller is missing from this build of the mod."); }

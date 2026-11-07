@@ -521,8 +521,9 @@ namespace
 		FindClose(find);
 	}
 
-	// Converted custom songs: "c" + five digits + "_" + name + ".pac" (CustomMusicConverter).
-	// The stock tracks are "000_btl_rg.pac" and the like, so this never matches one.
+	// Converted custom songs: "c" + five digits + "_" + name + ".pac" (CustomMusicConverter),
+	// and the ".pac.gain" volume file next to each. The stock tracks are "000_btl_rg.pac" and
+	// the like, so this never matches one.
 	bool IsCustomSongPac(const std::wstring& name)
 	{
 		if (name.size() < 12 || (name[0] != L'c' && name[0] != L'C') || name[6] != L'_')
@@ -530,7 +531,12 @@ namespace
 		for (int i = 1; i <= 5; ++i)
 			if (name[i] < L'0' || name[i] > L'9')
 				return false;
-		return _wcsicmp(name.c_str() + name.size() - 4, L".pac") == 0;
+		const auto endsWith = [&name](const wchar_t* suffix)
+		{
+			const size_t n = wcslen(suffix);
+			return name.size() > n && _wcsicmp(name.c_str() + name.size() - n, suffix) == 0;
+		};
+		return endsWith(L".pac") || endsWith(L".pac.gain");
 	}
 
 	void DeleteRegistryValue(const Handoff& h, const wchar_t* key, const std::wstring& value, REGSAM extra)
@@ -637,7 +643,7 @@ namespace
 			DeleteTree(h, Combine(installRoot, L"data\\Sound\\BGM\\custom"), stats);
 			DeleteTree(h, Combine(installRoot, L"data\\Sound\\BGM\\BBCFIM_Music"), stats);
 			DeleteTree(h, Combine(installRoot, L"data\\sound\\bgm_End\\BBCFIM_Music"), stats);
-			DeleteMatching(h, Combine(installRoot, L"data\\Sound\\BGM"), L"c*_*.pac", stats, IsCustomSongPac);
+			DeleteMatching(h, Combine(installRoot, L"data\\Sound\\BGM"), L"c*_*.pac*", stats, IsCustomSongPac);
 		}
 		else
 		{
@@ -657,7 +663,7 @@ namespace
 		wchar_t size[64] = {};
 		swprintf_s(size, L"%.1f MB", stats.bytes / (1024.0 * 1024.0));
 		std::wstring message = L"BBCF Improvement Mod has been uninstalled (" + std::to_wstring(stats.deleted) +
-			L" files, " + size + L").\n\nThe game will start without the mod from now on.";
+			L" files, " + size + L").\n\nPress OK to start the game again, now without the mod.";
 		if (!wipe)
 			message += L"\n\nYour settings, palettes, music and recordings were kept in the game folder (settings.ini, palettes.ini, BBCF_IM), so reinstalling picks them up again.";
 		if (!stats.failed.empty())
@@ -666,6 +672,19 @@ namespace
 			message += L"\n\n" + std::to_wstring(firewallLeft) + L" Windows Firewall rule(s) for BBCF_IM_4GB.exe are still there (administrator permission was not given). They are harmless, and can be removed in Windows Defender Firewall > Advanced settings.";
 		message += L"\n\nDetails: " + h.logPath;
 		MessageBoxW(nullptr, message.c_str(), L"BBCF IM Uninstall", stats.failed.empty() ? MB_ICONINFORMATION : MB_ICONWARNING);
+
+		// Start the game again, the way an update does, but only once the mod is really gone:
+		// with dinput8.dll still there it would start with the mod.
+		Handoff relaunch;
+		relaunch.installRoot = installRoot;
+		relaunch.bbcfExePath = Combine(installRoot, L"BBCF.exe");
+		if (GetFileAttributesW(Combine(installRoot, L"dinput8.dll").c_str()) == INVALID_FILE_ATTRIBUTES)
+		{
+			Log(h, "Starting the game again.");
+			Relaunch(relaunch);
+		}
+		else
+			Log(h, "dinput8.dll is still there; not starting the game.");
 		return stats.failed.empty() ? 0 : 1;
 	}
 

@@ -235,7 +235,7 @@ void MaintenanceDialogs::DrawUninstallModal()
 	if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 		return;
 
-	ImGui::TextWrapped("%s", L("Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched.").c_str());
+	ImGui::TextWrapped("%s", L("Removes the mod from this game folder and restarts the game without it. The game itself, your save data and your replays are not touched.").c_str());
 	ImGui::Spacing();
 
 	ImGui::Checkbox(L("Keep my settings, palettes, music and recordings").c_str(), &m_keepUserData);
@@ -254,7 +254,9 @@ void MaintenanceDialogs::DrawUninstallModal()
 	if (GetFileAttributesW(copy.c_str()) != INVALID_FILE_ATTRIBUTES)
 	{
 		ImGui::Spacing();
-		ImGui::TextDisabled("%s", L("Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.").c_str());
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+		ImGui::TextWrapped("%s", L("Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.").c_str());
+		ImGui::PopStyleColor();
 	}
 
 	if (!m_uninstallError.empty())
@@ -264,7 +266,7 @@ void MaintenanceDialogs::DrawUninstallModal()
 	}
 
 	ImGui::Separator();
-	if (DangerButton(L("Uninstall and close the game").c_str(), ImVec2(240, 0)))
+	if (DangerButton(L("Uninstall and restart the game").c_str(), ImVec2(240, 0)))
 	{
 		m_uninstallError.clear();
 		std::string error;
