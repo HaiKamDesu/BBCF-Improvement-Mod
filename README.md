@@ -18,7 +18,13 @@ That's the whole install. Everything else — `settings.ini`, `palettes.ini`, ev
 
 > **Where is my game folder?** In Steam, right-click BlazBlue Centralfiction → Manage → Browse local files.
 
-Nothing the mod does modifies the files Steam installed, so "Verify integrity of game files" has nothing to undo. To uninstall, delete `dinput8.dll`.
+Nothing the mod does modifies the files Steam installed, so "Verify integrity of game files" has nothing to undo.
+
+### Uninstalling
+
+F1 → **Settings** (bottom of the menu) → **Uninstall...** removes the mod and restarts the game without it. By default it keeps your settings, palettes, music and recordings in the game folder, so installing again picks them up; untick that to remove everything the mod ever made. It also undoes what 4 GB mode set up: its copy of the game, and the Windows and NVIDIA settings it copied from `BBCF.exe`.
+
+If the game won't start at all, deleting `dinput8.dll` stops the mod from loading. That leaves its files and settings in place.
 
 ### On Linux and Steam Deck
 
@@ -59,9 +65,11 @@ act on.
 - **Frame data overlay** — startup/active/recovery, frame advantage, and a scrolling frame meter (see [FrameHistory](#framehistory) below)
 - **Hitbox overlay** with per-attribute invulnerability display
 - **Freeze and frame step**, so you can walk through a sequence one frame at a time
-- **Dummy playback slots** — record, save to disk, and load back; wake-up and gap actions driven from a slot
-- **P2 State Library** — put the dummy into any state directly
-- **TAS combo tool** — build a combo frame by frame with a real editor: play, step, scrub, undo/redo, typed input composer, editable input list
+- **Dummy actions** — recorded playback slots saved to disk, and wake-up, on-block, on-hit, gap and throw-tech reactions, each trigger holding a list of actions with its own delay; the dummy can also be put into any state directly
+- **Training input delay** — practise with your inputs held back the way online play holds them
+- **Training file** — export, import or reset the whole Training page in one go
+- **HP numbers** over the health bars in training
+- **TAS combo tool** — build a combo frame by frame with a real editor: play, step, scrub, undo/redo, typed input composer, editable input list, named section markers
 - **Custom game modes** and freely adjustable in-game currency
 
 ### Replays
@@ -70,49 +78,54 @@ act on.
 - **Local replay file loading** and a replay database browser
 
 ### Online
-- **Ranked room list** with sorting and filtering
+- **Ranked and player room lists** with sorting and filtering
+- **Rank history** of every ranked match you play with the mod, and a progress bar showing how far into your rank you are
+- **PC & connection stats** (Ctrl+F2) — whose PC or connection is causing the lag, with optional on-screen icons for each player
+- **Online input delay** — play with more input delay than the game's fixed 2 frames
 - **Lobby links** — copy and join a lobby from a link (Ctrl+C / Ctrl+V)
-- **See each other's custom palettes** in online matches
+- **See each other's custom palettes** in online matches, and block palettes or players you'd rather not see
 - Change avatars and accessories in rooms without backing out to a menu
 
 ### Look and sound
-- **Custom palettes** — create, edit and load palettes and effects, with no file modification at all. Export one as a PNG and you get a sheet of your character — several poses, their effects, and a swatch block — *painted in that palette*, ready to recolour in any image editor and import straight back
+- **Custom palettes** — create, edit (in a visual editor) and load palettes and effects, with no file modification at all. Export one as a PNG and you get a sheet of your character — several poses, their effects, and a swatch block — *painted in that palette*, ready to recolour in any image editor and import straight back
 - **Music replacement** — hand any track the game ships with (including Astral themes) a song of your own. Supports **mp3, wav, flac, ogg, opus, m4a/aac and wma**, with per-song volume, applied on the spot
 - **Jukebox** — an in-game player with rotation, search and manual track selection, plus a `[ custom ]` category fed from your own files
 - **Graphics options** beyond what the game exposes, and performance options
 
 ### Everything else
-- **Automatic controller detection** and per-device overrides, including separate keyboards for P1 and P2
+- **Any keyboard or controller on either side** — automatic detection, per-device button settings, and separate keyboards for P1 and P2
 - **Rebindable hotkeys**, on keyboard or controller
+- **4 GB mode** — runs the game with 4 GB of memory instead of 2, which stops the out-of-memory crashes of long sessions (the game asks once)
+- **Clear cache** — frees up space by deleting old logs, crash reports, update backups and other leftovers
 - **Switchable overlay language** (English/Spanish, extendable — see [`docs/localization.md`](docs/localization.md))
-- **Automatic updates**
+- **Automatic updates**, and a one-click **uninstall**
 
 ---
 
 ## Default hotkeys
 
-Every one of these is rebindable in the F1 menu under Controllers → Hotkeys, to a key **or a controller button**.
+Every one of these is rebindable in F1 → **Settings** (bottom of the menu) → Hotkeys, to a key **or a controller button**.
 
 | Key | Action |
 |---|---|
 | `F1` | Open/close the mod menu |
-| `F2` | Toggle the online overlay |
-| `F3` | Toggle the game HUD |
+| `F2` | Open/close the online window |
+| `Ctrl+F2` | Show PC & connection stats |
+| `F3` | Hide/show the game HUD |
 | `F4` | Load replay takeover state |
-| `F5` / `F9` | Save / load state |
-| `F6` | Unlimited playback trigger |
-| `F7` / `F8` | Replay takeover trigger / cancel |
-| `F10` / `F11` | Toggle Jukebox / next track |
-| `C` / `V` | Freeze / frame step |
-| `Ctrl+C` / `Ctrl+V` | Copy / join lobby link |
-
-Some defaults overlap (F7 and F8 each do two things depending on which feature is active). The rebind UI warns you when a binding is already in use.
+| `F5` / `F9` | Save / load training state |
+| `F6` / `F7` | Start recorded playback / start-stop the playback loop |
+| `F10` / `F11` | Open/close the Jukebox / next song |
+| `C` / `V` | Pause / advance one frame |
+| `R` | Rewind the replay |
+| `Ctrl+C` / `Ctrl+V` | Copy room invite link / join a copied link |
+| `I` / `J` / `L` | TAS: apply typed inputs / step back / step forward |
 
 ---
 
 ## Custom music
 
-**Replacing a track:** F1 → Look & Sound → Music Replacement. Pick any track the game ships with, hand it a file, and that's the song now — everywhere, permanently, until you undo it. The mod keeps its converted copy off to one side and redirects the game to it, so nothing in your game folder is touched and undoing a swap is one click.
+**Replacing a track:** F1 → Look & Sound → **Replace songs...**. Pick any track the game ships with, hand it a file, and that's the song now — everywhere, permanently, until you undo it. The mod keeps its converted copy off to one side and redirects the game to it, so none of the game's own files are changed and undoing a swap is one click.
 
 Two things the window will also tell you: Astral music is loaded when a match starts, so a swap made mid-match is heard on the *next* one; and your Astral Heat BGM sound option decides which set of tracks actually plays, so replace all three variants of a set to be sure.
 
@@ -161,7 +174,7 @@ Visual Studio 2022, platform toolset **v143**, Windows SDK 10. Load `BBCF_IM.sln
 MSBuild.exe BBCF_IM.sln /m /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v143
 ```
 
-Configurations are `Debug`, `Release`, and the `DebugDeploy` / `ReleaseDeploy` variants, which additionally copy the built DLL into your game folder (path stored in `BBCF_IM.vcxproj.user`, which is not checked in). Output lands in `bin/<Configuration>/`.
+Configurations are `Debug`, `Release`, and the `DebugDeploy` / `ReleaseDeploy` variants, which additionally copy the built DLL into your game folder. That path goes in `deploy/DeploySettings.props` (copy `deploy/DeploySettings.props.example`; the real file is not checked in), see [`docs/VisualStudioPlaySetup.md`](docs/VisualStudioPlaySetup.md). `Debug` and `Release` package their output as a release zip plus `update-manifest.json` in `bin/<Configuration>/`.
 
 UI strings live in `resource/localization/Localization.csv` and are compiled into the DLL by a build step; see [`docs/localization.md`](docs/localization.md) to add a language.
 

@@ -1,21 +1,29 @@
-BBCF Improvement Mod (v3.1) by Libreofficecalc -- README
+BBCF Improvement Mod (Oceanya Edition) -- README
 ==========================
+Continued from libreofficecalc's v3.1 and KoviDomi's original BBCF Improvement Mod.
 
 What this mod provides
 ==========================
-- Unlocks the game's region restricted multiplayer
 - Adds extra game modes
 - Adds hitbox overlay
-- Adds framedata advantage info
+- Adds framedata advantage info and a frame history meter
+- Training dummy actions: recorded playbacks, and wake-up, on-block, on-hit, gap and throw-tech reactions
+- Save states, training input delay, and a TAS combo tool
+- Replay takeover, replay rewind and a replay database
 - Adds an in-game Jukebox with music rotation, search, and manual track selection
-- Supports custom music (mp3, wav, flac, ogg, m4a, wma) through the Jukebox's [ custom ] category
+- Supports custom music (mp3, wav, flac, ogg, opus, m4a, wma) through the Jukebox's [ custom ] category
 - Replace any of the game's own tracks with your own song, with per-song volume
-- Create and load custom palettes and effects without file modifications
-- See each other's custom palettes in online matches
+- Create, edit and load custom palettes and effects without file modifications
+- See each other's custom palettes in online matches, and block palettes or players you'd rather not see
+- Ranked and player room lists with sorting and filtering, and a rank history of your ranked matches
+- PC & connection stats (Ctrl+F2): whose PC or connection is causing lag, with optional on-screen icons
+- Any keyboard or controller on either side, with separate keyboards for P1 and P2
+- 4 GB mode: runs the game with 4 GB of memory instead of 2, against out-of-memory crashes
 - Options to improve the performance of the game even further
 - More flexibility to change the graphics options
 - Change avatars and accessories in online rooms/lobbies without going back into menu
 - Freely adjustable ingame currency value
+- Clear cache, uninstall and automatic updates from the Settings window
 
 Requirements
 ==============
@@ -48,11 +56,18 @@ anything from the F1 menu, or edit settings.ini by hand once it exists.
 
 Uninstall
 ==========================
-Delete or rename dinput8.dll. The mod makes no permanent changes to anything.
+Press F1, then Settings (bottom of the menu), then "Uninstall...". It removes the mod and
+restarts the game without it. By default it keeps your settings, palettes, music and
+recordings in the game folder, so installing again picks them up; untick that option to
+remove everything the mod ever made. It also undoes what 4 GB mode set up: its copy of
+the game (BBCF_IM_4GB.exe) and the Windows and NVIDIA settings it copied from BBCF.exe.
+
+If the game will not start at all, deleting dinput8.dll stops the mod from loading. That
+leaves the mod's files and settings in place.
 
 How to use the mod's overlay
 ==========================
-- By default the mod's main window can be toggled with the F1 key (can be changed in the settings.ini file).
+- By default the mod's main window can be toggled with the F1 key. Every hotkey can be rebound, to a key or a controller button, in Settings (bottom of the F1 menu) > Hotkeys.
 - Double-click on title bar to collapse windows.
 - Click and drag on any empty space to move the windows.
 - Click and drag on lower right corner to resize the palette editor window (double-click to auto fit window to its contents).
@@ -62,7 +77,7 @@ How to use the mod's overlay
 How to add custom songs to the Jukebox
 ==========================
 1. Open the game's "data\Sound\BGM\" directory and create a folder named "custom" if it does not already exist.
-2. Place your audio files in "data\Sound\BGM\custom\". mp3, wav, flac, ogg, m4a/aac and wma all work. Keep the original files there so the mod can discover the tracks on future launches.
+2. Place your audio files in "data\Sound\BGM\custom\". mp3, wav, flac, ogg, opus, m4a/aac and wma all work. Keep the original files there so the mod can discover the tracks on future launches.
 3. Launch the game and open the Jukebox (default hotkey: F10). New or changed files are converted in the background; conversion status and progress appear in the Jukebox.
 4. When conversion finishes, the songs appear immediately under the cyan [ custom ] category. Enter a match before selecting a song for playback.
 5. Converted .pac files are cached in "data\Sound\BGM\". They are rebuilt when the source file changes or the converter format is updated.
@@ -71,13 +86,13 @@ For example, "C:\Program Files (x86)\Steam\steamapps\common\BlazBlue Centralfict
 
 How to start a custom game mode
 ==========================
-- The custom game mode selector can be accessed under the "Gameplay settings" section on the main window while you are on the character selection screen in the following modes: Training, Versus, Online.
+- The custom game mode selector is on the F1 menu's Game page (Game mode), while you are on the character selection screen in the following modes: Training, Versus, Online.
 - The custom game mode selector is also available in the Replay Theater menu screen, so replays saved after after custom game modes can be replayed. (If a custom game mode that the replay's match was not played on is selected then the replay will desync)
 - Custom game modes can be played in online player rooms or lobbies with other Improvement Mod users as well. For this both player 1 and player 2 must select the same custom game mode while on the character selection screen. If the players have not settled on the same custom game mode, then it will default back to "Normal".
 
 How to access the palette editor
 ==========================
-- The palette editor's button can be accessed under the "Custom palettes" section on the main window while you are in a match in the following modes: Training, Versus.
+- On the F1 menu's Look & Sound page, open the Palettes window. "New palette" and "Edit palette" there open the palette editor, which works outside a match too.
 - Custom palettes saved in the editor can be found at "..\BlazBlue Centralfiction\BBCF_IM\Palettes\"
 
 How to edit a palette in an image editor
@@ -105,7 +120,7 @@ How to edit a palette in an image editor
 
 How to switch between custom palettes
 ==========================
-- The palette switching buttons can be accessed under the "Custom palettes" section whenever you are in a match.
+- The palette switching buttons are on the F1 menu's Look & Sound page (Palettes) whenever you are in a match.
 - In online matches you can only switch your own character's palette. (You can reset your opponent's palette with the button found next to the palette switching button).
 - Using the "palettes.ini" file in the game's root folder you can assign custom palettes to the ingame palette slots. The mod creates that file for you on first launch.
 
@@ -115,7 +130,7 @@ See the "palettes.ini" file in the game's root folder (the mod creates it on fir
 
 How to access the hitbox overlay
 ==========================
-- The hitbox overlay can be accessed under the "Hitbox overlay" section on the main window while you are in a match in the following modes: Training, Versus, Replay.
+- The hitbox overlay is on the F1 menu's Overlays page (Hitboxes), while you are in a match in the following modes: Training, Versus, Replay.
 
 Where to place and find your custom palette files (.cfpl and .hpl files)
 ==========================
@@ -134,12 +149,8 @@ Known issues
 2. Hitbox overlay is not aligned properly or is off-screen when the game's window resolution mismatches the rendering resolution.
 	- To prevent this, open up the settings.ini file, and set Viewport to 2, while setting the RenderingWidth and RenderingHeight to the resolution values you have in the ingame display options.
 
-3. Hitbox overlay shows phantom hitboxes that are disabled by the engine (shoutout to Shtkn for discovering this)
-
-4. Screen not displaying properly when Viewport in settings.ini is set to 2 or 3 with keep aspect ratio enabled in in-game settings. This is still being investigated. For now, either
+3. Screen not displaying properly when Viewport in settings.ini is set to 2 or 3 with keep aspect ratio enabled in in-game settings. This is still being investigated. For now, either
 disable keep aspect ratio or keep the Viewport option set to 1.
-
-5. Enabling "Separate Keyboard and Controllers" crashes the game on startup. The option is forced off each launch and no longer saves between sessions; enable it manually after the game loads if needed.
 
 Troubleshooting
 ==========================
@@ -164,9 +175,17 @@ Reboot your system.
 4. The mod's windows are off-screen or have disappeared:
 Delete the "menus.ini" file found in the game's root folder to reset the positions of the mod's windows.
 
+5. The game crashed:
+The mod writes a crash report to "BBCF_IM\CrashReports\Crash_<date and time>\". Zip that whole
+folder and send it in the mod's Discord (https://discord.gg/j2mCX9s).
+
 Keep in mind that the mod may partially, or completely stop working whenever a new official patch of the game is released. (Though unlikely)
 
 Changelog
+
+Changes from v4.0 onwards are in the release notes:
+https://github.com/HaiKamDesu/BBCF-Improvement-Mod/releases
+Below is the history of the mod up to libreofficecalc's v3.111.
 
 ===============================
 30-06-2026 -- version 3.111
