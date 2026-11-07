@@ -6090,8 +6090,8 @@ struct LocalizationKeysAccessor
         // Test: spectator view with fake players
         inline const char* Test_spectator_view_with_fake_players() const { return Get("Test: spectator view with fake players"); }
 
-        // In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds.
-        inline const char* In_development_check_offline_only_shows_the_spectator_layout_fed_by_made_up_player_reports_pushed_through_the_same_receive_code_as_real_ones_It_cycles_through_three_situations_every_6_seconds() const { return Get("In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds."); }
+        // In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through ten situations every 6 seconds (the connection icons follow it too).
+        inline const char* In_development_check_offline_only_shows_the_spectator_layout_fed_by_made_up_player_reports_pushed_through_the_same_receive_code_as_real_ones_It_cycles_through_ten_situations_every_6_seconds_the_connection_icons_follow_it_too() const { return Get("In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through ten situations every 6 seconds (the connection icons follow it too)."); }
 
         // Game+Draw
         inline const char* Game_Draw() const { return Get("Game+Draw"); }
@@ -6380,6 +6380,255 @@ struct LocalizationKeysAccessor
 
         // PC & connection stats
         inline const char* PC_connection_stats() const { return Get("PC & connection stats"); }
+
+        // Shown here so you can place it. During online matches it shows this player's state.
+        inline const char* Shown_here_so_you_can_place_it_During_online_matches_it_shows_this_player_s_state() const { return Get("Shown here so you can place it. During online matches it shows this player's state."); }
+
+        // This player does not run the mod, so their numbers are unknown.
+        inline const char* This_player_does_not_run_the_mod_so_their_numbers_are_unknown() const { return Get("This player does not run the mod, so their numbers are unknown."); }
+
+        // This player runs an older mod version that does not share these numbers.
+        inline const char* This_player_runs_an_older_mod_version_that_does_not_share_these_numbers() const { return Get("This player runs an older mod version that does not share these numbers."); }
+
+        // This player's mod is not sending its numbers.
+        inline const char* This_player_s_mod_is_not_sending_its_numbers() const { return Get("This player's mod is not sending its numbers."); }
+
+        // No opponent found yet.
+        inline const char* No_opponent_found_yet() const { return Get("No opponent found yet."); }
+
+        // Waiting for numbers...
+        inline const char* Waiting_for_numbers() const { return Get("Waiting for numbers..."); }
+
+        // %.0f%% capacity, %.0f FPS
+        inline const char* _0f_capacity_0f_FPS() const { return Get("%.0f%% capacity, %.0f FPS"); }
+
+        // Struggling
+        inline const char* Struggling() const { return Get("Struggling"); }
+
+        // This PC can't hold 60 FPS, so the match slows down for both players.
+        inline const char* This_PC_can_t_hold_60_FPS_so_the_match_slows_down_for_both_players() const { return Get("This PC can't hold 60 FPS, so the match slows down for both players."); }
+
+        // Borderline
+        inline const char* Borderline() const { return Get("Borderline"); }
+
+        // Keeps up, with little room to spare.
+        inline const char* Keeps_up_with_little_room_to_spare() const { return Get("Keeps up, with little room to spare."); }
+
+        // Runs the game with room to spare.
+        inline const char* Runs_the_game_with_room_to_spare() const { return Get("Runs the game with room to spare."); }
+
+        // Checking
+        inline const char* Checking_2() const { return Get("Checking"); }
+
+        // Give it a few seconds of play.
+        inline const char* Give_it_a_few_seconds_of_play() const { return Get("Give it a few seconds of play."); }
+
+        // Ping %u ms, jitter %u ms
+        inline const char* Ping_u_ms_jitter_u_ms() const { return Get("Ping %u ms, jitter %u ms"); }
+
+        // , longest gap in their packets %u ms
+        inline const char* longest_gap_in_their_packets_u_ms() const { return Get(", longest gap in their packets %u ms"); }
+
+        // , nearest Valve server %u ms
+        inline const char* nearest_Valve_server_u_ms() const { return Get(", nearest Valve server %u ms"); }
+
+        // Packets arrive steadily.
+        inline const char* Packets_arrive_steadily() const { return Get("Packets arrive steadily."); }
+
+        // High ping to the nearest Valve server: this side's line adds delay.
+        inline const char* High_ping_to_the_nearest_Valve_server_this_side_s_line_adds_delay() const { return Get("High ping to the nearest Valve server: this side's line adds delay."); }
+
+        // Packets arrive with long gaps: this side causes stutter and rollbacks.
+        inline const char* Packets_arrive_with_long_gaps_this_side_causes_stutter_and_rollbacks() const { return Get("Packets arrive with long gaps: this side causes stutter and rollbacks."); }
+
+        // Needs the other player's numbers too.
+        inline const char* Needs_the_other_player_s_numbers_too() const { return Get("Needs the other player's numbers too."); }
+
+        // PC State
+        inline const char* PC_State() const { return Get("PC State"); }
+
+        // Connection State
+        inline const char* Connection_State() const { return Get("Connection State"); }
+
+        // (no update for a few seconds)
+        inline const char* no_update_for_a_few_seconds() const { return Get("(no update for a few seconds)"); }
+
+        // Positions are locked (PC & connection stats window, Ctrl+F2).
+        inline const char* Positions_are_locked_PC_connection_stats_window_Ctrl_F2() const { return Get("Positions are locked (PC & connection stats window, Ctrl+F2)."); }
+
+        // Drag to move, drag the corner to resize all four. Ctrl+F2 opens the full stats.
+        inline const char* Drag_to_move_drag_the_corner_to_resize_all_four_Ctrl_F2_opens_the_full_stats() const { return Get("Drag to move, drag the corner to resize all four. Ctrl+F2 opens the full stats."); }
+
+        // Show connection icons on screen
+        inline const char* Show_connection_icons_on_screen() const { return Get("Show connection icons on screen"); }
+
+        // During online matches, a small PC icon and a connection icon (Wi-Fi or cable) for each player stay on screen: green is fine, orange is borderline, red is the cause of lag, grey is unknown, a question mark is a player without the mod. Hover one for its state. While the mod menu (F1) is open they show anywhere: drag one to move it, drag its corner to resize all four.
+        inline const char* During_online_matches_a_small_PC_icon_and_a_connection_icon_Wi_Fi_or_cable_for_each_player_stay_on_screen_green_is_fine_orange_is_borderline_red_is_the_cause_of_lag_grey_is_unknown_a_question_mark_is_a_player_without_the_mod_Hover_one_for_its_state_While_the_mod_menu_F1_is_open_they_show_anywhere_drag_one_to_move_it_drag_its_corner_to_resize_all_four() const { return Get("During online matches, a small PC icon and a connection icon (Wi-Fi or cable) for each player stay on screen: green is fine, orange is borderline, red is the cause of lag, grey is unknown, a question mark is a player without the mod. Hover one for its state. While the mod menu (F1) is open they show anywhere: drag one to move it, drag its corner to resize all four."); }
+
+        // Lock positions
+        inline const char* Lock_positions() const { return Get("Lock positions"); }
+
+        // Reset size
+        inline const char* Reset_size() const { return Get("Reset size"); }
+
+        // Clear cache...
+        inline const char* Clear_cache() const { return Get("Clear cache..."); }
+
+        // Free up space: delete old logs, crash reports, update backups and other leftovers from the game folder.
+        inline const char* Free_up_space_delete_old_logs_crash_reports_update_backups_and_other_leftovers_from_the_game_folder() const { return Get("Free up space: delete old logs, crash reports, update backups and other leftovers from the game folder."); }
+
+        // Uninstall...
+        inline const char* Uninstall() const { return Get("Uninstall..."); }
+
+        // Remove the mod from this game folder.
+        inline const char* Remove_the_mod_from_this_game_folder() const { return Get("Remove the mod from this game folder."); }
+
+        // Clear cache
+        inline const char* Clear_cache_2() const { return Get("Clear cache"); }
+
+        // Deletes leftovers the mod and the game pile up in the game folder. Your settings, palettes, music, recordings, saves and replays are never touched. Deleted files do not go to the Recycle Bin.
+        inline const char* Deletes_leftovers_the_mod_and_the_game_pile_up_in_the_game_folder_Your_settings_palettes_music_recordings_saves_and_replays_are_never_touched_Deleted_files_do_not_go_to_the_Recycle_Bin() const { return Get("Deletes leftovers the mod and the game pile up in the game folder. Your settings, palettes, music, recordings, saves and replays are never touched. Deleted files do not go to the Recycle Bin."); }
+
+        // Looking through the game folder...
+        inline const char* Looking_through_the_game_folder() const { return Get("Looking through the game folder..."); }
+
+        // Select all
+        inline const char* Select_all() const { return Get("Select all"); }
+
+        // nothing to clear
+        inline const char* nothing_to_clear() const { return Get("nothing to clear"); }
+
+        // file
+        inline const char* file() const { return Get("file"); }
+
+        // files
+        inline const char* files() const { return Get("files"); }
+
+        // Done: deleted
+        inline const char* Done_deleted() const { return Get("Done: deleted"); }
+
+        // freed.
+        inline const char* freed() const { return Get("freed."); }
+
+        // in use by the game right now were left; they can be cleared after a restart.
+        inline const char* in_use_by_the_game_right_now_were_left_they_can_be_cleared_after_a_restart() const { return Get("in use by the game right now were left; they can be cleared after a restart."); }
+
+        // could not be deleted; see BBCF_IM\DEBUG.txt.
+        inline const char* could_not_be_deleted_see_BBCF_IM_DEBUG_txt() const { return Get("could not be deleted; see BBCF_IM\\DEBUG.txt."); }
+
+        // Working...
+        inline const char* Working() const { return Get("Working..."); }
+
+        // Permanently delete
+        inline const char* Permanently_delete() const { return Get("Permanently delete"); }
+
+        // Yes, delete
+        inline const char* Yes_delete() const { return Get("Yes, delete"); }
+
+        // No
+        inline const char* No() const { return Get("No"); }
+
+        // Delete selected
+        inline const char* Delete_selected() const { return Get("Delete selected"); }
+
+        // Uninstall BBCF Improvement Mod
+        inline const char* Uninstall_BBCF_Improvement_Mod() const { return Get("Uninstall BBCF Improvement Mod"); }
+
+        // Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched.
+        inline const char* Removes_the_mod_from_this_game_folder_and_closes_the_game_The_next_time_you_start_BlazBlue_Centralfiction_it_runs_without_the_mod_The_game_itself_your_save_data_and_your_replays_are_not_touched() const { return Get("Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched."); }
+
+        // Keep my settings, palettes, music and recordings
+        inline const char* Keep_my_settings_palettes_music_and_recordings() const { return Get("Keep my settings, palettes, music and recordings"); }
+
+        // They stay in the game folder (settings.ini, palettes.ini and the BBCF_IM folder), so installing the mod again later picks them up. Untick to remove everything the mod ever made, including custom songs it converted into data\Sound\BGM.
+        inline const char* They_stay_in_the_game_folder_settings_ini_palettes_ini_and_the_BBCF_IM_folder_so_installing_the_mod_again_later_picks_them_up_Untick_to_remove_everything_the_mod_ever_made_including_custom_songs_it_converted_into_data_Sound_BGM() const { return Get("They stay in the game folder (settings.ini, palettes.ini and the BBCF_IM folder), so installing the mod again later picks them up. Untick to remove everything the mod ever made, including custom songs it converted into data\\Sound\\BGM."); }
+
+        // What gets removed:
+        inline const char* What_gets_removed() const { return Get("What gets removed:"); }
+
+        // The mod itself (dinput8.dll), its updater, readme and old version backups.
+        inline const char* The_mod_itself_dinput8_dll_its_updater_readme_and_old_version_backups() const { return Get("The mod itself (dinput8.dll), its updater, readme and old version backups."); }
+
+        // 4 GB mode's copy of the game (BBCF_IM_4GB.exe) and the Windows and NVIDIA settings it copied from BBCF.exe.
+        inline const char* _4_GB_mode_s_copy_of_the_game_BBCF_IM_4GB_exe_and_the_Windows_and_NVIDIA_settings_it_copied_from_BBCF_exe() const { return Get("4 GB mode's copy of the game (BBCF_IM_4GB.exe) and the Windows and NVIDIA settings it copied from BBCF.exe."); }
+
+        // Logs, crash reports and caches.
+        inline const char* Logs_crash_reports_and_caches() const { return Get("Logs, crash reports and caches."); }
+
+        // Your settings, palettes, music, recordings, rank history and every other file in BBCF_IM.
+        inline const char* Your_settings_palettes_music_recordings_rank_history_and_every_other_file_in_BBCF_IM() const { return Get("Your settings, palettes, music, recordings, rank history and every other file in BBCF_IM."); }
+
+        // Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.
+        inline const char* Windows_may_ask_for_administrator_permission_once_to_remove_the_firewall_rules_4_GB_mode_added() const { return Get("Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added."); }
+
+        // Uninstall and close the game
+        inline const char* Uninstall_and_close_the_game() const { return Get("Uninstall and close the game"); }
+
+        // The uninstaller is missing from this build of the mod.
+        inline const char* The_uninstaller_is_missing_from_this_build_of_the_mod() const { return Get("The uninstaller is missing from this build of the mod."); }
+
+        // Could not find the Windows temp folder.
+        inline const char* Could_not_find_the_Windows_temp_folder() const { return Get("Could not find the Windows temp folder."); }
+
+        // Could not write the uninstaller to the temp folder.
+        inline const char* Could_not_write_the_uninstaller_to_the_temp_folder() const { return Get("Could not write the uninstaller to the temp folder."); }
+
+        // Could not start the uninstaller (Windows error %lu).
+        inline const char* Could_not_start_the_uninstaller_Windows_error_lu() const { return Get("Could not start the uninstaller (Windows error %lu)."); }
+
+        // Old debug logs
+        inline const char* Old_debug_logs() const { return Get("Old debug logs"); }
+
+        // Diagnostic logs
+        inline const char* Diagnostic_logs() const { return Get("Diagnostic logs"); }
+
+        // Crash reports
+        inline const char* Crash_reports() const { return Get("Crash reports"); }
+
+        // Settings and palette backups
+        inline const char* Settings_and_palette_backups() const { return Get("Settings and palette backups"); }
+
+        // Old mod versions and update downloads
+        inline const char* Old_mod_versions_and_update_downloads() const { return Get("Old mod versions and update downloads"); }
+
+        // Save backups from older mod versions
+        inline const char* Save_backups_from_older_mod_versions() const { return Get("Save backups from older mod versions"); }
+
+        // Broken leftover files
+        inline const char* Broken_leftover_files() const { return Get("Broken leftover files"); }
+
+        // Caches
+        inline const char* Caches() const { return Get("Caches"); }
+
+        // Developer test data
+        inline const char* Developer_test_data() const { return Get("Developer test data"); }
+
+        // Logs from previous sessions (BBCF_IM\DebugHistory). The log of the session you are playing now is kept.
+        inline const char* Logs_from_previous_sessions_BBCF_IM_DebugHistory_The_log_of_the_session_you_are_playing_now_is_kept() const { return Get("Logs from previous sessions (BBCF_IM\\DebugHistory). The log of the session you are playing now is kept."); }
+
+        // Extra logs the mod writes when something goes wrong online or the game stutters (D-Code incidents, frame stalls, 4 GB mode). Only useful when sending a bug report.
+        inline const char* Extra_logs_the_mod_writes_when_something_goes_wrong_online_or_the_game_stutters_D_Code_incidents_frame_stalls_4_GB_mode_Only_useful_when_sending_a_bug_report() const { return Get("Extra logs the mod writes when something goes wrong online or the game stutters (D-Code incidents, frame stalls, 4 GB mode). Only useful when sending a bug report."); }
+
+        // Crash dumps from the mod (BBCF_IM\CrashReports) and from the game itself (bbcf_*_crash_*.mdmp, assert.txt in the game folder). Only useful when sending a bug report.
+        inline const char* Crash_dumps_from_the_mod_BBCF_IM_CrashReports_and_from_the_game_itself_bbcf_crash_mdmp_assert_txt_in_the_game_folder_Only_useful_when_sending_a_bug_report() const { return Get("Crash dumps from the mod (BBCF_IM\\CrashReports) and from the game itself (bbcf_*_crash_*.mdmp, assert.txt in the game folder). Only useful when sending a bug report."); }
+
+        // The copies of settings.ini and palettes.ini the updater makes before each update (*.bak-before-*). Your current settings and palettes are not touched.
+        inline const char* The_copies_of_settings_ini_and_palettes_ini_the_updater_makes_before_each_update_bak_before_Your_current_settings_and_palettes_are_not_touched() const { return Get("The copies of settings.ini and palettes.ini the updater makes before each update (*.bak-before-*). Your current settings and palettes are not touched."); }
+
+        // Every previous mod version the updater backed up, and the update zips it downloaded. Nothing uses them after the update.
+        inline const char* Every_previous_mod_version_the_updater_backed_up_and_the_update_zips_it_downloaded_Nothing_uses_them_after_the_update() const { return Get("Every previous mod version the updater backed up, and the update zips it downloaded. Nothing uses them after the update."); }
+
+        // Copies of your save data taken before older mod versions first ran. The copy for this version, and any restore you have scheduled, are kept; older ones can no longer be restored from the Online page.
+        inline const char* Copies_of_your_save_data_taken_before_older_mod_versions_first_ran_The_copy_for_this_version_and_any_restore_you_have_scheduled_are_kept_older_ones_can_no_longer_be_restored_from_the_Online_page() const { return Get("Copies of your save data taken before older mod versions first ran. The copy for this version, and any restore you have scheduled, are kept; older ones can no longer be restored from the Online page."); }
+
+        // Half-written .tmp files left behind when the game closed in the middle of saving something.
+        inline const char* Half_written_tmp_files_left_behind_when_the_game_closed_in_the_middle_of_saving_something() const { return Get("Half-written .tmp files left behind when the game closed in the middle of saving something."); }
+
+        // Files the mod rebuilds by itself. The next launch takes a second or two longer while they are rebuilt.
+        inline const char* Files_the_mod_rebuilds_by_itself_The_next_launch_takes_a_second_or_two_longer_while_they_are_rebuilt() const { return Get("Files the mod rebuilds by itself. The next launch takes a second or two longer while they are rebuilt."); }
+
+        // Test dumps and debug symbols from mod development. Players normally have none of these.
+        inline const char* Test_dumps_and_debug_symbols_from_mod_development_Players_normally_have_none_of_these() const { return Get("Test dumps and debug symbols from mod development. Players normally have none of these."); }
 };
 
 

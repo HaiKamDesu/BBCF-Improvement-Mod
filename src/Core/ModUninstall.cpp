@@ -1,6 +1,7 @@
 #include "ModUninstall.h"
 
 #include "Core/EmbeddedResources.h"
+#include "Core/Localization.h"
 #include "Core/logger.h"
 #include "Core/NvidiaProfileMirror.h"
 #include "Core/utils.h"
@@ -29,14 +30,14 @@ namespace ModUninstall
 		std::string updater;
 		if (!LoadEmbeddedResource(L"BBCFIMUpdater.exe", updater) || updater.size() < 2 || updater[0] != 'M' || updater[1] != 'Z')
 		{
-			*error = "The uninstaller is missing from this build of the mod.";
+			*error = L("The uninstaller is missing from this build of the mod.");
 			return false;
 		}
 
 		wchar_t temp[MAX_PATH] = {};
 		if (!GetTempPathW(MAX_PATH, temp))
 		{
-			*error = "Could not find the Windows temp folder.";
+			*error = L("Could not find the Windows temp folder.");
 			return false;
 		}
 		const std::wstring folder = std::wstring(temp) + L"BBCF_IM_Uninstall_" + std::to_wstring(GetCurrentProcessId());
@@ -44,7 +45,7 @@ namespace ModUninstall
 		const std::wstring exe = folder + L"\\BBCFIMUpdater.exe";
 		if (!WriteWholeFile(exe, updater))
 		{
-			*error = "Could not write the uninstaller to the temp folder.";
+			*error = L("Could not write the uninstaller to the temp folder.");
 			return false;
 		}
 
@@ -69,7 +70,7 @@ namespace ModUninstall
 		PROCESS_INFORMATION pi = {};
 		if (!CreateProcessW(exe.c_str(), &command[0], nullptr, nullptr, FALSE, 0, nullptr, folder.c_str(), &si, &pi))
 		{
-			*error = "Could not start the uninstaller (Windows error " + std::to_string(GetLastError()) + ").";
+			*error = FormatText(L("Could not start the uninstaller (Windows error %lu).").c_str(), GetLastError());
 			return false;
 		}
 		CloseHandle(pi.hThread);

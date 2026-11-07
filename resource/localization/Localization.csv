@@ -2208,7 +2208,7 @@ Details,Details,Detalles
 Whether each PC keeps up with 60 FPS (first line) and can absorb the rollbacks this connection produces without slowing down (second line).,Whether each PC keeps up with 60 FPS (first line) and can absorb the rollbacks this connection produces without slowing down (second line).,Si cada PC aguanta 60 FPS (primera línea) y puede absorber los rollbacks que produce esta conexión sin ralentizarse (segunda línea).
 %s's numbers: %.0f s ago,%s's numbers: %.0f s ago,Números de %s: hace %.0f s
 Test: spectator view with fake players,Test: spectator view with fake players,Prueba: vista de espectador con jugadores falsos
-"In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds.","In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through three situations every 6 seconds.","Prueba en desarrollo, solo offline: muestra la vista de espectador con reportes de jugadores inventados que pasan por el mismo código de recepción que los reales. Alterna entre tres situaciones cada 6 segundos."
+"In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through ten situations every 6 seconds (the connection icons follow it too).","In-development check, offline only: shows the spectator layout fed by made-up player reports pushed through the same receive code as real ones. It cycles through ten situations every 6 seconds (the connection icons follow it too).","Prueba en desarrollo, solo offline: muestra la vista de espectador alimentada con reportes inventados de jugadores, pasados por el mismo código de recepción que los reales. Recorre diez situaciones cada 6 segundos (los iconos de conexión también las siguen)."
 Game+Draw,Game+Draw,Juego+Dibujo
 "How fast this PC runs one full game frame - the game update and the drawing - compared with what 60 FPS needs. 100% is exactly enough; below 100% the game cannot hold 60 FPS and both players feel it. Measured without the frame limiter or vsync wait, as the typical (90th percentile) frame of the last 2 seconds.","How fast this PC runs one full game frame - the game update and the drawing - compared with what 60 FPS needs. 100% is exactly enough; below 100% the game cannot hold 60 FPS and both players feel it. Measured without the frame limiter or vsync wait, as the typical (90th percentile) frame of the last 2 seconds.","Qué tan rápido esta PC corre un frame completo del juego (actualización y dibujo) comparado con lo que piden 60 FPS. 100% alcanza justo; debajo de 100% el juego no aguanta 60 FPS y lo sienten los dos jugadores. Se mide sin el limitador de frames ni la espera de vsync, como el frame típico (percentil 90) de los últimos 2 segundos."
 Resim,Resim,Resim
@@ -2305,3 +2305,86 @@ Needs the code of the other player's nearest Valve server; it is exchanged while
 Show PC & connection stats,Show PC & connection stats,Ver datos de PC y conexión
 "Opens the PC & connection stats window (also Ctrl+F2): how fast each PC runs the game, the ping, and who is causing any lag - for players and spectators. The other side's numbers need them to run this mod too.","Opens the PC & connection stats window (also Ctrl+F2): how fast each PC runs the game, the ping, and who is causing any lag - for players and spectators. The other side's numbers need them to run this mod too.","Abre la ventana de datos de PC y conexión (también Ctrl+F2): qué tan rápido corre el juego cada PC, el ping, y quién causa el lag, para jugadores y espectadores. Los números del otro lado requieren que también use este mod."
 PC & connection stats,PC & connection stats,datos de PC y conexión
+Shown here so you can place it. During online matches it shows this player's state.,Shown here so you can place it. During online matches it shows this player's state.,Se muestra acá para que puedas ubicarlo. En partidas online muestra el estado de este jugador.
+"This player does not run the mod, so their numbers are unknown.","This player does not run the mod, so their numbers are unknown.","Este jugador no usa el mod, así que sus números son desconocidos."
+This player runs an older mod version that does not share these numbers.,This player runs an older mod version that does not share these numbers.,Este jugador usa una versión vieja del mod que no comparte estos números.
+This player's mod is not sending its numbers.,This player's mod is not sending its numbers.,El mod de este jugador no está enviando sus números.
+No opponent found yet.,No opponent found yet.,Todavía no se encontró rival.
+Waiting for numbers...,Waiting for numbers...,Esperando números...
+"%.0f%% capacity, %.0f FPS","%.0f%% capacity, %.0f FPS","%.0f%% de capacidad, %.0f FPS"
+Struggling,Struggling,Sufriendo
+"This PC can't hold 60 FPS, so the match slows down for both players.","This PC can't hold 60 FPS, so the match slows down for both players.","Esta PC no aguanta 60 FPS, así que la partida se ralentiza para los dos jugadores."
+Borderline,Borderline,Al límite
+"Keeps up, with little room to spare.","Keeps up, with little room to spare.","Aguanta, con poco margen."
+Runs the game with room to spare.,Runs the game with room to spare.,Corre el juego con margen de sobra.
+Checking,Checking,Comprobando
+Give it a few seconds of play.,Give it a few seconds of play.,Dale unos segundos de juego.
+"Ping %u ms, jitter %u ms","Ping %u ms, jitter %u ms","Ping %u ms, jitter %u ms"
+", longest gap in their packets %u ms",", longest gap in their packets %u ms",", mayor hueco en sus paquetes %u ms"
+", nearest Valve server %u ms",", nearest Valve server %u ms",", servidor de Valve más cercano %u ms"
+Packets arrive steadily.,Packets arrive steadily.,Los paquetes llegan de forma estable.
+High ping to the nearest Valve server: this side's line adds delay.,High ping to the nearest Valve server: this side's line adds delay.,Ping alto al servidor de Valve más cercano: la línea de este lado agrega demora.
+Packets arrive with long gaps: this side causes stutter and rollbacks.,Packets arrive with long gaps: this side causes stutter and rollbacks.,Los paquetes llegan con huecos largos: este lado causa tirones y rollbacks.
+Needs the other player's numbers too.,Needs the other player's numbers too.,Hacen falta también los números del otro jugador.
+PC State,PC State,Estado de la PC
+Connection State,Connection State,Estado de la conexión
+(no update for a few seconds),(no update for a few seconds),(sin actualizar hace unos segundos)
+"Positions are locked (PC & connection stats window, Ctrl+F2).","Positions are locked (PC & connection stats window, Ctrl+F2).","Las posiciones están bloqueadas (ventana de estadísticas de PC y conexión, Ctrl+F2)."
+"Drag to move, drag the corner to resize all four. Ctrl+F2 opens the full stats.","Drag to move, drag the corner to resize all four. Ctrl+F2 opens the full stats.","Arrastra para mover, arrastra la esquina para cambiar el tamaño de los cuatro. Ctrl+F2 abre las estadísticas completas."
+Show connection icons on screen,Show connection icons on screen,Mostrar iconos de conexión en pantalla
+"During online matches, a small PC icon and a connection icon (Wi-Fi or cable) for each player stay on screen: green is fine, orange is borderline, red is the cause of lag, grey is unknown, a question mark is a player without the mod. Hover one for its state. While the mod menu (F1) is open they show anywhere: drag one to move it, drag its corner to resize all four.","During online matches, a small PC icon and a connection icon (Wi-Fi or cable) for each player stay on screen: green is fine, orange is borderline, red is the cause of lag, grey is unknown, a question mark is a player without the mod. Hover one for its state. While the mod menu (F1) is open they show anywhere: drag one to move it, drag its corner to resize all four.","En partidas online quedan en pantalla un pequeño icono de PC y uno de conexión (Wi-Fi o cable) por jugador: verde está bien, naranja está al límite, rojo es la causa del lag, gris es desconocido, un signo de pregunta es un jugador sin el mod. Pasa el mouse por encima de uno para ver su estado. Con el menú del mod (F1) abierto se muestran en cualquier lado: arrastra uno para moverlo, arrastra su esquina para cambiar el tamaño de los cuatro."
+Lock positions,Lock positions,Bloquear posiciones
+Reset size,Reset size,Restablecer tamaño
+Clear cache...,Clear cache...,Limpiar caché...
+"Free up space: delete old logs, crash reports, update backups and other leftovers from the game folder.","Free up space: delete old logs, crash reports, update backups and other leftovers from the game folder.","Libera espacio: borra logs viejos, reportes de crash, respaldos de actualizaciones y otros restos de la carpeta del juego."
+Uninstall...,Uninstall...,Desinstalar...
+Remove the mod from this game folder.,Remove the mod from this game folder.,Quita el mod de esta carpeta del juego.
+Clear cache,Clear cache,Limpiar caché
+"Deletes leftovers the mod and the game pile up in the game folder. Your settings, palettes, music, recordings, saves and replays are never touched. Deleted files do not go to the Recycle Bin.","Deletes leftovers the mod and the game pile up in the game folder. Your settings, palettes, music, recordings, saves and replays are never touched. Deleted files do not go to the Recycle Bin.","Borra los restos que el mod y el juego van acumulando en la carpeta del juego. Tu configuración, paletas, música, grabaciones, partidas guardadas y repeticiones nunca se tocan. Los archivos borrados no van a la Papelera de reciclaje."
+Looking through the game folder...,Looking through the game folder...,Revisando la carpeta del juego...
+Select all,Select all,Seleccionar todo
+nothing to clear,nothing to clear,nada para limpiar
+file,file,archivo
+files,files,archivos
+Done: deleted,Done: deleted,Listo: se borraron
+freed.,freed.,liberados.
+in use by the game right now were left; they can be cleared after a restart.,in use by the game right now were left; they can be cleared after a restart.,en uso por el juego en este momento quedaron; se pueden limpiar después de reiniciar.
+could not be deleted; see BBCF_IM\DEBUG.txt.,could not be deleted; see BBCF_IM\DEBUG.txt.,no se pudieron borrar; mira BBCF_IM\DEBUG.txt.
+Working...,Working...,Trabajando...
+Permanently delete,Permanently delete,Borrar permanentemente
+"Yes, delete","Yes, delete","Sí, borrar"
+No,No,No
+Delete selected,Delete selected,Borrar seleccionados
+Uninstall BBCF Improvement Mod,Uninstall BBCF Improvement Mod,Desinstalar BBCF Improvement Mod
+"Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched.","Removes the mod from this game folder and closes the game. The next time you start BlazBlue Centralfiction it runs without the mod. The game itself, your save data and your replays are not touched.","Quita el mod de esta carpeta del juego y cierra el juego. La próxima vez que inicies BlazBlue Centralfiction va a correr sin el mod. El juego en sí, tus partidas guardadas y tus repeticiones no se tocan."
+"Keep my settings, palettes, music and recordings","Keep my settings, palettes, music and recordings","Conservar mi configuración, paletas, música y grabaciones"
+"They stay in the game folder (settings.ini, palettes.ini and the BBCF_IM folder), so installing the mod again later picks them up. Untick to remove everything the mod ever made, including custom songs it converted into data\Sound\BGM.","They stay in the game folder (settings.ini, palettes.ini and the BBCF_IM folder), so installing the mod again later picks them up. Untick to remove everything the mod ever made, including custom songs it converted into data\Sound\BGM.","Quedan en la carpeta del juego (settings.ini, palettes.ini y la carpeta BBCF_IM), así que si vuelves a instalar el mod más adelante los retoma. Desmárcalo para quitar todo lo que el mod creó, incluidas las canciones personalizadas que convirtió dentro de data\Sound\BGM."
+What gets removed:,What gets removed:,Qué se quita:
+"The mod itself (dinput8.dll), its updater, readme and old version backups.","The mod itself (dinput8.dll), its updater, readme and old version backups.","El mod en sí (dinput8.dll), su actualizador, el readme y los respaldos de versiones anteriores."
+4 GB mode's copy of the game (BBCF_IM_4GB.exe) and the Windows and NVIDIA settings it copied from BBCF.exe.,4 GB mode's copy of the game (BBCF_IM_4GB.exe) and the Windows and NVIDIA settings it copied from BBCF.exe.,La copia del juego del modo 4 GB (BBCF_IM_4GB.exe) y los ajustes de Windows y NVIDIA que copió de BBCF.exe.
+"Logs, crash reports and caches.","Logs, crash reports and caches.","Logs, reportes de crash y cachés."
+"Your settings, palettes, music, recordings, rank history and every other file in BBCF_IM.","Your settings, palettes, music, recordings, rank history and every other file in BBCF_IM.","Tu configuración, paletas, música, grabaciones, historial de rango y todos los demás archivos de BBCF_IM."
+"Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.","Windows may ask for administrator permission once, to remove the firewall rules 4 GB mode added.","Puede que Windows pida permiso de administrador una vez, para quitar las reglas del firewall que agregó el modo 4 GB."
+Uninstall and close the game,Uninstall and close the game,Desinstalar y cerrar el juego
+The uninstaller is missing from this build of the mod.,The uninstaller is missing from this build of the mod.,Falta el desinstalador en esta compilación del mod.
+Could not find the Windows temp folder.,Could not find the Windows temp folder.,No se encontró la carpeta temporal de Windows.
+Could not write the uninstaller to the temp folder.,Could not write the uninstaller to the temp folder.,No se pudo escribir el desinstalador en la carpeta temporal.
+Could not start the uninstaller (Windows error %lu).,Could not start the uninstaller (Windows error %lu).,No se pudo iniciar el desinstalador (error de Windows %lu).
+Old debug logs,Old debug logs,Logs de depuración viejos
+Diagnostic logs,Diagnostic logs,Logs de diagnóstico
+Crash reports,Crash reports,Reportes de crash
+Settings and palette backups,Settings and palette backups,Respaldos de configuración y paletas
+Old mod versions and update downloads,Old mod versions and update downloads,Versiones viejas del mod y descargas de actualizaciones
+Save backups from older mod versions,Save backups from older mod versions,Respaldos de partidas guardadas de versiones viejas del mod
+Broken leftover files,Broken leftover files,Archivos sobrantes rotos
+Caches,Caches,Cachés
+Developer test data,Developer test data,Datos de prueba de desarrollo
+Logs from previous sessions (BBCF_IM\DebugHistory). The log of the session you are playing now is kept.,Logs from previous sessions (BBCF_IM\DebugHistory). The log of the session you are playing now is kept.,Logs de sesiones anteriores (BBCF_IM\DebugHistory). El log de la sesión que estás jugando ahora se conserva.
+"Extra logs the mod writes when something goes wrong online or the game stutters (D-Code incidents, frame stalls, 4 GB mode). Only useful when sending a bug report.","Extra logs the mod writes when something goes wrong online or the game stutters (D-Code incidents, frame stalls, 4 GB mode). Only useful when sending a bug report.","Logs extra que el mod escribe cuando algo sale mal online o el juego se traba (incidentes de D-Code, congelamientos de frames, modo 4 GB). Solo sirven para enviar un reporte de bug."
+"Crash dumps from the mod (BBCF_IM\CrashReports) and from the game itself (bbcf_*_crash_*.mdmp, assert.txt in the game folder). Only useful when sending a bug report.","Crash dumps from the mod (BBCF_IM\CrashReports) and from the game itself (bbcf_*_crash_*.mdmp, assert.txt in the game folder). Only useful when sending a bug report.","Volcados de crash del mod (BBCF_IM\CrashReports) y del propio juego (bbcf_*_crash_*.mdmp, assert.txt en la carpeta del juego). Solo sirven para enviar un reporte de bug."
+The copies of settings.ini and palettes.ini the updater makes before each update (*.bak-before-*). Your current settings and palettes are not touched.,The copies of settings.ini and palettes.ini the updater makes before each update (*.bak-before-*). Your current settings and palettes are not touched.,Las copias de settings.ini y palettes.ini que hace el actualizador antes de cada actualización (*.bak-before-*). Tu configuración y paletas actuales no se tocan.
+"Every previous mod version the updater backed up, and the update zips it downloaded. Nothing uses them after the update.","Every previous mod version the updater backed up, and the update zips it downloaded. Nothing uses them after the update.","Cada versión anterior del mod que respaldó el actualizador, y los zips de actualización que descargó. Nada los usa después de actualizar."
+"Copies of your save data taken before older mod versions first ran. The copy for this version, and any restore you have scheduled, are kept; older ones can no longer be restored from the Online page.","Copies of your save data taken before older mod versions first ran. The copy for this version, and any restore you have scheduled, are kept; older ones can no longer be restored from the Online page.","Copias de tus partidas guardadas tomadas antes de que versiones viejas del mod se ejecutaran por primera vez. La copia de esta versión, y cualquier restauración que tengas programada, se conservan; las más viejas ya no se pueden restaurar desde la página Online."
+Half-written .tmp files left behind when the game closed in the middle of saving something.,Half-written .tmp files left behind when the game closed in the middle of saving something.,Archivos .tmp a medio escribir que quedaron cuando el juego se cerró en medio de un guardado.
+Files the mod rebuilds by itself. The next launch takes a second or two longer while they are rebuilt.,Files the mod rebuilds by itself. The next launch takes a second or two longer while they are rebuilt.,Archivos que el mod reconstruye solo. El próximo inicio tarda uno o dos segundos más mientras se reconstruyen.
+Test dumps and debug symbols from mod development. Players normally have none of these.,Test dumps and debug symbols from mod development. Players normally have none of these.,Volcados de prueba y símbolos de depuración del desarrollo del mod. Los jugadores normalmente no tienen ninguno.
