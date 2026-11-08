@@ -38,6 +38,8 @@ Keep this file small. It is always loaded; deeper context is opt-in.
 - Localization/UI copy: `resource/localization/Localization.csv`, generated `src/Core/LocalizationKeys.autogen.h`, `docs/localization.md`.
 - Overlay UI: `src/Overlay/Window*`, `src/Overlay/Widget*`, `src/Overlay/WindowManager.*`.
 - Hooks: `src/Hooks/*`, `notes.h`, `src/Game/GhidraDefs.h`, and `docs/HookEpilogueContract.md` (read before touching any JMP patch).
+- Reverse engineering: findings go in a `docs/Decompilation/*.md` ledger row or a `GhidraDefs.h` `ADDR_`, then
+  `tools/decomp/sync_archive.sh` so the private decompile archive always holds everything we know.
 - Replay/URT: `src/Game/ReplayTakeover`, `src/Game/ReplayRewind`, `src/Game/ReplayStates`, `docs/replay_takeover`.
 - Networking/Steam: `src/Network`, `src/SteamApiWrapper`.
 - Palettes: `src/Palette`, `resource/palettes.ini`.

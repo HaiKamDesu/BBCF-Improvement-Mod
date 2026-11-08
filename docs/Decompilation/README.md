@@ -9,12 +9,24 @@ How to work on this: the `bbcf-decompile` skill (`.claude/skills/bbcf-decompile/
 Joining in from another machine: [LocalSetup.md](LocalSetup.md) builds the same decompile from your
 own copy of BBCF.exe (`tools/decomp/build_local_decomp.sh`), and explains why we never upload it.
 
+## Keeping the archive complete
+
+The archive should always hold everything this repo knows. It gets that from two sources:
+- the ledger rows in these docs (Name column = the function's name in Ghidra, so use an
+  identifier; Level and Notes become its comment)
+- the `ADDR_` constants in `src/Game/GhidraDefs.h` (with the `//` lines above them as notes)
+
+`tools/decomp/sync_archive.sh` applies both to the archive's Ghidra project (plate comments between
+`[repo]` and `[/repo]`, so notes typed in the GUI survive), re-exports `decomp/` so the C carries
+them too, and copies these docs into `knowledge/` with the commit they came from. Run it after any
+session that adds rows or names; `--zip <path>` packs the result for handing over (private).
+
 ## Where things are
 
 | What | Where | In git? |
 |---|---|---|
 | Preserved game build, hashes, manifest | `C:\BBCF_Archive\build_11073075\` | no (private) |
-| Analysed Ghidra project with the mod's names | `C:\BBCF_Archive\build_11073075\ghidra\` | no |
+| Analysed Ghidra project with the repo's names and notes | `C:\BBCF_Archive\build_11073075\ghidra\` | no |
 | Every function decompiled to C, function and string indexes | `C:\BBCF_Archive\build_11073075\decomp\` | no: decompiled game code is never committed |
 | What each function *means*: this ledger and the per-subsystem docs | `docs/Decompilation/` | yes |
 | Names and addresses the mod uses | `src/Game/GhidraDefs.h` | yes |

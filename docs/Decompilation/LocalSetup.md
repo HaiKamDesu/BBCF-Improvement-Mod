@@ -47,8 +47,9 @@ Then run:
 tools/decomp/build_local_decomp.sh "<steam>/steamapps/common/BlazBlue Centralfiction/BBCF.exe" ~/bbcf-decomp ~/ghidra_11.4.2_PUBLIC
 ```
 
-It imports and fully analyses the exe, applies every name from `src/Game/GhidraDefs.h`, and exports
-every function as C. Expect around an hour. You end up with:
+It imports and fully analyses the exe, applies every name and note the repo has (the `ADDR_`
+constants in `src/Game/GhidraDefs.h` and every ledger row in `docs/Decompilation/`), and exports
+every function as C, each with our notes in a `/* [repo] ... */` comment above it. Expect around an hour. You end up with:
 
 | Path | What |
 |---|---|
@@ -76,7 +77,9 @@ python3 tools/bbcf_scr_scan.py "<install>" --ops 22008        # every invul-time
 - Write what a function *means* into the subsystem doc in `docs/Decompilation/`. The format and the
   L0-L3 levels are in [README.md](README.md). Quoting a few lines of decompiled code to explain a
   point is fine. Pasting whole functions isn't.
-- Give a function or global a name by adding a `static constexpr uintptr_t ADDR_<Name> = 0x<RVA>;`
-  to `src/Game/GhidraDefs.h`. The next time anyone runs the setup script (or `ApplyRepoNames.py` on
-  an existing project), it shows up under that name for everyone.
+- Name a function by giving it a ledger row with an identifier in the Name column
+  (`| 0x00573E50 | Hit_InvulGuardCheck | 2099 | L1 | notes |`), or, for an address the mod's
+  code uses, a `static constexpr uintptr_t ADDR_<Name> = 0x<RVA>;` in `src/Game/GhidraDefs.h`.
+- After pulling, refresh your project with everyone's latest names and notes (about 4 minutes):
+  `BBCF_ARCHIVE=~/bbcf-decomp GHIDRA_HOME=~/ghidra_11.4.2_PUBLIC BBCF_GHIDRA_USER=$USER tools/decomp/sync_archive.sh`
 - PRs to this repo as usual.

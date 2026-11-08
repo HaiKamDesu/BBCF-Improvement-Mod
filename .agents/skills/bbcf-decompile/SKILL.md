@@ -36,9 +36,29 @@ mod, one subsystem at a time (the re3/reVC approach). The ledger of what is done
 | Decompile + asm for a list | headless Ghidra `DecompList.py` (see bbcf-re-workflow / reference-headless-ghidra-from-wsl memory) on the repo project, `-readOnly` |
 | Raw bytes, jump tables | parse `BBCF.exe` sections in Python (see how the profile-sync jump table at 0x4B1128 was read) |
 | Branch-into-patch check | scan `tools/bbcf_disasm_ascii.txt` for jumps/calls landing inside a planned patch |
-| Push names back into Ghidra | `ApplyRepoNames.py` on the archive project (reads `ADDR_` constants from GhidraDefs.h) |
-| Regenerate the export | `ExportFullDecompile.py` (archive README.txt has the command) |
+| Push names and notes into the archive, re-export | `tools/decomp/sync_archive.sh` (see "Keep the archive current") |
 | Progress numbers | `python3 tools/decomp_progress.py` |
+
+## Keep the archive current (every session that learns something)
+
+The archive project is meant to hold *everything* we know about BBCF at any point, so that it
+can be handed to a collaborator as-is. Knowledge only reaches it through two files, and one
+script carries it over:
+
+1. Every function you understand goes in a ledger row in `docs/Decompilation/<Subsystem>.md`
+   with an **identifier** in the Name column (`Hit_InvulGuardCheck`, not `(invul check)`; a
+   parenthesised description becomes a note but never a name). Put the convention, arguments and
+   fields touched in Notes. Those notes become the function's comment in Ghidra and the C export.
+2. Addresses the mod's code uses go in `src/Game/GhidraDefs.h` as `ADDR_` constants; the `//`
+   lines right above one become its note.
+3. Before finishing, run `tools/decomp/sync_archive.sh` (about 4 minutes; close the archive
+   project in the Ghidra GUI first). It renames, writes the notes as plate comments between
+   `[repo]` lines, re-exports `decomp/`, and copies the write-ups into `knowledge/` stamped with
+   the commit. Check its summary line: `outside image` should be 0 and `kept` lists names it did
+   not override. Re-running is safe.
+4. To hand the project over, `tools/decomp/sync_archive.sh --zip <path>` (private: it contains
+   BBCF.exe and decompiled code; collaborators normally build their own via LocalSetup.md, which
+   runs the same sync script logic, so they get the same names and notes from the repo).
 
 ## Method for one subsystem
 
@@ -51,9 +71,9 @@ mod, one subsystem at a time (the re3/reVC approach). The ledger of what is done
    exactly that shape). List every function inside the boundary at L0, plus the shared data
    (globals, struct layouts, vtables) in prose below the table.
 3. **Raise every function to L1, then L2.** L1 = role + callers/callees. L2 = convention,
-   arguments, return, every field touched, every global read/written. Name functions in
-   `GhidraDefs.h` (`ADDR_` constants) as they become L2; run `ApplyRepoNames.py` so later
-   exports carry the names.
+   arguments, return, every field touched, every global read/written. Give every row an identifier name
+   as it becomes L1/L2 (the ledger name is what the archive gets), and add an `ADDR_` constant
+   to `GhidraDefs.h` when the mod's code needs the address.
 4. **Design the rewrite** in the subsystem doc: which functions get replaced, which stay as game
    calls (and why), what changes behaviour vs. vanilla (mark those, like ProfileSync's `[mod]`).
 5. **Rewrite** in `src/...`: replace whole functions at entry where possible (a 5-byte JMP onto a
@@ -64,7 +84,7 @@ mod, one subsystem at a time (the re3/reVC approach). The ledger of what is done
    runtime ESP check, which catches a wrong `ret N` immediately) and drive it with bbcf-agentctl.
    If the tool lacks a capability, extend the tool first. Mark functions L3 only after this.
 7. **Update the ledger** (`docs/Decompilation/README.md` subsystem row + progress table from
-   `tools/decomp_progress.py`) and the project memory.
+   `tools/decomp_progress.py`) and the project memory, then run `tools/decomp/sync_archive.sh`.
 
 ## Reference implementation
 

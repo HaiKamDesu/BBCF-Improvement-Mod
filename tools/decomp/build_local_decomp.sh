@@ -8,11 +8,11 @@
 #   tools/decomp/build_local_decomp.sh <path to BBCF.exe> <output dir> [ghidra install dir]
 #
 # Output:
-#   <out>/ghidra/BBCF.gpr          analysed Ghidra project, with the mod's names applied
+#   <out>/ghidra/BBCF.gpr          analysed Ghidra project, with the repo's names and notes
 #   <out>/decomp/src/XXXX0000.c    every function as C, in 64 KB address buckets
 #   <out>/decomp/functions.tsv     entry, name, size, file, callers, callees, convention
 #   <out>/decomp/strings.tsv       every string and the functions that use it
-#   <out>/apply_repo_names.txt     which names from src/Game/GhidraDefs.h were applied
+#   <out>/sync_report.txt          which names and notes from the repo were applied
 #
 # Needs Ghidra 11.x (tested with 11.4.2) and a JDK 21. Works on Linux natively: Ghidra is Java,
 # so a Linux/Steam Deck/WINE player does not need WINE for this part. Pass the Ghidra folder as the
@@ -57,9 +57,10 @@ mkdir -p "$OUT/ghidra" "$OUT/decomp"
 "$GHIDRA/support/analyzeHeadless" "$OUT/ghidra" BBCF \
     -import "$EXE" -overwrite \
     -scriptPath "$REPO/docs/Research/ghidra_scripts" \
-    -postScript ApplyRepoNames.py "$REPO/src/Game/GhidraDefs.h" "$OUT/apply_repo_names.txt" \
+    -postScript SyncRepoKnowledge.py "$REPO" "$OUT/sync_report.txt" \
     -postScript ExportFullDecompile.py "$OUT/decomp" 90
 
 echo
 echo "Done. Grep $OUT/decomp/src for a function, e.g.:  grep -n '^//==== 00573E50' $OUT/decomp/src/*.c"
 echo "Read docs/Decompilation/README.md for what is already mapped."
+echo "After a git pull, refresh the names and notes:  BBCF_ARCHIVE=$OUT GHIDRA_HOME=$GHIDRA BBCF_GHIDRA_USER=\$USER tools/decomp/sync_archive.sh"

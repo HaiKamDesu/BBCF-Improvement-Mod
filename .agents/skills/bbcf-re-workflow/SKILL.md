@@ -226,6 +226,18 @@ commands (cdb, WinDbg, grep on disasm files). Do NOT attempt to run cdb directly
 
 CDB pre-built commands for ranked crashes: `tools/cdb_ranked_crash_cmds.txt`
 
+## Recording findings so the archive gets them
+
+Any finding worth keeping (what a function does, a field's meaning, a hook site) ends in the
+repo, and from there in the private decompile archive:
+
+- functions: a row in the matching `docs/Decompilation/<Subsystem>.md` ledger
+  (`| 0x00XXXXXX | IdentifierName | size | L1 | notes |`); start a new subsystem doc if none fits
+- addresses the code uses: an `ADDR_` constant in `src/Game/GhidraDefs.h` with `//` notes above it
+- then run `tools/decomp/sync_archive.sh` (bbcf-decompile skill, "Keep the archive current")
+
+A finding that only lives in a `*GhidraReport.txt`, `notes.h` or chat never reaches the archive.
+
 ## Adding findings to GhidraDefs.h
 
 File: `src/Game/GhidraDefs.h`
