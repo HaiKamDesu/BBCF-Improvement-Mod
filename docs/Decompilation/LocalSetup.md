@@ -49,7 +49,9 @@ tools/decomp/build_local_decomp.sh "<steam>/steamapps/common/BlazBlue Centralfic
 
 It imports and fully analyses the exe, applies every name and note the repo has (the `ADDR_`
 constants in `src/Game/GhidraDefs.h` and every ledger row in `docs/Decompilation/`), and exports
-every function as C, each with our notes in a `/* [repo] ... */` comment above it. Expect around an hour. You end up with:
+every function as C, each with our notes in a `/* [repo] ... */` comment above it. It also
+loads our struct layouts and typed signatures (`docs/Decompilation/types/`), so the C reads
+`defender->invuln_timer` rather than `*(int *)(param_1 + 0x994)`. Expect around an hour. You end up with:
 
 | Path | What |
 |---|---|
@@ -80,6 +82,9 @@ python3 tools/bbcf_scr_scan.py "<install>" --ops 22008        # every invul-time
 - Name a function by giving it a ledger row with an identifier in the Name column
   (`| 0x00573E50 | Hit_InvulGuardCheck | 2099 | L1 | notes |`), or, for an address the mod's
   code uses, a `static constexpr uintptr_t ADDR_<Name> = 0x<RVA>;` in `src/Game/GhidraDefs.h`.
+- Name a struct field by splitting a `pad_` in its header (`src/Game/CharData.h`...) with a
+  `static_assert(offsetof(...))`; add a checked signature to `docs/Decompilation/types/signatures.h`.
+  Without MSVC you can't regenerate `types/structs.json`; say so in the PR and Kam will.
 - After pulling, refresh your project with everyone's latest names and notes (about 4 minutes):
   `BBCF_ARCHIVE=~/bbcf-decomp GHIDRA_HOME=~/ghidra_11.4.2_PUBLIC BBCF_GHIDRA_USER=$USER tools/decomp/sync_archive.sh`
 - PRs to this repo as usual.

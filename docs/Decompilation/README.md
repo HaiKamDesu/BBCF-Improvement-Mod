@@ -21,6 +21,28 @@ The archive should always hold everything this repo knows. It gets that from two
 them too, and copies these docs into `knowledge/` with the commit they came from. Run it after any
 session that adds rows or names; `--zip <path>` packs the result for handing over (private).
 
+### Types: structs and signatures
+
+The decompiler only prints `defender->invuln_timer` instead of `*(int *)(param_1 + 0x994)` when
+it knows the struct and the function's signature. Both come from the repo too:
+
+- **Struct layouts.** Game structs are declared in the mod's headers (`src/Game/CharData.h`,
+  `Room/`, `ReplayFiles/`, `GhidraDefs.h`). Offset comments in those headers are hand-written and
+  some are wrong, so `tools/decomp/gen_struct_layouts.py` asks MSVC for the real layout and writes
+  `types/structs.json`, which goes into Ghidra as the `/BBCF` category (pad_* fields stay
+  undefined, so their offsets still show). Name a field by splitting a pad in the header, and add
+  a `static_assert(offsetof(...))` for it. Commit the regenerated JSON: Linux collaborators have
+  no MSVC and use the committed copy.
+- **Typed signatures.** `types/signatures.h` has one line per understood function:
+  `/*0x0057EA70*/ int __cdecl Hit_PiercesInvul(CharData* defender, CharData* attacker);`. Add one
+  once the convention is checked in the assembly. Functions without a line still get their
+  convention and parameter names from a ledger note written as `thiscall(kbd, gameKey), ret 4`,
+  when the stack argument count matches `ret N`. `decomp/types_report.txt` lists the notes that
+  disagree with their own `ret`; those are doc errors to fix.
+
+The goal is a decompile that reads like source, one subsystem at a time, until enough of it is
+understood to run the game from our own code.
+
 ## Where things are
 
 | What | Where | In git? |

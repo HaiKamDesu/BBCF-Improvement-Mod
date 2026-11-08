@@ -52,12 +52,18 @@ script carries it over:
    fields touched in Notes. Those notes become the function's comment in Ghidra and the C export.
 2. Addresses the mod's code uses go in `src/Game/GhidraDefs.h` as `ADDR_` constants; the `//`
    lines right above one become its note.
-3. Before finishing, run `tools/decomp/sync_archive.sh` (about 4 minutes; close the archive
+3. Fields go in the mod's struct headers (split a `pad_` in `src/Game/CharData.h` etc. and add a
+   `static_assert(offsetof(...))`); typed signatures go in `docs/Decompilation/types/signatures.h`
+   once the convention is checked in the assembly. A ledger note written as
+   `thiscall(self, gameKey), ret 4` also gives the function its convention and parameter names.
+   `gen_struct_layouts.py` (run by the sync when MSVC is present) regenerates
+   `types/structs.json` from the headers; commit it.
+4. Before finishing, run `tools/decomp/sync_archive.sh` (about 4 minutes; close the archive
    project in the Ghidra GUI first). It renames, writes the notes as plate comments between
-   `[repo]` lines, re-exports `decomp/`, and copies the write-ups into `knowledge/` stamped with
-   the commit. Check its summary line: `outside image` should be 0 and `kept` lists names it did
-   not override. Re-running is safe.
-4. To hand the project over, `tools/decomp/sync_archive.sh --zip <path>` (private: it contains
+   `[repo]` lines, applies the structs and signatures, re-exports `decomp/`, and copies the write-ups into `knowledge/` stamped with
+   the commit. Check its summary lines: `outside image` should be 0, `kept` lists names it did
+   not override, and `types:` must show 0 failed signatures (`decomp/types_report.txt` says why). Re-running is safe.
+5. To hand the project over, `tools/decomp/sync_archive.sh --zip <path>` (private: it contains
    BBCF.exe and decompiled code; collaborators normally build their own via LocalSetup.md, which
    runs the same sync script logic, so they get the same names and notes from the repo).
 

@@ -1,0 +1,5619 @@
+{
+ "generated_by": "tools/decomp/gen_struct_layouts.py (MSVC /d1reportAllClassLayout, Win32)",
+ "enums": [
+  {
+   "name": "RoomRematch",
+   "base": "uint8_t",
+   "values": [
+    [
+     "RematchType_Disabled",
+     0
+    ],
+    [
+     "RematchType_Unlimited",
+     16
+    ],
+    [
+     "RematchType_Ft2",
+     32
+    ],
+    [
+     "RematchType_Ft3",
+     48
+    ],
+    [
+     "RematchType_Ft5",
+     80
+    ],
+    [
+     "RematchType_Ft10",
+     160
+    ]
+   ],
+   "header": "src/Game/Room/Room.h"
+  },
+  {
+   "name": "RoomSettingsRematchStatic",
+   "base": "uint32_t",
+   "values": [
+    [
+     "FixedRematchType_Disabled",
+     71
+    ],
+    [
+     "FixedRematchType_Unlimited",
+     72
+    ],
+    [
+     "FixedRematchType_Ft2",
+     73
+    ],
+    [
+     "FixedRematchType_Ft3",
+     74
+    ],
+    [
+     "FixedRematchType_Ft5",
+     75
+    ],
+    [
+     "FixedRematchType_Ft10",
+     76
+    ]
+   ],
+   "header": "src/Game/Room/Room.h"
+  },
+  {
+   "name": "RoomStatus",
+   "base": "int",
+   "values": [
+    [
+     "RoomStatus_Unavailable",
+     0
+    ],
+    [
+     "RoomStatus_Initializing",
+     1
+    ],
+    [
+     "RoomStatus_Functional",
+     2
+    ],
+    [
+     "RoomStatus_Terminating",
+     3
+    ]
+   ],
+   "header": "src/Game/Room/Room.h"
+  },
+  {
+   "name": "RoomType",
+   "base": "uint8_t",
+   "values": [
+    [
+     "RoomType_Ranked",
+     16
+    ],
+    [
+     "RoomType_MatchSpectate",
+     17
+    ],
+    [
+     "RoomType_Lobby",
+     18
+    ],
+    [
+     "RoomType_FFA",
+     33
+    ],
+    [
+     "RoomType_Training",
+     49
+    ],
+    [
+     "RoomType_Replay",
+     65
+    ]
+   ],
+   "header": "src/Game/Room/Room.h"
+  }
+ ],
+ "structs": [
+  {
+   "name": "BATTLE_CObjectManager",
+   "kind": "struct",
+   "size": 540232,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "field0_0x0",
+     "type": "byte",
+     "pointers": 0,
+     "span": 696,
+     "comment": ""
+    },
+    {
+     "offset": 696,
+     "name": "field1_0x2b8",
+     "type": "sized_20bdc_plaaceholder",
+     "pointers": 0,
+     "span": 402324,
+     "comment": ""
+    },
+    {
+     "offset": 403020,
+     "name": "field2_0x6264c",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 312,
+     "comment": ""
+    },
+    {
+     "offset": 403332,
+     "name": "ptr_to_smth_with_entity_list_1",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 403336,
+     "name": "ptr_to_smth_with_entity_list_2",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 403340,
+     "name": "ptr_to_smth_with_entity_list_3",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 403344,
+     "name": "array_ptr_to_OBJ_CBase",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 1000,
+     "comment": ""
+    },
+    {
+     "offset": 404344,
+     "name": "ptr_to_p1_OBJ_CCharBase",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 404348,
+     "name": "field8_0x62b7c",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 135880,
+     "comment": ""
+    },
+    {
+     "offset": 540228,
+     "name": "field9_0x83e44",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "CharData",
+   "kind": "struct",
+   "size": 149880,
+   "header": "src/Game/CharData.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "objCharbase",
+     "type": "OBJ_CCharBase",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "frame_count_minus_1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "thanks to kding0"
+    },
+    {
+     "offset": 8,
+     "name": "hitstop",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "thanks to kding0"
+    },
+    {
+     "offset": 12,
+     "name": "pad_0008",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 16,
+     "name": "unknownStatus1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 20,
+     "name": "pad_0014",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 24,
+     "name": "stateChangedCount",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 28,
+     "name": "pad_001C",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 52,
+     "name": "charIndex",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 56,
+     "name": "pad_0038",
+     "type": "char",
+     "pointers": 0,
+     "span": 20,
+     "comment": ""
+    },
+    {
+     "offset": 76,
+     "name": "pJonbEntryBegin",
+     "type": "JonbEntry",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 80,
+     "name": "pad_0050",
+     "type": "char",
+     "pointers": 0,
+     "span": 68,
+     "comment": ""
+    },
+    {
+     "offset": 148,
+     "name": "hurtboxCount",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 152,
+     "name": "hitboxCount",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 156,
+     "name": "pad_009C",
+     "type": "char",
+     "pointers": 0,
+     "span": 60,
+     "comment": ""
+    },
+    {
+     "offset": 216,
+     "name": "current_sprite_img",
+     "type": "char",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 220,
+     "name": "pad_00DC",
+     "type": "char",
+     "pointers": 0,
+     "span": 120,
+     "comment": ""
+    },
+    {
+     "offset": 340,
+     "name": "unknown_status2",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": "compared if 2 or not? I think 2 might mean its an entity that is anchored to the character that spawned it"
+    },
+    {
+     "offset": 341,
+     "name": "pad_0155",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 344,
+     "name": "pad_0158",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 352,
+     "name": "actionTime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 356,
+     "name": "actionTime2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 360,
+     "name": "actionTimeNoHitstop",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 364,
+     "name": "pad_0174",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": "char pad_0174[56]; //0x0174"
+    },
+    {
+     "offset": 372,
+     "name": "SLOT_31",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//EsBuff"
+    },
+    {
+     "offset": 376,
+     "name": "SLOT_51",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//bang kite float time"
+    },
+    {
+     "offset": 380,
+     "name": "SLOT_52",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 384,
+     "name": "SLOT_53",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 388,
+     "name": "SLOT_54",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 392,
+     "name": "SLOT_55",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 396,
+     "name": "SLOT_56",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 400,
+     "name": "SLOT_57",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 404,
+     "name": "SLOT_58",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 408,
+     "name": "SLOT_59",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//bang seal //azrael fireball /Plat item type"
+    },
+    {
+     "offset": 412,
+     "name": "SLOT_60",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//bang seal"
+    },
+    {
+     "offset": 416,
+     "name": "SLOT_61",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//bang seal"
+    },
+    {
+     "offset": 420,
+     "name": "SLOT_62",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "//bang seal /lambda_nu_drive_hitcount"
+    },
+    {
+     "offset": 424,
+     "name": "pad_01B0",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 440,
+     "name": "overdriveTimeleft",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 444,
+     "name": "overdriveTimerStartedAt",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 448,
+     "name": "pad_01C8",
+     "type": "char",
+     "pointers": 0,
+     "span": 20,
+     "comment": ""
+    },
+    {
+     "offset": 468,
+     "name": "moveSuperflashTime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 472,
+     "name": "pad_01D8",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 476,
+     "name": "superflashTime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 480,
+     "name": "isDoingDistortion",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 484,
+     "name": "pad_01E4",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 488,
+     "name": "ownerEntity",
+     "type": "CharData",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 492,
+     "name": "pad_01EC",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": "char pad_01EC[120]; //0x01EC"
+    },
+    {
+     "offset": 496,
+     "name": "enemyChar",
+     "type": "CharData",
+     "pointers": 1,
+     "span": 4,
+     "comment": "dont know exactly what it is yet, just that it is checked and I need to save it"
+    },
+    {
+     "offset": 500,
+     "name": "pad_01F4",
+     "type": "char",
+     "pointers": 0,
+     "span": 56,
+     "comment": "maybe this should be 56?"
+    },
+    {
+     "offset": 556,
+     "name": "last_child_entity_spawned",
+     "type": "CharData",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 560,
+     "name": "extra_child_entities",
+     "type": "CharData",
+     "pointers": 1,
+     "span": 28,
+     "comment": "should hold up to 7(?) idk extra child entities"
+    },
+    {
+     "offset": 588,
+     "name": "main_child_entity",
+     "type": "CharData",
+     "pointers": 1,
+     "span": 4,
+     "comment": "holds the main child entity, varies by character but its the puppets, arakune curse circle over enemy, etc. Some characters dont have it"
+    },
+    {
+     "offset": 592,
+     "name": "pad_0250",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": "char pad_0250[20]; // 0x0250"
+    },
+    {
+     "offset": 604,
+     "name": "bitflags_for_curr_state_properties_or_smth",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "holds some properties of attacks it seems in something like bitfields."
+    },
+    {
+     "offset": 608,
+     "name": "pad_0260",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 612,
+     "name": "facingLeft",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "is it not facing right?"
+    },
+    {
+     "offset": 616,
+     "name": "position_x",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 620,
+     "name": "position_y",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 624,
+     "name": "pad_0270",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 628,
+     "name": "offsetX_1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 632,
+     "name": "pad_0278",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 636,
+     "name": "rotationDegrees",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 640,
+     "name": "pad_0280",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 644,
+     "name": "scaleX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 648,
+     "name": "scaleY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 652,
+     "name": "pad_028C",
+     "type": "char",
+     "pointers": 0,
+     "span": 80,
+     "comment": ""
+    },
+    {
+     "offset": 732,
+     "name": "position_x_dupe",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 736,
+     "name": "position_y_dupe",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 740,
+     "name": "pad_02E4",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 756,
+     "name": "offsetX_2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 760,
+     "name": "pad_02F8",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 764,
+     "name": "offsetY_2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 768,
+     "name": "pad_0300",
+     "type": "char",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 796,
+     "name": "BoundingX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 800,
+     "name": "BoundingY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 804,
+     "name": "BoundingFixX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 808,
+     "name": "BoundingFixY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 812,
+     "name": "BoundingAddY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "do not use not sure what it is, but it's Unknown23087?"
+    },
+    {
+     "offset": 816,
+     "name": "BoundingAddX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 820,
+     "name": "stageEdgeTouchTimer",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 824,
+     "name": "pad_0338",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 848,
+     "name": "paletteColorOverride",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 852,
+     "name": "paletteFileIndex",
+     "type": "int16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 854,
+     "name": "paletteFileIndexIsColor",
+     "type": "int16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": "non-zero: paletteFileIndex is a color slot, not a file"
+    },
+    {
+     "offset": 856,
+     "name": "ownPaletteId",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 860,
+     "name": "linkedPaletteId",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 864,
+     "name": "pad_0360",
+     "type": "char",
+     "pointers": 0,
+     "span": 296,
+     "comment": ""
+    },
+    {
+     "offset": 1160,
+     "name": "typeOfAttack",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "1=normal, 2=special, 3=DD/EA, 5=AH"
+    },
+    {
+     "offset": 1164,
+     "name": "attackLevel",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1168,
+     "name": "moveDamage",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "; raw damage"
+    },
+    {
+     "offset": 1172,
+     "name": "pad_0494",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 1184,
+     "name": "attack_class_flags",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "bit 0x20 is gated by the defender's invuln bit 0x20000 (22036)"
+    },
+    {
+     "offset": 1188,
+     "name": "pad_04A4",
+     "type": "char",
+     "pointers": 0,
+     "span": 22,
+     "comment": ""
+    },
+    {
+     "offset": 1210,
+     "name": "attack_is_burst",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "script cmd 11026 (BurstObj, Izanami time stop); only invuln bit 0x200 stops it"
+    },
+    {
+     "offset": 1211,
+     "name": "attack_pierce_8000",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "lands unless the defender has invuln bit 0x8000 (22033); meaning unnamed"
+    },
+    {
+     "offset": 1212,
+     "name": "pad_04BC",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1216,
+     "name": "moveSpecialBlockstun",
+     "type": "int16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 1218,
+     "name": "pad_04C2",
+     "type": "char",
+     "pointers": 0,
+     "span": 6,
+     "comment": ""
+    },
+    {
+     "offset": 1224,
+     "name": "moveGuardCrushTime",
+     "type": "int16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 1226,
+     "name": "pad_04CA",
+     "type": "char",
+     "pointers": 0,
+     "span": 10,
+     "comment": ""
+    },
+    {
+     "offset": 1236,
+     "name": "vectorcheckX_1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1240,
+     "name": "vectorcheckY_1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1244,
+     "name": "vectorcheckX_2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1248,
+     "name": "vectorcheckY_2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1252,
+     "name": "ThrowRange",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1256,
+     "name": "attack_gate_4E8",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "hit-class gate vs defender invuln bit 0x80 (22022); also the 0x40000 shortcut"
+    },
+    {
+     "offset": 1257,
+     "name": "attack_gate_4E9",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "hit-class gate vs defender invuln bit 0x100 (22023)"
+    },
+    {
+     "offset": 1258,
+     "name": "attack_pierce_2000_a",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "with 0x4EB: both > 0 lands unless the defender has invuln bit 0x2000 (22030)"
+    },
+    {
+     "offset": 1259,
+     "name": "attack_pierce_2000_b",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 1260,
+     "name": "pad_04EC",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 1284,
+     "name": "performedThrowName",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 1316,
+     "name": "pad_0524",
+     "type": "char",
+     "pointers": 0,
+     "span": 100,
+     "comment": ""
+    },
+    {
+     "offset": 1416,
+     "name": "attack_invul_level",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "the hit is ignored only if the defender's invuln_level >= this"
+    },
+    {
+     "offset": 1417,
+     "name": "attack_head",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "attack attributes (script cmd 22019 of the ATTACKER's move data)"
+    },
+    {
+     "offset": 1418,
+     "name": "attack_body",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "each one lands through invul unless the defender has the matching"
+    },
+    {
+     "offset": 1419,
+     "name": "attack_foot",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "invuln_bitfield bit: head 0x8, body 0x10, foot 0x20,"
+    },
+    {
+     "offset": 1420,
+     "name": "attack_projectile",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "projectile 0x80000, throw 0x40"
+    },
+    {
+     "offset": 1421,
+     "name": "attack_throw",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 1422,
+     "name": "pad_058E",
+     "type": "char",
+     "pointers": 0,
+     "span": 214,
+     "comment": ""
+    },
+    {
+     "offset": 1636,
+     "name": "moveAirPushbackX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1640,
+     "name": "moveAirPushbackY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1644,
+     "name": "pad_066C",
+     "type": "char",
+     "pointers": 0,
+     "span": 20,
+     "comment": ""
+    },
+    {
+     "offset": 1664,
+     "name": "moveHitstunOverwrite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1668,
+     "name": "moveUntechOverwrite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1672,
+     "name": "pad_0688",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 1684,
+     "name": "movePushbackX",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1688,
+     "name": "pad_0698",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 1700,
+     "name": "moveP1Overwrite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1704,
+     "name": "moveP2Overwrite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1708,
+     "name": "pad_06AC",
+     "type": "char",
+     "pointers": 0,
+     "span": 40,
+     "comment": ""
+    },
+    {
+     "offset": 1748,
+     "name": "moveCounterHitAirPushbackY",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 1752,
+     "name": "pad_06D8",
+     "type": "char",
+     "pointers": 0,
+     "span": 700,
+     "comment": ""
+    },
+    {
+     "offset": 2452,
+     "name": "invuln_timer",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "script cmd 22008 sets it to N, the game subtracts 1 every frame."
+    },
+    {
+     "offset": 2456,
+     "name": "invuln_bitfield",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2460,
+     "name": "guard_point_bitfield",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "22020; reset to 0 on state entry"
+    },
+    {
+     "offset": 2464,
+     "name": "invuln_level",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": "script cmd 22021; reset to 0 on state entry. Compared with attack_invul_level"
+    },
+    {
+     "offset": 2465,
+     "name": "pad_09A1",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 2468,
+     "name": "invuln_hit_counter",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "> 0 = invul for that many hits (each absorbed hit subtracts 1), only while"
+    },
+    {
+     "offset": 2472,
+     "name": "pad_09A8",
+     "type": "char",
+     "pointers": 0,
+     "span": 40,
+     "comment": ""
+    },
+    {
+     "offset": 2512,
+     "name": "previousHP",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2516,
+     "name": "currentHP",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2520,
+     "name": "maxHP",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2524,
+     "name": "pad_09DC",
+     "type": "char",
+     "pointers": 0,
+     "span": 2372,
+     "comment": ""
+    },
+    {
+     "offset": 4896,
+     "name": "nextScriptLineLocationInMemory",
+     "type": "char",
+     "pointers": 1,
+     "span": 4,
+     "comment": "points to the place in memory where the next line of the script to be read is"
+    },
+    {
+     "offset": 4900,
+     "name": "currentScriptStateEntryInMemory",
+     "type": "char",
+     "pointers": 1,
+     "span": 4,
+     "comment": "points to the start of the current state in the script"
+    },
+    {
+     "offset": 4904,
+     "name": "frameCounterCurrentSprite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "Counts the frames the current sprite has been drawn on screen"
+    },
+    {
+     "offset": 4908,
+     "name": "frameLengthCurrentSprite",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "the amount of frames the current sprite should last"
+    },
+    {
+     "offset": 4912,
+     "name": "frameLengthCurrentSprite2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "the amount of frames the current sprite should last, this one seems to be the \"correct\" one"
+    },
+    {
+     "offset": 4916,
+     "name": "linesReadInCurrentState",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "counts the amount of \"lines\" read from the start of the script, in looping actions take the modulo"
+    },
+    {
+     "offset": 4920,
+     "name": "currentSprite",
+     "type": "int64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": "the name of the current sprite"
+    },
+    {
+     "offset": 4928,
+     "name": "pad_1340",
+     "type": "char",
+     "pointers": 0,
+     "span": 3252,
+     "comment": ""
+    },
+    {
+     "offset": 8180,
+     "name": "lastAction",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 8212,
+     "name": "current_action2",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": "another current action I guess, gets set by the set_action_override"
+    },
+    {
+     "offset": 8244,
+     "name": "pad_2034",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 8256,
+     "name": "set_action_override",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": "this sets the current action overriding the script order I guess? not sure, still need more testing"
+    },
+    {
+     "offset": 8288,
+     "name": "pad_2060",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 8304,
+     "name": "currentAction",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 8336,
+     "name": "pad_2090",
+     "type": "char",
+     "pointers": 0,
+     "span": 440,
+     "comment": ""
+    },
+    {
+     "offset": 8776,
+     "name": "char_abbr",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8780,
+     "name": "pad_224C",
+     "type": "char",
+     "pointers": 0,
+     "span": 20,
+     "comment": "char pad_224C[40]; //0x224C"
+    },
+    {
+     "offset": 8800,
+     "name": "facingLeft2",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": "used for checking if playback should flip side or not?"
+    },
+    {
+     "offset": 8804,
+     "name": "pad2264",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 8820,
+     "name": "blockstun",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8824,
+     "name": "pad_2278",
+     "type": "char",
+     "pointers": 0,
+     "span": 12024,
+     "comment": ""
+    },
+    {
+     "offset": 20848,
+     "name": "hitstun",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 20852,
+     "name": "pad_5174",
+     "type": "char",
+     "pointers": 0,
+     "span": 140,
+     "comment": ""
+    },
+    {
+     "offset": 20992,
+     "name": "hardLandingRecovery",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ", represents the amount of stiffLanding recovery frames to be applied on landing. Probably the amount to loop in CmnActLandingStiffLoop specifically"
+    },
+    {
+     "offset": 20996,
+     "name": "pad_5204",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 21012,
+     "name": "defaultProration",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 24,
+     "comment": "0x5227, for Lv0-Lv5"
+    },
+    {
+     "offset": 21036,
+     "name": "pad_5228",
+     "type": "char",
+     "pointers": 0,
+     "span": 1348,
+     "comment": ""
+    },
+    {
+     "offset": 22384,
+     "name": "hitCount",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22388,
+     "name": "hitCount2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22392,
+     "name": "timeAfterTechIsPerformed",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22396,
+     "name": "timeAfterLatestHit",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22400,
+     "name": "comboDamage",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22404,
+     "name": "comboDamage2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22408,
+     "name": "lastcomboDamage",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22412,
+     "name": "comboProration",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22416,
+     "name": "starterRating",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22420,
+     "name": "comboTime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22424,
+     "name": "singleHitDamage",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22428,
+     "name": "pad_579C",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 22432,
+     "name": "realTimeComboTime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "; THIS IS NOT COMBO TIME!"
+    },
+    {
+     "offset": 22436,
+     "name": "heatGeneratedForCombo",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "; this does not take heatGainCooldown into account"
+    },
+    {
+     "offset": 22440,
+     "name": "pad_57A4",
+     "type": "char",
+     "pointers": 0,
+     "span": 56,
+     "comment": ""
+    },
+    {
+     "offset": 22496,
+     "name": "hitByWhichAction",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 22528,
+     "name": "pad_5800",
+     "type": "char",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 22556,
+     "name": "sameMoveProrationStack",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": "; idk how long the stack is but it's pretty long lmao"
+    },
+    {
+     "offset": 22588,
+     "name": "pad_583C",
+     "type": "char",
+     "pointers": 0,
+     "span": 664,
+     "comment": ""
+    },
+    {
+     "offset": 23252,
+     "name": "heatMeter",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23256,
+     "name": "pad_5AD8",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23260,
+     "name": "heatGainCooldown",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23264,
+     "name": "pad_5AE0",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23268,
+     "name": "overdriveMeter",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23272,
+     "name": "pad_5AE8",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 23288,
+     "name": "overdriveMaxtime",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23292,
+     "name": "pad_5AFC",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 23300,
+     "name": "barrier",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 23304,
+     "name": "pad_5B08",
+     "type": "char",
+     "pointers": 0,
+     "span": 10364,
+     "comment": "char pad_5B08[102072]; //0x5b08"
+    },
+    {
+     "offset": 33668,
+     "name": "SLOT_unknown1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "// Izanami float (0 or 1), possibly other stuff"
+    },
+    {
+     "offset": 33672,
+     "name": "pad_8388",
+     "type": "char",
+     "pointers": 0,
+     "span": 91156,
+     "comment": ""
+    },
+    {
+     "offset": 124828,
+     "name": "L_input_buffer_flag_base",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 124829,
+     "name": "pad_1E79D",
+     "type": "char",
+     "pointers": 0,
+     "span": 171,
+     "comment": "the \"non-special\" inputs should be here"
+    },
+    {
+     "offset": 125000,
+     "name": "buffer_L_236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ac"
+    },
+    {
+     "offset": 125001,
+     "name": "buffer_L_623",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ad"
+    },
+    {
+     "offset": 125002,
+     "name": "buffer_L_214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ae"
+    },
+    {
+     "offset": 125003,
+     "name": "buffer_L_41236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +af"
+    },
+    {
+     "offset": 125004,
+     "name": "buffer_L_421",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b0"
+    },
+    {
+     "offset": 125005,
+     "name": "buffer_L_63214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b1"
+    },
+    {
+     "offset": 125006,
+     "name": "buffer_L_236236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b2"
+    },
+    {
+     "offset": 125007,
+     "name": "buffer_L_214214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b3"
+    },
+    {
+     "offset": 125008,
+     "name": "padding_1E850",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b4"
+    },
+    {
+     "offset": 125009,
+     "name": "buffer_L_6321463214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b5 (Double HCB, jubei astral)"
+    },
+    {
+     "offset": 125010,
+     "name": "buffer_L_632146_2",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b6 (terumi 100 meter damage super)"
+    },
+    {
+     "offset": 125011,
+     "name": "padding_1E853",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b7"
+    },
+    {
+     "offset": 125012,
+     "name": "buffer_L_2141236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b8 susanoo astral"
+    },
+    {
+     "offset": 125013,
+     "name": "buffer_L_2363214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b9 rachel, makoto astraleliussomething"
+    },
+    {
+     "offset": 125014,
+     "name": "buffer_L_22",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + ba"
+    },
+    {
+     "offset": 125015,
+     "name": "buffer_L_46",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + bb"
+    },
+    {
+     "offset": 125016,
+     "name": "padding_1e858",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + bc"
+    },
+    {
+     "offset": 125017,
+     "name": "buffer_L_2H8jinastral",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + BD 2H8 -> hold 2 -> 8, 30f 28 charge, used for jin's astral?"
+    },
+    {
+     "offset": 125018,
+     "name": "buffer_L_6428",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +BE"
+    },
+    {
+     "offset": 125019,
+     "name": "buffer_L_4H128",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + BF taokaka astral"
+    },
+    {
+     "offset": 125020,
+     "name": "buffer_L_64641236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C0 carl astral"
+    },
+    {
+     "offset": 125021,
+     "name": "buffer_L_412364123641236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C1   Triple HCF (412364123641236) Litchi OD astral"
+    },
+    {
+     "offset": 125022,
+     "name": "buffer_L_KS28_",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C2, kagura stance, maybe it includes all characters not just kagura as long as D is pressed?"
+    },
+    {
+     "offset": 125023,
+     "name": "buffer_L_646",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C3"
+    },
+    {
+     "offset": 125024,
+     "name": "padding_1E860",
+     "type": "char",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 125026,
+     "name": "buffer_L_CMASH",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C6 susanoo's c mash special"
+    },
+    {
+     "offset": 125027,
+     "name": "padding_1E863",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 125030,
+     "name": "buffer_L_360",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CA"
+    },
+    {
+     "offset": 125031,
+     "name": "buffer_L_720",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CB"
+    },
+    {
+     "offset": 125032,
+     "name": "padding_1E869",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125033,
+     "name": "buffer_L_222",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CD"
+    },
+    {
+     "offset": 125034,
+     "name": "padding_1E86B",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125035,
+     "name": "buffer_L_236236LambdaSuper",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CF specific to lambda-11 super it seems"
+    },
+    {
+     "offset": 125036,
+     "name": "padding_1E86D",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 9,
+     "comment": ""
+    },
+    {
+     "offset": 125045,
+     "name": "buffer_L_8izanamifloat",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +D9 input for izanami float"
+    },
+    {
+     "offset": 125046,
+     "name": "buffer_L_66",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DA"
+    },
+    {
+     "offset": 125047,
+     "name": "buffer_L_44",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DB"
+    },
+    {
+     "offset": 125048,
+     "name": "padding_1E878",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 125051,
+     "name": "buffer_L_22jinsekkajin",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DF specific to jins sekkajin"
+    },
+    {
+     "offset": 125052,
+     "name": "padding_1E87B",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125053,
+     "name": "buffer_L_44nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E1 specific for nine's second dash"
+    },
+    {
+     "offset": 125054,
+     "name": "buffer_L_66nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E2 specific for nine's second dash"
+    },
+    {
+     "offset": 125055,
+     "name": "padding_1E87F",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125056,
+     "name": "buffer_L_88nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E4 specific for nine's second dash"
+    },
+    {
+     "offset": 125057,
+     "name": "padding_1E877",
+     "type": "char",
+     "pointers": 0,
+     "span": 17,
+     "comment": ""
+    },
+    {
+     "offset": 125074,
+     "name": "buffer_L_1080",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F6"
+    },
+    {
+     "offset": 125075,
+     "name": "buffer_L_1632143",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F7"
+    },
+    {
+     "offset": 125076,
+     "name": "padding_1E895",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125077,
+     "name": "buffer_L_632146",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F9"
+    },
+    {
+     "offset": 125078,
+     "name": "buffer_L_66_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FA forward double-tap (6/9 then a fresh 6) in the last 5 frames. Input only, NOT invul."
+    },
+    {
+     "offset": 125079,
+     "name": "padding_1E897",
+     "type": "char",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 125081,
+     "name": "buffer_L_takemikazuchi_shit",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FD some specific stuff for the game's onslaught"
+    },
+    {
+     "offset": 125082,
+     "name": "buffer_L_4H6",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FE"
+    },
+    {
+     "offset": 125083,
+     "name": "buffer_L_2H8",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FF"
+    },
+    {
+     "offset": 125084,
+     "name": "padding_1E89D",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125085,
+     "name": "buffer_L_4H1236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +101"
+    },
+    {
+     "offset": 125086,
+     "name": "buffer_L_82",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +102"
+    },
+    {
+     "offset": 125087,
+     "name": "buffer_L_8H2",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +103"
+    },
+    {
+     "offset": 125088,
+     "name": "padding_1E8A0",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 125092,
+     "name": "buffer_L_236_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +108 236 within 5 frames of input valid, for mai's enhanced thrust"
+    },
+    {
+     "offset": 125093,
+     "name": "buffer_L_214_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +109 214 for mai backflip idk why its special"
+    },
+    {
+     "offset": 125094,
+     "name": "R_input_buffer_flag_base",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125095,
+     "name": "pad_1E8A7",
+     "type": "char",
+     "pointers": 0,
+     "span": 171,
+     "comment": "the \"non-special\" inputs should be here, they should be duplicated maybe?"
+    },
+    {
+     "offset": 125266,
+     "name": "buffer_R_236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ac +10A"
+    },
+    {
+     "offset": 125267,
+     "name": "buffer_R_623",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ad +10A"
+    },
+    {
+     "offset": 125268,
+     "name": "buffer_R_214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +ae +10A"
+    },
+    {
+     "offset": 125269,
+     "name": "buffer_R_41236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +af +10A"
+    },
+    {
+     "offset": 125270,
+     "name": "buffer_R_421",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b0 +10A"
+    },
+    {
+     "offset": 125271,
+     "name": "buffer_R_63214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b1 +10A"
+    },
+    {
+     "offset": 125272,
+     "name": "buffer_R_236236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b2 +10A"
+    },
+    {
+     "offset": 125273,
+     "name": "buffer_R_214214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b3 +10A"
+    },
+    {
+     "offset": 125274,
+     "name": "padding_1E95A",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b4 +10A"
+    },
+    {
+     "offset": 125275,
+     "name": "buffer_R_6321463214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b5 +10A(Double HCB, jubei astral)"
+    },
+    {
+     "offset": 125276,
+     "name": "buffer_R_632146_2",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b6 +10A(terumi 100 meter damage super)"
+    },
+    {
+     "offset": 125277,
+     "name": "padding_1E95D",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b7 +10A"
+    },
+    {
+     "offset": 125278,
+     "name": "buffer_R_2141236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b8 +10A susanoo astral"
+    },
+    {
+     "offset": 125279,
+     "name": "buffer_R_2363214",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + b9 +10A rachel, makoto astraleliussomething"
+    },
+    {
+     "offset": 125280,
+     "name": "buffer_R_22",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + ba +10A"
+    },
+    {
+     "offset": 125281,
+     "name": "buffer_R_46",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + bb +10A"
+    },
+    {
+     "offset": 125282,
+     "name": "padding_1E962",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + bc +10A"
+    },
+    {
+     "offset": 125283,
+     "name": "buffer_R_2H8jinastral",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + BD 2H8 -> hold 2 -> 8, 30f 28 charge, used for jin's astral?"
+    },
+    {
+     "offset": 125284,
+     "name": "buffer_R_6428",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +BE +10A"
+    },
+    {
+     "offset": 125285,
+     "name": "buffer_R_4H128",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + BF +10A taokaka astral"
+    },
+    {
+     "offset": 125286,
+     "name": "buffer_R_64641236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C0 +10A carl astral"
+    },
+    {
+     "offset": 125287,
+     "name": "buffer_R_412364123641236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C1 +10A   Triple HCF (412364123641236) Litchi OD astral"
+    },
+    {
+     "offset": 125288,
+     "name": "buffer_R_KS28_",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C2 +10A, kagura stance, maybe it includes all characters not just kagura as long as D is pressed?"
+    },
+    {
+     "offset": 125289,
+     "name": "buffer_R_646",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C3 +10A"
+    },
+    {
+     "offset": 125290,
+     "name": "padding_1E96A",
+     "type": "char",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 125292,
+     "name": "buffer_R_CMASH",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + C6 +10A susanoo's c mash special"
+    },
+    {
+     "offset": 125293,
+     "name": "padding_1E96D",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 125296,
+     "name": "buffer_R_360",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CA +10A"
+    },
+    {
+     "offset": 125297,
+     "name": "buffer_R_720",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CB +10A"
+    },
+    {
+     "offset": 125298,
+     "name": "padding_1E972",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125299,
+     "name": "buffer_R_222",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CD +10A"
+    },
+    {
+     "offset": 125300,
+     "name": "padding_1E974",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125301,
+     "name": "buffer_R_236236LambdaSuper",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", + CF +10A specific to lambda-11 super it seems"
+    },
+    {
+     "offset": 125302,
+     "name": "padding_1E976",
+     "type": "char",
+     "pointers": 0,
+     "span": 9,
+     "comment": ""
+    },
+    {
+     "offset": 125311,
+     "name": "buffer_R_8izanamifloat",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +D9 +10A input for izanami float"
+    },
+    {
+     "offset": 125312,
+     "name": "buffer_R_66",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DA +10A"
+    },
+    {
+     "offset": 125313,
+     "name": "buffer_R_44",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DB +10A"
+    },
+    {
+     "offset": 125314,
+     "name": "padding_1E982",
+     "type": "char",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 125317,
+     "name": "buffer_R_22jinsekkajin",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +DF +10A specific to jins sekkajin"
+    },
+    {
+     "offset": 125318,
+     "name": "padding_1E986",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125319,
+     "name": "buffer_R_44nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E1 +10A specific for nine's second dash"
+    },
+    {
+     "offset": 125320,
+     "name": "buffer_R_66nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E2 +10A specific for nine's second dash"
+    },
+    {
+     "offset": 125321,
+     "name": "padding_1E989",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125322,
+     "name": "buffer_R_88nineseconddash",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +E4 +10A specific for nine's second dash"
+    },
+    {
+     "offset": 125323,
+     "name": "padding_1E98B",
+     "type": "char",
+     "pointers": 0,
+     "span": 17,
+     "comment": ""
+    },
+    {
+     "offset": 125340,
+     "name": "buffer_R_1080",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F6 +10A"
+    },
+    {
+     "offset": 125341,
+     "name": "buffer_R_1632143",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F7 +10A"
+    },
+    {
+     "offset": 125342,
+     "name": "padding_1E99E",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125343,
+     "name": "buffer_R_632146",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +F9 +10A"
+    },
+    {
+     "offset": 125344,
+     "name": "buffer_R_66_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FA +10A forward double-tap in the last 5 frames (facing-left view, so raw 44 here). Input only, NOT invul."
+    },
+    {
+     "offset": 125345,
+     "name": "padding_1E9A1",
+     "type": "char",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 125347,
+     "name": "buffer_R_takemikazuchi_shit",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FD +10A some specific stuff for the game's onslaught"
+    },
+    {
+     "offset": 125348,
+     "name": "buffer_R_4H6",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FE +10A"
+    },
+    {
+     "offset": 125349,
+     "name": "buffer_R_2H8",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +FF +10A"
+    },
+    {
+     "offset": 125350,
+     "name": "padding_1E9A6",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 125351,
+     "name": "buffer_R_4H1236",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +101 +10A"
+    },
+    {
+     "offset": 125352,
+     "name": "buffer_R_82",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +102 +10A"
+    },
+    {
+     "offset": 125353,
+     "name": "buffer_R_8H2",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +103 +10A"
+    },
+    {
+     "offset": 125354,
+     "name": "padding_1E9AA",
+     "type": "char",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 125358,
+     "name": "buffer_R_236_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +108 +10A 236 within 5 frames of input valid, for mai's enhanced thrust"
+    },
+    {
+     "offset": 125359,
+     "name": "buffer_R_214_5f",
+     "type": "int8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ", +109 +10A 214 for mai backflip idk why its special"
+    },
+    {
+     "offset": 125360,
+     "name": "pad_1E9B0",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 125376,
+     "name": "slot2_or_slot4",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "referring to the scr SLOTs, naoto only for now until i figure out more about this shit !!! this is actually the buffer for dash"
+    },
+    {
+     "offset": 125380,
+     "name": "pad_1E9C4",
+     "type": "char",
+     "pointers": 0,
+     "span": 5960,
+     "comment": "108036"
+    },
+    {
+     "offset": 131340,
+     "name": "Drive1",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 131344,
+     "name": "pad_20110",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 131356,
+     "name": "Drive1_type",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 131360,
+     "name": "pad_20120",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 131376,
+     "name": "Drive2",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 131380,
+     "name": "pad_20134",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 131412,
+     "name": "Drive3",
+     "type": "int32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 131416,
+     "name": "pad_20158",
+     "type": "char",
+     "pointers": 0,
+     "span": 4972,
+     "comment": ""
+    },
+    {
+     "offset": 136388,
+     "name": "pad_214c4",
+     "type": "char",
+     "pointers": 0,
+     "span": 13492,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "GGPOSessionCallbacks",
+   "kind": "struct",
+   "size": 28,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "begin_game",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*begin_game)()"
+    },
+    {
+     "offset": 4,
+     "name": "save_game_state",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*save_game_state)(unsigned char**, int*, int*)"
+    },
+    {
+     "offset": 8,
+     "name": "load_game_state",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*load_game_state)(unsigned char*)"
+    },
+    {
+     "offset": 12,
+     "name": "maybe_log_game_state",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*maybe_log_game_state)()"
+    },
+    {
+     "offset": 16,
+     "name": "free_buffer",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*free_buffer)(unsigned char*)"
+    },
+    {
+     "offset": 20,
+     "name": "advance_frame",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*advance_frame)()"
+    },
+    {
+     "offset": 24,
+     "name": "on_event",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: int (*on_event)(unsigned char*)"
+    }
+   ]
+  },
+  {
+   "name": "GameInput",
+   "kind": "struct",
+   "size": 28,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "size",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "bits",
+     "type": "char",
+     "pointers": 0,
+     "span": 20,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "InputQueue",
+   "kind": "struct",
+   "size": 3936,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "_id",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "_head",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "_tail",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "_length",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 16,
+     "name": "_first_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 20,
+     "name": "_last_user_added_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 24,
+     "name": "_last_added_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 28,
+     "name": "_first_incorrect_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "_last_frame_requested",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 36,
+     "name": "_frame_delay",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 40,
+     "name": "_inputs",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 3864,
+     "comment": ""
+    },
+    {
+     "offset": 3904,
+     "name": "_prediction",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 3932,
+     "name": "field12_0xe46",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 3933,
+     "name": "field13_0xe47",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Poll",
+   "kind": "struct",
+   "size": 1296,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "field0_0x0",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1296,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "ReplayFile",
+   "kind": "struct",
+   "size": 65536,
+   "header": "src/Game/ReplayFiles/ReplayFile.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "pad_0000",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "pad_0008",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": "header from here to before inputs matches data in replay_list.dat (size 0x390)"
+    },
+    {
+     "offset": 16,
+     "name": "valid",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "always 1. empty items in replay list have this set to 0"
+    },
+    {
+     "offset": 20,
+     "name": "pad_0014",
+     "type": "char",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "date1_int",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 24,
+     "comment": "year, month, day, hour, minute, second"
+    },
+    {
+     "offset": 56,
+     "name": "date1",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 80,
+     "name": "pad_0050",
+     "type": "char",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 96,
+     "name": "date2_int",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 24,
+     "comment": "year, month, day, hour, minute, second"
+    },
+    {
+     "offset": 120,
+     "name": "date2",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 144,
+     "name": "pad_0090",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 152,
+     "name": "winner_maybe",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 156,
+     "name": "p1_steamID64",
+     "type": "uint64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 164,
+     "name": "p1_name",
+     "type": "wchar_t",
+     "pointers": 0,
+     "span": 36,
+     "comment": "its in utf-16"
+    },
+    {
+     "offset": 200,
+     "name": "pad_0xc8",
+     "type": "char",
+     "pointers": 0,
+     "span": 158,
+     "comment": ""
+    },
+    {
+     "offset": 358,
+     "name": "p2_steamID64",
+     "type": "uint64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 366,
+     "name": "p2_name",
+     "type": "wchar_t",
+     "pointers": 0,
+     "span": 36,
+     "comment": "its in utf-16"
+    },
+    {
+     "offset": 402,
+     "name": "pad_192",
+     "type": "char",
+     "pointers": 0,
+     "span": 158,
+     "comment": ""
+    },
+    {
+     "offset": 560,
+     "name": "p1_toon",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 564,
+     "name": "p2_toon",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 568,
+     "name": "recorder_steamID64",
+     "type": "uint64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 576,
+     "name": "recorder_name",
+     "type": "wchar_t",
+     "pointers": 0,
+     "span": 36,
+     "comment": ""
+    },
+    {
+     "offset": 612,
+     "name": "pad_264",
+     "type": "char",
+     "pointers": 0,
+     "span": 172,
+     "comment": ""
+    },
+    {
+     "offset": 784,
+     "name": "favorite",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "used by replay_list.dat to draw a star icon"
+    },
+    {
+     "offset": 788,
+     "name": "p1_lvl",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": "p1 ranked level (minus one)"
+    },
+    {
+     "offset": 792,
+     "name": "p2_lvl",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 796,
+     "name": "pad_31c",
+     "type": "char",
+     "pointers": 0,
+     "span": 1460,
+     "comment": ""
+    },
+    {
+     "offset": 2256,
+     "name": "replay_inputs",
+     "type": "char",
+     "pointers": 0,
+     "span": 63280,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "RingBuffer_QueueEntry_256_",
+   "kind": "struct",
+   "size": 6156,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "_elements",
+     "type": "SteamUdpProtocol__QueueEntry",
+     "pointers": 0,
+     "span": 6144,
+     "comment": ""
+    },
+    {
+     "offset": 6144,
+     "name": "_tail",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6148,
+     "name": "_size",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6152,
+     "name": "_head",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Room",
+   "kind": "struct",
+   "size": 1288,
+   "header": "src/Game/Room/Room.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "roomStatus",
+     "type": "RoomStatus",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "capacity",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 5,
+     "name": "invitation",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 6,
+     "name": "N000090AF",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 7,
+     "name": "N000090AD",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "roomName",
+     "type": "wchar_t",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 40,
+     "name": "pad_0028",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 48,
+     "name": "roomType",
+     "type": "RoomType",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 49,
+     "name": "N0001167D",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 50,
+     "name": "N00011681",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 51,
+     "name": "N0001167E",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 52,
+     "name": "roundsToWinPlusMatchLimitBitfield",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 53,
+     "name": "roundTime",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 54,
+     "name": "skipTimeLimit",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 55,
+     "name": "rematch",
+     "type": "RoomRematch",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 56,
+     "name": "memberCount",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 57,
+     "name": "N0000910B",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 58,
+     "name": "N0000910E",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 59,
+     "name": "N0000910C",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 60,
+     "name": "secondsElapsed",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 64,
+     "name": "pad_0040",
+     "type": "char",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 72,
+     "name": "member1",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 224,
+     "name": "member2",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 376,
+     "name": "member3",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 528,
+     "name": "member4",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 680,
+     "name": "member5",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 832,
+     "name": "member6",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 984,
+     "name": "member7",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    },
+    {
+     "offset": 1136,
+     "name": "member8",
+     "type": "RoomMemberEntry",
+     "pointers": 0,
+     "span": 152,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "RoomMemberEntry",
+   "kind": "struct",
+   "size": 152,
+   "header": "src/Game/Room/RoomMemberEntry.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "memberIndex",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 1,
+     "name": "N00009344",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 2,
+     "name": "N00009342",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 3,
+     "name": "N00009340",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "steamId",
+     "type": "uint64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "pad_000C",
+     "type": "char",
+     "pointers": 0,
+     "span": 32,
+     "comment": ""
+    },
+    {
+     "offset": 44,
+     "name": "seatFlags",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 48,
+     "name": "matchId",
+     "type": "uint32_t",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 52,
+     "name": "matchPlayerIndex",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 53,
+     "name": "N00009349",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 54,
+     "name": "N0000934C",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 55,
+     "name": "N0000934A",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 56,
+     "name": "pad_0038",
+     "type": "char",
+     "pointers": 0,
+     "span": 34,
+     "comment": ""
+    },
+    {
+     "offset": 90,
+     "name": "netcolor",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 91,
+     "name": "N0000914A",
+     "type": "uint8_t",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 92,
+     "name": "pad_005C",
+     "type": "char",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 120,
+     "name": "N0000914B",
+     "type": "uint64_t",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 128,
+     "name": "pad_0080",
+     "type": "char",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "RoomSettingsStatic",
+   "kind": "struct",
+   "size": 128,
+   "header": "src/Game/Room/Room.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "pad_0x0",
+     "type": "char",
+     "pointers": 0,
+     "span": 124,
+     "comment": ""
+    },
+    {
+     "offset": 124,
+     "name": "rematch",
+     "type": "RoomSettingsRematchStatic",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SnapshotManager",
+   "kind": "struct",
+   "size": 732,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "_saved_states_related_struct",
+     "type": "SnapshotManager__struct",
+     "pointers": 0,
+     "span": 720,
+     "comment": ""
+    },
+    {
+     "offset": 720,
+     "name": "_counter_of_some_sort",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 724,
+     "name": "field2_0x2d4",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 728,
+     "name": "_base_of_snapshot_mem",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SnapshotManager__struct",
+   "kind": "struct",
+   "size": 72,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "_framecount",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "_ptr_buf_saved_frame",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "field2_0x8",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "field3_0xc",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 16,
+     "name": "field4_0x10",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 20,
+     "name": "_ptr_buf_save_frame_1_maybe",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 24,
+     "name": "_ptr_buf_save_frame_1_plus_some_offset",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 28,
+     "name": "_ptr_BB_CEventInstance_0",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "field8_0x20",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 44,
+     "name": "_ptr_BB_CEventInstance_1",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 48,
+     "name": "_ptr_BB_CEventInstance_1_plus_some_offset",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 52,
+     "name": "field11_0x34",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 64,
+     "name": "field12_0x40",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 68,
+     "name": "field13_0x44",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamPeer2PeerBackend",
+   "kind": "struct",
+   "size": 137320,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "vftable",
+     "type": "void",
+     "pointers": 2,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "field1_0x4",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "field2_0x8",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "_callbacks",
+     "type": "GGPOSessionCallbacks",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 40,
+     "name": "field4_0x28",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 44,
+     "name": "_poll",
+     "type": "Poll",
+     "pointers": 0,
+     "span": 1296,
+     "comment": ""
+    },
+    {
+     "offset": 1340,
+     "name": "_sync",
+     "type": "Sync",
+     "pointers": 0,
+     "span": 1296,
+     "comment": ""
+    },
+    {
+     "offset": 2636,
+     "name": "_udp",
+     "type": "Udp",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 2648,
+     "name": "_endpoints",
+     "type": "SteamUdpProtocol",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2652,
+     "name": "idk_what",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 2656,
+     "name": "_spectators",
+     "type": "SteamUdpProtocol",
+     "pointers": 0,
+     "span": 134616,
+     "comment": ""
+    },
+    {
+     "offset": 137272,
+     "name": "_num_spectators",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137276,
+     "name": "_input_size",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137280,
+     "name": "_synchronizing",
+     "type": "BOOL",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137284,
+     "name": "_num_players",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137288,
+     "name": "_next_recommended_sleep",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137292,
+     "name": "_next_spectator_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137296,
+     "name": "_disconnect_timeout",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137300,
+     "name": "_disconnect_notify_start",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 137304,
+     "name": "_local_connect_status",
+     "type": "UdpMsg__connect_status",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 137312,
+     "name": "field20_0x21788",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137313,
+     "name": "field21_0x21789",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137314,
+     "name": "field22_0x2178a",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137315,
+     "name": "field23_0x2178b",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137316,
+     "name": "field24_0x2178c",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137317,
+     "name": "field25_0x2178d",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137318,
+     "name": "field26_0x2178e",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 137319,
+     "name": "field27_0x2178f",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol",
+   "kind": "struct",
+   "size": 22436,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "vftable",
+     "type": "void",
+     "pointers": 2,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "_udp",
+     "type": "Udp",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "_peer_addr",
+     "type": "sockaddr_in",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 24,
+     "name": "_magic_number",
+     "type": "UINT16",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 28,
+     "name": "_queue",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "_remote_magic_number",
+     "type": "UINT16",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 36,
+     "name": "_connected",
+     "type": "BOOL",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 40,
+     "name": "_send_latency",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 44,
+     "name": "_oop_percent",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 48,
+     "name": "_oo_packet",
+     "type": "SteamUdpProtocol___oo_packet",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 72,
+     "name": "_send_queue",
+     "type": "RingBuffer_QueueEntry_256_",
+     "pointers": 0,
+     "span": 6156,
+     "comment": ""
+    },
+    {
+     "offset": 6228,
+     "name": "field11_0x1850",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6232,
+     "name": "_packets_sent",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6236,
+     "name": "_bytes_sent",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6240,
+     "name": "_kbps_sent",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6244,
+     "name": "_stats_start_time",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 6248,
+     "name": "field16_0x1864",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 24,
+     "comment": ""
+    },
+    {
+     "offset": 6272,
+     "name": "_state",
+     "type": "SteamUdpProtocol___state",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 6284,
+     "name": "field18_0x1888",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 7188,
+     "comment": ""
+    },
+    {
+     "offset": 13472,
+     "name": "_last_received_input",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 13500,
+     "name": "field20_0x34b6",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13501,
+     "name": "field21_0x34b7",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 13504,
+     "name": "_last_sent_input",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 13532,
+     "name": "field23_0x34d2",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13533,
+     "name": "field24_0x34d3",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 13536,
+     "name": "_last_acked_input",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 13564,
+     "name": "field26_0x34ee",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13565,
+     "name": "field27_0x34ef",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 3,
+     "comment": ""
+    },
+    {
+     "offset": 13568,
+     "name": "_last_send_time",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13572,
+     "name": "_last_recv_time",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13576,
+     "name": "_shutdown_timeout",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13580,
+     "name": "_diconnect_event_sent",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13584,
+     "name": "_disconnect_timeout",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13588,
+     "name": "_disconnect_notify_start",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 13592,
+     "name": "_disconnect_notify_sent",
+     "type": "bool",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13593,
+     "name": "field35_0x3509",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13594,
+     "name": "field36_0x350a",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13595,
+     "name": "field37_0x350b",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 13596,
+     "name": "_next_send_seq",
+     "type": "uint16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 13598,
+     "name": "_next_recv_seq",
+     "type": "uint16_t",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 13600,
+     "name": "_timesync",
+     "type": "TimeSync",
+     "pointers": 0,
+     "span": 628,
+     "comment": ""
+    },
+    {
+     "offset": 14228,
+     "name": "field41_0x3770",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 8208,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol__QueueEntry",
+   "kind": "struct",
+   "size": 24,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "queue_time",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "dest_addr",
+     "type": "sockaddr_in",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 20,
+     "name": "msg",
+     "type": "UdpMsg",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol__Union_state_running",
+   "kind": "struct",
+   "size": 12,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "last_quality_report_time",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "last_network_stats_interval",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "last_input_packet_recv_time",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol__Union_state_sync",
+   "kind": "struct",
+   "size": 8,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "roundtrips_remaining",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "random",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol___oo_packet",
+   "kind": "struct",
+   "size": 24,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "send_time",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "dest_addr",
+     "type": "sockaddr_in",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 20,
+     "name": "msg",
+     "type": "UdpMsg",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "SteamUdpProtocol___state",
+   "kind": "union",
+   "size": 12,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "sync",
+     "type": "SteamUdpProtocol__Union_state_sync",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 0,
+     "name": "running",
+     "type": "SteamUdpProtocol__Union_state_running",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Sync",
+   "kind": "struct",
+   "size": 1296,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "vftable",
+     "type": "void",
+     "pointers": 2,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "_callbacks",
+     "type": "GGPOSessionCallbacks",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "_savedstate",
+     "type": "Sync__SavedState",
+     "pointers": 0,
+     "span": 164,
+     "comment": ""
+    },
+    {
+     "offset": 196,
+     "name": "_config",
+     "type": "Sync__Config",
+     "pointers": 0,
+     "span": 40,
+     "comment": ""
+    },
+    {
+     "offset": 236,
+     "name": "_rollingback",
+     "type": "BOOL",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 240,
+     "name": "_last_confirmed_frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 244,
+     "name": "_framecount",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 248,
+     "name": "_max_prediction_frames",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 252,
+     "name": "_input_queues",
+     "type": "InputQueue",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 256,
+     "name": "field9_0x100",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1036,
+     "comment": ""
+    },
+    {
+     "offset": 1292,
+     "name": "_local_connect_status",
+     "type": "UdpMsg__connect_status",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Sync__Config",
+   "kind": "struct",
+   "size": 40,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "callbacks",
+     "type": "GGPOSessionCallbacks",
+     "pointers": 0,
+     "span": 28,
+     "comment": ""
+    },
+    {
+     "offset": 28,
+     "name": "maybe_num_prediction_frames",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "maybe_num_players",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 36,
+     "name": "maybe_input_size",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Sync__SavedFrame",
+   "kind": "struct",
+   "size": 16,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "buf",
+     "type": "byte",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "cbuf",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "frame",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "checksum",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Sync__SavedState",
+   "kind": "struct",
+   "size": 164,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "frames",
+     "type": "Sync__SavedFrame",
+     "pointers": 0,
+     "span": 160,
+     "comment": ""
+    },
+    {
+     "offset": 160,
+     "name": "head",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "TimeSync",
+   "kind": "struct",
+   "size": 628,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "field0_0x0",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 4,
+     "name": "_local",
+     "type": "int",
+     "pointers": 0,
+     "span": 160,
+     "comment": ""
+    },
+    {
+     "offset": 164,
+     "name": "_remote",
+     "type": "int",
+     "pointers": 0,
+     "span": 160,
+     "comment": ""
+    },
+    {
+     "offset": 324,
+     "name": "_last_inputs",
+     "type": "GameInput",
+     "pointers": 0,
+     "span": 280,
+     "comment": ""
+    },
+    {
+     "offset": 604,
+     "name": "field4_0x248",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 605,
+     "name": "field5_0x249",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 606,
+     "name": "field6_0x24a",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 607,
+     "name": "field7_0x24b",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 608,
+     "name": "field8_0x24c",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 609,
+     "name": "field9_0x24d",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 610,
+     "name": "field10_0x24e",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 611,
+     "name": "field11_0x24f",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 612,
+     "name": "field12_0x250",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 613,
+     "name": "field13_0x251",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 614,
+     "name": "field14_0x252",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 615,
+     "name": "field15_0x253",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 616,
+     "name": "field16_0x254",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 617,
+     "name": "field17_0x255",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 618,
+     "name": "field18_0x256",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 619,
+     "name": "field19_0x257",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 620,
+     "name": "field20_0x258",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 621,
+     "name": "field21_0x259",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 622,
+     "name": "field22_0x25a",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 623,
+     "name": "field23_0x25b",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 624,
+     "name": "_next_prediction",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "Udp",
+   "kind": "struct",
+   "size": 12,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "SOCKET",
+     "type": "code",
+     "pointers": 1,
+     "span": 4,
+     "comment": "function pointer: SOCKET(*SOCKET)(int, int, int)"
+    },
+    {
+     "offset": 4,
+     "name": "_callbacks",
+     "type": "GGPOSessionCallbacks",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 8,
+     "name": "_poll",
+     "type": "Poll",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "UdpMsg",
+   "kind": "struct",
+   "size": 4128,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "field0_0x0",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 4128,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "UdpMsg__connect_status",
+   "kind": "struct",
+   "size": 4,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "disconnected",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": "disconnected: bits 0..0; last_frame: bits 1..31"
+    }
+   ]
+  },
+  {
+   "name": "_struct_1227",
+   "kind": "struct",
+   "size": 4,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "s_b1",
+     "type": "UCHAR",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 1,
+     "name": "s_b2",
+     "type": "UCHAR",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 2,
+     "name": "s_b3",
+     "type": "UCHAR",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 3,
+     "name": "s_b4",
+     "type": "UCHAR",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "_struct_1228",
+   "kind": "struct",
+   "size": 4,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "s_w1",
+     "type": "USHORT",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    },
+    {
+     "offset": 2,
+     "name": "s_w2",
+     "type": "USHORT",
+     "pointers": 0,
+     "span": 2,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "_union_1226",
+   "kind": "union",
+   "size": 4,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "S_un_b",
+     "type": "_struct_1227",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 0,
+     "name": "S_un_w",
+     "type": "_struct_1228",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 0,
+     "name": "S_addr",
+     "type": "ULONG",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "sized_20bdc_plaaceholder",
+   "kind": "struct",
+   "size": 134108,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "field0_0x0",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 134108,
+     "comment": ""
+    }
+   ]
+  },
+  {
+   "name": "static_DAT_of_PTR_on_load_4",
+   "kind": "struct",
+   "size": 724,
+   "header": "src/Game/GhidraDefs.h",
+   "fields": [
+    {
+     "offset": 0,
+     "name": "padding_0x0",
+     "type": "byte",
+     "pointers": 0,
+     "span": 12,
+     "comment": ""
+    },
+    {
+     "offset": 12,
+     "name": "ptr_OBJ_with_seemingly_list_managers_1",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 16,
+     "name": "padding_0x10",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 16,
+     "comment": ""
+    },
+    {
+     "offset": 32,
+     "name": "ptr_OBJ_with_seemingly_list_managers_2",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 36,
+     "name": "padding_0x24",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 8,
+     "comment": ""
+    },
+    {
+     "offset": 44,
+     "name": "size_or_counter_for_inline_managers_1",
+     "type": "uint",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 48,
+     "name": "ptr_BATTLE_CObjectManager_plus_0x4",
+     "type": "BATTLE_CObjectManager",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 52,
+     "name": "ptr_BATTLE_CScreenManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 56,
+     "name": "ptr_GAME_CEff3DInstHndlManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 60,
+     "name": "ptr_AA_CRandomManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 64,
+     "name": "ptr_battle_stat__StatBattleTemp",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 68,
+     "name": "ptr_BATTLE_CBGManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 72,
+     "name": "padding_0x48",
+     "type": "byte",
+     "pointers": 0,
+     "span": 104,
+     "comment": ""
+    },
+    {
+     "offset": 176,
+     "name": "size_or_counter_for_inline_managers_2",
+     "type": "int",
+     "pointers": 0,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 180,
+     "name": "ptr_BATTLE_CObjectManager_static",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 184,
+     "name": "ptr_AA_CParticleManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 188,
+     "name": "ptr_BATTLE_CScreenManager_differen",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 192,
+     "name": "ptr_AA_CCameraManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 196,
+     "name": "ptr_AA_CRandomManager_different_",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 200,
+     "name": "ptr_battle_stat__StatBattleTmp_different_",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 204,
+     "name": "ptr_BATTLE_CBGManager_different_",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 208,
+     "name": "ptr_game_Stat_PCoinManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 212,
+     "name": "ptr_AA_CModelInstanceManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 216,
+     "name": "ptr_CBattleReplayDataManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 220,
+     "name": "ptr_GAME_CEff3DInstHndlManager_different_",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 224,
+     "name": "ptr_GAME_CEventManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 228,
+     "name": "ptr_BG_EffectManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 232,
+     "name": "ptr_GAME_CFadeTaskManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 236,
+     "name": "ptr_GAME_CETCManager",
+     "type": "undefined",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 240,
+     "name": "padding_0xf0",
+     "type": "byte",
+     "pointers": 0,
+     "span": 128,
+     "comment": ""
+    },
+    {
+     "offset": 368,
+     "name": "ptr_snapshot_manager_mine",
+     "type": "SnapshotManager",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 372,
+     "name": "field31_0x174",
+     "type": "void",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 376,
+     "name": "field32_0x178",
+     "type": "void",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 380,
+     "name": "field33_0x17c",
+     "type": "void",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 384,
+     "name": "field34_0x180",
+     "type": "void",
+     "pointers": 1,
+     "span": 4,
+     "comment": ""
+    },
+    {
+     "offset": 388,
+     "name": "field35_0x184",
+     "type": "char",
+     "pointers": 0,
+     "span": 1,
+     "comment": ""
+    },
+    {
+     "offset": 389,
+     "name": "field36_0x185",
+     "type": "undefined",
+     "pointers": 0,
+     "span": 335,
+     "comment": ""
+    }
+   ]
+  }
+ ]
+}

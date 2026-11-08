@@ -131,7 +131,14 @@ public:
 	int32_t typeOfAttack; //0x0488 1=normal, 2=special, 3=DD/EA, 5=AH
 	int32_t attackLevel; //0x048C
 	int32_t moveDamage; //0x0490; raw damage
-	char pad_0494[44]; //0x0494
+	char pad_0494[12]; //0x0494
+	// Fields 0x4A0-0x58D are the ATTACKER's side of the hit check (Hit_InvulGuardCheck 0x573E50,
+	// Hit_PiercesInvul 0x57EA70); docs/Decompilation/Invulnerability.md.
+	uint32_t attack_class_flags; //0x04A0 bit 0x20 is gated by the defender's invuln bit 0x20000 (22036)
+	char pad_04A4[22]; //0x04A4
+	int8_t attack_is_burst; //0x04BA script cmd 11026 (BurstObj, Izanami time stop); only invuln bit 0x200 stops it
+	int8_t attack_pierce_8000; //0x04BB lands unless the defender has invuln bit 0x8000 (22033); meaning unnamed
+	char pad_04BC[4]; //0x04BC
 	int16_t moveSpecialBlockstun; //0x04C0
 	char pad_04C2[6]; //0x04C2
 	int16_t moveGuardCrushTime; //0x04C8
@@ -143,9 +150,20 @@ public:
 	int32_t vectorcheckX_2; //0x04D8
 	int32_t vectorcheckY_2; //0x04DC
 	int32_t ThrowRange; //0x04E4
-	char pad_04E8[28]; //0x04E8
+	int8_t attack_gate_4E8; //0x04E8 hit-class gate vs defender invuln bit 0x80 (22022); also the 0x40000 shortcut
+	int8_t attack_gate_4E9; //0x04E9 hit-class gate vs defender invuln bit 0x100 (22023)
+	int8_t attack_pierce_2000_a; //0x04EA with 0x4EB: both > 0 lands unless the defender has invuln bit 0x2000 (22030)
+	int8_t attack_pierce_2000_b; //0x04EB
+	char pad_04EC[24]; //0x04EC
 	char performedThrowName[32]; //0x0504
-	char pad_0524[320]; //0x0524
+	char pad_0524[100]; //0x0524
+	uint8_t attack_invul_level; //0x0588 the hit is ignored only if the defender's invuln_level >= this
+	int8_t attack_head; //0x0589 attack attributes (script cmd 22019 of the ATTACKER's move data):
+	int8_t attack_body; //0x058A   each one lands through invul unless the defender has the matching
+	int8_t attack_foot; //0x058B   invuln_bitfield bit: head 0x8, body 0x10, foot 0x20,
+	int8_t attack_projectile; //0x058C   projectile 0x80000, throw 0x40
+	int8_t attack_throw; //0x058D
+	char pad_058E[214]; //0x058E
 	int32_t moveAirPushbackX; //0x0664
 	int32_t moveAirPushbackY; //0x0668
 	char pad_066C[20]; //0x066C
@@ -185,7 +203,11 @@ public:
 	*/
 	int32_t guard_point_bitfield; // 0x099C  22020; reset to 0 on state entry
 	/*If the first bit is set it means to use guardpoint instead of invuln */
-	char pad_09A0[48]; //0x09A0
+	uint8_t invuln_level; //0x09A0 script cmd 22021; reset to 0 on state entry. Compared with attack_invul_level
+	char pad_09A1[3]; //0x09A1
+	int32_t invuln_hit_counter; //0x09A4 > 0 = invul for that many hits (each absorbed hit subtracts 1), only while
+	                             // bitflags_for_curr_state_properties_or_smth & 4 is clear
+	char pad_09A8[40]; //0x09A8
 	int32_t previousHP; //0x09D0
 	int32_t currentHP; //0x09D4
 	int32_t maxHP; //0x09D8
@@ -429,6 +451,18 @@ public:
 static_assert(offsetof(CharData, invuln_timer) == 0x994, "CharData::invuln_timer moved");
 static_assert(offsetof(CharData, invuln_bitfield) == 0x998, "CharData::invuln_bitfield moved");
 static_assert(offsetof(CharData, guard_point_bitfield) == 0x99C, "CharData::guard_point_bitfield moved");
+static_assert(offsetof(CharData, invuln_level) == 0x9A0, "CharData::invuln_level moved");
+static_assert(offsetof(CharData, invuln_hit_counter) == 0x9A4, "CharData::invuln_hit_counter moved");
+static_assert(offsetof(CharData, previousHP) == 0x9D0, "CharData::previousHP moved");
+static_assert(offsetof(CharData, attack_class_flags) == 0x4A0, "CharData::attack_class_flags moved");
+static_assert(offsetof(CharData, attack_is_burst) == 0x4BA, "CharData::attack_is_burst moved");
+static_assert(offsetof(CharData, moveSpecialBlockstun) == 0x4C0, "CharData::moveSpecialBlockstun moved");
+static_assert(offsetof(CharData, attack_gate_4E8) == 0x4E8, "CharData::attack_gate_4E8 moved");
+static_assert(offsetof(CharData, performedThrowName) == 0x504, "CharData::performedThrowName moved");
+static_assert(offsetof(CharData, attack_invul_level) == 0x588, "CharData::attack_invul_level moved");
+static_assert(offsetof(CharData, attack_throw) == 0x58D, "CharData::attack_throw moved");
+static_assert(offsetof(CharData, moveAirPushbackX) == 0x664, "CharData::moveAirPushbackX moved");
+static_assert(sizeof(CharData) == 0x24978, "CharData size changed");
 static_assert(offsetof(CharData, buffer_L_66_5f) == 0x1E896, "CharData::buffer_L_66_5f moved");
 static_assert(offsetof(CharData, buffer_R_66_5f) == 0x1E9A0, "CharData::buffer_R_66_5f moved");
 static_assert(offsetof(CharData, facingLeft2) == 0x2260, "CharData::facingLeft2 moved");

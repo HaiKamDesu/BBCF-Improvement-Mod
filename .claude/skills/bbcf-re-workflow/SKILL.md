@@ -234,6 +234,8 @@ repo, and from there in the private decompile archive:
 - functions: a row in the matching `docs/Decompilation/<Subsystem>.md` ledger
   (`| 0x00XXXXXX | IdentifierName | size | L1 | notes |`); start a new subsystem doc if none fits
 - addresses the code uses: an `ADDR_` constant in `src/Game/GhidraDefs.h` with `//` notes above it
+- struct fields: split a `pad_` in the struct header (`src/Game/CharData.h`...) plus a
+  `static_assert(offsetof(...))`; checked signatures: `docs/Decompilation/types/signatures.h`
 - then run `tools/decomp/sync_archive.sh` (bbcf-decompile skill, "Keep the archive current")
 
 A finding that only lives in a `*GhidraReport.txt`, `notes.h` or chat never reaches the archive.

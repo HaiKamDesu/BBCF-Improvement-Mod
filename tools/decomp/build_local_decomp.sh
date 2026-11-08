@@ -58,6 +58,7 @@ mkdir -p "$OUT/ghidra" "$OUT/decomp"
     -import "$EXE" -overwrite \
     -scriptPath "$REPO/docs/Research/ghidra_scripts" \
     -postScript SyncRepoKnowledge.py "$REPO" "$OUT/sync_report.txt" \
+    -postScript ApplyRepoTypes.py "$REPO" "$OUT/types_report.txt" \
     -postScript ExportFullDecompile.py "$OUT/decomp" 90
 
 echo

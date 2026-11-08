@@ -5,6 +5,9 @@
 #
 # 1. SyncRepoKnowledge.py writes every GhidraDefs.h name and every docs/Decompilation ledger row
 #    (name, level, notes) into the archive's Ghidra project (plate comments between [repo] lines).
+#    ApplyRepoTypes.py adds the struct layouts (docs/Decompilation/types/structs.json, regenerated
+#    from the mod's headers by gen_struct_layouts.py when MSVC is available) and the typed
+#    signatures (types/signatures.h, plus conventions written in ledger notes).
 # 2. ExportFullDecompile.py regenerates decomp/ from that project; the decompiler prints each
 #    function's notes as a /* [repo] ... */ comment above it. About 4 minutes.
 # 3. Copies the repo's own write-ups (docs/Decompilation, docs/Research/*.md, the struct headers in
@@ -42,12 +45,19 @@ fi
 
 COMMIT=$(git -C "$REPO" rev-parse --short HEAD)
 DIRTY=""
-if [ -n "$(git -C "$REPO" status --porcelain -- docs/Decompilation src/Game/GhidraDefs.h)" ]; then
+if [ -n "$(git -C "$REPO" status --porcelain -- docs/Decompilation src/Game)" ]; then
     DIRTY=" + uncommitted changes"
-    echo "note: docs/Decompilation or GhidraDefs.h has uncommitted changes; syncing them anyway." >&2
+    echo "note: docs/Decompilation or src/Game has uncommitted changes; syncing them anyway." >&2
 fi
 
-POST=(-postScript SyncRepoKnowledge.py "$REPO" "$ARCHIVE/decomp/sync_report.txt")
+# Struct layouts come from the compiler. Regenerate them when MSVC is reachable (Windows/WSL);
+# elsewhere the committed docs/Decompilation/types/structs.json is used as is.
+if command -v cmd.exe >/dev/null 2>&1 && [ -f "/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars32.bat" ]; then
+    python3 "$REPO/tools/decomp/gen_struct_layouts.py" | head -1
+fi
+
+POST=(-postScript SyncRepoKnowledge.py "$REPO" "$ARCHIVE/decomp/sync_report.txt"
+      -postScript ApplyRepoTypes.py "$REPO" "$ARCHIVE/decomp/types_report.txt")
 if [ $EXPORT -eq 1 ]; then
     POST+=(-postScript ExportFullDecompile.py "$ARCHIVE/decomp" 90)
 fi
@@ -57,22 +67,30 @@ JAVA_TOOL_OPTIONS="-Duser.name=${BBCF_GHIDRA_USER:-Usuario}" MAXMEM=${MAXMEM:-8G
 "$GHIDRA/support/analyzeHeadless" "$ARCHIVE/ghidra" BBCF -process BBCF.exe -noanalysis \
     -scriptPath "$REPO/docs/Research/ghidra_scripts" "${POST[@]}" \
     > "$ARCHIVE/decomp/sync.log" 2>&1 || { tail -30 "$ARCHIVE/decomp/sync.log" >&2; exit 1; }
-grep -E "GhidraDefs.h names|^done:" "$ARCHIVE/decomp/sync.log" | sed 's/^.*> //' || true
+# Headless Ghidra exits 0 even when a post-script throws.
+if grep -q "^Traceback\|ERROR REPORT SCRIPT ERROR" "$ARCHIVE/decomp/sync.log"; then
+    grep -A12 "^Traceback" "$ARCHIVE/decomp/sync.log" | head -30 >&2
+    echo "A Ghidra script failed (full log: $ARCHIVE/decomp/sync.log)." >&2
+    exit 1
+fi
+grep -E "GhidraDefs.h names|^types:|^done:" "$ARCHIVE/decomp/sync.log" | sed 's/^.*> //' || true
 
 # The repo's write-ups, next to the project they describe.
 rm -rf "$ARCHIVE/knowledge"
 mkdir -p "$ARCHIVE/knowledge"
 (cd "$REPO" && git ls-files -co --exclude-standard -- docs/Decompilation 'docs/Research/*.md' \
-    'src/Game/*.h' notes.h tools/bbcf_scr_scan.py tools/decomp_progress.py tools/decomp_callpath.py \
+    'src/Game/*.h' 'src/Game/**/*.h' notes.h tools/bbcf_scr_scan.py tools/decomp_progress.py tools/decomp_callpath.py \
     | while read -r f; do [ -f "$f" ] && mkdir -p "$ARCHIVE/knowledge/$(dirname "$f")" && cp "$f" "$ARCHIVE/knowledge/$f"; done)
 cat > "$ARCHIVE/knowledge/SYNCED.txt" <<EOF
 Synced from BBCF-Improvement-Mod commit $COMMIT$DIRTY on $(date -u +%Y-%m-%dT%H:%MZ).
 
 ghidra/BBCF.gpr  every repo name applied; each function's plate comment holds the repo's notes
-                 between [repo] and [/repo] (from src/Game/GhidraDefs.h and docs/Decompilation)
+                 between [repo] and [/repo] (from src/Game/GhidraDefs.h and docs/Decompilation);
+                 structs and enums in the /BBCF category; typed signatures (types/signatures.h)
 decomp/src/*.c   the same notes, as a /* [repo] ... */ comment above each function
 knowledge/       the write-ups themselves; start at docs/Decompilation/README.md
 decomp/sync_report.txt  what was renamed, labelled or kept on this sync
+decomp/types_report.txt structs, typed signatures, and ledger conventions applied or skipped
 EOF
 echo "knowledge/ refreshed ($COMMIT$DIRTY)"
 
