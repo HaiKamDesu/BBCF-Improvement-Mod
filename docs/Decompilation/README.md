@@ -6,6 +6,8 @@ approach. Take one subsystem, document every function in it, rewrite it in C++ i
 redirect the original functions to the rewrite, verify in-game, move on.
 
 How to work on this: the `bbcf-decompile` skill (`.claude/skills/bbcf-decompile/SKILL.md`).
+Joining in from another machine: [LocalSetup.md](LocalSetup.md) builds the same decompile from your
+own copy of BBCF.exe (`tools/decomp/build_local_decomp.sh`), and explains why we never upload it.
 
 ## Where things are
 
@@ -59,6 +61,7 @@ below is from 2026-10-07:
 | Ranked / LP | `docs/Research/RankedProgress.md` | partial L1 | none |
 | Character palettes (colour selection, live slot block, online records, battle container load/Bind/teardown, round/rematch lifecycle) | [Palettes.md](Palettes.md) | **mapped** (boundary L1, hooked/callable functions L2). Root causes for every field palette report + the mod's own races | **mod side rewritten** 2026-10-19 (dirty-flag redraw, owner-based slots, per-battle gate, mirror-wrap fix); verified online + offline, see Palettes.md |
 | Effect palettes / renderer palette lookup | `tools/build_effect_palette_map.py` | partial L2 | offline map |
+| Invulnerability (the three invul switches, attribute bits, burst rule, invul script commands) | [Invulnerability.md](Invulnerability.md) | **mapped** (check and setters L2, hit processing L0/L1). Explains why 10 characters' backdashes showed no invul | frame history + script frame data read all three switches |
 | Spectator input sync | `docs/Research/SpectatorDesyncInvestigation.md` | one function L2 | none |
 | Training reset | `docs/Research/ResetLabOverride.md` | one function L2 | hook |
 

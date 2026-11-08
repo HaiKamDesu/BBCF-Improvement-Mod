@@ -117,8 +117,15 @@ int first_det_active(std::vector<FrameActivity>& activity_status) {
 }
 
 
-Attribute parse_dyn_invul(uint32 invul_field, uint32 gp_bitfield) {
-    if ((invul_field & 0x02) == 0) {
+// Mirrors the game's own hit check (FUN_00573E50 / FUN_0057EA70); see
+// docs/Decompilation/Invulnerability.md. Invul is ON if any of the three switches is set:
+//   invul_field & 0x02  setInvincible (script cmd 22007), what most moves use
+//   invul_field & 0x04  script cmd 22009, only Nine's Exceed Accel uses it
+//   invul_timer > 0     script cmd 22008 "invul for N frames"; Nu, Rachel, Hazama, Platinum,
+//                       Valkenhayn, Lambda, Celica, Izayoi, Mu and Tager backdash with ONLY this
+// The attribute bits then say which hits are ignored, exactly as before.
+Attribute parse_dyn_invul(uint32 invul_field, uint32 gp_bitfield, int32_t invul_timer) {
+    if ((invul_field & 0x06) == 0 && invul_timer <= 0) {
         return Attribute::N;
     }
 
@@ -130,6 +137,8 @@ Attribute parse_dyn_invul(uint32 invul_field, uint32 gp_bitfield) {
     if (invul_field & 0x20)     invul = invul | Attribute::F;
     if (invul_field & 0x80000)  invul = invul | Attribute::P;
     if (invul_field & 0x40)     invul = invul | Attribute::T;
+    // Off by default; without it a burst hits straight through any invul.
+    if (invul_field & 0x200)    invul = invul | Attribute::O;
 
 
 
@@ -140,7 +149,7 @@ PlayerFrameState::PlayerFrameState(scrState* state, unsigned int frame,
     CharData* player, BackedUpCharData old_data) {
 
     // set state variables
-    invul = parse_dyn_invul(player->invuln_bitfield, player->guard_point_bitfield);
+    invul = parse_dyn_invul(player->invuln_bitfield, player->guard_point_bitfield, player->invuln_timer);
     is_new = frame == 0;
     
     
@@ -291,6 +300,7 @@ std::string attributeToString(Attribute attr) {
     if (bool(attr & Attribute::F))  append("Foot");
     if (bool(attr & Attribute::T))  append("Throw");
     if (bool(attr & Attribute::P))  append("Projectile");
+    if (bool(attr & Attribute::O))  append("Burst");
     return res;
 }
 

@@ -16,6 +16,10 @@ Win32 proxy `dinput8.dll` for BBCF. Startup in `src/Core/dllmain.cpp` loads real
   `./tools/urt_automation/run_bbcf_debug_cycle.sh`
 - Read-only escalated helper for dump/cdb-style commands:
   `tools/safe_readonly_exec.ps1` with schema in `tools/SAFE_READONLY_EXECUTOR.md`.
+- Character move scripts (what a state does, frame by frame, e.g. invul commands):
+  `python3 tools/bbcf_scr_scan.py "<install>" --chars ny --states CmnActBDash --all-ops`
+  (walks `data/Char/char_XX_scr.pac` with the game's own command-size table; opcode meanings for
+  invul in `docs/Decompilation/Invulnerability.md`).
 
 Never use Deploy configs by default: `DebugDeploy|Win32`, `ReleaseDeploy|Win32`.
 No unit test suite is present; normal validation is build plus operator in-game testing.

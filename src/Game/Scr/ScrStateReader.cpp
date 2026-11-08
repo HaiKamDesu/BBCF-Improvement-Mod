@@ -264,6 +264,12 @@ int parse_state(char* addr,
 	//CMD = *(addr + offset);
 	offset += 4;
 	FrameInvuln invuln = FrameInvuln::None; //flag to turn on/off invuln windows
+	// Invul timer (cmd 22008): "invulnerable for the next N frames", with whatever attributes are set at
+	// the time. It is a separate switch from setInvincible (22007), so it is collected here and laid over
+	// the per-frame vector once the whole state has been walked. See docs/Decompilation/Invulnerability.md.
+	struct InvulTimerSet { unsigned int start; unsigned int frames; FrameInvuln attrs; };
+	std::vector<InvulTimerSet> invulTimers;
+	FrameInvuln invulAttrs = FrameInvuln::All; // the state-entry default (0x998 = 0xBBDF9) has every attribute set
 	//int iter = 0;
 	//PS: I may have been calling uint32 char for some reason here, not sure why tbh, gotta double check before changing the comments
 	while (CMD != 0x1) {
@@ -352,11 +358,19 @@ int parse_state(char* addr,
 			uint16_t thro = *(uint32_t*)(addr + offset) * (uint16_t)FrameInvuln::Throw; //thro is throw, throw is a reserved word
 			offset += 4;
 			invuln = (FrameInvuln)(head | body | leg  | thro);// note the missing projectile assumed "approach" since its not implemented yet
+			invulAttrs = invuln;
 			RecordRetroSpan(prev_frames, s->frame_invuln_status.size());
 			for (size_t i = prev_frames; i < s->frame_invuln_status.size(); i++) {//when invuln is turned on/off I need to retroactively remove the last sprite length added, since it applies its effect to the start, not end of the sprite
 				s->frame_invuln_status[i] = invuln;
 			}
 
+		}
+		else if (CMD == 22008) {
+			// invul timer call(int); like the other commands it takes effect at the start of the last sprite.
+			uint32_t frames;
+			memcpy(&frames, addr + offset, 4);
+			invulTimers.push_back({ prev_frames, frames, invulAttrs });
+			offset += 4;
 		}
 		else if (CMD == 2002 || CMD == 23027) {
 			//refreshMultihit(more like disableHitbox)  call() 2002
@@ -584,6 +598,18 @@ int parse_state(char* addr,
 		//CMD = *(unsigned long*)(addr + offset);
 		offset += 4;
 
+	}
+
+	// Lay the invul timers over the frames. A later 22008 replaces whatever is left of an earlier one
+	// (Hakumen's j.5D sets 10, then 0 to end it early), so each one runs until the next one starts.
+	for (size_t t = 0; t < invulTimers.size(); t++) {
+		size_t end = (size_t)invulTimers[t].start + invulTimers[t].frames;
+		if (t + 1 < invulTimers.size() && invulTimers[t + 1].start < end)
+			end = invulTimers[t + 1].start;
+		if (end > s->frame_invuln_status.size())
+			end = s->frame_invuln_status.size();
+		for (size_t i = invulTimers[t].start; i < end; i++)
+			s->frame_invuln_status[i] = (FrameInvuln)((uint16_t)s->frame_invuln_status[i] | (uint16_t)invulTimers[t].attrs);
 	}
 
 	g_scrStats.statesParsed++;

@@ -158,20 +158,32 @@ public:
 	int32_t moveP2Overwrite; //0x06A8
 	char pad_06AC[40]; //0x06AC
 	int32_t moveCounterHitAirPushbackY; //0x06D4
-	char pad_06D8[704]; //0x06D8
+	char pad_06D8[700]; //0x06D8
 
+	// Invulnerability. Full write-up: docs/Decompilation/Invulnerability.md.
+	// Invul is ON if any one of these is true (hit check FUN_00573E50):
+	//   invuln_timer > 0, invuln_bitfield & 0x02, invuln_bitfield & 0x04
+	// and then the attribute bits below decide which hits it ignores (FUN_0057EA70).
+	// The state-entry routine (FUN_005975C0) resets invuln_timer to 0 and invuln_bitfield to
+	// 0xBBDF9 every time a new state starts.
+	int32_t invuln_timer; //0x0994 script cmd 22008 sets it to N, the game subtracts 1 every frame.
+	                      // Ten characters' backdashes (Nu, Rachel, Hazama, Platinum, Valkenhayn,
+	                      // Lambda, Celica, Izayoi, Mu, Tager) use only this, never bit 0x02.
 	int32_t invuln_bitfield; // 0x0998
-	/*  Invuln flags for each attribute, pseudocode listing them:
-    if (invul_field & 0x08)        invul = invul | Attribute::H;
-    if (invul_field & 0x10)        invul = invul | Attribute::B;
-    if (invul_field & 0x20)        invul = invul | Attribute::F;
-    if (invul_field & 0x80000)     invul = invul | Attribute::P;
-    if (invul_field & 0x40)        invul = invul | Attribute::T;
-	if (invul_field & 0x200)       invul = invul | Attribute::O; BURST
-
-	
+	/*  Script commands that set each bit (interpreter FUN_00582BB0):
+	0x02    22007 setInvincible        invul ON (most moves)
+	0x04    22009                      invul ON (only Nine's EA DriveDef_BGN uses it)
+	0x08    22019 arg1  head           attribute bits: a hit with that attribute is ignored
+	0x10    22019 arg2  body             while invul is ON; default after state entry = all set
+	0x20    22019 arg3  foot
+	0x80000 22019 arg4  projectile
+	0x40    22019 arg5  throw
+	0x200   22026       burst          NOT set by default: a burst beats invul unless this is set
+	0x01 22006, 0x80 22022, 0x100 22023, 0x400 22027, 0x800 22028, 0x1000 22029, 0x2000 22030,
+	0x4000 22032, 0x8000 22033, 0x10000 22034, 0x20000 22036, 0x40000 22037: other hit classes,
+	mostly unnamed, see docs/Decompilation/Invulnerability.md.
 	*/
-	int32_t guard_point_bitfield; // 0x099C  
+	int32_t guard_point_bitfield; // 0x099C  22020; reset to 0 on state entry
 	/*If the first bit is set it means to use guardpoint instead of invuln */
 	char pad_09A0[48]; //0x09A0
 	int32_t previousHP; //0x09D0
@@ -254,7 +266,10 @@ public:
 
 	/*input buffers*/
 	char L_input_buffer_flag_base; //0x1e79c
-	/*input buffer for Left side, size=0x10A this will skip all the non motion inputs for now*/
+	/*input buffer as seen FACING RIGHT ("L" = on the left side of the screen), size=0x10A. The game builds
+	  both this and the facing-left copy at 0x1E8A6 from zero every frame (FUN_005CA700) and reads the one
+	  that matches facingLeft2 (0x2260). Each byte is 0 or 1 for the current frame only.
+	  this will skip all the non motion inputs for now*/
 	char pad_1E79D[0xAB];//0x1e79d the "non-special" inputs should be here
 	/*motion buffers Left side, the offsets listed are the offsets from input_buffer_flag_base*/
 	int8_t buffer_L_236;//0x1e848, +ac
@@ -307,7 +322,8 @@ public:
 	int8_t buffer_L_1632143; //0x1E893, +F7
 	char padding_1E895; //0x1E894
 	int8_t buffer_L_632146; //0x1E895, +F9
-	char padding_1E897[3]; //0x1E896
+	int8_t buffer_L_66_5f; //0x1E896, +FA forward double-tap (6/9 then a fresh 6) in the last 5 frames. Input only, NOT invul.
+	char padding_1E897[2]; //0x1E897
 	int8_t buffer_L_takemikazuchi_shit; //0x1E899, +FD some specific stuff for the game's onslaught
 	int8_t buffer_L_4H6; //0x1E89A, +FE
 	int8_t buffer_L_2H8; //0x1E89B, +FF
@@ -321,7 +337,8 @@ public:
 
 	
 	char R_input_buffer_flag_base; //0x1E8A6
-	/*input buffer for Right side, size=0x10A this will skip all the non motion inputs for now*/
+	/*input buffer as seen FACING LEFT, size=0x10A, same layout as the facing-right copy above.
+	  this will skip all the non motion inputs for now*/
 	char pad_1E8A7[0xAB];//0x1E8A7 the "non-special" inputs should be here, they should be duplicated maybe?
 
 	/*motion buffers Right side, the offsets listed are the offsets from input_buffer_flag_base*/
@@ -375,7 +392,8 @@ public:
 	int8_t buffer_R_1632143; //0x1E99D, +F7 +10A
 	char padding_1E99E; //0x1E99E
 	int8_t buffer_R_632146; //0x1E99F, +F9 +10A
-	char padding_1E9A0[3]; //0x1E9A0
+	int8_t buffer_R_66_5f; //0x1E9A0, +FA +10A forward double-tap in the last 5 frames (facing-left view, so raw 44 here). Input only, NOT invul.
+	char padding_1E9A1[2]; //0x1E9A1
 	int8_t buffer_R_takemikazuchi_shit; //0x1E9A3, +FD +10A some specific stuff for the game's onslaught
 	int8_t buffer_R_4H6; //0x1E9A4, +FE +10A
 	int8_t buffer_R_2H8; //0x1E9A5, +FF +10A
@@ -406,3 +424,11 @@ public:
 	char pad_214c4[0x34b4]; //0x214c4
 }; //Size: 0x24978 
 // old: Size: 0x214C4 !actual size seems to be 0x24978
+
+#include <cstddef>
+static_assert(offsetof(CharData, invuln_timer) == 0x994, "CharData::invuln_timer moved");
+static_assert(offsetof(CharData, invuln_bitfield) == 0x998, "CharData::invuln_bitfield moved");
+static_assert(offsetof(CharData, guard_point_bitfield) == 0x99C, "CharData::guard_point_bitfield moved");
+static_assert(offsetof(CharData, buffer_L_66_5f) == 0x1E896, "CharData::buffer_L_66_5f moved");
+static_assert(offsetof(CharData, buffer_R_66_5f) == 0x1E9A0, "CharData::buffer_R_66_5f moved");
+static_assert(offsetof(CharData, facingLeft2) == 0x2260, "CharData::facingLeft2 moved");
